@@ -3,6 +3,9 @@
 //! Copyright (C) 2004-2025 Greg Landrum and other RDKit contributors.
 //! Licensed under the BSD 3-Clause license (see LICENSES/RDKit-BSD-3-Clause.txt).
 
+use std::sync::Arc;
+
+use crate::external::ring_decomposer_lib as rdl;
 use crate::{RDKitError, Result};
 
 /// `FIND_RING_TYPE`
@@ -16,7 +19,7 @@ pub enum FindRingType {
 }
 
 /// Ring membership information (`RDKit::RingInfo`).
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default)]
 pub struct RingInfo {
     initialized: bool,
     find_type: FindRingType,
@@ -28,6 +31,8 @@ pub struct RingInfo {
     bond_ring_families: Vec<Vec<i32>>,
     fused_rings: Vec<Vec<bool>>,
     num_fused_bonds: Vec<u32>,
+    /// RingDecomposerLib result (`dp_urfData`), shared between copies
+    urf_data: Option<Arc<rdl::Data>>,
 }
 
 fn not_init() -> RDKitError {
@@ -82,6 +87,40 @@ impl RingInfo {
     pub fn reset_ring_families(&mut self) {
         self.atom_ring_families.clear();
         self.bond_ring_families.clear();
+        self.urf_data = None;
+    }
+
+    pub fn set_urf_data(&mut self, data: Option<Arc<rdl::Data>>) {
+        self.urf_data = data;
+    }
+
+    pub fn urf_data(&self) -> Option<Arc<rdl::Data>> {
+        self.urf_data.clone()
+    }
+
+    /// `areRingFamiliesInitialized`
+    pub fn are_ring_families_initialized(&self) -> bool {
+        self.urf_data.is_some()
+    }
+
+    /// `numRelevantCycles`
+    pub fn num_relevant_cycles(&self) -> Result<u32> {
+        self.check()?;
+        let d = self
+            .urf_data
+            .as_ref()
+            .ok_or_else(|| RDKitError::precondition("Ring families not initialized"))?;
+        Ok(d.num_relevant_cycles() as u32)
+    }
+
+    /// `atomRelevantCycles`
+    pub fn atom_relevant_cycles(&self) -> Result<Vec<Vec<i32>>> {
+        self.check()?;
+        let d = self
+            .urf_data
+            .as_ref()
+            .ok_or_else(|| RDKitError::precondition("Ring families not initialized"))?;
+        Ok(crate::graphmol::find_rings::atom_relevant_cycles(d))
     }
 
     pub fn preallocate(&mut self, num_atoms: usize, num_bonds: usize) {

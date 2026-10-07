@@ -4,11 +4,14 @@
     python tools/differential/compare.py MODE [--limit N] [FILES...]
 
 Runs tools/differential/dump.py under the reference interpreter
-(.venv-ref, official `rdkit`) and the rdoxide interpreter (.venv) and
+(official `rdkit` of the ported version, e.g. a conda-forge env:
+`micromamba create -p REF -c conda-forge python=3.13 rdkit=2026.09.1`,
+selected with --ref-python or RDOXIDE_REF_PYTHON) and the rdoxide interpreter (.venv) and
 reports molecules whose dumps differ. Default corpus: SMILES files from the
 upstream checkout. Exit code 1 if anything differs.
 """
 import argparse
+import os
 import json
 import subprocess
 import sys
@@ -29,10 +32,11 @@ def run(python, mode, path):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("mode", choices=["parse", "sanitize", "smiles"])
+    ap.add_argument("mode", choices=["parse", "rings", "sanitize", "ranks", "molfromsmiles", "smiles"])
     ap.add_argument("files", nargs="*")
     ap.add_argument("--limit", type=int, default=20, help="number of differences to print")
-    ap.add_argument("--ref-python", default=str(ROOT / ".venv-ref/bin/python"))
+    ap.add_argument("--ref-python", default=os.environ.get("RDOXIDE_REF_PYTHON", str(ROOT / ".venv-ref/bin/python")),
+                    help="interpreter with the official RDKit of the ported version (env RDOXIDE_REF_PYTHON)")
     ap.add_argument("--test-python", default=str(ROOT / ".venv/bin/python"))
     args = ap.parse_args()
     files = [Path(f) for f in (args.files or [ROOT / f for f in DEFAULT_CORPUS])]

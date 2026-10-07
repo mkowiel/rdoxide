@@ -34,3 +34,5 @@ __pycache__/
 .pytest_cache/
 /dist/
 .venv-ref/
+.venv-ref2609/
+.mamba/

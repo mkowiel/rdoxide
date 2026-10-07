@@ -10,6 +10,7 @@
 //! contributors, used under the BSD 3-Clause license (see `LICENSES/`).
 
 pub mod error;
+pub mod external;
 pub mod geometry;
 pub mod graphmol;
 pub mod rdgeneral;

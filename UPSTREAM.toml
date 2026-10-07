@@ -4,3 +4,11 @@ repository = "https://github.com/rdkit/rdkit.git"
 version = "2026.09.1"
 tag = "Release_2026_09_1"
 commit = "fece8caa860bdf6c9c82bdb9253f22a0cf87150c"
+
+# Third-party sources RDKit downloads at build time (see the External/
+# CMakeLists in the upstream checkout). Fetched by `sync_upstream.py fetch`
+# into upstream/external/<name>.
+[external.RingDecomposerLib]
+url = "https://github.com/rareylab/RingDecomposerLib/archive/v1.1.3_rdkit.tar.gz"
+md5 = "e9a0bcdda8b921a35e812b9888a9a874"
+license = "BSD-3-Clause"

@@ -1,4 +1,4 @@
-//! Ported from RDKit `Code/Geometry/point.h` (Point3D / Point2D).
+//! Ported from RDKit `Code/Geometry/point.{h,cpp}` (Point3D / Point2D).
 //!
 //! Copyright (C) 2003-2024 Greg Landrum and other RDKit contributors.
 //! Licensed under the BSD 3-Clause license (see LICENSES/RDKit-BSD-3-Clause.txt).
@@ -192,6 +192,35 @@ impl Point2D {
     pub fn dot_product(&self, o: &Point2D) -> f64 {
         self.x * o.x + self.y * o.y
     }
+}
+
+/// `RDGeom::computeDihedralAngle` (point.cpp): unsigned dihedral, in [0, PI].
+pub fn compute_dihedral_angle(pt1: &Point3D, pt2: &Point3D, pt3: &Point3D, pt4: &Point3D) -> f64 {
+    let beg_end = *pt3 - *pt2;
+    let beg_nbr = *pt1 - *pt2;
+    let crs1 = beg_nbr.cross_product(&beg_end);
+    let end_nbr = *pt4 - *pt3;
+    let crs2 = end_nbr.cross_product(&beg_end);
+    crs1.angle_to(&crs2)
+}
+
+/// `RDGeom::computeSignedDihedralAngle` (point.cpp): in [-PI, PI].
+pub fn compute_signed_dihedral_angle(
+    pt1: &Point3D,
+    pt2: &Point3D,
+    pt3: &Point3D,
+    pt4: &Point3D,
+) -> f64 {
+    let beg_end = *pt3 - *pt2;
+    let beg_nbr = *pt1 - *pt2;
+    let crs1 = beg_nbr.cross_product(&beg_end);
+    let end_nbr = *pt4 - *pt3;
+    let crs2 = end_nbr.cross_product(&beg_end);
+    let mut ang = crs1.angle_to(&crs2);
+    if crs1.cross_product(&crs2).dot_product(&beg_end) < 0.0 {
+        ang *= -1.0;
+    }
+    ang
 }
 
 #[cfg(test)]

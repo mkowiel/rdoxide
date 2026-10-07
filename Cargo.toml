@@ -20,6 +20,14 @@ missing_debug_implementations = "warn"
 
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }
+# Ported algorithms keep upstream's index-based loops and signatures so they
+# can be diffed against new RDKit releases line by line.
+needless_range_loop = "allow"
+too_many_arguments = "allow"
+collapsible_if = "allow"
+collapsible_else_if = "allow"
+if_same_then_else = "allow"
+map_entry = "allow"
 
 [profile.release]
 lto = "fat"

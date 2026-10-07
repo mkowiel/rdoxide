@@ -36,6 +36,38 @@ def load_upstream_cfg() -> dict:
         return tomllib.load(fh)["rdkit"]
 
 
+def load_externals() -> dict:
+    with open(ROOT / "UPSTREAM.toml", "rb") as fh:
+        return tomllib.load(fh).get("external", {})
+
+
+def fetch_externals() -> None:
+    """Download pinned third-party sources and verify their MD5."""
+    import hashlib
+    import tarfile
+    import urllib.request
+
+    base = ROOT / "upstream" / "external"
+    base.mkdir(parents=True, exist_ok=True)
+    for name, spec in load_externals().items():
+        dest = base / name
+        if dest.exists():
+            print(f"external {name}: present")
+            continue
+        archive = base / f"{name}.tar.gz"
+        urllib.request.urlretrieve(spec["url"], archive)
+        digest = hashlib.md5(archive.read_bytes()).hexdigest()
+        if digest != spec["md5"]:
+            archive.unlink()
+            sys.exit(f"external {name}: md5 mismatch ({digest} != {spec['md5']})")
+        with tarfile.open(archive) as tf:
+            top = tf.getnames()[0].split("/")[0]
+            tf.extractall(base, filter="data")
+        (base / top).rename(dest)
+        archive.unlink()
+        print(f"external {name}: fetched")
+
+
 def git(*args: str, cwd: Path = UPSTREAM_DIR) -> str:
     return subprocess.run(
         ["git", *args], cwd=cwd, check=True, capture_output=True, text=True
@@ -59,6 +91,7 @@ def cmd_fetch(_args) -> None:
     if head != cfg["commit"]:
         sys.exit(f"upstream HEAD {head} does not match UPSTREAM.toml commit {cfg['commit']}")
     print(f"upstream/rdkit at {cfg['tag']} ({head})")
+    fetch_externals()
 
 
 # --------------------------------------------------------------------------- regen
