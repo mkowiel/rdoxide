@@ -1,0 +1,13 @@
+# Upstream RDKit Python test files run by tools/run_upstream_tests.py
+# (glob patterns relative to upstream/rdkit).
+rdkit/UnitTestLogging.py
+Code/GraphMol/Wrap/rough_test.py
+Code/GraphMol/Wrap/test*.py
+Code/GraphMol/**/Wrap/*test*.py
+Code/GraphMol/**/Wrap/*Test*.py
+Code/DataStructs/Wrap/*test*.py
+Code/DataStructs/Wrap/*Test*.py
+Code/Geometry/Wrap/*test*.py
+rdkit/Chem/UnitTest*.py
+rdkit/Chem/**/UnitTest*.py
+rdkit/DataStructs/UnitTest*.py

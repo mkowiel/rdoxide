@@ -1,0 +1,33 @@
+# Map of rdoxide modules to the upstream RDKit files they were ported from.
+# The value is the git blob hash of the upstream file at the time it was
+# ported. `tools/sync_upstream.py diff` lists files whose upstream content
+# changed; after porting the changes run `tools/sync_upstream.py stamp MODULE`.
+
+[module."rdoxide::rdgeneral::dict".sources]
+"Code/RDGeneral/Dict.h" = "021addc5ee60c74d4e87eaeaab3a36e30de32809"
+"Code/RDGeneral/RDProps.h" = "d7efff136c7faa9691050de943f495f693645de6"
+"Code/RDGeneral/RDValue.h" = "1bdbe00a2cab00c1ee863112769fcabab83c4d03"
+"Code/RDGeneral/RDValue-taggedunion.h" = "fd6d99c9492287a07e8a622029feae0813db1f68"
+
+[module."rdoxide::rdgeneral::log".sources]
+"Code/RDGeneral/RDLog.h" = "b69864d30ad248ba49cfb7404547ac4c306b559b"
+"Code/RDGeneral/RDLog.cpp" = "2abb2da8e69baca79f80989e0a3124b6d441672a"
+
+[module."rdoxide::rdgeneral::random".sources]
+"Code/RDGeneral/utils.h" = "99ea0f7e833c4cc53a084f6057c23b60666c3ea5"
+"Code/RDGeneral/utils.cpp" = "7549ad58bb62d188b3a50274ff3ebe9d31a33f98"
+
+[module."rdoxide::graphmol::periodic_table".sources]
+"Code/GraphMol/PeriodicTable.h" = "b5bbb899c988426033e5197113f256bcef32ae62"
+"Code/GraphMol/PeriodicTable.cpp" = "d316963531ddc47ee5547db6b88af6a015a872b3"
+"Code/GraphMol/atomic_data.h" = "84e63f226e1a7774f2f109e037023ece43944a5b"
+"Code/GraphMol/atomic_data.cpp" = "fbd8341e740e01b18bc7e2d72f71d0bcb4b46cba"
+
+[module."rdoxide_python::rdbase".sources]
+"Code/RDBoost/Wrap/RDBase.cpp" = "c85eb3fda7cf93fc400d8107fa126a0f77052d89"
+
+[module."rdoxide_python::rdchem".sources]
+"Code/GraphMol/Wrap/Table.cpp" = "8f66014772cd97894de74b11f57efbb5dee18d4e"
+
+[module."python::rdkit.Chem.__init__".sources]
+"rdkit/Chem/__init__.py" = "fa0e7f12b763cd4312eea7d1a9d879c07cac32db"

@@ -1,0 +1,36 @@
+# Upstream RDKit Python tests known to pass on rdoxide (ratchet).
+# Maintained by tools/run_upstream_tests.py --update
+Code/GraphMol/Wrap/test_cdxml.py::TestCase::test_cdxml
+Code/GraphMol/Wrap/test_lazy_numpy.py::TestLazyNumpy::test_chem_import_does_not_load_numpy
+rdkit/UnitTestLogging.py::TestCaptureErrorLog::testBasicCapture
+rdkit/UnitTestLogging.py::TestCaptureErrorLog::testEmptyWhenNothingLogged
+rdkit/UnitTestLogging.py::TestCaptureErrorLog::testLoggingRestoredAfterContextExit
+rdkit/UnitTestLogging.py::TestCaptureErrorLog::testMessagesAccessibleAfterContextExit
+rdkit/UnitTestLogging.py::TestCaptureErrorLog::testMessagesReadableInsideContext
+rdkit/UnitTestLogging.py::TestCaptureErrorLog::testNestedCaptures
+rdkit/UnitTestLogging.py::TestCaptureErrorLog::testOnlyCapturesErrorLog
+rdkit/UnitTestLogging.py::TestLogToCppStreams::testAsynchronous1
+rdkit/UnitTestLogging.py::TestLogToCppStreams::testAsynchronous2
+rdkit/UnitTestLogging.py::TestLogToCppStreams::testDebug
+rdkit/UnitTestLogging.py::TestLogToCppStreams::testError
+rdkit/UnitTestLogging.py::TestLogToCppStreams::testInfo
+rdkit/UnitTestLogging.py::TestLogToCppStreams::testSynchronous
+rdkit/UnitTestLogging.py::TestLogToCppStreams::testWarning
+rdkit/UnitTestLogging.py::TestLogToPythonLogger::testAsynchronous1
+rdkit/UnitTestLogging.py::TestLogToPythonLogger::testAsynchronous2
+rdkit/UnitTestLogging.py::TestLogToPythonLogger::testDebug
+rdkit/UnitTestLogging.py::TestLogToPythonLogger::testError
+rdkit/UnitTestLogging.py::TestLogToPythonLogger::testInfo
+rdkit/UnitTestLogging.py::TestLogToPythonLogger::testSynchronous
+rdkit/UnitTestLogging.py::TestLogToPythonLogger::testWarning
+rdkit/UnitTestLogging.py::TestLogToPythonStderr::testAsynchronous1
+rdkit/UnitTestLogging.py::TestLogToPythonStderr::testAsynchronous2
+rdkit/UnitTestLogging.py::TestLogToPythonStderr::testDebug
+rdkit/UnitTestLogging.py::TestLogToPythonStderr::testError
+rdkit/UnitTestLogging.py::TestLogToPythonStderr::testInfo
+rdkit/UnitTestLogging.py::TestLogToPythonStderr::testSynchronous
+rdkit/UnitTestLogging.py::TestLogToPythonStderr::testWarning
+rdkit/UnitTestLogging.py::TestWrapLogs::testDebug
+rdkit/UnitTestLogging.py::TestWrapLogs::testError
+rdkit/UnitTestLogging.py::TestWrapLogs::testInfo
+rdkit/UnitTestLogging.py::TestWrapLogs::testWarning

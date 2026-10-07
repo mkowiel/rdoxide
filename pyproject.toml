@@ -1,0 +1,43 @@
+[build-system]
+requires = ["maturin>=1.9,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "rdoxide"
+description = "RDKit, rusted: a pure-Rust drop-in replacement for the RDKit Python API"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT AND BSD-3-Clause"
+license-files = ["LICENSE", "LICENSES/*", "NOTICE"]
+authors = [{ name = "Marcin Kowiel" }]
+keywords = ["chemistry", "cheminformatics", "rdkit", "rust"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
+    "Topic :: Scientific/Engineering :: Chemistry",
+]
+dependencies = ["numpy"]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[tool.maturin]
+python-source = "python"
+module-name = "rdkit._rdoxide"
+manifest-path = "crates/rdoxide-python/Cargo.toml"
+features = ["pyo3/extension-module"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests/python"]
+
+[tool.ruff]
+line-length = 100
+extend-exclude = ["python/rdkit/upstream_*", "upstream"]

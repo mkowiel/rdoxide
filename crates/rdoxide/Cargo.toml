@@ -1,0 +1,16 @@
+[package]
+name = "rdoxide"
+description = "Pure-Rust port of the RDKit cheminformatics toolkit"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+include = ["src/**", "data/**"]
+
+[dependencies]
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+
+[lints]
+workspace = true

@@ -1,0 +1,39 @@
+rdoxide — RDKit, rusted
+Copyright (c) 2026 Marcin Kowiel and rdoxide contributors
+
+rdoxide is a Rust translation of the RDKit cheminformatics toolkit
+(https://github.com/rdkit/rdkit), version 2026.09.1. Substantial portions of
+this software are derived from RDKit source code, data files, Python modules
+and tests, which are:
+
+  Copyright (c) 2006-2026 Greg Landrum, Rational Discovery LLC,
+  Novartis Institutes for BioMedical Research Inc. and other RDKit contributors
+
+and are distributed under the BSD 3-Clause License reproduced in
+LICENSES/RDKit-BSD-3-Clause.txt. Parts of RDKit's ChemReactions code are
+covered by the Novartis BSD license in
+LICENSES/RDKit-ChemReactions-Novartis-BSD-3-Clause.txt.
+
+Licensing summary
+-----------------
+* Original rdoxide code (build tooling, Rust/PyO3 glue written from scratch)
+  is MIT licensed (see LICENSE).
+* Files translated from, or copied verbatim from, RDKit remain subject to
+  the RDKit BSD 3-Clause license; each such file names its upstream source in
+  its header. The pure-Python modules under python/rdkit/ that are copied
+  verbatim keep their original RDKit copyright headers.
+* Data tables under crates/rdoxide/data/ are extracted from RDKit
+  (Code/GraphMol/atomic_data.cpp) and remain under the RDKit BSD license.
+
+The combined work is therefore distributed under "MIT AND BSD-3-Clause".
+Redistributions (source or binary) must retain this NOTICE file and the
+license texts in LICENSE and LICENSES/.
+
+Third-party components that are ported in later stages (e.g. InChI, Avalon,
+CoordGen, RingDecomposerLib) have their own licenses; when such a component is
+ported, its license is added to LICENSES/ and listed below.
+
+Third-party license index
+-------------------------
+LICENSES/RDKit-BSD-3-Clause.txt                          RDKit core
+LICENSES/RDKit-ChemReactions-Novartis-BSD-3-Clause.txt   RDKit ChemReactions

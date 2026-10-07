@@ -1,0 +1,6 @@
+# The RDKit release rdoxide is ported from. tools/sync_upstream.py reads this.
+[rdkit]
+repository = "https://github.com/rdkit/rdkit.git"
+version = "2026.09.1"
+tag = "Release_2026_09_1"
+commit = "fece8caa860bdf6c9c82bdb9253f22a0cf87150c"

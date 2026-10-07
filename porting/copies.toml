@@ -1,0 +1,16 @@
+# Files copied verbatim from upstream RDKit by `tools/sync_upstream.py regen`.
+# Paths: `from` is relative to upstream/rdkit, `to` relative to the repo root.
+# Only list files that work unmodified on top of the currently ported native
+# modules; everything else is tracked in porting/manifest.toml.
+
+[[copy]]
+from = "rdkit/__init__.py"
+to = "python/rdkit/__init__.py"
+
+[[copy]]
+from = "rdkit/RDLogger.py"
+to = "python/rdkit/RDLogger.py"
+
+[[copy]]
+from = "rdkit/RDRandom.py"
+to = "python/rdkit/RDRandom.py"

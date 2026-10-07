@@ -1,0 +1,21 @@
+[package]
+name = "rdoxide-python"
+description = "Python bindings for rdoxide, API-compatible with RDKit"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[lib]
+name = "_rdoxide"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+rdoxide.workspace = true
+pyo3.workspace = true
+
+[lints]
+workspace = true
