@@ -57,12 +57,27 @@ impl RDKitError {
             message: message.into(),
         }
     }
+    /// `URANGE_CHECK(x, hi)` failure; logged to the error log like upstream.
+    pub fn range(name: &str, x: impl fmt::Display, hi: impl fmt::Display) -> Self {
+        let err = RDKitError::Invariant {
+            kind: "Range Error",
+            message: format!("{name}\n\tFailed Expression: {x} < {hi}"),
+        };
+        crate::rd_log_error!("\n\n****\n{err}****\n");
+        err
+    }
 }
 
 impl fmt::Display for RDKitError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            RDKitError::Invariant { kind, message } => write!(f, "{kind}\n{message}"),
+            RDKitError::Invariant { kind, message } => {
+                write!(
+                    f,
+                    "{kind}\n\t{message}\n\tRDKIT: {}\n",
+                    crate::rdgeneral::RDKIT_VERSION
+                )
+            }
             RDKitError::Value(m) | RDKitError::Key(m) | RDKitError::Index(m) => f.write_str(m),
             RDKitError::Sanitize(e) => match e {
                 SanitizeError::Generic { message }

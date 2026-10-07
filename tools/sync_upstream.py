@@ -113,6 +113,44 @@ def regen_atomic_data() -> None:
           f"data/element_names.txt: {len(names)} names")
 
 
+def regen_common_properties() -> None:
+    """Generate rdgeneral/common_properties.rs from Code/RDGeneral/types.h."""
+    src = (UPSTREAM_DIR / "Code/RDGeneral/types.h").read_text()
+    block = src[src.index("namespace common_properties {"):]
+    block = block[: block.index("}  // namespace common_properties")]
+    out = [
+        "//! Property names shared across RDKit (`RDKit::common_properties`).",
+        "//!",
+        "//! GENERATED from RDKit `Code/RDGeneral/types.h` by tools/sync_upstream.py regen.",
+        "//! DO NOT EDIT. Copyright (C) RDKit contributors, BSD-3-Clause.",
+        "#![allow(non_upper_case_globals)]",
+        "",
+    ]
+    # declarations may wrap onto a second line
+    block = re.sub(r"//[^\n]*", "", block)
+    tokens = re.findall(
+        r'inline constexpr std::string_view (\w+)\s*=\s*("(?:[^"\\]|\\.)*");'
+        r"|namespace (\w+) \{|(\})",
+        block,
+    )
+    n, depth = 0, 0
+    for name, value, ns, close in tokens:
+        if name:
+            out.append(f"{'    ' * depth}pub const {name}: &str = {value};")
+            n += 1
+        elif ns == "common_properties":
+            continue
+        elif ns:
+            out.append(f"{'    ' * depth}pub mod {ns} {{")
+            depth += 1
+        elif close and depth:
+            depth -= 1
+            out.append(f"{'    ' * depth}}}")
+    path = ROOT / "crates/rdoxide/src/rdgeneral/common_properties.rs"
+    path.write_text("\n".join(out) + "\n")
+    print(f"common_properties.rs: {n} names")
+
+
 def regen_copies() -> None:
     """Copy verbatim files (pure-python modules, test data) listed in porting/copies.toml."""
     if not COPIES.exists():
@@ -138,6 +176,7 @@ def cmd_regen(_args) -> None:
     if not UPSTREAM_DIR.exists():
         sys.exit("upstream/rdkit missing - run `sync_upstream.py fetch` first")
     regen_atomic_data()
+    regen_common_properties()
     regen_copies()
 
 

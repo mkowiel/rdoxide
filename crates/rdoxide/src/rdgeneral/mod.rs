@@ -1,9 +1,11 @@
 //! Port of RDKit `Code/RDGeneral`: properties, errors, logging, versions.
 
+pub mod common_properties;
 pub mod dict;
 pub mod log;
 pub mod random;
 pub mod strings;
+pub mod utils;
 
 pub use dict::{Dict, RDProps, RDValue};
 
