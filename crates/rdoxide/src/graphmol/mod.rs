@@ -3,6 +3,7 @@
 pub mod aromaticity;
 pub mod atom;
 pub mod bond;
+pub mod canon;
 pub mod chirality;
 pub mod conformer;
 pub mod conjug_hybrid;
