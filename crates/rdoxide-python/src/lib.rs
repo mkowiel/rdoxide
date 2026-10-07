@@ -22,6 +22,7 @@ mod rdbase;
 mod rdchem;
 mod rdmolfiles;
 mod rdmolops;
+mod rdmolops_hs;
 mod ringinfo;
 mod stereo_group;
 

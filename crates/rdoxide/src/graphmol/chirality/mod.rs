@@ -1,6 +1,8 @@
 //! Port of RDKit `Code/GraphMol/Chirality.{h,cpp}` (in progress) and
 //! `NontetrahedralStereo.cpp`.
 
+pub mod bond_dirs;
+pub mod legacy;
 pub mod nontetrahedral;
 
 use std::sync::atomic::{AtomicU8, Ordering};

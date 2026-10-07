@@ -37,6 +37,10 @@ pub mod sanitize_flags {
 }
 use sanitize_flags::*;
 
+pub mod add_hs;
+use crate::rdgeneral::RDProps;
+pub use add_hs::{RemoveHsParameters, remove_hs};
+
 /// `QueryOps::isMetal` for plain atoms (Marvin's "M" pseudo-element).
 pub fn is_metal(atomic_num: u32) -> bool {
     const NON_METALS: [u32; 23] = [
@@ -645,9 +649,30 @@ pub fn sanitize_mol(mol: &mut RWMol, ops: u32) -> std::result::Result<(), (u32, 
 
 /// The sanitize / removeHs / stereo steps `MolFromSmiles` runs after
 /// parsing. removeHs and stereochemistry assignment are ported next.
-pub fn smiles_post_parse_sanitize(mol: &mut RWMol, sanitize: bool, _remove_hs: bool) -> Result<()> {
-    if sanitize {
+/// The sanitize/removeHs/stereo part of `SmilesToMol` (`MolFromSmiles` in
+/// SmilesParse.cpp), run when `sanitize || removeHs`.
+pub fn smiles_post_parse_sanitize(mol: &mut RWMol, sanitize: bool, remove_hs: bool) -> Result<()> {
+    if remove_hs {
+        let rhp = RemoveHsParameters {
+            update_explicit_count: true,
+            ..Default::default()
+        };
+        add_hs::remove_hs(mol, &rhp, sanitize)?;
+    } else if sanitize {
         sanitize_mol(mol, SANITIZE_ALL).map_err(|(_, e)| e)?;
     }
-    Ok(())
+    if mol.has_prop("_needsDetectBondStereo") {
+        // the first 2D conformer, else the first 3D one
+        let confs = mol.conformers();
+        let conf = confs
+            .iter()
+            .position(|c| !c.is_3d())
+            .or_else(|| confs.iter().position(|c| c.is_3d()));
+        if conf.is_some() {
+            clear_single_bond_dir_flags(mol, false);
+        }
+        crate::graphmol::chirality::bond_dirs::set_double_bond_neighbor_directions(mol, conf)?;
+    }
+    mol.clear_prop("_needsDetectBondStereo");
+    crate::graphmol::chirality::legacy::assign_stereochemistry(mol, true, true, true)
 }

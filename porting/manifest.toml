@@ -44,6 +44,7 @@
 
 [module."rdoxide::geometry::point".sources]
 "Code/Geometry/point.h" = "6fc8a29071705a3a3db2213f26f91953ec6d477a"
+"Code/Geometry/point.cpp" = "c3439d70d14936e6adf97c2623326a98c2adcabf"
 
 [module."rdoxide::graphmol::atom".sources]
 "Code/GraphMol/Atom.h" = "558a1c3bffb593001dee392d0863c854beb4a61f"
@@ -164,3 +165,21 @@
 "Code/GraphMol/new_canon.h" = "fdb8f65ec94dcb3e963947831189510d4dacd4dd"
 "Code/GraphMol/new_canon.cpp" = "38498ec4e39d163a1403e3551fa58c53d67cf0d6"
 "Code/RDGeneral/hanoiSort.h" = "69182b49fa4393d77ce2ba7d6b3c9053e94f7d38"
+
+[module."rdoxide::graphmol::chirality::legacy".sources]
+"Code/GraphMol/Chirality.cpp" = "4ae1eb5d92ea880ef07395a25b33c647ec87b09b"
+"Code/GraphMol/Atropisomers.cpp" = "31a89e53044311a590576f635cb7e814d5a940cc"
+"Code/RDGeneral/Ranking.h" = "21a9b52d975836c7d4a67415db30c497394aebbc"
+
+[module."rdoxide::graphmol::chirality::bond_dirs".sources]
+"Code/GraphMol/Chirality.cpp" = "4ae1eb5d92ea880ef07395a25b33c647ec87b09b"
+
+[module."rdoxide::graphmol::query_ops".sources]
+"Code/GraphMol/QueryOps.cpp" = "1f093329f2fa6643fa16a706b3ca97ad48cbfe2e"
+
+[module."rdoxide::graphmol::mol_ops::add_hs".sources]
+"Code/GraphMol/AddHs.cpp" = "ac653bc04e5c317b9803d986fcdef668fb17759e"
+"Code/GraphMol/MolOps.h" = "c5a0698d6bf73d26329ac02a32ac4b694ca2d10f"
+
+[module."rdoxide_python::rdmolops_hs".sources]
+"Code/GraphMol/Wrap/MolOps.cpp" = "2dc7ae10c4ce7523938a4db10e31215cfe2162db"

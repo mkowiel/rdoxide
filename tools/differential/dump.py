@@ -19,6 +19,16 @@ def atom_record(a):
     return rec
 
 
+STEREO_PROPS = ("_CIPCode", "_ChiralityPossible", "_CIPRank", "_ringStereoAtoms", "_UnknownStereo",
+                "_StereochemDone")
+
+
+def private_props(obj):
+    d = obj.GetPropsAsDict(includePrivate=True, includeComputed=True)
+    return {k: (list(v) if not isinstance(v, (int, float, str)) else v)
+            for k, v in sorted(d.items()) if k in STEREO_PROPS}
+
+
 def bond_record(b):
     return [b.GetBeginAtomIdx(), b.GetEndAtomIdx(), int(b.GetBondType()), int(b.GetBondDir()),
             int(b.GetStereo()), list(b.GetStereoAtoms()), b.GetIsAromatic()]
@@ -67,8 +77,10 @@ def dump(mode, smi):
         for a in m.GetAtoms():
             recs.append(atom_record(a) + [a.GetTotalNumHs(), int(a.GetHybridization()),
                                           a.GetTotalValence()])
-        return {"atoms": recs, "bonds": [bond_record(b) + [b.GetIsConjugated()] for b in m.GetBonds()],
-                "rings": [list(r) for r in m.GetRingInfo().AtomRings()]}
+        return {"atoms": recs,
+                "bonds": [bond_record(b) + [b.GetIsConjugated(), private_props(b)] for b in m.GetBonds()],
+                "rings": [list(r) for r in m.GetRingInfo().AtomRings()],
+                "mol": private_props(m)}
     if mode == "ranks":
         p = Chem.SmilesParserParams()
         p.sanitize = False
@@ -100,9 +112,11 @@ def dump(mode, smi):
         recs = []
         for a in m.GetAtoms():
             recs.append(atom_record(a) + [a.GetTotalNumHs(), int(a.GetHybridization()),
-                                          a.IsInRing()])
-        return {"atoms": recs, "bonds": [bond_record(b) + [b.GetIsConjugated()] for b in m.GetBonds()],
-                "rings": [list(r) for r in m.GetRingInfo().AtomRings()]}
+                                          a.IsInRing(), private_props(a)])
+        return {"atoms": recs,
+                "bonds": [bond_record(b) + [b.GetIsConjugated(), private_props(b)] for b in m.GetBonds()],
+                "rings": [list(r) for r in m.GetRingInfo().AtomRings()],
+                "mol": private_props(m)}
     if mode == "smiles":
         m = Chem.MolFromSmiles(smi)
         return None if m is None else Chem.MolToSmiles(m)

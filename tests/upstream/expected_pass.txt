@@ -1,7 +1,18 @@
 # Upstream RDKit Python tests known to pass on rdoxide (ratchet).
 # Maintained by tools/run_upstream_tests.py --update
+Code/GraphMol/Wrap/testConformer.py::TestCase::test0Conformers
 Code/GraphMol/Wrap/test_cdxml.py::TestCase::test_cdxml
 Code/GraphMol/Wrap/test_lazy_numpy.py::TestLazyNumpy::test_chem_import_does_not_load_numpy
+Code/GraphMol/Wrap/test_lazy_numpy.py::TestLazyNumpy::test_conformer_positions_loads_numpy
+rdkit/Chem/UnitTestChemAtom.py::TestCase::test1Implicit
+rdkit/Chem/UnitTestChemAtom.py::TestCase::test2BondIter
+rdkit/Chem/UnitTestChemAtom.py::TestCase::test3GetBond
+rdkit/Chem/UnitTestChemAtom.py::TestCase::test4Props
+rdkit/Chem/UnitTestChemAtom.py::TestCase::test5Setters
+rdkit/Chem/UnitTestChemBond.py::TestCase::test1Get
+rdkit/Chem/UnitTestChemBond.py::TestCase::test2Setters
+rdkit/Chem/UnitTestChemBond.py::TestCase::test3Props
+rdkit/Chem/UnitTestChemBond.py::TestCase::test4Props2
 rdkit/UnitTestLogging.py::TestCaptureErrorLog::testBasicCapture
 rdkit/UnitTestLogging.py::TestCaptureErrorLog::testEmptyWhenNothingLogged
 rdkit/UnitTestLogging.py::TestCaptureErrorLog::testLoggingRestoredAfterContextExit

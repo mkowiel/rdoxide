@@ -291,6 +291,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
         ],
         None,
     )?;
+    crate::rdmolops_hs::init(m)?;
     m.add_function(wrap_pyfunction!(py_kekulize, m)?)?;
     m.add_function(wrap_pyfunction!(py_kekulize_if_possible, m)?)?;
     m.add_function(wrap_pyfunction!(py_sanitize_mol, m)?)?;
