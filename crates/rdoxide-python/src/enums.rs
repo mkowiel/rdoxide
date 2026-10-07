@@ -107,6 +107,22 @@ pub fn add_enum(
     Ok(())
 }
 
+/// Like [`add_enum`] and also export the members into the module namespace
+/// (Boost.Python's `.export_values()`).
+pub fn add_enum_exported(
+    m: &Bound<'_, PyModule>,
+    name: &'static str,
+    members: &[(&str, i64)],
+    doc: Option<&str>,
+) -> PyResult<()> {
+    add_enum(m, name, members, doc)?;
+    let cls = m.getattr(name)?;
+    for (n, _) in members {
+        m.add(*n, cls.getattr(*n)?)?;
+    }
+    Ok(())
+}
+
 /// Convert a value to an instance of the registered enum `name`.
 pub fn to_py(py: Python<'_>, name: &str, value: i64) -> PyResult<Py<PyAny>> {
     let cls = {

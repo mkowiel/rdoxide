@@ -141,3 +141,21 @@
 
 # RingDecomposerLib is external (UPSTREAM.toml [external]); its sources are not
 # tracked by blob hash. Re-port when the pinned version/md5 changes.
+
+[module."rdoxide::graphmol::aromaticity".sources]
+"Code/GraphMol/Aromaticity.cpp" = "07f12501f6ddc962d172df0202deceb46a62c058"
+
+[module."rdoxide::graphmol::kekulize".sources]
+"Code/GraphMol/Kekulize.cpp" = "59014ab3916701d65eb6406fdc06f57390aac3d3"
+
+[module."rdoxide::graphmol::conjug_hybrid".sources]
+"Code/GraphMol/ConjugHybrid.cpp" = "19cfc6144fbd1ac1ed0294ddb014ff96faa40504"
+
+[module."rdoxide::graphmol::mol_ops".sources]
+"Code/GraphMol/MolOps.h" = "c5a0698d6bf73d26329ac02a32ac4b694ca2d10f"
+"Code/GraphMol/QueryOps.cpp" = "1f093329f2fa6643fa16a706b3ca97ad48cbfe2e"
+"Code/GraphMol/Atropisomers.cpp" = "31a89e53044311a590576f635cb7e814d5a940cc"
+"Code/GraphMol/Chirality.cpp" = "4ae1eb5d92ea880ef07395a25b33c647ec87b09b"
+
+[module."rdoxide::rdgeneral::types".sources]
+"Code/RDGeneral/types.cpp" = "801620e08f476e577d140c04e73d8ddc10dd1dff"

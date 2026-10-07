@@ -1,11 +1,14 @@
 //! Port of RDKit `Code/GraphMol`.
 
+pub mod aromaticity;
 pub mod atom;
 pub mod bond;
 pub mod chirality;
 pub mod conformer;
+pub mod conjug_hybrid;
 pub mod debug;
 pub mod find_rings;
+pub mod kekulize;
 pub mod mol_ops;
 pub mod periodic_table;
 pub mod ring_info;

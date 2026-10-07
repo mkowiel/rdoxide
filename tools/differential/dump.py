@@ -2,7 +2,7 @@
 RDKit and under rdoxide; tools/differential/compare.py diffs the outputs.
 
 usage: python -I dump.py MODE INPUT.smi > out.jsonl
-  MODE: parse (sanitize=False) | rings | sanitize | smiles (canonical SMILES)
+  MODE: parse (sanitize=False) | rings | sanitize (SanitizeMol) | molfromsmiles | smiles (canonical SMILES)
 """
 import json
 import sys
@@ -53,6 +53,23 @@ def dump(mode, smi):
         return {"sssr": sssr, "symm": symm, "legacy": legacy, "fast": fast,
                 "bonds": [list(r) for r in m.GetRingInfo().BondRings()]}
     if mode == "sanitize":
+        p = Chem.SmilesParserParams()
+        p.sanitize = False
+        p.removeHs = False
+        m = Chem.MolFromSmiles(smi, p)
+        if m is None:
+            return None
+        try:
+            Chem.SanitizeMol(m)
+        except Exception as e:  # noqa: BLE001
+            return {"error": type(e).__name__, "msg": str(e)}
+        recs = []
+        for a in m.GetAtoms():
+            recs.append(atom_record(a) + [a.GetTotalNumHs(), int(a.GetHybridization()),
+                                          a.GetTotalValence()])
+        return {"atoms": recs, "bonds": [bond_record(b) + [b.GetIsConjugated()] for b in m.GetBonds()],
+                "rings": [list(r) for r in m.GetRingInfo().AtomRings()]}
+    if mode == "molfromsmiles":
         m = Chem.MolFromSmiles(smi)
         if m is None:
             return None
