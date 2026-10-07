@@ -1,0 +1,69 @@
+"""Dump molecule features as JSON lines. Runs unchanged under the official
+RDKit and under rdoxide; tools/differential/compare.py diffs the outputs.
+
+usage: python -I dump.py MODE INPUT.smi > out.jsonl
+  MODE: parse (sanitize=False) | sanitize | smiles (canonical SMILES)
+"""
+import json
+import sys
+
+from rdkit import Chem, RDLogger
+
+RDLogger.DisableLog("rdApp.*")
+
+
+def atom_record(a):
+    rec = [a.GetAtomicNum(), a.GetFormalCharge(), a.GetIsotope(), a.GetNumExplicitHs(),
+           a.GetNoImplicit(), a.GetIsAromatic(), int(a.GetChiralTag()), a.GetNumRadicalElectrons(),
+           sorted(a.GetPropNames())]
+    return rec
+
+
+def bond_record(b):
+    return [b.GetBeginAtomIdx(), b.GetEndAtomIdx(), int(b.GetBondType()), int(b.GetBondDir()),
+            int(b.GetStereo()), list(b.GetStereoAtoms()), b.GetIsAromatic()]
+
+
+def dump(mode, smi):
+    if mode == "parse":
+        p = Chem.SmilesParserParams()
+        p.sanitize = False
+        p.removeHs = False
+        m = Chem.MolFromSmiles(smi, p)
+        if m is None:
+            return None
+        return {"atoms": [atom_record(a) for a in m.GetAtoms()],
+                "bonds": [bond_record(b) for b in m.GetBonds()]}
+    if mode == "sanitize":
+        m = Chem.MolFromSmiles(smi)
+        if m is None:
+            return None
+        recs = []
+        for a in m.GetAtoms():
+            recs.append(atom_record(a) + [a.GetTotalNumHs(), int(a.GetHybridization()),
+                                          a.IsInRing()])
+        return {"atoms": recs, "bonds": [bond_record(b) + [b.GetIsConjugated()] for b in m.GetBonds()],
+                "rings": [list(r) for r in m.GetRingInfo().AtomRings()]}
+    if mode == "smiles":
+        m = Chem.MolFromSmiles(smi)
+        return None if m is None else Chem.MolToSmiles(m)
+    raise SystemExit(f"unknown mode {mode}")
+
+
+def main():
+    mode, path = sys.argv[1], sys.argv[2]
+    with open(path) as fh:
+        for line in fh:
+            parts = line.split()
+            if not parts or parts[0].lower() == "smiles":
+                continue
+            smi = parts[0]
+            try:
+                res = dump(mode, smi)
+            except Exception as e:  # noqa: BLE001
+                res = {"exception": type(e).__name__}
+            print(json.dumps([smi, res]))
+
+
+if __name__ == "__main__":
+    main()

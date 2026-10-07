@@ -2,11 +2,14 @@
 
 pub mod atom;
 pub mod bond;
+pub mod chirality;
 pub mod conformer;
 pub mod debug;
+pub mod mol_ops;
 pub mod periodic_table;
 pub mod ring_info;
 pub mod romol;
+pub mod smiles_parse;
 pub mod stereo_group;
 
 pub use atom::{Atom, ChiralType, HybridizationType, ValenceType};

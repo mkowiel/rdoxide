@@ -19,3 +19,4 @@
 from rdkit import rdBase
 from rdkit.Chem import rdchem
 from rdkit.Chem.rdchem import *
+from rdkit.Chem.rdmolfiles import *

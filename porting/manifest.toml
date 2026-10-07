@@ -107,3 +107,26 @@
 
 [module."python::rdkit.Geometry.__init__".sources]
 "rdkit/Geometry/__init__.py" = "ce2a8f5aae4528ae84fd9797869a16395a612e46"
+
+[module."rdoxide::graphmol::smiles_parse::lexer".sources]
+"Code/GraphMol/SmilesParse/smiles.ll" = "3bf58ba7948758af44e7ab3f7d8386186d861045"
+
+[module."rdoxide::graphmol::smiles_parse::parser".sources]
+"Code/GraphMol/SmilesParse/smiles.yy" = "2b9bff90917e86e4fabbe79bd7ac3a8a79476f64"
+
+[module."rdoxide::graphmol::smiles_parse".sources]
+"Code/GraphMol/SmilesParse/SmilesParse.cpp" = "da2c774ada6847ae0c42348394013caeb3a3b5d8"
+"Code/GraphMol/SmilesParse/SmilesParse.h" = "2d672235b3a044ef571d49370e88095b39a9889f"
+
+[module."rdoxide::graphmol::smiles_parse::ops".sources]
+"Code/GraphMol/SmilesParse/SmilesParseOps.cpp" = "40f9bf3ddff97b5b3866cf6ee574aee2dfcc3800"
+"Code/GraphMol/Canon.cpp" = "e4e60c911669bb7ae61e7ff797d8209c2c09aa85"
+
+[module."rdoxide::graphmol::chirality".sources]
+"Code/GraphMol/Chirality.h" = "00f628293afe048e44e86c120e86acc3a6e9d280"
+
+[module."rdoxide::graphmol::chirality::nontetrahedral".sources]
+"Code/GraphMol/NontetrahedralStereo.cpp" = "5168ccef3f31ceaf443bebd82eef5126d901017f"
+
+[module."rdoxide_python::rdmolfiles".sources]
+"Code/GraphMol/Wrap/rdmolfiles.cpp" = "829058d8e8a382c358d2464cee762f8cff04f75f"
