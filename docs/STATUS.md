@@ -17,8 +17,8 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 2 | `rdGeometry` Point3D / Point2D | 🟡 | PointND, UniformGrid3D later |
 | 2b | SubstanceGroup, MonomerInfo / PDBResidueInfo, bookmarks API in Python, QueryAtom/QueryBond | ⬜ | queries with stage 4 |
 | 3 | Ring finding: RingDecomposerLib port, findSSSR, symmetrizeSSSR (RDL + legacy), fastFindRings, ring families | ✅ | differential: 10312/10312 identical to RDKit 2026.09.1 |
-| 3 | sanitizeMol: cleanUp, Kekulize, aromaticity (RDKit/simple/MDL/MMFF94), conjugation, hybridization, radicals, adjustHs, chirality/atropisomer cleanup | ✅ | differential `sanitize` 10310/10312 (2 organometallics need canonical ranks) |
-| 3 | Canonical atom ranking (new_canon) — needed by cleanUpOrganometallics, canonical Kekulize, SMILES writer | ⬜ | next |
+| 3 | sanitizeMol: cleanUp, cleanUpOrganometallics, Kekulize (canonical + input order), aromaticity (RDKit/simple/MDL/MMFF94), conjugation, hybridization, radicals, adjustHs, chirality/atropisomer cleanup | ✅ | differential `sanitize` 10312/10312 |
+| 3 | Canonical atom ranking (new_canon: rankMolAtoms, rankFragmentAtoms, chiralRankMolAtoms); `CanonicalRankAtoms(InFragment)` | ✅ | differential `ranks` 10312/10312 |
 | 3 | AddHs/RemoveHs, legacy assignStereochemistry, CIP | ⬜ | |
 | 4 | SMILES parser (lexer + grammar + SmilesParseOps, non-tetrahedral stereo) | ✅ | differential: 10312/10312 identical to RDKit (sanitize=False) |
 | 4 | `MolFromSmiles` sanitize/removeHs path | ⬜ | needs stage 3 |
@@ -51,7 +51,7 @@ selected with `--ref-python` or `RDOXIDE_REF_PYTHON`. (PyPI only has
 2026.03.x, which predates the RDL-based SSSR, so it is not a valid oracle for
 ring order.)
 
-Current results: `parse` 10312/10312, `rings` 10312/10312, `sanitize` 10310/10312.
+Current results: `parse`, `rings`, `sanitize`, `ranks`: 10312/10312 each.
 
 ## Known deviations (to revisit)
 
@@ -60,7 +60,5 @@ Current results: `parse` 10312/10312, `rings` 10312/10312, `sanitize` 10310/1031
   point at a different atom (upstream: dangling pointer).
 * `Mol(pickle)` / `ToBinary` not available until MolPickler (stage 6).
 * `Atom.IsInRing()` needs stage 3 (`findSSSR`).
-* `Chem.Kekulize(canonical=True)` currently uses input-order ranks (canonical
-  ranking not ported yet), so bond placement can differ from upstream.
 * `Chem.SetAllowNontetrahedralChirality` & co. keep the value in-process;
   upstream also writes it to the process environment.

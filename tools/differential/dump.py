@@ -69,6 +69,30 @@ def dump(mode, smi):
                                           a.GetTotalValence()])
         return {"atoms": recs, "bonds": [bond_record(b) + [b.GetIsConjugated()] for b in m.GetBonds()],
                 "rings": [list(r) for r in m.GetRingInfo().AtomRings()]}
+    if mode == "ranks":
+        p = Chem.SmilesParserParams()
+        p.sanitize = False
+        p.removeHs = False
+        m = Chem.MolFromSmiles(smi, p)
+        if m is None:
+            return None
+        try:
+            Chem.SanitizeMol(m)
+        except Exception as e:  # noqa: BLE001
+            return {"error": type(e).__name__}
+        n = m.GetNumAtoms()
+        res = {"ties": list(Chem.CanonicalRankAtoms(m, breakTies=False)),
+               "ranks": list(Chem.CanonicalRankAtoms(m)),
+               "nochiral": list(Chem.CanonicalRankAtoms(m, includeChirality=False))}
+        if n > 2:
+            half = list(range(n // 2))
+            bonds = [b.GetIdx() for b in m.GetBonds()
+                     if b.GetBeginAtomIdx() in half and b.GetEndAtomIdx() in half]
+            res["frag"] = list(Chem.CanonicalRankAtomsInFragment(m, half, bonds))
+        m2 = Chem.Mol(m)
+        Chem.Kekulize(m2)
+        res["kekule"] = [int(b.GetBondType()) for b in m2.GetBonds()]
+        return res
     if mode == "molfromsmiles":
         m = Chem.MolFromSmiles(smi)
         if m is None:

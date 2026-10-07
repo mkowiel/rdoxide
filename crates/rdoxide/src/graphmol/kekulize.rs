@@ -502,10 +502,16 @@ pub fn kekulize_fragment(
     if !found_aromatic {
         return Ok(());
     }
-    // canonical atom ranks arrive with the new_canon port; identity ranks give
-    // the non-canonical (input-order) kekulization
-    let _ = canonical;
-    let atom_ranks: Vec<u32> = (0..n).collect();
+    let atom_ranks: Vec<u32> = if canonical {
+        crate::graphmol::new_canon::rank_fragment_atoms(
+            mol,
+            atoms_to_use,
+            &bonds_to_use,
+            &crate::graphmol::new_canon::FragmentRankOptions::default(),
+        )?
+    } else {
+        (0..n).collect()
+    };
     if bonds_to_use.iter().any(|&b| b) {
         let mut wedged = vec![false; n as usize];
         for b in mol.bonds() {

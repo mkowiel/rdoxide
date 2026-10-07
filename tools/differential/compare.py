@@ -32,7 +32,7 @@ def run(python, mode, path):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("mode", choices=["parse", "rings", "sanitize", "molfromsmiles", "smiles"])
+    ap.add_argument("mode", choices=["parse", "rings", "sanitize", "ranks", "molfromsmiles", "smiles"])
     ap.add_argument("files", nargs="*")
     ap.add_argument("--limit", type=int, default=20, help="number of differences to print")
     ap.add_argument("--ref-python", default=os.environ.get("RDOXIDE_REF_PYTHON", str(ROOT / ".venv-ref/bin/python")),

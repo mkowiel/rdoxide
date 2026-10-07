@@ -224,11 +224,58 @@ pub fn clean_up_organometallics(mol: &mut RWMol) -> Result<()> {
     if !needs_fixing {
         return Ok(());
     }
-    // upstream orders the atoms by canonical rank (Canon::rankMolAtoms),
-    // which is ported together with the SMILES writer
-    Err(RDKitError::Value(
-        "rdoxide: cleanUpOrganometallics needs canonical atom ranking (not ported yet)".into(),
-    ))
+    mol.update_property_cache(false)?;
+    let ranks = crate::graphmol::new_canon::rank_mol_atoms(
+        mol,
+        crate::graphmol::new_canon::RankOptions::default(),
+    )?;
+    let mut atom_ranks: Vec<(usize, u32)> = ranks.iter().copied().enumerate().collect();
+    // std::sort by rank (ranks are unique after tie breaking)
+    atom_ranks.sort_by_key(|&(_, r)| r);
+    for (aid, _) in atom_ranks {
+        metal_bond_cleanup(mol, aid as u32, &ranks)?;
+    }
+    Ok(())
+}
+
+fn num_dative_bonds(mol: &RWMol, aid: u32) -> i32 {
+    mol.atom_bonds(aid)
+        .filter(|b| {
+            matches!(
+                b.bond_type(),
+                BondType::Dative | BondType::DativeOne | BondType::DativeL | BondType::DativeR
+            )
+        })
+        .count() as i32
+}
+
+fn metal_bond_cleanup(mol: &mut RWMol, aid: u32, ranks: &[u32]) -> Result<()> {
+    if !(is_hypervalent_non_metal(mol, aid)? && !no_dative(mol.atom(aid).atomic_num())) {
+        return Ok(());
+    }
+    let mut metals: Vec<u32> = mol
+        .atom_bonds(aid)
+        .filter(|b| b.bond_type() == BondType::Single)
+        .map(|b| b.other_atom_idx(aid).expect("in bond"))
+        .filter(|&o| is_metal(mol.atom(o).atomic_num()))
+        .collect();
+    if metals.is_empty() {
+        return Ok(());
+    }
+    metals.sort_by(|&a1, &a2| {
+        let (n1, n2) = (num_dative_bonds(mol, a1), num_dative_bonds(mol, a2));
+        if n1 == n2 {
+            ranks[a2 as usize].cmp(&ranks[a1 as usize])
+        } else {
+            n1.cmp(&n2)
+        }
+    });
+    if let Some(b) = mol.bond_idx_between(aid, metals[0]) {
+        mol.bond_mut(b).set_bond_type(BondType::Dative);
+        mol.set_bond_begin_atom_idx(b, aid)?;
+        mol.set_bond_end_atom_idx(b, metals[0])?;
+    }
+    Ok(())
 }
 
 // ------------------------------------------------------------------ radicals / Hs

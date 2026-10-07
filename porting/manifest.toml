@@ -159,3 +159,8 @@
 
 [module."rdoxide::rdgeneral::types".sources]
 "Code/RDGeneral/types.cpp" = "801620e08f476e577d140c04e73d8ddc10dd1dff"
+
+[module."rdoxide::graphmol::new_canon".sources]
+"Code/GraphMol/new_canon.h" = "fdb8f65ec94dcb3e963947831189510d4dacd4dd"
+"Code/GraphMol/new_canon.cpp" = "38498ec4e39d163a1403e3551fa58c53d67cf0d6"
+"Code/RDGeneral/hanoiSort.h" = "69182b49fa4393d77ce2ba7d6b3c9053e94f7d38"

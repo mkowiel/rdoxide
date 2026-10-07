@@ -140,6 +140,100 @@ fn mol_from_smiles(
     Ok(parse(py, &smiles, &p))
 }
 
+/// Returns the canonical atom ranking for each atom of a molecule fragment.
+/// If breakTies is False, this returns the symmetry class for each atom.  The symmetry
+/// class is used by the canonicalization routines to type each atom based on the whole
+/// chemistry of the molecular graph.  Any atom with the same rank (symmetry class) is
+/// indistinguishable.
+#[pyfunction]
+#[pyo3(name = "CanonicalRankAtoms", signature = (mol, breakTies = true, includeChirality = true, includeIsotopes = true, includeAtomMaps = true, includeChiralPresence = false))]
+#[allow(non_snake_case)]
+fn canonical_rank_atoms(
+    mut mol: PyRefMut<'_, PyMol>,
+    breakTies: bool,
+    includeChirality: bool,
+    includeIsotopes: bool,
+    includeAtomMaps: bool,
+    includeChiralPresence: bool,
+) -> PyResult<Vec<u32>> {
+    let opts = rdoxide::graphmol::new_canon::RankOptions {
+        break_ties: breakTies,
+        include_chirality: includeChirality,
+        include_isotopes: includeIsotopes,
+        include_atom_maps: includeAtomMaps,
+        include_chiral_presence: includeChiralPresence,
+        ..Default::default()
+    };
+    rdoxide::graphmol::new_canon::rank_mol_atoms(&mut mol.mol, opts).map_err(crate::errors::to_py)
+}
+
+/// Returns the canonical atom ranking for each atom of a molecule fragment
+///   See help(CanonicalRankAtoms) for more information.
+#[pyfunction]
+#[pyo3(name = "CanonicalRankAtomsInFragment", signature = (mol, atomsToUse, bondsToUse = None, atomSymbols = None, breakTies = true, includeChirality = true, includeIsotopes = true, includeAtomMaps = true, includeChiralPresence = false))]
+#[allow(non_snake_case, clippy::too_many_arguments)]
+fn canonical_rank_atoms_in_fragment(
+    mut mol: PyRefMut<'_, PyMol>,
+    atomsToUse: Vec<i64>,
+    bondsToUse: Option<Vec<i64>>,
+    atomSymbols: Option<Vec<String>>,
+    breakTies: bool,
+    includeChirality: bool,
+    includeIsotopes: bool,
+    includeAtomMaps: bool,
+    includeChiralPresence: bool,
+) -> PyResult<Vec<i32>> {
+    let na = mol.mol.num_atoms() as usize;
+    let nb = mol.mol.num_bonds() as usize;
+    if atomsToUse.is_empty() {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "atomsToUse must not be empty",
+        ));
+    }
+    if atomSymbols.as_ref().is_some_and(|a| a.len() != na) {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "length of atom symbol list != number of atoms",
+        ));
+    }
+    let mut atoms = vec![false; na];
+    for a in atomsToUse {
+        if a < 0 || a as usize >= na {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "list element larger than allowed value",
+            ));
+        }
+        atoms[a as usize] = true;
+    }
+    let mut bonds = vec![false; nb];
+    for b in bondsToUse.unwrap_or_default() {
+        if b < 0 || b as usize >= nb {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "list element larger than allowed value",
+            ));
+        }
+        bonds[b as usize] = true;
+    }
+    let _ = includeAtomMaps;
+    // NB: upstream passes includeChiralPresence in the includeAtomMaps slot
+    let opts = rdoxide::graphmol::new_canon::FragmentRankOptions {
+        atom_symbols: atomSymbols.as_deref(),
+        break_ties: breakTies,
+        include_chirality: includeChirality,
+        include_isotopes: includeIsotopes,
+        include_atom_maps: includeChiralPresence,
+        include_chiral_presence: false,
+        ..Default::default()
+    };
+    let ranks =
+        rdoxide::graphmol::new_canon::rank_fragment_atoms(&mut mol.mol, &atoms, &bonds, &opts)
+            .map_err(crate::errors::to_py)?;
+    Ok(ranks
+        .iter()
+        .enumerate()
+        .map(|(i, &r)| if atoms[i] { r as i32 } else { -1 })
+        .collect())
+}
+
 pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add(
         "__doc__",
@@ -147,5 +241,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     )?;
     m.add_class::<PySmilesParserParams>()?;
     m.add_function(wrap_pyfunction!(mol_from_smiles, m)?)?;
+    m.add_function(wrap_pyfunction!(canonical_rank_atoms, m)?)?;
+    m.add_function(wrap_pyfunction!(canonical_rank_atoms_in_fragment, m)?)?;
     Ok(())
 }
