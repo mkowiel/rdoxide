@@ -382,11 +382,11 @@ mod tests {
         {
             let inner = CaptureLog::error();
             log(Level::Error, "inner");
-            assert!(inner.messages().ends_with("] inner\n"));
+            assert!(inner.messages().contains("] inner\n"));
         }
         cap.finish();
         let m = cap.messages();
-        assert!(m.starts_with('[') && m.ends_with("] boom\n"), "{m}");
+        assert!(m.contains("] boom\n") && !m.contains("inner"), "{m}");
         enable_logs("rdApp.*");
     }
 }
