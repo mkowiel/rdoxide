@@ -114,6 +114,19 @@ pub enum ValenceType {
     Explicit = 1,
 }
 
+impl ValenceType {
+    pub const ALL: [ValenceType; 2] = [ValenceType::Implicit, ValenceType::Explicit];
+    pub fn name(self) -> &'static str {
+        match self {
+            ValenceType::Implicit => "IMPLICIT",
+            ValenceType::Explicit => "EXPLICIT",
+        }
+    }
+    pub fn from_u8(v: u8) -> Option<Self> {
+        Self::ALL.get(v as usize).copied()
+    }
+}
+
 /// An atom (`RDKit::Atom`).
 #[derive(Debug, Clone, PartialEq)]
 pub struct Atom {

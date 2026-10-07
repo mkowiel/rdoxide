@@ -146,6 +146,122 @@ fn get_periodic_table(py: Python<'_>) -> PyResult<Py<PyPeriodicTable>> {
         .map(|t| t.clone_ref(py))
 }
 
+pyo3::create_exception!(
+    rdkit.Chem.rdchem,
+    MolSanitizeException,
+    pyo3::exceptions::PyValueError
+);
+pyo3::create_exception!(
+    rdkit.Chem.rdchem,
+    AtomSanitizeException,
+    MolSanitizeException
+);
+pyo3::create_exception!(
+    rdkit.Chem.rdchem,
+    AtomValenceException,
+    AtomSanitizeException
+);
+pyo3::create_exception!(
+    rdkit.Chem.rdchem,
+    AtomKekulizeException,
+    AtomSanitizeException
+);
+pyo3::create_exception!(rdkit.Chem.rdchem, KekulizeException, MolSanitizeException);
+
+/// exception arising from sanitization (the `cause` of the Python exceptions)
+#[pyclass(
+    name = "_cppMolSanitizeException",
+    module = "rdkit.Chem.rdchem",
+    frozen
+)]
+#[derive(Debug)]
+pub struct SanitizeCause {
+    pub kind: &'static str,
+    pub message: String,
+    pub atom_idx: Option<u32>,
+    pub atom_indices: Vec<u32>,
+}
+
+#[pymethods]
+impl SanitizeCause {
+    #[pyo3(name = "Message")]
+    fn message(&self) -> String {
+        self.message.clone()
+    }
+    #[pyo3(name = "GetType")]
+    fn get_type(&self) -> &'static str {
+        self.kind
+    }
+    #[pyo3(name = "GetAtomIdx")]
+    fn get_atom_idx(&self) -> PyResult<u32> {
+        self.atom_idx
+            .ok_or_else(|| pyo3::exceptions::PyAttributeError::new_err("GetAtomIdx"))
+    }
+    #[pyo3(name = "GetAtomIndices")]
+    fn get_atom_indices<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, pyo3::types::PyTuple>> {
+        pyo3::types::PyTuple::new(py, &self.atom_indices)
+    }
+}
+
+/// Build the Python exception for a sanitization failure.
+pub fn sanitize_error(err: &rdoxide::SanitizeError) -> PyErr {
+    use rdoxide::SanitizeError as S;
+    Python::attach(|py| {
+        let (kind, message, atom_idx, atom_indices) = match err {
+            S::Generic { message } => ("MolSanitizeException", message.clone(), None, vec![]),
+            S::AtomValence { atom_idx, message } => (
+                "AtomValenceException",
+                message.clone(),
+                Some(*atom_idx),
+                vec![],
+            ),
+            S::AtomKekulize { atom_idx, message } => (
+                "AtomKekulizeException",
+                message.clone(),
+                Some(*atom_idx),
+                vec![],
+            ),
+            S::Kekulize {
+                atom_indices,
+                message,
+            } => (
+                "KekulizeException",
+                message.clone(),
+                None,
+                atom_indices.clone(),
+            ),
+        };
+        let exc_type = match err {
+            S::Generic { .. } => py.get_type::<MolSanitizeException>(),
+            S::AtomValence { .. } => py.get_type::<AtomValenceException>(),
+            S::AtomKekulize { .. } => py.get_type::<AtomKekulizeException>(),
+            S::Kekulize { .. } => py.get_type::<KekulizeException>(),
+        };
+        let build = || -> PyResult<PyErr> {
+            let cause = Py::new(
+                py,
+                SanitizeCause {
+                    kind,
+                    message: message.clone(),
+                    atom_idx,
+                    atom_indices,
+                },
+            )?;
+            let inst = exc_type.call1((message.clone(),))?;
+            inst.setattr("cause", &cause)?;
+            // upstream sets `cause` on the exception type as well
+            exc_type.setattr("cause", &cause)?;
+            Ok(PyErr::from_value(inst))
+        };
+        build().unwrap_or_else(|e| e)
+    })
+}
+
+#[pyfunction]
+fn tossit() -> PyResult<()> {
+    Err(pyo3::exceptions::PyIndexError::new_err("1"))
+}
+
 pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add(
         "__doc__",
@@ -153,5 +269,56 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     )?;
     m.add_class::<PyPeriodicTable>()?;
     m.add_function(wrap_pyfunction!(get_periodic_table, m)?)?;
+
+    use crate::enums::add_enum;
+    use crate::enums_impl::*;
+    add_enum(
+        m,
+        "HybridizationType",
+        &PyHybridizationType::members(),
+        Some("Hybridization type"),
+    )?;
+    add_enum(m, "ChiralType", &PyChiralType::members(), None)?;
+    add_enum(m, "ValenceType", &PyValenceType::members(), None)?;
+    add_enum(m, "BondType", &PyBondType::members(), None)?;
+    add_enum(m, "BondDir", &PyBondDir::members(), None)?;
+    add_enum(m, "BondStereo", &PyBondStereo::members(), None)?;
+    add_enum(m, "StereoGroupType", &PyStereoGroupType::members(), None)?;
+
+    let py = m.py();
+    m.add_class::<SanitizeCause>()?;
+    m.add(
+        "MolSanitizeException",
+        py.get_type::<MolSanitizeException>(),
+    )?;
+    m.add(
+        "AtomSanitizeException",
+        py.get_type::<AtomSanitizeException>(),
+    )?;
+    m.add(
+        "AtomValenceException",
+        py.get_type::<AtomValenceException>(),
+    )?;
+    m.add(
+        "AtomKekulizeException",
+        py.get_type::<AtomKekulizeException>(),
+    )?;
+    m.add("KekulizeException", py.get_type::<KekulizeException>())?;
+
+    m.add_class::<crate::atom::PyAtom>()?;
+    m.add_class::<crate::bond::PyBond>()?;
+    m.add_class::<crate::conformer::PyConformer>()?;
+    m.add_class::<crate::mol::PyMol>()?;
+    m.add_class::<crate::mol::PyRWMol>()?;
+    m.add_class::<crate::mol::PyEditableMol>()?;
+    m.add_class::<crate::mol::AtomSeq>()?;
+    m.add_class::<crate::mol::BondSeq>()?;
+    m.add_class::<crate::ringinfo::PyRingInfo>()?;
+    m.add_class::<crate::stereo_group::PyStereoGroup>()?;
+    m.add_function(wrap_pyfunction!(
+        crate::stereo_group::create_stereo_group,
+        m
+    )?)?;
+    m.add_function(wrap_pyfunction!(tossit, m)?)?;
     Ok(())
 }

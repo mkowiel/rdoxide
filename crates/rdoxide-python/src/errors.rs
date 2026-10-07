@@ -11,7 +11,7 @@ pub fn to_py(err: RDKitError) -> PyErr {
         RDKitError::Value(m) => PyValueError::new_err(m),
         RDKitError::Key(m) => PyKeyError::new_err(m),
         RDKitError::Index(m) => PyIndexError::new_err(m),
-        RDKitError::Sanitize(_) => PyValueError::new_err(err.to_string()),
+        RDKitError::Sanitize(e) => crate::rdchem::sanitize_error(&e),
     }
 }
 

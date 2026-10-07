@@ -7,9 +7,21 @@
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
+mod atom;
+mod bond;
+mod conformer;
+mod debug;
+mod enums;
+mod enums_impl;
 mod errors;
+mod geometry;
+mod mol;
+mod perception;
+mod props;
 mod rdbase;
 mod rdchem;
+mod ringinfo;
+mod stereo_group;
 
 /// Create a submodule named `full_name` (e.g. `rdkit.Chem.rdchem`) and attach
 /// it to `parent` under `attr`.
@@ -37,6 +49,7 @@ fn add_submodule<'py>(
 fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("__version__", rdoxide::rdgeneral::RDOXIDE_VERSION)?;
     add_submodule(m, "rdBase", "rdkit.rdBase", rdbase::init)?;
+    add_submodule(m, "rdGeometry", "rdkit.Geometry.rdGeometry", geometry::init)?;
     add_submodule(m, "rdchem", "rdkit.Chem.rdchem", rdchem::init)?;
     Ok(())
 }

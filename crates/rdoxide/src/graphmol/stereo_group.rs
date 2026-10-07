@@ -17,6 +17,10 @@ pub enum StereoGroupType {
 }
 
 impl StereoGroupType {
+    pub const ALL: [StereoGroupType; 3] = [Self::Absolute, Self::Or, Self::And];
+    pub fn from_u8(v: u8) -> Option<Self> {
+        Self::ALL.get(v as usize).copied()
+    }
     pub fn name(self) -> &'static str {
         match self {
             StereoGroupType::Absolute => "STEREO_ABSOLUTE",

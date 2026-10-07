@@ -43,6 +43,13 @@ impl Conformer {
         }
     }
 
+    /// Copy that is not owned by any molecule (copy-constructor semantics).
+    pub fn copy_detached(&self) -> Conformer {
+        let mut c = self.clone();
+        c.has_owner = false;
+        c
+    }
+
     pub fn num_atoms(&self) -> u32 {
         self.positions.len() as u32
     }

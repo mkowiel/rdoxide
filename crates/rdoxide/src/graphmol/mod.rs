@@ -3,6 +3,7 @@
 pub mod atom;
 pub mod bond;
 pub mod conformer;
+pub mod debug;
 pub mod periodic_table;
 pub mod ring_info;
 pub mod romol;

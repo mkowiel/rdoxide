@@ -70,3 +70,40 @@
 "Code/GraphMol/ROMol.cpp" = "358085ced5f048064615fac4ea124fb2ac75b968"
 "Code/GraphMol/RWMol.h" = "7b4d0aed7d750ee63ebada203e37aa7d50bead33"
 "Code/GraphMol/RWMol.cpp" = "31e79904f62417d4b7f62ef2c72355bb352d2206"
+
+[module."rdoxide::graphmol::debug".sources]
+"Code/GraphMol/Atom.cpp" = "c4c2721635e22bc1201745346a22fb04729a05fe"
+"Code/GraphMol/Bond.cpp" = "69ddc08e2018937f7a43f9a42e7d13b3fffe1ab4"
+"Code/GraphMol/StereoGroup.cpp" = "5e04632e462a4a9991e15f5024df6da194e4961a"
+
+[module."rdoxide_python::props".sources]
+"Code/GraphMol/Wrap/props.hpp" = "6c8c77c751888c38f9e2cd4dc0c669d43ab0c83c"
+
+[module."rdoxide_python::atom".sources]
+"Code/GraphMol/Wrap/Atom.cpp" = "f1f5d4273c1e6ce60fec9fc220888676ae70e036"
+
+[module."rdoxide_python::bond".sources]
+"Code/GraphMol/Wrap/Bond.cpp" = "c0cf898bccc0f465e63a2865fd5026db55d4dcb7"
+
+[module."rdoxide_python::mol".sources]
+"Code/GraphMol/Wrap/Mol.cpp" = "8c57aa57c2e1af86142c97971f50947f8974a678"
+"Code/GraphMol/Wrap/EditableMol.cpp" = "41c0eb995ad9f14b5d0b50cedab95548ef34637c"
+"Code/GraphMol/Wrap/seqs.hpp" = "90f79509c054152a926e686883393923bf23bce1"
+
+[module."rdoxide_python::conformer".sources]
+"Code/GraphMol/Wrap/Conformer.cpp" = "70b54cbd630c7d86edeb074dd3039e2d50c61bf2"
+
+[module."rdoxide_python::ringinfo".sources]
+"Code/GraphMol/Wrap/RingInfo.cpp" = "77d16106d96878d8b4c0390c68b91a7409b6354f"
+
+[module."rdoxide_python::stereo_group".sources]
+"Code/GraphMol/Wrap/StereoGroup.cpp" = "65722c28eaf9aa86a53c9d41a11973458b652218"
+
+[module."rdoxide_python::rdchem::exceptions".sources]
+"Code/GraphMol/Wrap/rdchem.cpp" = "196da536436820ffd657081e99a79f6f22295c0a"
+
+[module."rdoxide_python::geometry".sources]
+"Code/Geometry/Wrap/Point.cpp" = "5a5cbaf1521dfdad08ed24641946f1f37e8c35f4"
+
+[module."python::rdkit.Geometry.__init__".sources]
+"rdkit/Geometry/__init__.py" = "ce2a8f5aae4528ae84fd9797869a16395a612e46"

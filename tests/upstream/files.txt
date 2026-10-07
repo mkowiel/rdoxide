@@ -2,6 +2,7 @@
 # (glob patterns relative to upstream/rdkit).
 rdkit/UnitTestLogging.py
 Code/GraphMol/Wrap/rough_test.py
+Code/GraphMol/nbWrap/rough_test.py
 Code/GraphMol/Wrap/test*.py
 Code/GraphMol/**/Wrap/*test*.py
 Code/GraphMol/**/Wrap/*Test*.py

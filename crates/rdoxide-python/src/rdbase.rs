@@ -232,7 +232,10 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
         format!("rdoxide-{}", rdoxide::rdgeneral::RDOXIDE_VERSION),
     )?;
     m.add("rdoxideVersion", rdoxide::rdgeneral::RDOXIDE_VERSION)?;
-    m.add("_wrapperType", "rdoxide")?;
+    // PyO3 behaves like nanobind (TypeError on bad arguments, builtin
+    // functions do not bind as methods), so upstream Python code must take
+    // its nanobind code paths.
+    m.add("_wrapperType", "nanobind")?;
     m.add("_serializationEnabled", false)?;
     m.add("_iostreamsEnabled", false)?;
     m.add("_multithreadedEnabled", true)?;
