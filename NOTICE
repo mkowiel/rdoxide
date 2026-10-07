@@ -37,3 +37,6 @@ Third-party license index
 -------------------------
 LICENSES/RDKit-BSD-3-Clause.txt                          RDKit core
 LICENSES/RDKit-ChemReactions-Novartis-BSD-3-Clause.txt   RDKit ChemReactions
+LICENSES/RingDecomposerLib-BSD-3-Clause.txt              RingDecomposerLib (ring families, SSSR),
+                                                         Copyright (c) 2016 University of Hamburg,
+                                                         ZBH - Center for Bioinformatics

@@ -16,7 +16,8 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 2 | `rdchem` Python: Atom, Bond, Mol, RWMol, EditableMol, Conformer, RingInfo, StereoGroup, enums, props API, sanitize exceptions | ✅ | `_wrapperType = 'nanobind'` (PyO3 semantics match nanobind's) |
 | 2 | `rdGeometry` Point3D / Point2D | 🟡 | PointND, UniformGrid3D later |
 | 2b | SubstanceGroup, MonomerInfo / PDBResidueInfo, bookmarks API in Python, QueryAtom/QueryBond | ⬜ | queries with stage 4 |
-| 3 | Perception (rings, valence, aromaticity, kekulize, sanitize, stereo) | ⬜ | |
+| 3 | Ring finding: RingDecomposerLib port, findSSSR, symmetrizeSSSR (RDL + legacy), fastFindRings, ring families | ✅ | differential: 10312/10312 identical to RDKit 2026.09.1 |
+| 3 | Kekulize, aromaticity, conjugation/hybridization, cleanUp, sanitizeMol, AddHs/RemoveHs, stereo perception | ⬜ | next |
 | 4 | SMILES parser (lexer + grammar + SmilesParseOps, non-tetrahedral stereo) | ✅ | differential: 10312/10312 identical to RDKit (sanitize=False) |
 | 4 | `MolFromSmiles` sanitize/removeHs path | ⬜ | needs stage 3 |
 | 4 | CXSMILES, SMARTS, query atoms/bonds (`~`), SMILES writer, canonicalization | ⬜ | |
@@ -40,9 +41,15 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 ## Differential testing
 
 `tools/differential/compare.py MODE` runs the same dump script under the
-official RDKit wheel (`.venv-ref`, PyPI `rdkit==2026.3.6` until 2026.9.1 is
-published) and under rdoxide (`.venv`) on the upstream SMILES corpora
-(NCI first_5K, canonSmiles.long) and reports differences.
+official RDKit of the ported version and under rdoxide (`.venv`) on the
+upstream SMILES corpora (NCI first_5K, canonSmiles.long) and reports
+differences. The reference interpreter comes from conda-forge
+(`micromamba create -p REF -c conda-forge python=3.13 rdkit=2026.09.1`) and is
+selected with `--ref-python` or `RDOXIDE_REF_PYTHON`. (PyPI only has
+2026.03.x, which predates the RDL-based SSSR, so it is not a valid oracle for
+ring order.)
+
+Current results: `parse` 10312/10312, `rings` 10312/10312.
 
 ## Known deviations (to revisit)
 

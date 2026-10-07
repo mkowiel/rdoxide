@@ -21,6 +21,7 @@ mod props;
 mod rdbase;
 mod rdchem;
 mod rdmolfiles;
+mod rdmolops;
 mod ringinfo;
 mod stereo_group;
 
@@ -53,5 +54,6 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
     add_submodule(m, "rdGeometry", "rdkit.Geometry.rdGeometry", geometry::init)?;
     add_submodule(m, "rdchem", "rdkit.Chem.rdchem", rdchem::init)?;
     add_submodule(m, "rdmolfiles", "rdkit.Chem.rdmolfiles", rdmolfiles::init)?;
+    add_submodule(m, "rdmolops", "rdkit.Chem.rdmolops", rdmolops::init)?;
     Ok(())
 }

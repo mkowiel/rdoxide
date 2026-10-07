@@ -130,3 +130,14 @@
 
 [module."rdoxide_python::rdmolfiles".sources]
 "Code/GraphMol/Wrap/rdmolfiles.cpp" = "829058d8e8a382c358d2464cee762f8cff04f75f"
+
+[module."rdoxide::graphmol::find_rings".sources]
+"Code/GraphMol/FindRings.cpp" = "21d8bd7404e0fd6d8305ca07f1d5b6718bee2c4e"
+"Code/GraphMol/RingInfo.cpp" = "6f0d2bd7fd6e4a80faf78d2260ab5a36b6b0b03e"
+"Code/GraphMol/MolOps.cpp" = "86965b783ea65fab3ded49a13dc3cc8ddba9c315"
+
+[module."rdoxide_python::rdmolops".sources]
+"Code/GraphMol/Wrap/MolOps.cpp" = "2dc7ae10c4ce7523938a4db10e31215cfe2162db"
+
+# RingDecomposerLib is external (UPSTREAM.toml [external]); its sources are not
+# tracked by blob hash. Re-port when the pinned version/md5 changes.

@@ -5,6 +5,7 @@ pub mod bond;
 pub mod chirality;
 pub mod conformer;
 pub mod debug;
+pub mod find_rings;
 pub mod mol_ops;
 pub mod periodic_table;
 pub mod ring_info;

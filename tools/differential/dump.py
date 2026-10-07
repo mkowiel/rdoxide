@@ -2,7 +2,7 @@
 RDKit and under rdoxide; tools/differential/compare.py diffs the outputs.
 
 usage: python -I dump.py MODE INPUT.smi > out.jsonl
-  MODE: parse (sanitize=False) | sanitize | smiles (canonical SMILES)
+  MODE: parse (sanitize=False) | rings | sanitize | smiles (canonical SMILES)
 """
 import json
 import sys
@@ -34,6 +34,24 @@ def dump(mode, smi):
             return None
         return {"atoms": [atom_record(a) for a in m.GetAtoms()],
                 "bonds": [bond_record(b) for b in m.GetBonds()]}
+    if mode == "rings":
+        p = Chem.SmilesParserParams()
+        p.sanitize = False
+        p.removeHs = False
+        m = Chem.MolFromSmiles(smi, p)
+        if m is None:
+            return None
+        sssr = [list(r) for r in Chem.GetSSSR(m)]
+        symm = [list(r) for r in Chem.GetSymmSSSR(Chem.Mol(m))]
+        alg = getattr(Chem, "SymmetrizeSSSRAlgorithm", None)
+        legacy = None
+        if alg is not None:
+            legacy = [list(r) for r in Chem.GetSymmSSSR(Chem.Mol(m), algorithm=alg.LEGACY)]
+        m2 = Chem.Mol(m)
+        Chem.FastFindRings(m2)
+        fast = [list(r) for r in m2.GetRingInfo().AtomRings()]
+        return {"sssr": sssr, "symm": symm, "legacy": legacy, "fast": fast,
+                "bonds": [list(r) for r in m.GetRingInfo().BondRings()]}
     if mode == "sanitize":
         m = Chem.MolFromSmiles(smi)
         if m is None:
