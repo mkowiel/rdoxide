@@ -348,3 +348,14 @@
 
 [module."rdoxide_python::datastructs_siv".sources]
 "Code/DataStructs/Wrap/SparseIntVect.cpp" = "694a25495d6c3ed1fddaef32a2228328f6ffec0e"
+
+[module."rdoxide::datastructs::value_vects".sources]
+"Code/DataStructs/DiscreteValueVect.cpp" = "a3b4e299e41e3a7a29f15243093c0e223d00f79e"
+"Code/DataStructs/DiscreteValueVect.h" = "ef1b4afac73971b762cd6a6c4883b02d70444d88"
+"Code/DataStructs/DiscreteDistMat.cpp" = "f0fa8da28d46f1ec3672407bab686c532de7d169"
+"Code/DataStructs/RealValueVect.cpp" = "b50517becd97f95641d4bca8fbe0151af700381c"
+"Code/DataStructs/RealValueVect.h" = "9ef21ae718b59125e576cd35384a444679625fc7"
+
+[module."rdoxide_python::datastructs_vv".sources]
+"Code/DataStructs/Wrap/DiscreteValueVect.cpp" = "9dcf666d1c58f6c25f696c7ba116cad5e237d736"
+"Code/DataStructs/Wrap/RealValueVect.cpp" = "85c62a7c6da4419151111dced5cc92ce47672f0f"

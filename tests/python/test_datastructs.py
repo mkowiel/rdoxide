@@ -99,3 +99,34 @@ def test_sparse_int_vect(cls):
     assert v1.GetNonzeroElements() == {0: 0, 2: 0, 3: 0, 4: 0}
     with pytest.raises(TypeError):
         v1 /= 2
+
+
+def test_discrete_value_vect():
+    a = DS.DiscreteValueVect(DS.DiscreteValueType.FOURBITVALUE, 10)
+    b = DS.DiscreteValueVect(DS.TWOBITVALUE, 10)
+    a[0], a[3], b[0], b[5] = 15, 2, 3, 1
+    assert list(a & b)[:6] == [3, 0, 0, 0, 0, 0]
+    assert (a & b).GetValueType() == DS.TWOBITVALUE
+    assert list(a | b)[:6] == [15, 0, 0, 2, 0, 1]
+    assert list(a + b)[:6] == [15, 0, 0, 2, 0, 1]
+    assert list(a - b)[:6] == [12, 0, 0, 2, 0, 0]
+    assert a.GetTotalVal() == 17
+    assert len(pickle.loads(pickle.dumps(a))) == 10
+    with pytest.raises(ValueError):
+        a[1] = 16
+    with pytest.raises(ValueError):
+        DS.ComputeL1Norm(a, b)
+    assert DS.ComputeL1Norm(a, DS.DiscreteValueVect(DS.FOURBITVALUE, 10)) == 17
+
+
+def test_real_value_vect():
+    x = DS.RealValueVect(3)
+    y = DS.RealValueVect(3)
+    x[0], x[1], y[1], y[2] = 1.5, -2.0, 3.0, 0.25
+    assert list(x & y) == [0.0, -2.0, 0.0]
+    assert list(x | y) == [1.5, 3.0, 0.25]
+    assert list(x - y) == [1.5, -5.0, -0.25]
+    assert DS.ComputeL1Norm(x, y) == 6.75
+    assert list(pickle.loads(pickle.dumps(x))) == [1.5, -2.0, 0.0]
+    with pytest.raises(IndexError):
+        x[3]
