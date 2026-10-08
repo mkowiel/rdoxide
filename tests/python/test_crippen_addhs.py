@@ -101,3 +101,16 @@ def test_addhs_coordinates():
     assert len(got) == len(expected)
     for g, e in zip(got, expected):
         assert g == pytest.approx(e, abs=1e-6)
+
+
+def test_crippen_bool_args_accept_ints():
+    # upstream's bool converter takes any object by truthiness, so 1/0 act as True/False
+    smi = "Oc1ccccc1/C=N/NC(=O)c1ccncc1"
+    assert Crippen.MolLogP(Chem.MolFromSmiles(smi), includeHs=1) == pytest.approx(
+      Crippen.MolLogP(Chem.MolFromSmiles(smi), includeHs=True))
+    assert Crippen.MolLogP(Chem.MolFromSmiles(smi), includeHs=0) == pytest.approx(
+      Crippen.MolLogP(Chem.MolFromSmiles(smi), includeHs=False))
+    assert rdMolDescriptors.CalcCrippenDescriptors(Chem.MolFromSmiles(smi), 0,
+                                                    1) == pytest.approx(
+                                                      rdMolDescriptors.CalcCrippenDescriptors(
+                                                        Chem.MolFromSmiles(smi), False, True))

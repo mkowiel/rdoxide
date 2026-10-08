@@ -5,6 +5,7 @@
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
+use rdoxide::graphmol::descriptors::connectivity::{self as conn, PHI_VERSION};
 use rdoxide::graphmol::descriptors::crippen::{
     CRIPPEN_VERSION, calc_crippen_descriptors, get_crippen_atom_contribs,
 };
@@ -530,16 +531,17 @@ fn get_maccs_keys_fingerprint(mol: PyRef<'_, PyMol>) -> PyResult<PyExplicitBitVe
 #[pyfunction]
 #[pyo3(
     name = "_CalcCrippenContribs",
-    signature = (mol, force = false, atomTypes = None, atomTypeLabels = None)
+    signature = (mol, force = None, atomTypes = None, atomTypeLabels = None)
 )]
 #[allow(non_snake_case)]
 fn calc_crippen_contribs<'py>(
     py: Python<'py>,
     mol: &Bound<'py, PyMol>,
-    force: bool,
+    force: Option<&Bound<'py, PyAny>>,
     atomTypes: Option<Bound<'py, PyList>>,
     atomTypeLabels: Option<Bound<'py, PyList>>,
 ) -> PyResult<Bound<'py, PyList>> {
+    let force = bool_arg(force, false)?;
     let mut m = mol.borrow_mut();
     let n = m.mol.num_atoms() as usize;
     let n_types = atomTypes.as_ref().map_or(0, |l| l.len());
@@ -576,21 +578,29 @@ fn calc_crippen_contribs<'py>(
     Ok(contribs)
 }
 
+/// A bool-typed argument with a default. Upstream's Boost.Python bool converter
+/// accepts any object, converting it by truthiness (`includeHs=1` is `True`).
+fn bool_arg(v: Option<&Bound<'_, PyAny>>, default: bool) -> PyResult<bool> {
+    v.map_or(Ok(default), |v| v.is_truthy())
+}
+
 /// `CalcCrippenDescriptors(mol, includeHs=True, force=False)`: the Wildman-Crippen
 /// (logP, MR) pair of a molecule.
 #[pyfunction]
 #[pyo3(
     name = "CalcCrippenDescriptors",
-    signature = (mol, includeHs = true, force = false)
+    signature = (mol, includeHs = None, force = None)
 )]
 #[allow(non_snake_case)]
 fn calc_crippen_descriptors_py(
     mol: &Bound<'_, PyMol>,
-    includeHs: bool,
-    force: bool,
+    includeHs: Option<&Bound<'_, PyAny>>,
+    force: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<(f64, f64)> {
+    let include_hs = bool_arg(includeHs, true)?;
+    let force = bool_arg(force, false)?;
     let mut m = mol.borrow_mut();
-    calc_crippen_descriptors(&mut m.mol, includeHs, force).py()
+    calc_crippen_descriptors(&mut m.mol, include_hs, force).py()
 }
 
 /// Defines `(mol) -> count` functions over a shared molecule borrow.
@@ -626,6 +636,7 @@ mol_count_fn!(calc_num_amide_bonds, "CalcNumAmideBonds", u32, |m| {
 mol_count_fn!(calc_num_rings, "CalcNumRings", u32, |m| {
     lip::calc_num_rings(m).py()
 });
+mol_count_fn!(calc_phi, "CalcPhi", f64, |m| { conn::calc_phi(m).py() });
 mol_count_fn!(calc_fraction_csp3, "CalcFractionCSP3", f64, |m| {
     lip::calc_fraction_csp3(m).py()
 });
@@ -775,6 +786,7 @@ const LIPINSKI_VERSIONS: &[(&str, &str)] = &[
     ("_CalcNumAmideBonds_version", lip::NUM_AMIDE_BONDS_VERSION),
     ("_CalcFractionCSP3_version", lip::FRACTION_CSP3_VERSION),
     ("_CalcNumRings_version", lip::NUM_RINGS_VERSION),
+    ("_CalcPhi_version", PHI_VERSION),
     (
         "_CalcNumHeterocycles_version",
         lip::NUM_HETEROCYCLES_VERSION,
@@ -847,6 +859,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(calc_num_heteroatoms, m)?)?;
     m.add_function(wrap_pyfunction!(calc_num_amide_bonds, m)?)?;
     m.add_function(wrap_pyfunction!(calc_num_rings, m)?)?;
+    m.add_function(wrap_pyfunction!(calc_phi, m)?)?;
     m.add_function(wrap_pyfunction!(calc_fraction_csp3, m)?)?;
     m.add_function(wrap_pyfunction!(calc_num_heterocycles, m)?)?;
     m.add_function(wrap_pyfunction!(calc_num_aromatic_rings, m)?)?;

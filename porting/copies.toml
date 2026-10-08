@@ -102,3 +102,7 @@ to = "python/rdkit/Chem/MACCSkeys.py"
 [[copy]]
 from = "rdkit/Chem/Crippen.py"
 to = "python/rdkit/Chem/Crippen.py"
+
+[[copy]]
+from = "rdkit/Chem/Lipinski.py"
+to = "python/rdkit/Chem/Lipinski.py"
