@@ -52,7 +52,8 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 9 | RDKit FP generator (`GetRDKitFPGenerator`, `GetRDKitAtomInvGen`, `RDKitFingerprintOptions`; branched/linear paths, bond orders, query bonds, numBitsPerFeature via upstream's 4-word Mersenne twister) | ✅ | differential `rdkitfp` (6 configs + all output kinds): 5000/5000 identical |
 | 9 | Legacy `Chem.RDKFingerprint` (tgtDensity folding, atomBits, bitInfo) and `UnfoldedRDKFingerprintCountBased` | ✅ | differential `rdkfingerprint` 1300/1300 identical |
 | 9 | `rdMolDescriptors` legacy fingerprints: GetMorganFingerprint / GetHashedMorganFingerprint / GetMorganFingerprintAsBitVect (useFeatures, bitInfo), GetConnectivityInvariants, GetFeatureInvariants, GetAtomPair(Atom)Code, (Hashed) atom pairs and topological torsions (+AsBitVect), deprecation warnings; `GetMorganFeatureAtomInvGen` | ✅ | differential `moldescfp` 5000/5000 identical |
-| 9 | LayeredFingerprint, PatternFingerprint, MACCS, other rdMolDescriptors descriptors, JSON (de)serialization, GetFPs bulk helpers, legacy `GetMorganFingerprint*` (rdMolDescriptors), MACCS, pattern/layered fingerprints | ⬜ | |
+| 9 | MACCS keys (`rdMolDescriptors.GetMACCSKeysFingerprint`, verbatim `Chem/MACCSkeys.py`); `maccs.rs` is generated from upstream `MACCS.cpp` by `tools/gen_maccs.py` (then `cargo fmt`) | ✅ | differential `maccs` 15300/15300 identical |
+| 9 | LayeredFingerprint, PatternFingerprint, other rdMolDescriptors descriptors, JSON (de)serialization, GetFPs bulk helpers, legacy `GetMorganFingerprint*` (rdMolDescriptors), MACCS, pattern/layered fingerprints | ⬜ | |
 | 7–13 | see PLAN.md | ⬜ | |
 
 ## Python package files
@@ -64,6 +65,8 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | `rdkit/rdBase.py`, `rdkit/Chem/rdchem.py`, `rdkit/Geometry/rdGeometry.py` | shims → `rdkit._rdoxide` |
 | `rdkit/DataStructs/{__init__,TopNContainer,BitUtils,VectCollection,LazySignature,BitEnsemble}.py` | verbatim upstream |
 | `rdkit/DataStructs/cDataStructs.py` | shim → `rdkit._rdoxide` |
+| `rdkit/Chem/MACCSkeys.py` | verbatim upstream |
+| `rdkit/Chem/rdFingerprintGenerator.py`, `rdkit/Chem/rdMolDescriptors.py` | shims → `rdkit._rdoxide` |
 | `rdkit/Chem/__init__.py`, `rdkit/Geometry/__init__.py` | provisional (until rdmolfiles/rdmolops/DataStructs exist) |
 
 ## Iteration log
@@ -153,3 +156,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-08 — Stage 9e: RDKit FP generator (CI back; #17-#19 merged, merged branches deleted). Next: legacy fingerprint functions (rdMolDescriptors / Chem.RDKFingerprint, AllChem.GetMorganFingerprint*), MACCS, pattern FP.
 * 2026-10-08 — Stage 9f: legacy RDKFingerprint. Next: rdMolDescriptors legacy Morgan / atom pairs / torsions, MACCS.
 * 2026-10-08 — Stage 9g: rdMolDescriptors legacy fingerprints. Next: MACCS keys, then descriptors (rdMolDescriptors / Descriptors).
+* 2026-10-08 — Stage 9h: MACCS keys. Next: descriptors (rdMolDescriptors: CalcNumAtoms, formula, MW, ring counts, Lipinski counts, TPSA, logP/MR (Crippen), ...).
