@@ -364,6 +364,10 @@ def moldescfp_record(smi):
 
 
 def dump(mode, smi):
+    if mode == "maccs":
+        from rdkit.Chem import MACCSkeys
+        m = Chem.MolFromSmiles(smi)
+        return None if m is None else list(MACCSkeys.GenMACCSKeys(m).GetOnBits())
     if mode == "moldescfp":
         from rdkit import RDLogger
         RDLogger.DisableLog("rdApp.*")

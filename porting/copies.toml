@@ -94,3 +94,7 @@ to = "python/rdkit/DataStructs/LazySignature.py"
 [[copy]]
 from = "rdkit/DataStructs/BitEnsemble.py"
 to = "python/rdkit/DataStructs/BitEnsemble.py"
+
+[[copy]]
+from = "rdkit/Chem/MACCSkeys.py"
+to = "python/rdkit/Chem/MACCSkeys.py"

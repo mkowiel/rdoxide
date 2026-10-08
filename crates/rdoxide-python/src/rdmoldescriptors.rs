@@ -510,6 +510,15 @@ fn get_hashed_topological_torsion_fingerprint_bv(
     Ok(PyExplicitBitVect::wrap(r))
 }
 
+/// Returns the MACCS keys for a molecule as an ExplicitBitVect
+#[pyfunction]
+#[pyo3(name = "GetMACCSKeysFingerprint", signature = (mol))]
+fn get_maccs_keys_fingerprint(mol: PyRef<'_, PyMol>) -> PyResult<PyExplicitBitVect> {
+    Ok(PyExplicitBitVect::wrap(
+        rdoxide::graphmol::fingerprints::maccs::get_fingerprint_as_bit_vect(&mol.mol).py()?,
+    ))
+}
+
 pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add(
         "__doc__",
@@ -517,6 +526,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     )?;
     m.add("_MorganFingerprint_version", "1.0.0")?;
     m.add_function(wrap_pyfunction!(get_morgan_fingerprint, m)?)?;
+    m.add_function(wrap_pyfunction!(get_maccs_keys_fingerprint, m)?)?;
     m.add_function(wrap_pyfunction!(get_hashed_morgan_fingerprint, m)?)?;
     m.add_function(wrap_pyfunction!(get_morgan_fingerprint_bv, m)?)?;
     m.add_function(wrap_pyfunction!(get_connectivity_invariants_py, m)?)?;
