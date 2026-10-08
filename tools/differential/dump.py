@@ -588,6 +588,38 @@ def gasteiger_record(smi):
     }
 
 
+def connectivity_record(smi):
+    """Chi/Kappa/Hall-Kier/Phi (ConnectivityDescriptors.cpp), on the molecule and on its explicit-H form."""
+    from rdkit.Chem import rdMolDescriptors as D
+    m = Chem.MolFromSmiles(smi)
+    if m is None:
+        return None
+
+    def attempt(fn):
+        try:
+            return fn()
+        except Exception as e:  # noqa: BLE001
+            return type(e).__name__
+
+    def record(mol):
+        res = {}
+        for name in ("Chi0v", "Chi1v", "Chi2v", "Chi3v", "Chi4v", "Chi0n", "Chi1n", "Chi2n", "Chi3n", "Chi4n",
+                     "HallKierAlpha", "Kappa1", "Kappa2", "Kappa3", "Phi"):
+            res[name] = attempt(lambda: getattr(D, "Calc" + name)(Chem.Mol(mol)))
+        res["ChiNv5"] = attempt(lambda: D.CalcChiNv(Chem.Mol(mol), 5))
+        res["ChiNn1"] = attempt(lambda: D.CalcChiNn(Chem.Mol(mol), 1, True))
+        res["ChiNnForce"] = attempt(lambda: D.CalcChiNn(Chem.Mol(mol), 3, force=True))
+
+        def contribs():
+            lst = [0.0] * mol.GetNumAtoms()
+            total = D.CalcHallKierAlpha(Chem.Mol(mol), lst)
+            return [total, lst]
+        res["alphaContribs"] = attempt(contribs)
+        return res
+
+    return {"plain": record(m), "withHs": record(Chem.AddHs(m))}
+
+
 def lipinski_record(smi):
     """rdMolDescriptors counts (Lipinski.cpp), with the rotatable-bond modes and the atom lists."""
     from rdkit.Chem import rdMolDescriptors as D
@@ -639,6 +671,8 @@ def dump(mode, smi):
         return molsurf_record(smi)
     if mode == "gasteiger":
         return gasteiger_record(smi)
+    if mode == "connectivity":
+        return connectivity_record(smi)
     if mode == "crippen":
         return crippen_record(smi)
     if mode == "addhs":

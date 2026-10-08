@@ -5,7 +5,6 @@
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
-use rdoxide::graphmol::descriptors::connectivity::{self as conn, PHI_VERSION};
 use rdoxide::graphmol::descriptors::crippen::{
     CRIPPEN_VERSION, calc_crippen_descriptors, get_crippen_atom_contribs,
 };
@@ -636,7 +635,6 @@ mol_count_fn!(calc_num_amide_bonds, "CalcNumAmideBonds", u32, |m| {
 mol_count_fn!(calc_num_rings, "CalcNumRings", u32, |m| {
     lip::calc_num_rings(m).py()
 });
-mol_count_fn!(calc_phi, "CalcPhi", f64, |m| conn::calc_phi(m).py());
 mol_count_fn!(calc_fraction_csp3, "CalcFractionCSP3", f64, |m| {
     lip::calc_fraction_csp3(m).py()
 });
@@ -786,7 +784,6 @@ const LIPINSKI_VERSIONS: &[(&str, &str)] = &[
     ("_CalcNumAmideBonds_version", lip::NUM_AMIDE_BONDS_VERSION),
     ("_CalcFractionCSP3_version", lip::FRACTION_CSP3_VERSION),
     ("_CalcNumRings_version", lip::NUM_RINGS_VERSION),
-    ("_CalcPhi_version", PHI_VERSION),
     (
         "_CalcNumHeterocycles_version",
         lip::NUM_HETEROCYCLES_VERSION,
@@ -859,9 +856,9 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(calc_num_heteroatoms, m)?)?;
     m.add_function(wrap_pyfunction!(calc_num_amide_bonds, m)?)?;
     m.add_function(wrap_pyfunction!(calc_num_rings, m)?)?;
-    m.add_function(wrap_pyfunction!(calc_phi, m)?)?;
     crate::rdmoldescriptors_props::init(m)?;
     crate::rdmoldescriptors_molsurf::init(m)?;
+    crate::rdmoldescriptors_connectivity::init(m)?;
     m.add_function(wrap_pyfunction!(calc_fraction_csp3, m)?)?;
     m.add_function(wrap_pyfunction!(calc_num_heterocycles, m)?)?;
     m.add_function(wrap_pyfunction!(calc_num_aromatic_rings, m)?)?;
