@@ -30,7 +30,7 @@ use crate::stereo_group::PyStereoGroup;
 ///           molecule itself is modified, for example).
 ///         Molecules also have the concept of *private* properties, which are tagged
 ///           by beginning the property name with an underscore (_).
-#[pyclass(name = "Mol", module = "rdkit.Chem.rdchem", subclass, weakref)]
+#[pyclass(name = "Mol", module = "rdkit.Chem.rdchem", subclass, weakref, dict)]
 #[derive(Debug)]
 pub struct PyMol {
     pub mol: ROMol,
@@ -53,22 +53,26 @@ impl_props!(PyMol, computed = true, dict_defaults = (false, false));
 
 /// Arguments accepted by the `Mol(...)` constructor.
 #[derive(FromPyObject)]
-#[allow(dead_code)] // pickle payloads are decoded once MolPickler lands (stage 6)
 enum MolInit<'py> {
     Mol(PyRef<'py, PyMol>),
     Bytes(Vec<u8>),
     Str(String),
 }
 
-fn make_mol(other: Option<MolInit<'_>>, quick_copy: bool, conf_id: i32) -> PyResult<ROMol> {
+fn make_mol(
+    other: Option<MolInit<'_>>,
+    quick_copy: bool,
+    conf_id: i32,
+    pickle_flags: u32,
+) -> PyResult<ROMol> {
     match other {
         None => Ok(ROMol::new()),
         Some(MolInit::Mol(m)) => Ok(ROMol::copy_from(&m.mol, quick_copy, conf_id)),
-        Some(MolInit::Bytes(_)) | Some(MolInit::Str(_)) => {
-            // MolPickler is ported in stage 6
-            Err(PyRuntimeError::new_err(
-                "rdoxide: molecule pickles are not supported yet",
-            ))
+        Some(MolInit::Bytes(b)) => {
+            rdoxide::graphmol::pickle::mol_from_pickle(&b, pickle_flags).py()
+        }
+        Some(MolInit::Str(s)) => {
+            rdoxide::graphmol::pickle::mol_from_pickle(s.as_bytes(), pickle_flags).py()
         }
     }
 }
@@ -86,6 +90,62 @@ impl PyMol {
 
     fn __copy__(slf: &Bound<'_, Self>) -> PyResult<Py<PyAny>> {
         copy_same_type(slf)
+    }
+
+    /// Returns a binary string representation of the molecule.
+    ///
+    /// Alternatively: ToBinary(propertyFlags) to choose which properties are included.
+    #[pyo3(name = "ToBinary", signature = (propertyFlags = None))]
+    #[allow(non_snake_case)]
+    fn to_binary<'py>(
+        &self,
+        py: Python<'py>,
+        propertyFlags: Option<u32>,
+    ) -> PyResult<Bound<'py, pyo3::types::PyBytes>> {
+        use rdoxide::graphmol::pickle::{get_default_pickle_properties, pickle_mol};
+        let flags = propertyFlags.unwrap_or_else(get_default_pickle_properties);
+        let m = &self.mol;
+        let bytes = py.detach(|| pickle_mol(m, flags)).py()?;
+        Ok(pyo3::types::PyBytes::new(py, &bytes))
+    }
+
+    /// `rdkit_pickle_suite`: `(type(self), (self.ToBinary(),), (self.__dict__,))`
+    fn __reduce__<'py>(slf: &Bound<'py, Self>) -> PyResult<Bound<'py, PyTuple>> {
+        let py = slf.py();
+        let bin = slf.call_method0("ToBinary")?;
+        let dict = slf.getattr("__dict__")?;
+        PyTuple::new(
+            py,
+            [
+                slf.get_type().into_any(),
+                PyTuple::new(py, [bin])?.into_any(),
+                PyTuple::new(py, [dict])?.into_any(),
+            ],
+        )
+    }
+
+    fn __getinitargs__<'py>(slf: &Bound<'py, Self>) -> PyResult<Bound<'py, PyTuple>> {
+        PyTuple::new(slf.py(), [slf.call_method0("ToBinary")?])
+    }
+
+    fn __getstate__<'py>(slf: &Bound<'py, Self>) -> PyResult<Bound<'py, PyTuple>> {
+        PyTuple::new(slf.py(), [slf.getattr("__dict__")?])
+    }
+
+    fn __setstate__(slf: &Bound<'_, Self>, state: &Bound<'_, PyAny>) -> PyResult<()> {
+        let state = state.cast::<PyTuple>().map_err(|_| {
+            pyo3::exceptions::PyValueError::new_err(format!(
+                "expected 1-item tuple in call to __setstate__; got {state}"
+            ))
+        })?;
+        if state.len() != 1 {
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "expected 1-item tuple in call to __setstate__; got {state}"
+            )));
+        }
+        slf.getattr("__dict__")?
+            .call_method1("update", (state.get_item(0)?,))?;
+        Ok(())
     }
 
     #[pyo3(signature = (memo))]
@@ -369,10 +429,20 @@ impl PyMol {
         quick_copy: bool,
         conf_id: i32,
     ) -> PyResult<ROMol> {
+        use rdoxide::graphmol::pickle::flags::ALL_PROPS;
         match args.len() {
-            0 => make_mol(None, quick_copy, conf_id),
+            0 => make_mol(None, quick_copy, conf_id, ALL_PROPS),
             1..=3 => {
                 let first: MolInit<'_> = args.get_item(0)?.extract()?;
+                if matches!(first, MolInit::Bytes(_) | MolInit::Str(_)) {
+                    // Mol(pklString) / Mol(pklString, propertyFlags)
+                    let flags = if args.len() > 1 {
+                        args.get_item(1)?.extract::<u32>()?
+                    } else {
+                        ALL_PROPS
+                    };
+                    return make_mol(Some(first), quick_copy, conf_id, flags);
+                }
                 let qc = if args.len() > 1 {
                     args.get_item(1)?.extract::<bool>()?
                 } else {
@@ -383,7 +453,7 @@ impl PyMol {
                 } else {
                     conf_id
                 };
-                make_mol(Some(first), qc, cid)
+                make_mol(Some(first), qc, cid, ALL_PROPS)
             }
             _ => Err(PyTypeError::new_err(
                 "Mol() takes at most 3 positional arguments",

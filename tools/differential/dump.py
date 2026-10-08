@@ -141,6 +141,26 @@ def dump(mode, smi):
         run("bond_smarts", lambda: [b.GetSmarts() for b in m.GetBonds()])
         run("roundtrip", lambda: Chem.MolToSmarts(Chem.MolFromSmarts(Chem.MolToSmarts(m))))
         return out
+    if mode in ("pickle", "picklesmarts"):
+        m = Chem.MolFromSmiles(smi) if mode == "pickle" else Chem.MolFromSmarts(smi)
+        if m is None:
+            return None
+        P = Chem.PropertyPickleOptions
+        out = {}
+        for key, flags in (("default", None), ("all", P.AllProps),
+                           ("all_double", P.AllProps | P.CoordsAsDouble),
+                           ("noconf_mol", P.MolProps | P.NoConformers)):
+            try:
+                b = m.ToBinary() if flags is None else m.ToBinary(flags)
+                back = Chem.Mol(b)
+                out[key] = [b.hex(), back.GetNumAtoms(), back.GetNumBonds(),
+                            Chem.MolToSmiles(back) if mode == "pickle" else Chem.MolToSmarts(back),
+                            sorted(back.GetPropsAsDict(True, True).items(), key=str),
+                            [sorted(a.GetPropsAsDict(True, True).items(), key=str) for a in back.GetAtoms()],
+                            list(map(list, back.GetRingInfo().AtomRings()))]
+            except Exception as e:  # noqa: BLE001
+                out[key] = "EXC:" + type(e).__name__ + ":" + str(e)[:80]
+        return out
     if mode == "substruct":
         m = Chem.MolFromSmiles(smi)
         if m is None:
@@ -236,7 +256,7 @@ def main():
                 res = dump(mode, smi)
             except Exception as e:  # noqa: BLE001
                 res = {"exception": type(e).__name__}
-            print(json.dumps([smi, res]))
+            print(json.dumps([smi, res], default=list))
 
 
 if __name__ == "__main__":

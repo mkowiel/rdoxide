@@ -14,6 +14,9 @@ pub enum RDKitError {
     Key(String),
     /// `IndexErrorException` -> `IndexError`
     Index(String),
+    /// `std::runtime_error` and friends (e.g. `MolPicklerException`) ->
+    /// `RuntimeError` with the plain message.
+    Runtime(String),
     /// Sanitization failures (`MolSanitizeException` hierarchy).
     Sanitize(SanitizeError),
 }
@@ -78,7 +81,10 @@ impl fmt::Display for RDKitError {
                     crate::rdgeneral::RDKIT_VERSION
                 )
             }
-            RDKitError::Value(m) | RDKitError::Key(m) | RDKitError::Index(m) => f.write_str(m),
+            RDKitError::Value(m)
+            | RDKitError::Key(m)
+            | RDKitError::Index(m)
+            | RDKitError::Runtime(m) => f.write_str(m),
             RDKitError::Sanitize(e) => match e {
                 SanitizeError::Generic { message }
                 | SanitizeError::AtomValence { message, .. }
