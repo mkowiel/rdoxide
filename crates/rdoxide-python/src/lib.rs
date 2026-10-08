@@ -10,6 +10,7 @@ use pyo3::types::PyDict;
 mod atom;
 mod bond;
 mod conformer;
+mod datastructs;
 mod debug;
 mod enums;
 mod enums_impl;
@@ -65,5 +66,11 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
     add_submodule(m, "rdmolfiles", "rdkit.Chem.rdmolfiles", rdmolfiles::init)?;
     add_submodule(m, "rdmolops", "rdkit.Chem.rdmolops", rdmolops::init)?;
     add_submodule(m, "rdDepictor", "rdkit.Chem.rdDepictor", rddepictor::init)?;
+    add_submodule(
+        m,
+        "cDataStructs",
+        "rdkit.DataStructs.cDataStructs",
+        datastructs::init,
+    )?;
     Ok(())
 }

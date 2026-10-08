@@ -318,3 +318,27 @@
 
 [module."rdoxide_python::rdmolfiles_sdwriter".sources]
 "Code/GraphMol/Wrap/SDWriter.cpp" = "88a92d85958a621ba2c4972fe4278fbcd5ac3753"
+
+[module."rdoxide::datastructs".sources]
+"Code/DataStructs/BitVectUtils.h" = "d6d77207a164765acd185f2b71fb36606a0c8b71"
+
+[module."rdoxide::datastructs::bit_vect".sources]
+"Code/DataStructs/BitVect.cpp" = "e8547dfa43c9f18f069f308696178b812e9b6439"
+"Code/DataStructs/BitVect.h" = "8ed55566abac20c5bb17b9c8b180b4ac75726a9f"
+"Code/DataStructs/ExplicitBitVect.cpp" = "7ddde13479f22084356233268c2897b004120c39"
+"Code/DataStructs/ExplicitBitVect.h" = "252ba1ef48f07972ef04683350e87073ee0fcba7"
+"Code/DataStructs/SparseBitVect.cpp" = "801bf8aaebe83fa083c9f70e76d954296bae0a30"
+"Code/DataStructs/SparseBitVect.h" = "879f8da477bf386fde873a409a94f9934ca33af8"
+"Code/DataStructs/base64.cpp" = "a03864baf7232bfcca80f8efdf3edb8251727580"
+"Code/DataStructs/base64.h" = "05a70b0212b35f3a1e6249437e02ed23461101c7"
+
+[module."rdoxide::datastructs::bit_ops".sources]
+"Code/DataStructs/BitOps.cpp" = "60e8b371375b015429b458295e735f778efe2cb7"
+"Code/DataStructs/BitOps.h" = "e18431058bd84a3adb2a0101abc687526623a54b"
+
+[module."rdoxide_python::datastructs".sources]
+"Code/DataStructs/Wrap/DataStructs.cpp" = "4b28e37bc4881df060259a715912bb2fbcbd887c"
+"Code/DataStructs/Wrap/wrap_BitOps.cpp" = "cd1280597fecd22e676956edf4d5682477b47158"
+"Code/DataStructs/Wrap/wrap_ExplicitBV.cpp" = "90eabc9c0e97a3f2a2ebde9621a17c5a9d871ccc"
+"Code/DataStructs/Wrap/wrap_SparseBV.cpp" = "a6a1b885ffd3ae6731dd2086ee6ededf50b90b64"
+"Code/DataStructs/Wrap/wrap_Utils.cpp" = "eb020c2fe13c558f63b01cfc746c9966e839a62c"
