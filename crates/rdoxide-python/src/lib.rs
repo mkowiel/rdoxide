@@ -26,6 +26,7 @@ mod rdchem;
 mod rddepictor;
 mod rdfingerprintgenerator;
 mod rdmoldescriptors;
+mod rdmoldescriptors_props;
 mod rdmolfiles;
 mod rdmolfiles_molblock;
 mod rdmolfiles_molwrite;

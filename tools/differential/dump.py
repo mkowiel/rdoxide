@@ -456,6 +456,57 @@ def crippen_record(smi):
     return res
 
 
+def molprops_record(smi):
+    """MolWt/ExactMolWt/formula/atom counts (MolProps.cpp), also with explicit Hs, isotopes and charges."""
+    from rdkit.Chem import rdMolDescriptors as D
+    m = Chem.MolFromSmiles(smi)
+    if m is None:
+        return None
+
+    def attempt(fn):
+        try:
+            return fn()
+        except Exception as e:  # noqa: BLE001
+            return type(e).__name__
+
+    def record(mol):
+        return {
+            "amw": attempt(lambda: D._CalcMolWt(mol)),
+            "amwHeavy": attempt(lambda: D._CalcMolWt(mol, True)),
+            "exact": attempt(lambda: D.CalcExactMolWt(mol)),
+            "exactHeavy": attempt(lambda: D.CalcExactMolWt(mol, onlyHeavy=True)),
+            "formula": attempt(lambda: D.CalcMolFormula(mol)),
+            "formulaIso": attempt(lambda: D.CalcMolFormula(mol, True)),
+            "formulaIsoNoAbbrev": attempt(lambda: D.CalcMolFormula(mol, True, False)),
+            "heavy": attempt(lambda: D.CalcNumHeavyAtoms(mol)),
+            "atoms": attempt(lambda: D.CalcNumAtoms(mol)),
+        }
+
+    def isotopes(mol):
+        mm = Chem.RWMol(mol)
+        for a in mm.GetAtoms():
+            if a.GetAtomicNum() == 1:
+                a.SetIsotope(2 if a.GetIdx() % 2 else 3)
+            elif a.GetIdx() == 0:
+                a.SetIsotope(13)
+        return mm
+
+    def charged(mol):
+        mm = Chem.RWMol(mol)
+        if mm.GetNumAtoms():
+            mm.GetAtomWithIdx(0).SetFormalCharge(mm.GetAtomWithIdx(0).GetFormalCharge() + 1)
+            mm.UpdatePropertyCache(strict=False)
+        return mm
+
+    withHs = Chem.AddHs(m)
+    return {
+        "plain": record(m),
+        "withHs": record(withHs),
+        "isotopes": record(isotopes(withHs)),
+        "charged": record(charged(m)),
+    }
+
+
 def lipinski_record(smi):
     """rdMolDescriptors counts (Lipinski.cpp), with the rotatable-bond modes and the atom lists."""
     from rdkit.Chem import rdMolDescriptors as D
@@ -501,6 +552,8 @@ def lipinski_record(smi):
 def dump(mode, smi):
     if mode == "lipinski":
         return lipinski_record(smi)
+    if mode == "molprops":
+        return molprops_record(smi)
     if mode == "crippen":
         return crippen_record(smi)
     if mode == "addhs":
