@@ -423,3 +423,10 @@
 [module."rdoxide::graphmol::descriptors::lipinski".sources]
 "Code/GraphMol/Descriptors/Lipinski.cpp" = "a64fd400dcf9beb0b38953db241a290d6501f806"
 "Code/GraphMol/Descriptors/Lipinski.h" = "9acfde68b709cd71c20213c762656c6d400e1d41"
+
+[module."rdoxide::rdgeneral::threads".sources]
+"Code/RDGeneral/RDThreads.h" = "c42c3d73acc8c523ce73ed54840668e5402d78ff"
+
+[module."rdoxide::graphmol::descriptors::connectivity".sources]
+"Code/GraphMol/Descriptors/ConnectivityDescriptors.cpp" = "365d3a54611181c6c40619750cc313fe93d072ee"
+"Code/GraphMol/Descriptors/ConnectivityDescriptors.h" = "238cd325edab2a036851cb4dbecf0493456120f1"

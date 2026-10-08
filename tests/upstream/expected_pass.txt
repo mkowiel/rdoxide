@@ -91,8 +91,11 @@ rdkit/Chem/UnitTestChemSmarts.py::TestCase::testOrder
 rdkit/Chem/UnitTestCrippen.py::TestCase::testDetails
 rdkit/Chem/UnitTestCrippen.py::TestCase::testDetails2
 rdkit/Chem/UnitTestCrippen.py::TestCase::testIssue1749494
+rdkit/Chem/UnitTestCrippen.py::TestCase::testIssue80
 rdkit/Chem/UnitTestCrippen.py::TestCase::testLogP
 rdkit/Chem/UnitTestCrippen.py::TestCase::testRepeat
+rdkit/Chem/UnitTestLipinski.py::TestCase::test1
+rdkit/Chem/UnitTestLipinski.py::TestCase::testIssue2183420
 rdkit/Chem/UnitTestSmiles.py::TestCase::testFailures
 rdkit/Chem/UnitTestSmiles.py::TestCase::testHighSymmetry
 rdkit/Chem/UnitTestSmiles.py::TestCase::testLinear1

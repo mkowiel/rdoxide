@@ -11,6 +11,8 @@ use rdoxide::graphmol::fingerprints::{
     AdditionalOutput, AtomInvariantsGenerator, BondInvariantsGenerator, EnvGenerator,
     FingerprintArguments, FingerprintFuncArguments, FingerprintGenerator,
 };
+use rdoxide::graphmol::romol::ROMol;
+use rdoxide::rdgeneral::threads::par_map;
 
 use crate::datastructs::{PyExplicitBitVect, PySparseBitVect};
 use crate::datastructs_siv::{PyUIntSIV, PyULongSIV};
@@ -396,59 +398,58 @@ impl PyFPGen {
     }
 
     #[pyo3(name = "GetFingerprints", signature = (mols, numThreads = 1))]
-    #[allow(non_snake_case, unused_variables)]
+    #[allow(non_snake_case)]
     fn get_fingerprints<'py>(
         &self,
         py: Python<'py>,
         mols: &Bound<'py, PyAny>,
         numThreads: i32,
     ) -> PyResult<Bound<'py, PyTuple>> {
-        self.bulk(py, mols, |g, m| {
+        self.bulk(py, mols, numThreads, |g, m| {
             Ok(PyExplicitBitVect::wrap(
-                g.fingerprint(m, &mut Default::default()).py()?,
+                g.fingerprint(m, &mut Default::default())?,
             ))
         })
     }
     #[pyo3(name = "GetCountFingerprints", signature = (mols, numThreads = 1))]
-    #[allow(non_snake_case, unused_variables)]
+    #[allow(non_snake_case)]
     fn get_count_fingerprints<'py>(
         &self,
         py: Python<'py>,
         mols: &Bound<'py, PyAny>,
         numThreads: i32,
     ) -> PyResult<Bound<'py, PyTuple>> {
-        self.bulk(py, mols, |g, m| {
+        self.bulk(py, mols, numThreads, |g, m| {
             Ok(PyUIntSIV::wrap(
-                g.count_fingerprint(m, &mut Default::default()).py()?,
+                g.count_fingerprint(m, &mut Default::default())?,
             ))
         })
     }
     #[pyo3(name = "GetSparseFingerprints", signature = (mols, numThreads = 1))]
-    #[allow(non_snake_case, unused_variables)]
+    #[allow(non_snake_case)]
     fn get_sparse_fingerprints<'py>(
         &self,
         py: Python<'py>,
         mols: &Bound<'py, PyAny>,
         numThreads: i32,
     ) -> PyResult<Bound<'py, PyTuple>> {
-        self.bulk(py, mols, |g, m| {
+        self.bulk(py, mols, numThreads, |g, m| {
             Ok(PySparseBitVect::wrap(
-                g.sparse_fingerprint(m, &mut Default::default()).py()?,
+                g.sparse_fingerprint(m, &mut Default::default())?,
             ))
         })
     }
     #[pyo3(name = "GetSparseCountFingerprints", signature = (mols, numThreads = 1))]
-    #[allow(non_snake_case, unused_variables)]
+    #[allow(non_snake_case)]
     fn get_sparse_count_fingerprints<'py>(
         &self,
         py: Python<'py>,
         mols: &Bound<'py, PyAny>,
         numThreads: i32,
     ) -> PyResult<Bound<'py, PyTuple>> {
-        self.bulk(py, mols, |g, m| {
+        self.bulk(py, mols, numThreads, |g, m| {
             Ok(PyULongSIV::wrap(
-                g.sparse_count_fingerprint(m, &mut Default::default())
-                    .py()?,
+                g.sparse_count_fingerprint(m, &mut Default::default())?,
             ))
         })
     }
@@ -482,21 +483,41 @@ impl PyFPGen {
 }
 
 impl PyFPGen {
-    fn bulk<'py, T: pyo3::PyClass + Into<PyClassInitializer<T>>>(
+    /// Runs `f` over every molecule of `mols` (`None` entries stay `None`) on
+    /// `numThreads` threads with the GIL released. Results keep the input
+    /// order and the first error in that order is raised.
+    fn bulk<'py, T>(
         &self,
         py: Python<'py>,
         mols: &Bound<'py, PyAny>,
-        f: impl Fn(&FingerprintGenerator, &rdoxide::graphmol::romol::ROMol) -> PyResult<T>,
-    ) -> PyResult<Bound<'py, PyTuple>> {
-        let mut out = Vec::new();
+        num_threads: i32,
+        f: impl Fn(&FingerprintGenerator, &ROMol) -> rdoxide::error::Result<T> + Sync,
+    ) -> PyResult<Bound<'py, PyTuple>>
+    where
+        T: pyo3::PyClass + Into<PyClassInitializer<T>> + Send,
+    {
+        let mut borrowed = Vec::new();
         for m in mols.try_iter()? {
             let m = m?;
-            if m.is_none() {
-                out.push(py.None());
-                continue;
-            }
-            let m = m.extract::<PyRef<'_, PyMol>>()?;
-            out.push(Py::new(py, f(&self.gen_, &m.mol)?)?.into_any());
+            borrowed.push(if m.is_none() {
+                None
+            } else {
+                Some(m.extract::<PyRef<'_, PyMol>>()?)
+            });
+        }
+        let refs: Vec<Option<&ROMol>> = borrowed
+            .iter()
+            .map(|m| m.as_ref().map(|m| &m.mol))
+            .collect();
+        let gen_ = &self.gen_;
+        let results =
+            py.detach(|| par_map(&refs, num_threads, |m| m.map(|m| f(gen_, m)).transpose()));
+        let mut out = Vec::with_capacity(results.len());
+        for r in results {
+            out.push(match r.py()? {
+                Some(v) => Py::new(py, v)?.into_any(),
+                None => py.None(),
+            });
         }
         PyTuple::new(py, out)
     }

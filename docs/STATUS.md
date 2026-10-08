@@ -6,7 +6,9 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 |-------|-----------|--------|-------|
 | 0 | Workspace, packaging (maturin, abi3-py310), CI, licenses, NOTICE | ✅ | |
 | 0 | `tools/sync_upstream.py` (fetch/regen/diff/stamp), `porting/manifest.toml` | ✅ | |
-| 0 | Upstream test ratchet (`tools/run_upstream_tests.py`) | ✅ | 169 upstream tests passing |
+| 0 | Multi-core: `rdgeneral::threads` (`getNumThreadsToUse`, order-preserving `par_map` on scoped threads, no dependency); `rdFingerprintGenerator.Get*Fingerprints(mols, numThreads)` run in parallel with the GIL released | ✅ | results independent of the thread count; 20k molecules RDKit-FP 2.4s -> 0.4s on 14 cores. Other batch APIs adopt `par_map` as they are ported |
+| 0 | Dependency license audit (`tools/check_licenses.py`, `LICENSES/CRATES.md`, CI step) | ✅ | permissive-only allow-list; 53 crates |
+| 0 | Upstream test ratchet (`tools/run_upstream_tests.py`) | ✅ | 172 upstream tests passing |
 | 1 | RDGeneral: Dict/RDValue/RDProps | ✅ | |
 | 1 | RDGeneral: RDLog + `rdBase` logging API | ✅ | upstream `UnitTestLogging.py` 32/32 |
 | 1 | RDGeneral: RNG (`boost::minstd_rand`, glibc `rand`) | ✅ | |
@@ -54,10 +56,10 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 9 | Legacy `Chem.RDKFingerprint` (tgtDensity folding, atomBits, bitInfo) and `UnfoldedRDKFingerprintCountBased` | ✅ | differential `rdkfingerprint` 1300/1300 identical |
 | 9 | `rdMolDescriptors` legacy fingerprints: GetMorganFingerprint / GetHashedMorganFingerprint / GetMorganFingerprintAsBitVect (useFeatures, bitInfo), GetConnectivityInvariants, GetFeatureInvariants, GetAtomPair(Atom)Code, (Hashed) atom pairs and topological torsions (+AsBitVect), deprecation warnings; `GetMorganFeatureAtomInvGen` | ✅ | differential `moldescfp` 5000/5000 identical |
 | 9 | MACCS keys (`rdMolDescriptors.GetMACCSKeysFingerprint`, verbatim `Chem/MACCSkeys.py`); `maccs.rs` is generated from upstream `MACCS.cpp` by `tools/gen_maccs.py` (then `cargo fmt`) | ✅ | differential `maccs` 15300/15300 identical |
-| 10a | Wildman-Crippen logP/MR: `CalcCrippenDescriptors` (includeHs, cached sums), `_CalcCrippenContribs` (atom types and labels, cache semantics), `rdkit.Chem.Crippen` (verbatim `MolLogP`/`MolMR`) | ✅ | differential `crippen` 15000/15000 (ZINC 10k + chiral 5k); upstream `UnitTestCrippen` 5/6 (`testIssue80` needs `Lipinski`) |
+| 10a | Wildman-Crippen logP/MR: `CalcCrippenDescriptors` (includeHs, cached sums), `_CalcCrippenContribs` (atom types and labels, cache semantics), `rdkit.Chem.Crippen` (verbatim `MolLogP`/`MolMR`) | ✅ | differential `crippen` 15000/15000 (ZINC 10k + chiral 5k); upstream `UnitTestCrippen` 6/6 |
 | 10a | `Transform3D` (identity, rotations, point transform) for addHs coordinates; the rest of Transform3D waits for its consumers | 🟡 | covered by `addhs3d` |
 | 10b | Lipinski counts: HBA/HBD (Lipinski and SMARTS variants), rotatable bonds (all four definitions; `Default` is Strict as in the released build), heteroatoms, amide bonds, ring families, FractionCSP3, spiro/bridgehead atoms, stereo-center counts | ✅ | differential `lipinski` 15300/15300 identical (NCI 300 + ZINC 10k + chiral 5k); upstream bool/enum argument handling reproduced |
-| 10b | `CalcPhi` (needs the Hall-Kier alpha table from ConnectivityDescriptors) and verbatim `Chem/Lipinski.py` (imports every ring count at import time) | ⬜ | next; upstream `testIssue80` waits for it |
+| 10b | `CalcPhi` (Hall-Kier alpha, kappa helpers of ConnectivityDescriptors) and verbatim `Chem/Lipinski.py` | ✅ | identical to RDKit on 14 molecules; upstream `UnitTestLipinski` 2/3 (`testLipinskiLong` is skipped, and fails on the reference build too: its regression data predates the strict default) |
 | 10a | MolWt/ExactMolWt, TPSA, Labute ASA, rest of `rdMolDescriptors`/`Descriptors`, ... | ⬜ | next |
 | 9 | LayeredFingerprint, PatternFingerprint, JSON (de)serialization, GetFPs bulk helpers | ⬜ | |
 | 7–13 | see PLAN.md | ⬜ | |
@@ -165,3 +167,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-08 — Stage 9h: MACCS keys. Next: descriptors (rdMolDescriptors: CalcNumAtoms, formula, MW, ring counts, Lipinski counts, TPSA, logP/MR (Crippen), ...).
 * 2026-10-08 — Stage 10a (part 1): Crippen logP/MR (`CalcCrippenDescriptors`, `_CalcCrippenContribs`, `rdkit.Chem.Crippen`) and addHs (with coordinates) identical to RDKit; ratchet 169. Next: Lipinski and the other descriptors (MolWt, TPSA, counts), then the rest of `rdMolDescriptors`.
 * 2026-10-08 — Stage 10b: Lipinski counts identical to RDKit (rotatable-bond definitions with the released strict default, bool/enum argument handling, spiro/bridgehead lists). Next: CalcPhi and verbatim Lipinski.py, then MolWt/TPSA/Labute ASA.
+* 2026-10-09 — Stage 10c: CalcPhi and verbatim Lipinski.py; Crippen/AddHs-style bool arguments accept any truthy value like Boost.Python; multi-core batch fingerprints (`numThreads`); crate license audit in CI. Ratchet 172. Next: MolWt/ExactMolWt, TPSA, Labute ASA.
