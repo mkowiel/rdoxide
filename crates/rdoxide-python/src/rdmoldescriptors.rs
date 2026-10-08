@@ -580,7 +580,7 @@ fn calc_crippen_contribs<'py>(
 
 /// A bool-typed argument with a default. Upstream's Boost.Python bool converter
 /// accepts any object, converting it by truthiness (`includeHs=1` is `True`).
-fn bool_arg(v: Option<&Bound<'_, PyAny>>, default: bool) -> PyResult<bool> {
+pub(crate) fn bool_arg(v: Option<&Bound<'_, PyAny>>, default: bool) -> PyResult<bool> {
     v.map_or(Ok(default), |v| v.is_truthy())
 }
 
@@ -860,6 +860,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(calc_num_amide_bonds, m)?)?;
     m.add_function(wrap_pyfunction!(calc_num_rings, m)?)?;
     m.add_function(wrap_pyfunction!(calc_phi, m)?)?;
+    crate::rdmoldescriptors_props::init(m)?;
     m.add_function(wrap_pyfunction!(calc_fraction_csp3, m)?)?;
     m.add_function(wrap_pyfunction!(calc_num_heterocycles, m)?)?;
     m.add_function(wrap_pyfunction!(calc_num_aromatic_rings, m)?)?;

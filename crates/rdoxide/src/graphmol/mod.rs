@@ -17,6 +17,7 @@ pub mod fingerprints;
 pub mod kekulize;
 pub mod matrices;
 pub mod mol_ops;
+pub mod mol_props;
 pub mod new_canon;
 pub mod periodic_table;
 pub mod pickle;

@@ -430,3 +430,10 @@
 [module."rdoxide::graphmol::descriptors::connectivity".sources]
 "Code/GraphMol/Descriptors/ConnectivityDescriptors.cpp" = "365d3a54611181c6c40619750cc313fe93d072ee"
 "Code/GraphMol/Descriptors/ConnectivityDescriptors.h" = "238cd325edab2a036851cb4dbecf0493456120f1"
+
+[module."rdoxide::graphmol::mol_props".sources]
+"Code/GraphMol/MolProps.cpp" = "97b530f264aee5c5b1de1e67afe8920afcf4ab38"
+
+[module."rdoxide_python::rdmoldescriptors_props".sources]
+"Code/GraphMol/Descriptors/MolDescriptors.cpp" = "5529fa1ecd5217a2f4cf6dd7819bbd9df4f2f450"
+"Code/GraphMol/Descriptors/MolDescriptors.h" = "274525c5fbdb54adb090a30fcf366c17d351ed1f"
