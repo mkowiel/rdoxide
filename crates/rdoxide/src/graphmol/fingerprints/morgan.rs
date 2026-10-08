@@ -283,3 +283,48 @@ pub fn get_environments(
     }
     Ok(result)
 }
+
+/// `defaultFeatureSmarts`: Donor, Acceptor, Aromatic, Halogen, Basic, Acidic
+/// (adapted from Gobbi and Poppinger, Biotech. Bioeng. 61 47-54 (1998)).
+pub const DEFAULT_FEATURE_SMARTS: [&str; 6] = [
+    "[$([N;!H0;v3,v4&+1]),$([O,S;H1;+0]),n&H1&+0]",
+    "[$([O,S;H1;v2;!$(*-*=[O,N,P,S])]),$([O,S;H0;v2]),$([O,S;-]),$([N;v3;!$(N-*=[O,N,P,S])]),n&H0&+0,$([o,s;+0;!$([o,s]:n);!$([o,s]:c:n)])]",
+    "[a]",
+    "[F,Cl,Br,I]",
+    "[#7;+,$([N;H2&+0][$([C,a]);!$([C,a](=O))]),$([N;H1&+0]([$([C,a]);!$([C,a](=O))])[$([C,a]);!$([C,a](=O))]),$([N;H0&+0]([C;!$(C(=O))])([C;!$(C(=O))])[C;!$(C(=O))])]",
+    "[$([C,S](=[O,S,P])-[O;H1,-1])]",
+];
+
+fn default_feature_matchers() -> Result<&'static [ROMol]> {
+    static MATCHERS: std::sync::OnceLock<Vec<ROMol>> = std::sync::OnceLock::new();
+    if let Some(m) = MATCHERS.get() {
+        return Ok(m);
+    }
+    let params = crate::graphmol::smiles_parse::smarts::SmartsParserParams::default();
+    let mut v = Vec::new();
+    for sma in DEFAULT_FEATURE_SMARTS {
+        let m = crate::graphmol::smiles_parse::smarts::mol_from_smarts(sma, &params)?
+            .ok_or_else(|| RDKitError::invariant("bad smarts"))?;
+        v.push(m);
+    }
+    Ok(MATCHERS.get_or_init(|| v))
+}
+
+/// `MorganFingerprints::getFeatureInvariants`
+pub fn get_feature_invariants(mol: &ROMol, patterns: Option<&[ROMol]>) -> Result<Vec<u32>> {
+    let queries = match patterns {
+        Some(p) => p,
+        None => default_feature_matchers()?,
+    };
+    let mut invars = vec![0u32; mol.num_atoms() as usize];
+    let ps = crate::graphmol::substruct::SubstructMatchParameters::default();
+    for (i, q) in queries.iter().enumerate() {
+        let mask = 1u32.wrapping_shl(i as u32);
+        for m in crate::graphmol::substruct::substruct_match(mol, q, &ps)? {
+            for (_, a) in m {
+                invars[a as usize] |= mask;
+            }
+        }
+    }
+    Ok(invars)
+}

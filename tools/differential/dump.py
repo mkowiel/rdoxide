@@ -331,7 +331,43 @@ def rdkfingerprint_record(smi):
     return res
 
 
+def moldescfp_record(smi):
+    """Legacy rdMolDescriptors fingerprints (Morgan / atom pairs / torsions)."""
+    from rdkit.Chem import rdMolDescriptors as D
+    from rdkit.Chem import rdFingerprintGenerator as G
+    m = Chem.MolFromSmiles(smi)
+    if m is None:
+        return None
+    nz = lambda v: sorted(v.GetNonzeroElements().items())  # noqa: E731
+    res = {}
+    bi = {}
+    res["morgan2"] = nz(D.GetMorganFingerprint(m, 2, bitInfo=bi))
+    res["morgan2bi"] = sorted(bi.items())
+    res["morgan2nc"] = nz(D.GetMorganFingerprint(m, 2, useCounts=False, useChirality=True))
+    res["morgan3feat"] = nz(D.GetMorganFingerprint(m, 3, useFeatures=True))
+    res["hmorgan"] = nz(D.GetHashedMorganFingerprint(m, 2, nBits=1024, useBondTypes=False))
+    res["morganbv"] = list(D.GetMorganFingerprintAsBitVect(m, 2, nBits=512, fromAtoms=[0]).GetOnBits())
+    res["conninv"] = D.GetConnectivityInvariants(m)
+    res["featinv"] = D.GetFeatureInvariants(m)
+    res["featgen"] = list(G.GetMorganGenerator(atomInvariantsGenerator=G.GetMorganFeatureAtomInvGen()).GetFingerprint(m).GetOnBits())
+    res["ap"] = nz(D.GetAtomPairFingerprint(m))
+    res["apchiral"] = nz(D.GetAtomPairFingerprint(m, includeChirality=True, maxLength=10))
+    res["hap"] = nz(D.GetHashedAtomPairFingerprint(m, nBits=512))
+    res["hapbv"] = list(D.GetHashedAtomPairFingerprintAsBitVect(m, ignoreAtoms=[0]).GetOnBits())
+    res["hapbv3"] = list(D.GetHashedAtomPairFingerprintAsBitVect(m, nBitsPerEntry=3).GetOnBits())
+    res["tt"] = nz(D.GetTopologicalTorsionFingerprint(m))
+    res["ttchiral"] = nz(D.GetTopologicalTorsionFingerprint(m, includeChirality=True, fromAtoms=[0, 1]))
+    res["htt"] = nz(D.GetHashedTopologicalTorsionFingerprint(m, nBits=512))
+    res["httbv"] = list(D.GetHashedTopologicalTorsionFingerprintAsBitVect(m).GetOnBits())
+    res["apcode"] = [D.GetAtomPairAtomCode(a) for a in m.GetAtoms()]
+    return res
+
+
 def dump(mode, smi):
+    if mode == "moldescfp":
+        from rdkit import RDLogger
+        RDLogger.DisableLog("rdApp.*")
+        return moldescfp_record(smi)
     if mode == "rdkfingerprint":
         return rdkfingerprint_record(smi)
     if mode == "rdkitfp":

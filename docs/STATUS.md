@@ -6,7 +6,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 |-------|-----------|--------|-------|
 | 0 | Workspace, packaging (maturin, abi3-py310), CI, licenses, NOTICE | ✅ | |
 | 0 | `tools/sync_upstream.py` (fetch/regen/diff/stamp), `porting/manifest.toml` | ✅ | |
-| 0 | Upstream test ratchet (`tools/run_upstream_tests.py`) | ✅ | 162 upstream tests passing |
+| 0 | Upstream test ratchet (`tools/run_upstream_tests.py`) | ✅ | 163 upstream tests passing |
 | 1 | RDGeneral: Dict/RDValue/RDProps | ✅ | |
 | 1 | RDGeneral: RDLog + `rdBase` logging API | ✅ | upstream `UnitTestLogging.py` 32/32 |
 | 1 | RDGeneral: RNG (`boost::minstd_rand`, glibc `rand`) | ✅ | |
@@ -51,7 +51,8 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 9 | Topological-torsion generator (`GetTopologicalTorsionGenerator`, `TopologicalTorsionFingerprintOptions`; hashed and unhashed codes, onlyShortestPaths, bitPaths) | ✅ | differential `torsion` (6 configs + all output kinds): 15000/15000 identical |
 | 9 | RDKit FP generator (`GetRDKitFPGenerator`, `GetRDKitAtomInvGen`, `RDKitFingerprintOptions`; branched/linear paths, bond orders, query bonds, numBitsPerFeature via upstream's 4-word Mersenne twister) | ✅ | differential `rdkitfp` (6 configs + all output kinds): 5000/5000 identical |
 | 9 | Legacy `Chem.RDKFingerprint` (tgtDensity folding, atomBits, bitInfo) and `UnfoldedRDKFingerprintCountBased` | ✅ | differential `rdkfingerprint` 1300/1300 identical |
-| 9 | LayeredFingerprint, PatternFingerprint, Morgan feature invariants, JSON (de)serialization, GetFPs bulk helpers, legacy `GetMorganFingerprint*` (rdMolDescriptors), MACCS, pattern/layered fingerprints | ⬜ | |
+| 9 | `rdMolDescriptors` legacy fingerprints: GetMorganFingerprint / GetHashedMorganFingerprint / GetMorganFingerprintAsBitVect (useFeatures, bitInfo), GetConnectivityInvariants, GetFeatureInvariants, GetAtomPair(Atom)Code, (Hashed) atom pairs and topological torsions (+AsBitVect), deprecation warnings; `GetMorganFeatureAtomInvGen` | ✅ | differential `moldescfp` 5000/5000 identical |
+| 9 | LayeredFingerprint, PatternFingerprint, MACCS, other rdMolDescriptors descriptors, JSON (de)serialization, GetFPs bulk helpers, legacy `GetMorganFingerprint*` (rdMolDescriptors), MACCS, pattern/layered fingerprints | ⬜ | |
 | 7–13 | see PLAN.md | ⬜ | |
 
 ## Python package files
@@ -151,3 +152,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-08 — Stage 9d: topological-torsion generator. CI blocked by GitHub billing (jobs not started); PRs #17/#18 wait. Next: RDKit FP generator.
 * 2026-10-08 — Stage 9e: RDKit FP generator (CI back; #17-#19 merged, merged branches deleted). Next: legacy fingerprint functions (rdMolDescriptors / Chem.RDKFingerprint, AllChem.GetMorganFingerprint*), MACCS, pattern FP.
 * 2026-10-08 — Stage 9f: legacy RDKFingerprint. Next: rdMolDescriptors legacy Morgan / atom pairs / torsions, MACCS.
+* 2026-10-08 — Stage 9g: rdMolDescriptors legacy fingerprints. Next: MACCS keys, then descriptors (rdMolDescriptors / Descriptors).
