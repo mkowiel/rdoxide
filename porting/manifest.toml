@@ -381,3 +381,9 @@
 
 [module."rdoxide_python::rdfingerprintgenerator".sources]
 "Code/GraphMol/Fingerprints/Wrap/AtomPairWrapper.cpp" = "57953328cc2bb966e44aae3f2f3af0862ae3c790"
+
+[module."rdoxide::graphmol::subgraphs".sources]
+"Code/GraphMol/Subgraphs/Subgraphs.cpp" = "5a7c403b1a59772617e03a85ba1691207af787e8"
+"Code/GraphMol/Subgraphs/Subgraphs.h" = "91a7fe800370a5d55466a82237474c3868ff9077"
+"Code/GraphMol/Subgraphs/SubgraphUtils.cpp" = "871fb0ef2858827922e521b870ff4af068edc52a"
+"Code/GraphMol/Subgraphs/SubgraphUtils.h" = "bd76772bbca551bbe2af9087749be114a9c7ad58"

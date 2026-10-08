@@ -10,7 +10,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 1 | RDGeneral: Dict/RDValue/RDProps | ✅ | |
 | 1 | RDGeneral: RDLog + `rdBase` logging API | ✅ | upstream `UnitTestLogging.py` 32/32 |
 | 1 | RDGeneral: RNG (`boost::minstd_rand`, glibc `rand`) | ✅ | |
-| 1 | `rdBase` vector converters (`_vecti`, ...) | ⬜ | come with stage 2 return types |
+| 1 | `rdBase` vector types `_vecti`, `_vectj`, `_vectd`, list of int vectors (mutable sequences without value equality, like Boost.Python's indexing suites) | 🟡 | used by DataStructs and Subgraphs; string/nested-vector variants later |
 | 2 | PeriodicTable (+ data extraction from upstream) | ✅ | |
 | 2 | Atom, Bond, Conformer, ROMol/RWMol, RingInfo, StereoGroup (core) | ✅ | boost adjacency ordering, RWMol edits, batch edits, valence calc |
 | 2 | `rdchem` Python: Atom, Bond, Mol, RWMol, EditableMol, Conformer, RingInfo, StereoGroup, enums, props API, sanitize exceptions | ✅ | `_wrapperType = 'nanobind'` (PyO3 semantics match nanobind's) |
@@ -41,13 +41,14 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 6 | SGroups (V2000/V3000; also needed for M ZBO/ZCH/HYD/MRV and for writing SMARTS-query / generic-group / zero-order-bond molecules), M APO/LIN, ATTCHORD templates, ForwardSDMolSupplier | ⬜ | reader returns None, writer raises RuntimeError for now |
 | 7 | 2D coordinates: RDDepict::compute2DCoords (EmbeddedFrag, DepictUtils, fused rings, cis/trans and non-tetrahedral fragments, collision removal: bond/spiro flips, open angles, shorten bonds, path angle expansion, canonical orientation, coordMap, bondLength); `rdDepictor.Compute2DCoords`; `MolToMolBlock` of molecules without conformers | ✅ | differential `depict` (canonOrient on/off coordinates to 6 decimals + MolBlock): NCI 4999/4999, canonSmiles.long + stereo/pickle edge cases 5400/5400 identical to the arm64 build |
 | 7 | Ring-system templates, random flip sampling (nSample/nFlipsPerSample), Compute2DCoordsMimicDistmat, generateDepictionMatching2D/3DStructure, straighten/normalizeDepiction, CoordGen | ⬜ | raise RuntimeError |
-| 8 | DataStructs: ExplicitBitVect, SparseBitVect (bit ops, pickles byte-identical, base64, indexing), all similarity metrics + Bulk*/\*Neighbors, Tversky, on/off-bit projections, FoldFingerprint, AllProbeBitsMatch, text/FPS/binary conversions, ConvertToNumpyArray; `rdkit.DataStructs` Python package (verbatim upstream pure-Python modules) | ✅ | 3000 random pairs identical to the arm64 build (x86 differs in last bits through FMA, as upstream does); upstream `testBV.py` and `UnitTestcBitVect.py` pass. Lists of ints/doubles are returned as tuples until `rdBase._vecti`/`_vectd` exist |
+| 8 | DataStructs: ExplicitBitVect, SparseBitVect (bit ops, pickles byte-identical, base64, indexing), all similarity metrics + Bulk*/\*Neighbors, Tversky, on/off-bit projections, FoldFingerprint, AllProbeBitsMatch, text/FPS/binary conversions, ConvertToNumpyArray; `rdkit.DataStructs` Python package (verbatim upstream pure-Python modules) | ✅ | 3000 random pairs identical to the arm64 build (x86 differs in last bits through FMA, as upstream does); upstream `testBV.py` and `UnitTestcBitVect.py` pass. Lists of ints/doubles are `rdBase._vecti`/`_vectd` like upstream |
 | 8 | SparseIntVect (Int/Long/UInt/ULong): fuzzy &/|, arithmetic, scalar ops (incl. upstream's stored zeros and missing `/=`), pickles, Dice/Tanimoto/Tversky (+ bounds, Bulk*), ConvertToNumpyArray | ✅ | 3000 random pairs identical to the arm64 build; upstream `testSparseIntVect.py` 10/10 incl. legacy pickles |
 | 8 | DiscreteValueVect (+ `DiscreteValueType`), RealValueVect, ComputeL1Norm, ConvertToNumpyArray for all vector types | ✅ | 2000 random pairs identical (incl. error cases); upstream tests 12/12 |
 | 8 | FPBReader, InitFromDaylightString | ⬜ | |
 | 9 | Fingerprint generator framework (bit / sparse / count / sparse-count fingerprints, count simulation, numBitsPerFeature via boost mt19937, fromAtoms, custom invariants, AdditionalOutput incl. atomsPerBit, GetOptions views, bulk + NumPy) and the Morgan generator (`GetMorganGenerator`, `GetMorganAtomInvGen`, `GetMorganBondInvGen`); `rdkit.Chem.rdFingerprintGenerator` | ✅ | differential `morgan` (6 configs + all output kinds): ZINC 10000 + ChEMBL chiral 5000 identical. SparseBitVect now iterates in signed (`std::set<int>`) order |
 | 9 | Atom-pair generator (`GetAtomPairGenerator`, `GetAtomPairAtomInvGen`, `AtomPairFingerprintOptions`; 2D and 3D distances, hashed and unhashed codes), `get3DDistanceMat` | ✅ | differential `atompair` (5 configs + all output kinds): 15000/15000 identical; 3D (`use2D=False`) 490/490 |
-| 9 | Morgan feature invariants, RDKit / topological-torsion generators (need Subgraphs: findAllPathsOfLengthN / findAllSubgraphs), JSON (de)serialization, GetFPs bulk helpers, legacy `GetMorganFingerprint*` (rdMolDescriptors), MACCS, pattern/layered fingerprints | ⬜ | |
+| 9 | Subgraphs: findAllSubgraphsOfLengthN / MtoN, findUniqueSubgraphsOfLengthN (path discriminators), findAllPathsOfLengthN / MtoN (incl. onlyShortestPaths, rooted), findAtomEnvironmentOfRadiusN; rdmolops wrappers | ✅ | differential `subgraphs` 5000/5000 identical. `PathToSubmol` waits for copyMolSubset(BONDS) |
+| 9 | Morgan feature invariants, RDKit / topological-torsion generators, JSON (de)serialization, GetFPs bulk helpers, legacy `GetMorganFingerprint*` (rdMolDescriptors), MACCS, pattern/layered fingerprints | ⬜ | |
 | 7–13 | see PLAN.md | ⬜ | |
 
 ## Python package files
@@ -143,3 +144,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-08 — Stage 8c: DiscreteValueVect, RealValueVect. CI: macOS jobs commented out at the user's request. Next: fingerprints (Morgan, RDKit, atom pairs, topological torsions) or SGroups.
 * 2026-10-08 — Stage 9a: fingerprint generator framework + Morgan. Next: RDKit FP / atom pairs / torsions generators.
 * 2026-10-08 — Stage 9b: atom-pair generator. Next: Subgraphs (path/subgraph enumeration) → topological torsion + RDKit FP generators.
+* 2026-10-08 — Stage 9c: Subgraphs + rdBase vector types. Next: topological torsion + RDKit FP generators.

@@ -295,6 +295,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_kekulize, m)?)?;
     m.add_function(wrap_pyfunction!(py_kekulize_if_possible, m)?)?;
     m.add_function(wrap_pyfunction!(py_sanitize_mol, m)?)?;
+    crate::rdmolops_subgraphs::add(m)?;
     m.add_function(wrap_pyfunction!(py_set_aromaticity, m)?)?;
     m.add_function(wrap_pyfunction!(py_set_conjugation, m)?)?;
     m.add_function(wrap_pyfunction!(py_set_hybridization, m)?)?;

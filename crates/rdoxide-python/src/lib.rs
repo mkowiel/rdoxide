@@ -34,9 +34,11 @@ mod rdmolfiles_smarts;
 mod rdmolfiles_write;
 mod rdmolops;
 mod rdmolops_hs;
+mod rdmolops_subgraphs;
 mod ringinfo;
 mod stereo_group;
 mod substruct;
+mod vects;
 
 /// Create a submodule named `full_name` (e.g. `rdkit.Chem.rdchem`) and attach
 /// it to `parent` under `attr`.
