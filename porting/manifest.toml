@@ -183,3 +183,20 @@
 
 [module."rdoxide_python::rdmolops_hs".sources]
 "Code/GraphMol/Wrap/MolOps.cpp" = "2dc7ae10c4ce7523938a4db10e31215cfe2162db"
+
+[module."rdoxide::graphmol::canon".sources]
+"Code/GraphMol/Canon.h" = "c16523ab3ad8100f747a0038dfd8567d88af6be2"
+"Code/GraphMol/Canon.cpp" = "e4e60c911669bb7ae61e7ff797d8209c2c09aa85"
+"Code/GraphMol/FindStereo.cpp" = "a3ad1280f33a06430df7d566a825dc80e589cbb9"
+"Code/RDGeneral/hash/hash.hpp" = "0a296f3a3ae2b4872185bb4119ba1d6e2f0c0bd6"
+
+[module."rdoxide::graphmol::mol_ops::frags".sources]
+"Code/GraphMol/Subset.cpp" = "2cf759a4725b21574e4a9eb913047e6dbd373290"
+"Code/GraphMol/Subset.h" = "0ce93092d0a9bb0a2e3b31a81761f8b55e308afd"
+
+[module."rdoxide::graphmol::smiles_parse::write".sources]
+"Code/GraphMol/SmilesParse/SmilesWrite.h" = "b0a648a8b05239ae2122852131ba1e06cc9d7191"
+"Code/GraphMol/SmilesParse/SmilesWrite.cpp" = "ac3c240d578a11d9eb015633d4aa66d0c859750f"
+
+[module."rdoxide_python::rdmolfiles_write".sources]
+"Code/GraphMol/Wrap/rdmolfiles.cpp" = "829058d8e8a382c358d2464cee762f8cff04f75f"

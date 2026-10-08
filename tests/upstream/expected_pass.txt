@@ -2,6 +2,7 @@
 # Maintained by tools/run_upstream_tests.py --update
 Code/GraphMol/Wrap/testConformer.py::TestCase::test0Conformers
 Code/GraphMol/Wrap/test_cdxml.py::TestCase::test_cdxml
+Code/GraphMol/Wrap/test_lazy_numpy.py::TestLazyNumpy::test_basic_smiles_roundtrip_without_numpy
 Code/GraphMol/Wrap/test_lazy_numpy.py::TestLazyNumpy::test_chem_import_does_not_load_numpy
 Code/GraphMol/Wrap/test_lazy_numpy.py::TestLazyNumpy::test_conformer_positions_loads_numpy
 rdkit/Chem/UnitTestChemAtom.py::TestCase::test1Implicit
@@ -13,6 +14,12 @@ rdkit/Chem/UnitTestChemBond.py::TestCase::test1Get
 rdkit/Chem/UnitTestChemBond.py::TestCase::test2Setters
 rdkit/Chem/UnitTestChemBond.py::TestCase::test3Props
 rdkit/Chem/UnitTestChemBond.py::TestCase::test4Props2
+rdkit/Chem/UnitTestSmiles.py::TestCase::testFailures
+rdkit/Chem/UnitTestSmiles.py::TestCase::testHighSymmetry
+rdkit/Chem/UnitTestSmiles.py::TestCase::testLinear1
+rdkit/Chem/UnitTestSmiles.py::TestCase::testProblems
+rdkit/Chem/UnitTestSmiles.py::TestCase::testRings1
+rdkit/Chem/UnitTestSmiles.py::TestCase::testRings2
 rdkit/UnitTestLogging.py::TestCaptureErrorLog::testBasicCapture
 rdkit/UnitTestLogging.py::TestCaptureErrorLog::testEmptyWhenNothingLogged
 rdkit/UnitTestLogging.py::TestCaptureErrorLog::testLoggingRestoredAfterContextExit

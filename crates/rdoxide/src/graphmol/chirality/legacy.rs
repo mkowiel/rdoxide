@@ -1158,3 +1158,48 @@ pub fn assign_stereochemistry(
     mol.set_prop(cp::_StereochemDone, 1i32, true)?;
     Ok(())
 }
+
+/// `Chirality::detail::isAtomPotentialTetrahedralCenter` (FindStereo.cpp)
+pub fn is_atom_potential_tetrahedral_center(mol: &ROMol, atom: u32) -> Result<bool> {
+    let a = mol.atom(atom);
+    let nz_degree = get_atom_nonzero_degree(mol, atom);
+    let total_hs = mol.total_num_hs(atom, false)?;
+    if nz_degree + total_hs > 4 {
+        return Ok(false);
+    }
+    if nz_degree == 4 {
+        return Ok(true);
+    }
+    if nz_degree <= 1 {
+        return Ok(false);
+    }
+    let anum = a.atomic_num();
+    if nz_degree < 3 && anum != 15 && anum != 33 {
+        return Ok(false);
+    }
+    if anum == 15 || anum == 33 {
+        return Ok(true);
+    }
+    if nz_degree == 3 {
+        if total_hs == 1 {
+            return Ok(!has_protium_neighbor(mol, atom));
+        }
+        let ev = a.valence(ValenceType::Explicit)?;
+        if (anum == 16 || anum == 34) && (ev == 4 || (ev == 3 && a.formal_charge() == 1)) {
+            return Ok(true);
+        }
+        if anum == 7
+            && a.hybridization() == HybridizationType::SP3
+            && !atom_has_conjugated_bond(mol, atom)
+            && (mol
+                .ring_info()
+                .is_atom_in_ring_of_size(atom, 3)
+                .unwrap_or(false)
+                || query_is_atom_bridgehead(mol, atom))
+        {
+            return Ok(true);
+        }
+        return Ok(false);
+    }
+    Ok(false)
+}
