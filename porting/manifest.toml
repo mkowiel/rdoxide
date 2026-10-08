@@ -200,3 +200,29 @@
 
 [module."rdoxide_python::rdmolfiles_write".sources]
 "Code/GraphMol/Wrap/rdmolfiles.cpp" = "829058d8e8a382c358d2464cee762f8cff04f75f"
+
+[module."rdoxide::graphmol::queries".sources]
+"Code/Query/Query.h" = "5b1d961452b9baeeeb591eb917c7caf485d7578a"
+"Code/Query/EqualityQuery.h" = "502d7303b1a3a6dd3f47bb2b2c4bcddd8fa8f383"
+"Code/Query/LessQuery.h" = "d101e78cdf04f78a0c38e97aa1e9847735d4ce81"
+"Code/Query/LessEqualQuery.h" = "bbf8699262da61240bf674dddd7ff5a3ae695ba3"
+"Code/Query/GreaterQuery.h" = "aea9a5a96324c3d71e7934d49ade4e37174698a8"
+"Code/Query/GreaterEqualQuery.h" = "16797f965ec6b076f969955807aa2ee0d39aed4b"
+"Code/Query/RangeQuery.h" = "69c9ec0aac2f99729c2199a5abc3867510607d4b"
+"Code/Query/SetQuery.h" = "5a2b004643aa02128d6132c322878b806a09d597"
+"Code/Query/AndQuery.h" = "89efc438b133eb4ae6a9765397eff2c8cff37fdc"
+"Code/Query/OrQuery.h" = "c35d649c046ac22c37d97908ebf9bbb4e98b1dd7"
+"Code/Query/XOrQuery.h" = "41c8ed289f4563711f50f6bd5a6edb98a7bea0b3"
+"Code/Query/NullQueryAlgebra.h" = "337f18cd58ed3e6e4a65dff5f80b7e0d4de71cd2"
+"Code/GraphMol/QueryOps.h" = "ebfd6a3841b35ebfe42dc21ea302cfd9a50d18ef"
+"Code/GraphMol/QueryAtom.h" = "695b562fd1b46417345eeef45509496780b2407d"
+"Code/GraphMol/QueryAtom.cpp" = "21494efddf8c7df4ac5d33bf8dc3348697f5390f"
+"Code/GraphMol/QueryBond.h" = "1265f25b5e4fb05e41ac0c80b908ab604cb98eaa"
+"Code/GraphMol/QueryBond.cpp" = "f3eff715819c91519c626b46bf83941706a7f2eb"
+
+[module."rdoxide::graphmol::smiles_parse::smarts".sources]
+"Code/GraphMol/SmilesParse/smarts.ll" = "1d954172c15baf59f90a62a7a1a05f2df468ccd4"
+"Code/GraphMol/SmilesParse/smarts.yy" = "eb2aa309e82031916f872f7b14e734dfbd610b6b"
+
+[module."rdoxide_python::rdmolfiles_smarts".sources]
+"Code/GraphMol/Wrap/rdmolfiles.cpp" = "829058d8e8a382c358d2464cee762f8cff04f75f"

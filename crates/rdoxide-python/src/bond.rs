@@ -337,6 +337,12 @@ impl PyBond {
     }
 
     /// Returns whether or not the bond has an associated query
+    /// returns a text description of the query. Primarily intended for debugging purposes.
+    #[pyo3(name = "DescribeQuery")]
+    fn describe_query(&self, py: Python<'_>) -> PyResult<String> {
+        self.with(py, |b| b.query().map_or(String::new(), |q| q.describe(0)))
+    }
+
     #[pyo3(name = "HasQuery")]
     fn has_query(&self, py: Python<'_>) -> PyResult<bool> {
         self.with(py, Bond::has_query)

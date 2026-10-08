@@ -6,6 +6,7 @@
 pub mod lexer;
 pub mod ops;
 pub mod parser;
+pub mod smarts;
 pub mod write;
 
 use std::collections::BTreeMap;
@@ -55,7 +56,7 @@ fn trim_ctrl(s: &str) -> (usize, &str) {
 }
 
 /// `preprocessSmiles`: split off name / CXSMILES part and apply replacements.
-fn preprocess(smiles: &str, params: &SmilesParserParams) -> (String, String, String) {
+pub(crate) fn preprocess(smiles: &str, params: &SmilesParserParams) -> (String, String, String) {
     let mut lsmiles = String::new();
     let mut name = String::new();
     let mut cx_part = String::new();

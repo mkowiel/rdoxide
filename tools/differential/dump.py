@@ -2,7 +2,7 @@
 RDKit and under rdoxide; tools/differential/compare.py diffs the outputs.
 
 usage: python -I dump.py MODE INPUT.smi > out.jsonl
-  MODE: parse (sanitize=False) | rings | sanitize (SanitizeMol) | molfromsmiles | smiles (canonical SMILES)
+  MODE: parse (sanitize=False) | rings | sanitize (SanitizeMol) | molfromsmiles | smiles (SMILES writer) | smarts (MolFromSmarts)
 """
 import json
 import sys
@@ -117,6 +117,14 @@ def dump(mode, smi):
                 "bonds": [bond_record(b) + [b.GetIsConjugated(), private_props(b)] for b in m.GetBonds()],
                 "rings": [list(r) for r in m.GetRingInfo().AtomRings()],
                 "mol": private_props(m)}
+    if mode == "smarts":
+        m = Chem.MolFromSmarts(smi)
+        if m is None:
+            return None
+        atoms = [atom_record(a) + [a.GetQueryType(), a.DescribeQuery(), a.GetAtomMapNum()]
+                 for a in m.GetAtoms()]
+        bonds = [bond_record(b) + [b.DescribeQuery()] for b in m.GetBonds()]
+        return {"atoms": atoms, "bonds": bonds}
     if mode == "smiles":
         m = Chem.MolFromSmiles(smi)
         if m is None:

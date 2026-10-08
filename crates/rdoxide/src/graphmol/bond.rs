@@ -128,6 +128,8 @@ pub struct Bond {
     pub(crate) flags: u64,
     pub(crate) has_owner: bool,
     pub(crate) props: Dict,
+    /// `QueryBond::dp_query`
+    pub(crate) query: Option<Box<crate::graphmol::queries::BondQuery>>,
 }
 
 impl Default for Bond {
@@ -160,6 +162,7 @@ impl Bond {
             flags: 0,
             has_owner: false,
             props: Dict::new(),
+            query: None,
         }
     }
 
@@ -237,11 +240,21 @@ impl Bond {
         self.has_owner
     }
     pub fn has_query(&self) -> bool {
-        false
+        self.query.is_some()
+    }
+    /// `getQuery()`
+    pub fn query(&self) -> Option<&crate::graphmol::queries::BondQuery> {
+        self.query.as_deref()
+    }
+    /// `setQuery()`
+    pub fn set_query(&mut self, q: Option<crate::graphmol::queries::BondQuery>) {
+        self.query = q.map(Box::new);
     }
     /// `QueryOps::hasComplexBondTypeQuery`
     pub fn has_complex_bond_type_query(&self) -> bool {
-        false
+        self.query
+            .as_deref()
+            .is_some_and(crate::graphmol::queries::has_complex_bond_type_query)
     }
 
     /// For detached bonds only (owned bonds go through `ROMol`).
