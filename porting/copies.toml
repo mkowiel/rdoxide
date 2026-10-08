@@ -98,3 +98,7 @@ to = "python/rdkit/DataStructs/BitEnsemble.py"
 [[copy]]
 from = "rdkit/Chem/MACCSkeys.py"
 to = "python/rdkit/Chem/MACCSkeys.py"
+
+[[copy]]
+from = "rdkit/Chem/Crippen.py"
+to = "python/rdkit/Chem/Crippen.py"

@@ -6,7 +6,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 |-------|-----------|--------|-------|
 | 0 | Workspace, packaging (maturin, abi3-py310), CI, licenses, NOTICE | ✅ | |
 | 0 | `tools/sync_upstream.py` (fetch/regen/diff/stamp), `porting/manifest.toml` | ✅ | |
-| 0 | Upstream test ratchet (`tools/run_upstream_tests.py`) | ✅ | 163 upstream tests passing |
+| 0 | Upstream test ratchet (`tools/run_upstream_tests.py`) | ✅ | 169 upstream tests passing |
 | 1 | RDGeneral: Dict/RDValue/RDProps | ✅ | |
 | 1 | RDGeneral: RDLog + `rdBase` logging API | ✅ | upstream `UnitTestLogging.py` 32/32 |
 | 1 | RDGeneral: RNG (`boost::minstd_rand`, glibc `rand`) | ✅ | |
@@ -21,7 +21,8 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 3 | Canonical atom ranking (new_canon: rankMolAtoms, rankFragmentAtoms, chiralRankMolAtoms); `CanonicalRankAtoms(InFragment)` | ✅ | differential `ranks` 10312/10312 |
 | 3 | removeHs/removeAllHs (`RemoveHsParameters`), legacy assignStereochemistry (CIP ranks/codes, ring stereo, E/Z), setDoubleBondNeighborDirections | ✅ | differential `molfromsmiles` 10312/10312 + 35140 stereo-rich + 72 edge cases; SubstanceGroup checks wait for stage 2b |
 | 3 | Stereo from coordinates: assignChiralTypesFromBondDirs (pseudo-3D wedges), assignChiralTypesFrom3D (incl. non-tetrahedral), detectBondStereochemistry, atropisomer perception (2D/3D/no conformer) | ✅ | differential `molblock` |
-| 3 | addHs, new (non-legacy) stereo perception, CIPLabeler | ⬜ | `SetUseLegacyStereoPerception(False)` currently raises |
+| 3 | addHs (`AddHs`, `AddHsParameters`, `onlyOnAtoms`, explicit/implicit Hs with coordinates from `Transform3D`; residue info waits for MonomerInfo) | ✅ | differential `addhs` 5000/5000, `addhs3d` 7706/7721 (the 15 are upstream molblocks with SGroups, which the reader cannot read yet) |
+| 3 | new (non-legacy) stereo perception, CIPLabeler | ⬜ | `SetUseLegacyStereoPerception(False)` currently raises |
 | 4 | SMILES parser (lexer + grammar + SmilesParseOps, non-tetrahedral stereo) | ✅ | differential: 10312/10312 identical to RDKit (sanitize=False) |
 | 4 | `MolFromSmiles` sanitize/removeHs/stereo path (defaults) | ✅ | differential `molfromsmiles` identical |
 | 4 | SMILES writer + canonical SMILES (Canon.cpp DFS, SmilesWrite.cpp, getMolFrags/copyMolSubset): `MolToSmiles` (both overloads), `MolFragmentToSmiles`, `MolToRandomSmilesVect`, `SmilesWriteParams` | ✅ | differential `smiles` (canonical, output order, non-canonical, kekule, non-isomeric, explicit, rooted, random, fragment, roundtrip) 10312 + 35973 identical |
@@ -53,7 +54,10 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 9 | Legacy `Chem.RDKFingerprint` (tgtDensity folding, atomBits, bitInfo) and `UnfoldedRDKFingerprintCountBased` | ✅ | differential `rdkfingerprint` 1300/1300 identical |
 | 9 | `rdMolDescriptors` legacy fingerprints: GetMorganFingerprint / GetHashedMorganFingerprint / GetMorganFingerprintAsBitVect (useFeatures, bitInfo), GetConnectivityInvariants, GetFeatureInvariants, GetAtomPair(Atom)Code, (Hashed) atom pairs and topological torsions (+AsBitVect), deprecation warnings; `GetMorganFeatureAtomInvGen` | ✅ | differential `moldescfp` 5000/5000 identical |
 | 9 | MACCS keys (`rdMolDescriptors.GetMACCSKeysFingerprint`, verbatim `Chem/MACCSkeys.py`); `maccs.rs` is generated from upstream `MACCS.cpp` by `tools/gen_maccs.py` (then `cargo fmt`) | ✅ | differential `maccs` 15300/15300 identical |
-| 9 | LayeredFingerprint, PatternFingerprint, other rdMolDescriptors descriptors, JSON (de)serialization, GetFPs bulk helpers, legacy `GetMorganFingerprint*` (rdMolDescriptors), MACCS, pattern/layered fingerprints | ⬜ | |
+| 10a | Wildman-Crippen logP/MR: `CalcCrippenDescriptors` (includeHs, cached sums), `_CalcCrippenContribs` (atom types and labels, cache semantics), `rdkit.Chem.Crippen` (verbatim `MolLogP`/`MolMR`) | ✅ | differential `crippen` 15000/15000 (ZINC 10k + chiral 5k); upstream `UnitTestCrippen` 5/6 (`testIssue80` needs `Lipinski`) |
+| 10a | `Transform3D` (identity, rotations, point transform) for addHs coordinates; the rest of Transform3D waits for its consumers | 🟡 | covered by `addhs3d` |
+| 10a | Lipinski, MolWt/ExactMolWt, TPSA, Labute ASA, atom and ring counts, rest of `rdMolDescriptors`/`Descriptors`, ... | ⬜ | next |
+| 9 | LayeredFingerprint, PatternFingerprint, JSON (de)serialization, GetFPs bulk helpers | ⬜ | |
 | 7–13 | see PLAN.md | ⬜ | |
 
 ## Python package files
@@ -157,3 +161,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-08 — Stage 9f: legacy RDKFingerprint. Next: rdMolDescriptors legacy Morgan / atom pairs / torsions, MACCS.
 * 2026-10-08 — Stage 9g: rdMolDescriptors legacy fingerprints. Next: MACCS keys, then descriptors (rdMolDescriptors / Descriptors).
 * 2026-10-08 — Stage 9h: MACCS keys. Next: descriptors (rdMolDescriptors: CalcNumAtoms, formula, MW, ring counts, Lipinski counts, TPSA, logP/MR (Crippen), ...).
+* 2026-10-08 — Stage 10a (part 1): Crippen logP/MR (`CalcCrippenDescriptors`, `_CalcCrippenContribs`, `rdkit.Chem.Crippen`) and addHs (with coordinates) identical to RDKit; ratchet 169. Next: Lipinski and the other descriptors (MolWt, TPSA, counts), then the rest of `rdMolDescriptors`.

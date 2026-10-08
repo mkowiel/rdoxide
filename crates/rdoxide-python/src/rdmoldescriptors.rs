@@ -5,6 +5,9 @@
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
+use rdoxide::graphmol::descriptors::crippen::{
+    CRIPPEN_VERSION, calc_crippen_descriptors, get_crippen_atom_contribs,
+};
 use rdoxide::graphmol::fingerprints::atom_pair::{CODE_SIZE, get_atom_code, get_atom_pair_code};
 use rdoxide::graphmol::fingerprints::legacy::{self, BitInfoMap, MorganKind, MorganResult};
 use rdoxide::graphmol::fingerprints::morgan::{
@@ -519,6 +522,75 @@ fn get_maccs_keys_fingerprint(mol: PyRef<'_, PyMol>) -> PyResult<PyExplicitBitVe
     ))
 }
 
+/// `_CalcCrippenContribs(mol, force=False, atomTypes=[], atomTypeLabels=[])`: per-atom
+/// (logP, MR) contributions. Non-empty `atomTypes` / `atomTypeLabels` lists (of the
+/// molecule's length) receive the matched parameter index and label of each atom.
+#[pyfunction]
+#[pyo3(
+    name = "_CalcCrippenContribs",
+    signature = (mol, force = false, atomTypes = None, atomTypeLabels = None)
+)]
+#[allow(non_snake_case)]
+fn calc_crippen_contribs<'py>(
+    py: Python<'py>,
+    mol: &Bound<'py, PyMol>,
+    force: bool,
+    atomTypes: Option<Bound<'py, PyList>>,
+    atomTypeLabels: Option<Bound<'py, PyList>>,
+) -> PyResult<Bound<'py, PyList>> {
+    let mut m = mol.borrow_mut();
+    let n = m.mol.num_atoms() as usize;
+    let n_types = atomTypes.as_ref().map_or(0, |l| l.len());
+    if n_types != 0 && n_types != n {
+        return Err(PyValueError::new_err(
+            "if atomTypes vector is provided, it must be as long as the number of atoms",
+        ));
+    }
+    let n_labels = atomTypeLabels.as_ref().map_or(0, |l| l.len());
+    if n_labels != 0 && n_labels != n {
+        return Err(PyValueError::new_err(
+            "if atomTypeLabels vector is provided, it must be as long as the number of atoms",
+        ));
+    }
+    let c = get_crippen_atom_contribs(&mut m.mol, force).py()?;
+    let contribs = PyList::empty(py);
+    for i in 0..n {
+        contribs.append((c.logp[i], c.mr[i]))?;
+    }
+    if let Some(types) = &atomTypes
+        && n_types != 0
+    {
+        for (i, t) in c.atom_types.iter().enumerate() {
+            types.set_item(i, *t)?;
+        }
+    }
+    if let Some(labels) = &atomTypeLabels
+        && n_labels != 0
+    {
+        for (i, l) in c.atom_type_labels.iter().enumerate() {
+            labels.set_item(i, l)?;
+        }
+    }
+    Ok(contribs)
+}
+
+/// `CalcCrippenDescriptors(mol, includeHs=True, force=False)`: the Wildman-Crippen
+/// (logP, MR) pair of a molecule.
+#[pyfunction]
+#[pyo3(
+    name = "CalcCrippenDescriptors",
+    signature = (mol, includeHs = true, force = false)
+)]
+#[allow(non_snake_case)]
+fn calc_crippen_descriptors_py(
+    mol: &Bound<'_, PyMol>,
+    includeHs: bool,
+    force: bool,
+) -> PyResult<(f64, f64)> {
+    let mut m = mol.borrow_mut();
+    calc_crippen_descriptors(&mut m.mol, includeHs, force).py()
+}
+
 pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add(
         "__doc__",
@@ -527,6 +599,9 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("_MorganFingerprint_version", "1.0.0")?;
     m.add_function(wrap_pyfunction!(get_morgan_fingerprint, m)?)?;
     m.add_function(wrap_pyfunction!(get_maccs_keys_fingerprint, m)?)?;
+    m.add_function(wrap_pyfunction!(calc_crippen_contribs, m)?)?;
+    m.add_function(wrap_pyfunction!(calc_crippen_descriptors_py, m)?)?;
+    m.add("_CalcCrippenDescriptors_version", CRIPPEN_VERSION)?;
     m.add_function(wrap_pyfunction!(get_hashed_morgan_fingerprint, m)?)?;
     m.add_function(wrap_pyfunction!(get_morgan_fingerprint_bv, m)?)?;
     m.add_function(wrap_pyfunction!(get_connectivity_invariants_py, m)?)?;

@@ -363,7 +363,108 @@ def moldescfp_record(smi):
     return res
 
 
+def props_record(obj):
+    """All properties (private and computed), or the exception name."""
+    try:
+        d = obj.GetPropsAsDict(includePrivate=True, includeComputed=True)
+    except Exception as e:  # noqa: BLE001
+        return type(e).__name__
+    return {k: d[k] for k in sorted(d)}
+
+
+def mol_state_record(m):
+    rec = {"smiles": Chem.MolToSmiles(m),
+           "atoms": [atom_record(a) + [props_record(a)] for a in m.GetAtoms()],
+           "bonds": [bond_record(b) + [props_record(b)] for b in m.GetBonds()],
+           "mol": props_record(m)}
+    if m.GetNumConformers():
+        conf = m.GetConformer()
+        rec["coords"] = [[round(p.x, 6), round(p.y, 6), round(p.z, 6)]
+                         for p in (conf.GetAtomPosition(i) for i in range(m.GetNumAtoms()))]
+    return rec
+
+
+def addhs_records(m):
+    """AddHs with the default, explicit-only, coordinate and atom-restricted options."""
+    n = m.GetNumAtoms()
+    only = [i for i in range(n) if i % 2 == 0]
+    cases = (
+        ("default", lambda mm: Chem.AddHs(mm)),
+        ("explicitOnly", lambda mm: Chem.AddHs(mm, explicitOnly=True)),
+        ("addCoords", lambda mm: Chem.AddHs(mm, addCoords=True)),
+        ("onlyOnAtoms", lambda mm: Chem.AddHs(mm, onlyOnAtoms=only)),
+        ("params", lambda mm: Chem.AddHs(mm, Chem.AddHsParameters())),
+    )
+    res = {}
+    for key, fn in cases:
+        try:
+            res[key] = mol_state_record(fn(Chem.Mol(m)))
+        except Exception as e:  # noqa: BLE001
+            res[key] = type(e).__name__
+    return res
+
+
+def crippen_record(smi):
+    from rdkit.Chem import rdMolDescriptors as D
+    from rdkit.Chem import Crippen
+    m = Chem.MolFromSmiles(smi)
+    if m is None:
+        return None
+
+    def attempt(fn):
+        try:
+            return fn()
+        except Exception as e:  # noqa: BLE001
+            return type(e).__name__
+
+    def contribs(mm, force=False):
+        n = mm.GetNumAtoms()
+        types, labels = [0] * n, [""] * n
+        c = D._CalcCrippenContribs(mm, force, types, labels)
+        return [[list(t) for t in c], types, labels]
+
+    res = {}
+    res["calc"] = attempt(lambda: list(D.CalcCrippenDescriptors(Chem.Mol(m))))
+    res["calcNoH"] = attempt(lambda: list(D.CalcCrippenDescriptors(Chem.Mol(m), False)))
+    res["contribs"] = attempt(lambda: contribs(Chem.Mol(m)))
+    res["contribsNoForce"] = attempt(lambda: contribs(Chem.Mol(m), True))
+    res["MolLogP"] = attempt(lambda: Crippen.MolLogP(Chem.Mol(m)))
+    res["MolMR"] = attempt(lambda: Crippen.MolMR(Chem.Mol(m)))
+
+    def cached():
+        mm = Chem.Mol(m)
+        D.CalcCrippenDescriptors(mm, False)
+        return contribs(mm)
+    res["cachedContribs"] = attempt(cached)
+
+    def cached_calc():
+        mm = Chem.Mol(m)
+        contribs(mm)
+        return list(D.CalcCrippenDescriptors(mm, False))
+    res["cachedCalc"] = attempt(cached_calc)
+
+    def forced():
+        mm = Chem.Mol(m)
+        D.CalcCrippenDescriptors(mm)
+        return list(D.CalcCrippenDescriptors(mm, True, True))
+    res["forced"] = attempt(forced)
+
+    mh = Chem.AddHs(m)
+    res["explicitH"] = attempt(lambda: list(D.CalcCrippenDescriptors(Chem.Mol(mh), False)))
+    res["explicitHContribs"] = attempt(lambda: contribs(Chem.Mol(mh)))
+    res["badTypes"] = attempt(lambda: D._CalcCrippenContribs(Chem.Mol(m), False, [0] * (m.GetNumAtoms() + 1)))
+    return res
+
+
 def dump(mode, smi):
+    if mode == "crippen":
+        return crippen_record(smi)
+    if mode == "addhs":
+        m = Chem.MolFromSmiles(smi)
+        return None if m is None else addhs_records(m)
+    if mode == "addhs3d":
+        m = Chem.MolFromMolBlock(smi)
+        return None if m is None else addhs_records(m)
     if mode == "maccs":
         from rdkit.Chem import MACCSkeys
         m = Chem.MolFromSmiles(smi)
@@ -632,7 +733,7 @@ def main():
         for rec in sdf_records(path):
             print(json.dumps(rec, default=list))
         return
-    if mode in ("molblock", "molwrite"):
+    if mode in ("molblock", "molwrite", "addhs3d"):
         txt = open(path, encoding="utf-8").read()
         for i, blk in enumerate(txt.split("$$$$\n")):
             if not blk.strip():

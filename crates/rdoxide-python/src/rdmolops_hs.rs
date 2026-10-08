@@ -5,6 +5,7 @@ use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple};
 use rdoxide::graphmol::chirality::{bond_dirs, legacy};
+use rdoxide::graphmol::mol_ops::add_hs::{AddHsParameters, add_hs};
 use rdoxide::graphmol::mol_ops::{RemoveHsParameters, remove_hs};
 use rdoxide::graphmol::romol::ROMol;
 
@@ -297,8 +298,131 @@ fn py_set_double_bond_neighbor_directions(
     bond_dirs::set_double_bond_neighbor_directions(&mut mol.mol, conf).py()
 }
 
+/// Parameters controlling which Hs are added.
+#[pyclass(
+    name = "AddHsParameters",
+    module = "rdkit.Chem.rdmolops",
+    skip_from_py_object
+)]
+#[derive(Debug, Clone, Default)]
+pub struct PyAddHsParameters {
+    /// only add explicit Hs
+    #[pyo3(get, set, name = "explicitOnly")]
+    explicit_only: bool,
+    /// add coordinates to the Hs
+    #[pyo3(get, set, name = "addCoords")]
+    add_coords: bool,
+    /// add residue info to the Hs
+    #[pyo3(get, set, name = "addResidueInfo")]
+    add_residue_info: bool,
+    /// do not add Hs to query atoms or atoms with query bonds
+    #[pyo3(get, set, name = "skipQueries")]
+    skip_queries: bool,
+}
+
+#[pymethods]
+impl PyAddHsParameters {
+    #[new]
+    fn new() -> Self {
+        Self::default()
+    }
+}
+
+/// Adds hydrogens to the graph of a molecule.
+///
+///   AddHs(mol, explicitOnly=False, addCoords=False, onlyOnAtoms=None, addResidueInfo=False)
+///   or AddHs(mol, params, onlyOnAtoms=None) with an AddHsParameters object.
+#[pyfunction]
+#[pyo3(name = "AddHs", signature = (*args, **kwargs))]
+fn py_add_hs(args: &Bound<'_, PyTuple>, kwargs: Option<&Bound<'_, PyDict>>) -> PyResult<PyMol> {
+    let get = |pos: usize, name: &str| -> PyResult<Option<Bound<'_, PyAny>>> {
+        let kw = match kwargs {
+            Some(k) => k.get_item(name)?,
+            None => None,
+        };
+        let p = if pos < args.len() {
+            Some(args.get_item(pos)?)
+        } else {
+            None
+        };
+        match (p, kw) {
+            (Some(_), Some(_)) => Err(PyTypeError::new_err(format!(
+                "AddHs() got multiple values for argument '{name}'"
+            ))),
+            (a, b) => Ok(a.or(b)),
+        }
+    };
+    let mol_obj = get(0, "mol")?
+        .ok_or_else(|| PyTypeError::new_err("AddHs() missing required argument 'mol'"))?;
+    let mol = mol_obj.cast::<PyMol>()?.borrow();
+    let second = match kwargs.map(|k| k.get_item("params")).transpose()?.flatten() {
+        Some(p) => Some(p),
+        None => {
+            if args.len() > 1 {
+                Some(args.get_item(1)?)
+            } else {
+                None
+            }
+        }
+    };
+    let (params, only_on) = if let Some(p) = second
+        .as_ref()
+        .and_then(|s| s.cast::<PyAddHsParameters>().ok())
+    {
+        let p = p.borrow();
+        (
+            AddHsParameters {
+                explicit_only: p.explicit_only,
+                add_coords: p.add_coords,
+                add_residue_info: p.add_residue_info,
+                skip_queries: p.skip_queries,
+            },
+            get(2, "onlyOnAtoms")?,
+        )
+    } else {
+        let flag = |pos, name| -> PyResult<bool> {
+            Ok(match get(pos, name)? {
+                Some(v) => v.is_truthy()?,
+                None => false,
+            })
+        };
+        (
+            AddHsParameters {
+                explicit_only: flag(1, "explicitOnly")?,
+                add_coords: flag(2, "addCoords")?,
+                add_residue_info: flag(4, "addResidueInfo")?,
+                skip_queries: false,
+            },
+            get(3, "onlyOnAtoms")?,
+        )
+    };
+    // pythonObjectToVect(onlyOnAtoms, nAtoms): falsy -> all atoms
+    let only = match only_on {
+        Some(o) if o.is_truthy()? => {
+            let n = mol.mol.num_atoms();
+            let mut v = Vec::new();
+            for x in o.try_iter()? {
+                let x: u32 = x?.extract()?;
+                if x >= n {
+                    return Err(pyo3::exceptions::PyValueError::new_err(
+                        "list element larger than allowed value",
+                    ));
+                }
+                v.push(x);
+            }
+            Some(v)
+        }
+        _ => None,
+    };
+    let mut res: ROMol = mol.mol.clone();
+    add_hs(&mut res, &params, only.as_deref()).py()?;
+    Ok(PyMol { mol: res })
+}
+
 pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyRemoveHsParameters>()?;
+    m.add_class::<PyAddHsParameters>()?;
+    m.add_function(wrap_pyfunction!(py_add_hs, m)?)?;
     m.add_function(wrap_pyfunction!(py_remove_hs, m)?)?;
     m.add_function(wrap_pyfunction!(py_remove_all_hs, m)?)?;
     m.add_function(wrap_pyfunction!(py_assign_stereochemistry, m)?)?;
