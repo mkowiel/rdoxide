@@ -507,6 +507,47 @@ def molprops_record(smi):
     }
 
 
+def molsurf_record(smi):
+    """Labute ASA, TPSA and the VSA binnings (MolSurf.cpp), each on a fresh copy (they cache on the mol)."""
+    from rdkit.Chem import rdMolDescriptors as D
+    m = Chem.MolFromSmiles(smi)
+    if m is None:
+        return None
+
+    def attempt(fn):
+        try:
+            return fn()
+        except Exception as e:  # noqa: BLE001
+            return type(e).__name__
+
+    def fresh(fn):
+        return attempt(lambda: fn(Chem.Mol(m)))
+
+    def labute_contribs(mol):
+        contribs, h = D._CalcLabuteASAContribs(mol)
+        return [list(contribs), h]
+
+    def charged_prop(mol):
+        for a in mol.GetAtoms():
+            a.SetDoubleProp("p", (a.GetIdx() % 7) / 3.0)
+        return D.CustomProp_VSA_(mol, "p", [0.2, 0.9, 1.5])
+
+    return {
+        "labute": fresh(lambda x: D.CalcLabuteASA(x)),
+        "labuteNoHs": fresh(lambda x: D.CalcLabuteASA(x, includeHs=False)),
+        "labuteContribs": fresh(labute_contribs),
+        "tpsa": fresh(lambda x: D.CalcTPSA(x)),
+        "tpsaSP": fresh(lambda x: D.CalcTPSA(x, includeSandP=True)),
+        "tpsaContribs": fresh(lambda x: list(D._CalcTPSAContribs(x))),
+        "tpsaContribsSP": fresh(lambda x: list(D._CalcTPSAContribs(x, includeSandP=True))),
+        "slogpVsa": fresh(lambda x: D.SlogP_VSA_(x)),
+        "smrVsa": fresh(lambda x: D.SMR_VSA_(x)),
+        "slogpVsaBins": fresh(lambda x: D.SlogP_VSA_(x, [0.5, -0.5, 0.0])),
+        "customVsa": fresh(charged_prop),
+        "tpsaWithHs": attempt(lambda: D.CalcTPSA(Chem.AddHs(m), includeSandP=True)),
+    }
+
+
 def lipinski_record(smi):
     """rdMolDescriptors counts (Lipinski.cpp), with the rotatable-bond modes and the atom lists."""
     from rdkit.Chem import rdMolDescriptors as D
@@ -554,6 +595,8 @@ def dump(mode, smi):
         return lipinski_record(smi)
     if mode == "molprops":
         return molprops_record(smi)
+    if mode == "molsurf":
+        return molsurf_record(smi)
     if mode == "crippen":
         return crippen_record(smi)
     if mode == "addhs":

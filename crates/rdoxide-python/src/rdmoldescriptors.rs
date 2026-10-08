@@ -861,6 +861,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(calc_num_rings, m)?)?;
     m.add_function(wrap_pyfunction!(calc_phi, m)?)?;
     crate::rdmoldescriptors_props::init(m)?;
+    crate::rdmoldescriptors_molsurf::init(m)?;
     m.add_function(wrap_pyfunction!(calc_fraction_csp3, m)?)?;
     m.add_function(wrap_pyfunction!(calc_num_heterocycles, m)?)?;
     m.add_function(wrap_pyfunction!(calc_num_aromatic_rings, m)?)?;
