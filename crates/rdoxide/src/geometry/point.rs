@@ -7,6 +7,7 @@ use std::f64::consts::PI;
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
 use crate::error::{RDKitError, Result};
+use crate::rdgeneral::fp::fmuladd;
 
 pub const ZERO_TOLERANCE: f64 = 1.0e-16;
 
@@ -23,12 +24,13 @@ impl Point3D {
         Point3D { x, y, z }
     }
 
-    pub fn length(&self) -> f64 {
-        (self.x * self.x + self.y * self.y + self.z * self.z).sqrt()
+    /// `x * x + y * y + z * z` (contracted like the reference build)
+    pub fn length_sq(&self) -> f64 {
+        fmuladd(self.z, self.z, fmuladd(self.x, self.x, self.y * self.y))
     }
 
-    pub fn length_sq(&self) -> f64 {
-        self.x * self.x + self.y * self.y + self.z * self.z
+    pub fn length(&self) -> f64 {
+        self.length_sq().sqrt()
     }
 
     pub fn normalize(&mut self) -> Result<()> {
@@ -45,7 +47,7 @@ impl Point3D {
     }
 
     pub fn dot_product(&self, o: &Point3D) -> f64 {
-        self.x * o.x + self.y * o.y + self.z * o.z
+        fmuladd(self.z, o.z, fmuladd(self.x, o.x, self.y * o.y))
     }
 
     /// Unsigned angle in [0, pi] between the two vectors.
@@ -64,7 +66,7 @@ impl Point3D {
     /// Signed angle in [0, 2pi), sign from the z-component of the cross product.
     pub fn signed_angle_to(&self, o: &Point3D) -> f64 {
         let res = self.angle_to(o);
-        if (self.x * o.y - self.y * o.x) < -ZERO_TOLERANCE {
+        if fmuladd(self.x, o.y, -(self.y * o.x)) < -ZERO_TOLERANCE {
             2.0 * PI - res
         } else {
             res
@@ -79,9 +81,9 @@ impl Point3D {
 
     pub fn cross_product(&self, o: &Point3D) -> Point3D {
         Point3D {
-            x: self.y * o.z - self.z * o.y,
-            y: -self.x * o.z + self.z * o.x,
-            z: self.x * o.y - self.y * o.x,
+            x: fmuladd(self.y, o.z, -(self.z * o.y)),
+            y: fmuladd(-self.x, o.z, self.z * o.x),
+            z: fmuladd(self.x, o.y, -(self.y * o.x)),
         }
     }
 
@@ -184,13 +186,94 @@ impl Point2D {
         Point2D { x, y }
     }
     pub fn length(&self) -> f64 {
-        (self.x * self.x + self.y * self.y).sqrt()
+        self.length_sq().sqrt()
     }
     pub fn length_sq(&self) -> f64 {
-        self.x * self.x + self.y * self.y
+        fmuladd(self.x, self.x, self.y * self.y)
     }
     pub fn dot_product(&self, o: &Point2D) -> f64 {
-        self.x * o.x + self.y * o.y
+        fmuladd(self.x, o.x, self.y * o.y)
+    }
+    pub fn normalize(&mut self) -> Result<()> {
+        let l = self.length();
+        if l < ZERO_TOLERANCE {
+            return Err(RDKitError::Runtime(
+                "Cannot normalize a zero length vector".into(),
+            ));
+        }
+        self.x /= l;
+        self.y /= l;
+        Ok(())
+    }
+    pub fn rotate90(&mut self) {
+        let t = self.x;
+        self.x = -self.y;
+        self.y = t;
+    }
+    /// Unsigned angle in [0, pi] between the two vectors.
+    pub fn angle_to(&self, o: &Point2D) -> Result<f64> {
+        let mut t1 = *self;
+        let mut t2 = *o;
+        t1.normalize()?;
+        t2.normalize()?;
+        let d = t1.dot_product(&t2).clamp(-1.0, 1.0);
+        Ok(d.acos())
+    }
+    /// Angle in [0, 2pi), sign from the cross product.
+    pub fn signed_angle_to(&self, o: &Point2D) -> Result<f64> {
+        let mut res = self.angle_to(o)?;
+        if fmuladd(self.x, o.y, -(self.y * o.x)) < -ZERO_TOLERANCE {
+            res = 2.0 * PI - res;
+        }
+        Ok(res)
+    }
+    pub fn direction_vector(&self, o: &Point2D) -> Result<Point2D> {
+        let mut res = Point2D::new(o.x - self.x, o.y - self.y);
+        res.normalize()?;
+        Ok(res)
+    }
+}
+
+impl Add for Point2D {
+    type Output = Point2D;
+    fn add(self, o: Point2D) -> Point2D {
+        Point2D::new(self.x + o.x, self.y + o.y)
+    }
+}
+impl Sub for Point2D {
+    type Output = Point2D;
+    fn sub(self, o: Point2D) -> Point2D {
+        Point2D::new(self.x - o.x, self.y - o.y)
+    }
+}
+impl Neg for Point2D {
+    type Output = Point2D;
+    fn neg(self) -> Point2D {
+        Point2D::new(-self.x, -self.y)
+    }
+}
+impl Mul<f64> for Point2D {
+    type Output = Point2D;
+    fn mul(self, s: f64) -> Point2D {
+        Point2D::new(self.x * s, self.y * s)
+    }
+}
+impl AddAssign for Point2D {
+    fn add_assign(&mut self, o: Point2D) {
+        self.x += o.x;
+        self.y += o.y;
+    }
+}
+impl SubAssign for Point2D {
+    fn sub_assign(&mut self, o: Point2D) {
+        self.x -= o.x;
+        self.y -= o.y;
+    }
+}
+impl MulAssign<f64> for Point2D {
+    fn mul_assign(&mut self, s: f64) {
+        self.x *= s;
+        self.y *= s;
     }
 }
 

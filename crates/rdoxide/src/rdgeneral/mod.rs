@@ -3,6 +3,7 @@
 pub mod common_properties;
 pub mod cxx_sort;
 pub mod dict;
+pub mod fp;
 pub mod log;
 pub mod random;
 pub mod strings;

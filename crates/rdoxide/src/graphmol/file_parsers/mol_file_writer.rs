@@ -8,8 +8,7 @@
 //!
 //! Not ported yet (reported as errors): SubstanceGroups (including the ones
 //! the writer creates for SMARTS queries, generic groups and zero-order
-//! bonds), wedging of atropisomers, and 2D coordinate generation for
-//! molecules without a conformer when `includeStereo` is set.
+//! bonds) and wedging of atropisomers.
 //!
 //! Copyright (C) 2003-2025 Greg Landrum and other RDKit contributors.
 //! Licensed under the BSD 3-Clause license (see LICENSES/RDKit-BSD-3-Clause.txt).
@@ -1440,9 +1439,7 @@ fn prepare_mol(mol: &mut RWMol, params: &MolWriterParams) -> Result<Vec<bool>> {
         kekulize(mol, true, true, 100)?;
     }
     if params.include_stereo && mol.num_conformers() == 0 {
-        return Err(not_ported(
-            "computing 2D coordinates (RDDepict::compute2DCoords)",
-        ));
+        crate::graphmol::depictor::compute_2d_coords(mol, &Default::default())?;
     }
     if needs_additional_sgroups(mol) {
         return Err(not_ported("writing SubstanceGroups"));

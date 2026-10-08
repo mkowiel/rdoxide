@@ -128,6 +128,25 @@ def molwrite_record(blk):
 
 
 def dump(mode, smi):
+    if mode == "depict":
+        from rdkit.Chem import rdDepictor
+        m = Chem.MolFromSmiles(smi)
+        if m is None:
+            return None
+        res = {}
+        for key, kw in (("default", {}), ("nocanon", {"canonOrient": False})):
+            mm = Chem.Mol(m)
+            try:
+                rdDepictor.Compute2DCoords(mm, **kw)
+                conf = mm.GetConformer()
+                res[key] = [[round(conf.GetAtomPosition(i).x, 6), round(conf.GetAtomPosition(i).y, 6)] for i in range(mm.GetNumAtoms())]
+            except Exception as e:  # noqa: BLE001
+                res[key] = type(e).__name__
+        try:
+            res["block"] = Chem.MolToMolBlock(m)
+        except Exception as e:  # noqa: BLE001
+            res["block"] = type(e).__name__
+        return res
     if mode == "molwrite":
         return molwrite_record(smi)
     if mode == "molblock":

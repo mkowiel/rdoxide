@@ -288,3 +288,26 @@
 
 [module."rdoxide_python::rdmolfiles_molwrite".sources]
 "Code/GraphMol/Wrap/rdmolfiles.cpp" = "829058d8e8a382c358d2464cee762f8cff04f75f"
+
+[module."rdoxide::geometry::transform2d".sources]
+"Code/Geometry/Transform2D.h" = "ee774587aea919b28dbe7ed764b3bf5f80bf08e7"
+"Code/Geometry/Transform2D.cpp" = "c2091c93e114bdc1d7e41b78416734d65b2676fd"
+"Code/Numerics/SquareMatrix.h" = "dbe5ed53d34bc78e672c1137dba8ae260726ce15"
+
+[module."rdoxide::graphmol::matrices".sources]
+"Code/GraphMol/Matrices.cpp" = "a0a036ef7fe7cce7454fafcd07c9eb7a565f00b0"
+
+[module."rdoxide::graphmol::depictor".sources]
+"Code/GraphMol/Depictor/RDDepictor.cpp" = "31a4547458b6fb1bf0ba2a1128f4362457b7ecd9"
+"Code/GraphMol/Depictor/RDDepictor.h" = "920846744603ec126c1690bc8ee247778ab9129e"
+
+[module."rdoxide::graphmol::depictor::depict_utils".sources]
+"Code/GraphMol/Depictor/DepictUtils.cpp" = "167919ec1c130a0c7bd59c99f909b380150a1901"
+"Code/GraphMol/Depictor/DepictUtils.h" = "109fe3bd93ac5ec047293a55fd8347df51d012ad"
+
+[module."rdoxide::graphmol::depictor::embedded_frag".sources]
+"Code/GraphMol/Depictor/EmbeddedFrag.cpp" = "93a08c2d53e0144c58be43da9f003ca03aaaa808"
+"Code/GraphMol/Depictor/EmbeddedFrag.h" = "7bc6e37e06cdbf26bc789b625357ef5d2522a5ce"
+
+[module."rdoxide_python::rddepictor".sources]
+"Code/GraphMol/Depictor/Wrap/rdDepictor.cpp" = "698ee36508e4dba886c48637bfdafc9fbb0c35fc"
