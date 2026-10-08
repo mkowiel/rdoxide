@@ -2,6 +2,7 @@
 
 pub mod mol_file_parser;
 pub mod mol_file_v3000;
+pub mod mol_file_writer;
 pub mod sd_mol_supplier;
 pub mod utils;
 
