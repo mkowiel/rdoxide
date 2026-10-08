@@ -683,7 +683,7 @@ def transforms_record(smi):
 
 
 def descriptors_record(smi):
-    """Every descriptor of rdkit.Chem.Descriptors (minus the ones rdoxide cannot compute yet)."""
+    """Every descriptor of rdkit.Chem.Descriptors (minus SPS, which needs the new stereo perception)."""
     from rdkit.Chem import Descriptors
     m = Chem.MolFromSmiles(smi)
     if m is None:
@@ -691,10 +691,13 @@ def descriptors_record(smi):
     skip = {"SPS"}
     res = {}
     for name, fn in Descriptors._descList:
-        if name in skip or name.startswith("BCUT2D"):
+        if name in skip:
             continue
         try:
             res[name] = fn(Chem.Mol(m))
+            if name.startswith("BCUT2D"):
+                # eigenvalues come from different solvers (Eigen vs rdoxide's QL): compare to 9 decimals
+                res[name] = round(res[name], 9) + 0.0
         except Exception as e:  # noqa: BLE001
             res[name] = type(e).__name__
     return res

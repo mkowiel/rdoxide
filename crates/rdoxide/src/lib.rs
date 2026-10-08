@@ -15,6 +15,7 @@ pub mod external;
 pub mod geometry;
 pub mod graphmol;
 pub mod ml;
+pub mod numerics;
 pub mod rdgeneral;
 
 pub use error::{RDKitError, Result, SanitizeError};

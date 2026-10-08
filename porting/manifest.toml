@@ -482,3 +482,13 @@
 
 [module."rdoxide_python::rdmolops_transforms".sources]
 "Code/GraphMol/Wrap/MolOps.cpp" = "2dc7ae10c4ce7523938a4db10e31215cfe2162db"
+
+[module."rdoxide::graphmol::descriptors::bcut".sources]
+"Code/GraphMol/Descriptors/BCUT.cpp" = "8b160c21095bf92975f8e5386f26396d9717d158"
+"Code/GraphMol/Descriptors/BCUT.h" = "af4ce907df6cd94f368def7d5be33103e3f7df9e"
+
+[module."rdoxide_python::rdmoldescriptors_bcut".sources]
+"Code/GraphMol/Descriptors/Wrap/rdMolDescriptors.cpp" = "4d3c2e1d6315579af9f3bf02b1564224fe48b82e"
+
+[module."python::rdkit.Chem.AllChem".sources]
+"rdkit/Chem/AllChem.py" = "25c893b1b335fe25af3736d4c1b1413e69d4f1db"
