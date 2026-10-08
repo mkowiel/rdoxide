@@ -110,3 +110,75 @@ to = "python/rdkit/Chem/Lipinski.py"
 [[copy]]
 from = "rdkit/Chem/MolSurf.py"
 to = "python/rdkit/Chem/MolSurf.py"
+
+[[copy]]
+from = "rdkit/Chem/ChemUtils/__init__.py"
+to = "python/rdkit/Chem/ChemUtils/__init__.py"
+
+[[copy]]
+from = "rdkit/Chem/ChemUtils/DescriptorUtilities.py"
+to = "python/rdkit/Chem/ChemUtils/DescriptorUtilities.py"
+
+[[copy]]
+from = "rdkit/Chem/EState/__init__.py"
+to = "python/rdkit/Chem/EState/__init__.py"
+
+[[copy]]
+from = "rdkit/Chem/EState/AtomTypes.py"
+to = "python/rdkit/Chem/EState/AtomTypes.py"
+
+[[copy]]
+from = "rdkit/Chem/EState/EState.py"
+to = "python/rdkit/Chem/EState/EState.py"
+
+[[copy]]
+from = "rdkit/Chem/EState/EState_VSA.py"
+to = "python/rdkit/Chem/EState/EState_VSA.py"
+
+[[copy]]
+from = "rdkit/Chem/EState/Fingerprinter.py"
+to = "python/rdkit/Chem/EState/Fingerprinter.py"
+
+[[copy]]
+from = "rdkit/Chem/QED.py"
+to = "python/rdkit/Chem/QED.py"
+
+[[copy]]
+from = "rdkit/Chem/SpacialScore.py"
+to = "python/rdkit/Chem/SpacialScore.py"
+
+[[copy]]
+from = "rdkit/Chem/Descriptors.py"
+to = "python/rdkit/Chem/Descriptors.py"
+
+[[copy]]
+from = "rdkit/ML/__init__.py"
+to = "python/rdkit/ML/__init__.py"
+
+[[copy]]
+from = "rdkit/ML/InfoTheory/__init__.py"
+to = "python/rdkit/ML/InfoTheory/__init__.py"
+
+[[copy]]
+from = "rdkit/ML/InfoTheory/entropy.py"
+to = "python/rdkit/ML/InfoTheory/entropy.py"
+
+[[copy]]
+from = "rdkit/Chem/Graphs.py"
+to = "python/rdkit/Chem/Graphs.py"
+
+[[copy]]
+from = "rdkit/Chem/GraphDescriptors.py"
+to = "python/rdkit/Chem/GraphDescriptors.py"
+
+[[copy]]
+from = "rdkit/Chem/Fragments.py"
+to = "python/rdkit/Chem/Fragments.py"
+
+[[copy]]
+from = "rdkit/Chem/Descriptors3D.py"
+to = "python/rdkit/Chem/Descriptors3D.py"
+
+[[copy]]
+from = "Data/FragmentDescriptors.csv"
+to = "python/rdkit/share/RDKit/Data/FragmentDescriptors.csv"
