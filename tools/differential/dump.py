@@ -119,7 +119,31 @@ def dump(mode, smi):
                 "mol": private_props(m)}
     if mode == "smiles":
         m = Chem.MolFromSmiles(smi)
-        return None if m is None else Chem.MolToSmiles(m)
+        if m is None:
+            return None
+        out = {}
+
+        def run(key, f):
+            try:
+                out[key] = f()
+            except Exception as e:  # noqa: BLE001
+                out[key] = "EXC:" + type(e).__name__
+
+        run("canonical", lambda: Chem.MolToSmiles(m))
+        run("order", lambda: list(m.GetPropsAsDict(True, True)["_smilesAtomOutputOrder"]))
+        run("bond_order", lambda: list(m.GetPropsAsDict(True, True)["_smilesBondOutputOrder"]))
+        run("noncanonical", lambda: Chem.MolToSmiles(m, canonical=False))
+        run("kekule", lambda: Chem.MolToSmiles(Chem.Mol(m), kekuleSmiles=True))
+        run("noniso", lambda: Chem.MolToSmiles(m, isomericSmiles=False))
+        run("explicit", lambda: Chem.MolToSmiles(m, allBondsExplicit=True, allHsExplicit=True))
+        run("rooted", lambda: Chem.MolToSmiles(m, rootedAtAtom=m.GetNumAtoms() - 1))
+        run("random", lambda: Chem.MolToRandomSmilesVect(m, 3, randomSeed=42))
+        n = m.GetNumAtoms()
+        run("fragment", lambda: Chem.MolFragmentToSmiles(m, atomsToUse=list(range(max(1, n // 2)))))
+        run("fragment_kekule", lambda: Chem.MolFragmentToSmiles(
+            Chem.Mol(m), atomsToUse=list(range(n)), kekuleSmiles=True, canonical=False))
+        run("roundtrip", lambda: Chem.MolToSmiles(Chem.MolFromSmiles(Chem.MolToSmiles(m))))
+        return out
     raise SystemExit(f"unknown mode {mode}")
 
 

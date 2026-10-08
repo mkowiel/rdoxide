@@ -216,6 +216,14 @@ fn permutation_limit(tag: ChiralType) -> Option<i32> {
     }
 }
 
+/// `SmilesParseOps::checkChiralPermutation`
+pub fn check_chiral_permutation(tag: ChiralType, permutation: i32) -> bool {
+    match permutation_limit(tag) {
+        Some(limit) if tag > ChiralType::Other => (0..=limit).contains(&permutation),
+        _ => true,
+    }
+}
+
 /// `CheckChiralitySpecifications`
 pub fn check_chirality_specifications(
     mol: &mut RWMol,

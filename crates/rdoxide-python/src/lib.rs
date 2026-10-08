@@ -21,6 +21,7 @@ mod props;
 mod rdbase;
 mod rdchem;
 mod rdmolfiles;
+mod rdmolfiles_write;
 mod rdmolops;
 mod rdmolops_hs;
 mod ringinfo;

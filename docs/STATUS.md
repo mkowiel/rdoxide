@@ -6,7 +6,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 |-------|-----------|--------|-------|
 | 0 | Workspace, packaging (maturin, abi3-py310), CI, licenses, NOTICE | ✅ | |
 | 0 | `tools/sync_upstream.py` (fetch/regen/diff/stamp), `porting/manifest.toml` | ✅ | |
-| 0 | Upstream test ratchet (`tools/run_upstream_tests.py`) | ✅ | 45 upstream tests passing |
+| 0 | Upstream test ratchet (`tools/run_upstream_tests.py`) | ✅ | 52 upstream tests passing (incl. `UnitTestSmiles.py`) |
 | 1 | RDGeneral: Dict/RDValue/RDProps | ✅ | |
 | 1 | RDGeneral: RDLog + `rdBase` logging API | ✅ | upstream `UnitTestLogging.py` 32/32 |
 | 1 | RDGeneral: RNG (`boost::minstd_rand`, glibc `rand`) | ✅ | |
@@ -23,7 +23,8 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 3 | addHs, new (non-legacy) stereo perception, CIPLabeler, atropisomer perception from wedges | ⬜ | `SetUseLegacyStereoPerception(False)` currently raises |
 | 4 | SMILES parser (lexer + grammar + SmilesParseOps, non-tetrahedral stereo) | ✅ | differential: 10312/10312 identical to RDKit (sanitize=False) |
 | 4 | `MolFromSmiles` sanitize/removeHs/stereo path (defaults) | ✅ | differential `molfromsmiles` identical |
-| 4 | CXSMILES, SMARTS, query atoms/bonds (`~`), SMILES writer, canonicalization | ⬜ | |
+| 4 | SMILES writer + canonical SMILES (Canon.cpp DFS, SmilesWrite.cpp, getMolFrags/copyMolSubset): `MolToSmiles` (both overloads), `MolFragmentToSmiles`, `MolToRandomSmilesVect`, `SmilesWriteParams` | ✅ | differential `smiles` (canonical, output order, non-canonical, kekule, non-isomeric, explicit, rooted, random, fragment, roundtrip) 10312 + 35973 identical |
+| 4 | CXSMILES (read/write), SMARTS, query atoms/bonds (`~`) | ⬜ | |
 | 5–13 | see PLAN.md | ⬜ | |
 
 ## Python package files
@@ -44,6 +45,8 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 * 2026-10-07 — Stage 3d: removeHs + legacy stereo perception; default `MolFromSmiles`
   is now identical to RDKit. Next: SMILES writer (SmilesWrite.cpp, Canon.cpp
   canonicalizeFragment, MolToSmiles/MolFragmentToSmiles) → rough_test.py imports.
+* 2026-10-08 — Stage 4b: SMILES writer identical to RDKit. Next: SMARTS + query atoms/bonds
+  (needed by rough_test.py imports and substructure search), then CXSMILES.
 
 ## Differential testing
 
@@ -56,7 +59,7 @@ selected with `--ref-python` or `RDOXIDE_REF_PYTHON`. (PyPI only has
 2026.03.x, which predates the RDL-based SSSR, so it is not a valid oracle for
 ring order.)
 
-Current results: `parse`, `rings`, `sanitize`, `ranks`, `molfromsmiles`: 10312/10312 each.
+Current results: `parse`, `rings`, `sanitize`, `ranks`, `molfromsmiles`, `smiles`: 10312/10312 each.
 `molfromsmiles` (atoms, bonds, stereo props `_CIPCode`/`_CIPRank`/`_ringStereoAtoms`/
 `_ChiralityPossible`) also matches on 35140 molecules from the stereo-rich upstream
 corpora (zinc, ChEMBL, idorsia enumeration, MMFF) and on `tests/data/stereo_edge_cases.smi`.
@@ -69,6 +72,9 @@ New Python test files are also run against the official wheel to validate expect
   point at a different atom (upstream: dangling pointer).
 * `Mol(pickle)` / `ToBinary` not available until MolPickler (stage 6).
 * `Atom.IsInRing()` needs stage 3 (`findSSSR`).
+* `MolFragmentToSmiles(mol, params, atomsToUse)` with `params` passed positionally works
+  in rdoxide; upstream's Boost overload resolution raises AttributeError for it (keyword
+  form works in both).
 * `GetPropsAsDict(includePrivate=True, includeComputed=True)` returns `__computedProps`
   as a list (upstream: a `_vectSt6string` wrapper).
 * `Chem.SetAllowNontetrahedralChirality` & co. keep the value in-process;
