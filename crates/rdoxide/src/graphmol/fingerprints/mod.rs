@@ -3,6 +3,7 @@
 
 pub mod atom_pair;
 pub mod morgan;
+pub mod torsion;
 
 use std::collections::BTreeMap;
 
@@ -194,6 +195,7 @@ pub struct FingerprintFuncArguments<'a> {
 pub enum AtomEnvironment {
     Morgan(morgan::MorganAtomEnv),
     AtomPair(atom_pair::AtomPairAtomEnv),
+    Torsion(torsion::TopologicalTorsionAtomEnv),
 }
 
 impl AtomEnvironment {
@@ -207,6 +209,7 @@ impl AtomEnvironment {
         match self {
             AtomEnvironment::Morgan(e) => Ok(e.code),
             AtomEnvironment::AtomPair(e) => e.bit_id(args, atom_invs, hash_results),
+            AtomEnvironment::Torsion(e) => Ok(e.bit_id),
         }
     }
     fn update_additional_output(
@@ -221,6 +224,7 @@ impl AtomEnvironment {
                 Ok(())
             }
             AtomEnvironment::AtomPair(e) => e.update_additional_output(ao, bit_id),
+            AtomEnvironment::Torsion(e) => e.update_additional_output(ao, bit_id),
         }
     }
 }
@@ -313,6 +317,7 @@ impl BondInvariantsGenerator {
 pub enum EnvGenerator {
     Morgan(morgan::MorganArguments),
     AtomPair(atom_pair::AtomPairArguments),
+    TopologicalTorsion(torsion::TopologicalTorsionArguments),
 }
 
 /// `FingerprintGenerator<OutputType>`; `output_64` selects the OutputType.
@@ -338,6 +343,9 @@ impl FingerprintGenerator {
     }
     /// `AtomEnvironmentGenerator::getResultSize`
     fn result_size(&self) -> u64 {
+        if let EnvGenerator::TopologicalTorsion(t) = &self.env {
+            return t.result_size(self.args.include_chirality);
+        }
         if let EnvGenerator::AtomPair(_) = self.env {
             let chiral = if self.args.include_chirality {
                 atom_pair::NUM_CHIRAL_BITS
@@ -358,6 +366,9 @@ impl FingerprintGenerator {
         let (args, env) = match &self.env {
             EnvGenerator::Morgan(m) => (m.info_string(), "MorganEnvironmentGenerator"),
             EnvGenerator::AtomPair(a) => (a.info_string(), "AtomPairEnvironmentGenerator"),
+            EnvGenerator::TopologicalTorsion(t) => {
+                (t.info_string(), "TopologicalTorsionEnvGenerator")
+            }
         };
         format!(
             "{}{sep}{}{sep}{}{sep}{}{sep}{}",
@@ -381,9 +392,22 @@ impl FingerprintGenerator {
         fargs: &FingerprintFuncArguments<'_>,
         atom_invs: Option<&[u32]>,
         bond_invs: Option<&[u32]>,
+        hash_results: bool,
     ) -> Result<Vec<AtomEnvironment>> {
         let from_atoms = fargs.from_atoms;
         match &self.env {
+            EnvGenerator::TopologicalTorsion(t) => Ok(torsion::get_environments(
+                mol,
+                t,
+                self.args.include_chirality,
+                from_atoms,
+                fargs.ignore_atoms,
+                atom_invs.ok_or_else(|| RDKitError::precondition("bad atom invariants size"))?,
+                hash_results,
+            )?
+            .into_iter()
+            .map(AtomEnvironment::Torsion)
+            .collect()),
             EnvGenerator::AtomPair(a) => Ok(atom_pair::get_environments(
                 mol,
                 a,
@@ -446,7 +470,13 @@ impl FingerprintGenerator {
                 .map(|g| g.bond_invariants(mol))
                 .transpose()?,
         };
-        let envs = self.environments(lmol, fargs, atom_invs.as_deref(), bond_invs.as_deref())?;
+        let envs = self.environments(
+            lmol,
+            fargs,
+            atom_invs.as_deref(),
+            bond_invs.as_deref(),
+            fp_size != 0,
+        )?;
 
         let kind = self.output_kind();
         let len = if fp_size != 0 {
