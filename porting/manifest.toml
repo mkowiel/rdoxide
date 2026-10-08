@@ -456,3 +456,6 @@
 
 [module."rdoxide_python::rdpartialcharges".sources]
 "Code/GraphMol/PartialCharges/Wrap/rdPartialCharges.cpp" = "a3b8c2ec1de06218315622e327b28b4c133454ac"
+
+[module."rdoxide_python::rdmoldescriptors_connectivity".sources]
+"Code/GraphMol/Descriptors/Wrap/rdMolDescriptors.cpp" = "4d3c2e1d6315579af9f3bf02b1564224fe48b82e"

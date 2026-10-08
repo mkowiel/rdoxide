@@ -63,7 +63,8 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 10e | `_CalcMolWt`, `CalcExactMolWt`, `CalcMolFormula` (Hill order, isotopes, D/T), `CalcNumHeavyAtoms`, `CalcNumAtoms` (`MolOps::getAvgMolWt`/`getExactMolWt`/`getMolFormula`) | ✅ | differential `molprops` 15312/15312 identical (also with explicit Hs, isotopes, charges); bool arguments take truthy values |
 | 10f | `CalcLabuteASA`, `_CalcLabuteASAContribs`, `CalcTPSA` (+ `includeSandP`), `_CalcTPSAContribs`, `SlogP_VSA_`, `SMR_VSA_`, `CustomProp_VSA_` (`MolSurf.cpp`; `std::upper_bound` search reproduced for user bins; per-mol caches like upstream) | ✅ | differential `molsurf` 15312/15312 bit-identical (NCI, ZINC, chiral set) |
 | 10g | Gasteiger charges (`rdPartialCharges.ComputeGasteigerCharges`, parameter tables, conjugated charge sharing), `PEOE_VSA_`, verbatim `Chem/MolSurf.py` | ✅ | differential `gasteiger` 15312/15312 identical (string and double properties); upstream `UnitTestSurf` 9/13 + 4 long tests that also pass with `doLong` (one of them fails identically on the reference: bad SMILES in its data), `testPartialCharges` 6/7 |
-| 10a | rest of `rdMolDescriptors` (Chi/Kappa, MQNs, ...) and the `Descriptors` module | ⬜ | |
+| 10h | Connectivity descriptors: `CalcChi{0..4}{v,n}`, `CalcChiNv`/`CalcChiNn`, `CalcHallKierAlpha` (with `atomContribs`), `CalcKappa1/2/3` (+ `CalcPhi` moved to its own binding module); the HK deltas / nVals caches follow upstream (including its unsigned `nOuter - nHs`) | ✅ | differential `connectivity` 15312/15312 identical (plain and explicit-H forms) |
+| 10a | rest of `rdMolDescriptors` (MQNs, BCUT, AUTOCORR2D, ...) and the `Descriptors` module (needs EState, QED, SpacialScore, GraphDescriptors) | ⬜ | next |
 | 9 | LayeredFingerprint, PatternFingerprint, JSON (de)serialization, GetFPs bulk helpers | ⬜ | |
 | 7–13 | see PLAN.md | ⬜ | |
 
@@ -174,3 +175,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-09 — Stage 10e: MolWt/ExactMolWt/formula/atom counts identical to RDKit (`molprops` differential). Next: TPSA, Labute ASA (MolSurf), then the `Descriptors` module.
 * 2026-10-09 — Stage 10f: Labute ASA, TPSA and the SlogP/SMR/custom VSA binnings identical to RDKit (`molsurf` differential). Next: Gasteiger charges, `PEOE_VSA_`, verbatim `MolSurf.py`.
 * 2026-10-09 — Stage 10g: Gasteiger charges, `PEOE_VSA_` and verbatim MolSurf.py identical to RDKit (`gasteiger` differential). Next: the rest of `rdMolDescriptors` (Chi/Kappa, MQNs, ...) and the `Descriptors` module.
+* 2026-10-09 — Stage 10h: Chi/Kappa/Hall-Kier connectivity descriptors identical to RDKit (`connectivity` differential; `res += a*b` of Chi1 is fused on arm64). Next: the `Descriptors` module prerequisites (EState, GraphDescriptors, ...).
