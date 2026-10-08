@@ -12,6 +12,7 @@ mod bond;
 mod conformer;
 mod datastructs;
 mod datastructs_siv;
+mod datastructs_vv;
 mod debug;
 mod enums;
 mod enums_impl;

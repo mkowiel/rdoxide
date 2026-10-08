@@ -3,6 +3,7 @@
 pub mod bit_ops;
 pub mod bit_vect;
 pub mod sparse_int_vect;
+pub mod value_vects;
 
 pub use bit_vect::{BitVect, ExplicitBitVect, SparseBitVect};
 

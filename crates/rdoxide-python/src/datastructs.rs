@@ -16,6 +16,7 @@ use rdoxide::datastructs::{
 
 use crate::datastructs_siv as siv;
 use crate::errors::IntoPyResult;
+use pyo3::IntoPyObjectExt;
 
 /// Accepts str or bytes like `std::string` arguments of the wrappers.
 fn bytes_arg(o: &Bound<'_, PyAny>) -> PyResult<Vec<u8>> {
@@ -705,19 +706,26 @@ fn create_from_binary(fps: &Bound<'_, PyAny>) -> PyResult<PyExplicitBitVect> {
 #[pyo3(name = "ConvertToNumpyArray", signature = (bv, destArray))]
 #[allow(non_snake_case)]
 fn convert_to_numpy(bv: &Bound<'_, PyAny>, destArray: &Bound<'_, PyAny>) -> PyResult<()> {
-    let vals: Vec<i64> = if let Some(v) = siv::get_siv(bv) {
+    let py = bv.py();
+    let vals: Vec<Py<PyAny>> = if let Some(v) = crate::datastructs_vv::numpy_values(bv) {
+        v
+    } else if let Some(v) = siv::get_siv(bv) {
         let mut vals = vec![0i64; v.length() as usize];
         for (&k, &x) in v.nonzero_elements() {
             vals[k as usize] = x as i64;
         }
-        vals
+        vals.into_iter()
+            .map(|x| x.into_py_any(py))
+            .collect::<PyResult<_>>()?
     } else {
         let bv = bv.extract::<PyRef<'_, PyExplicitBitVect>>()?;
         let mut vals = vec![0i64; bv.bv.num_bits() as usize];
         for b in bv.bv.on_bits() {
             vals[b as usize] = 1;
         }
-        vals
+        vals.into_iter()
+            .map(|x| x.into_py_any(py))
+            .collect::<PyResult<_>>()?
     };
     let n = vals.len();
     destArray.call_method1("resize", ((n,),)).or_else(|_| {
@@ -743,6 +751,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyExplicitBitVect>()?;
     m.add_class::<PySparseBitVect>()?;
     siv::add_classes(m)?;
+    crate::datastructs_vv::add_classes(m)?;
     add_metric_fns(m)?;
     for f in [
         wrap_pyfunction!(on_bit_similarity, m)?,
