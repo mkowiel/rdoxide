@@ -1,6 +1,7 @@
 //! Port of RDKit `Code/GraphMol/FileParsers`.
 
 pub mod mol_file_parser;
+pub mod mol_file_v3000;
 pub mod utils;
 
 pub use mol_file_parser::{

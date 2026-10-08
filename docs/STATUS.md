@@ -33,8 +33,8 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 5 | `extraFinalCheck`/`extraAtomCheck`/`extraBondCheck` callbacks, generic matchers, MolBundle, ResonanceMolSupplier | ⬜ | |
 | 6 | MolPickler (byte-identical pickles; reads versions >= 2 incl. queries, rings, stereo groups, conformers, props): `Mol.ToBinary`, `Mol(pkl[, flags])`, Python `pickle`, `Get/SetDefaultPickleProperties`, `PropertyPickleOptions` | ✅ | differential `pickle`/`picklesmarts` byte-identical on 10312 + 1101 + 1426 + edge cases; upstream canonSmiles.v2.pkl stream reads |
 | 6 | Pickles with SubstanceGroups / monomer info, v1 pickles, ExplicitBitVect property handler | ⬜ | raise RuntimeError for now |
-| 6 | MolBlock V2000 reader: atoms/bonds incl. query atoms (A/Q/X/M/R/*, generic groups, H count), query bonds (5-8, topology), M CHG/RAD/ISO/RGP/ALS/RBC/SUB/UNS/PXA, old atom lists, aliases/values, S SKP, 2D/3D stereo; `MolFromMolBlock`, `MolFromMolFile` | ✅ | differential `molblock` (4 parse variants, byte-identical pickles with all props): 2D 4990/4991, 3D 490/490, upstream test_data 309/364 (all diffs are the unported features below) |
-| 6 | V3000 CTAB, SGroups, M ZBO/ZCH/HYD/MRV/APO/LIN, SDMolSupplier, MolToMolBlock, SDWriter | ⬜ | parse as failures (None) for now; next |
+| 6 | MolBlock reader, V2000 + V3000 (atom lists, NOT lists, query props HCOUNT/UNSAT/RBCNT/SUBST, RGROUPS, enhanced stereo collections, LINKNODE, OBJ3D skipping, continuation lines): atoms/bonds incl. query atoms (A/Q/X/M/R/*, generic groups, H count), query bonds (5-8, topology), M CHG/RAD/ISO/RGP/ALS/RBC/SUB/UNS/PXA, old atom lists, aliases/values, S SKP, 2D/3D stereo; `MolFromMolBlock`, `MolFromMolFile` | ✅ | differential `molblock` (4 parse variants, byte-identical pickles with all props): 2D 4991/4991, V3000 1876/1876 (116 with stereo groups), 3D 490/490, upstream test_data 349/364 (remaining diffs need SGroups) |
+| 6 | SGroups (V2000/V3000; also needed for M ZBO/ZCH/HYD/MRV), M APO/LIN, ATTCHORD templates, SDMolSupplier, MolToMolBlock, SDWriter | ⬜ | parse as failures (None) for now; next |
 | 7–13 | see PLAN.md | ⬜ | |
 
 ## Python package files
@@ -71,8 +71,8 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 * 2026-10-08 — Stage 6a: MolPickler byte-identical to RDKit; Python pickling. Ratchet 53 -> 56.
   Next: MolBlock reader/writer + SDMolSupplier (stage 6b).
 * 2026-10-08 — Stage 6b (part 1): V2000 MolBlock reader + stereo from coordinates identical to
-  RDKit (`molblock` differential). Ratchet 56 -> 58. Next: V3000 + SGroups, SDMolSupplier,
-  MolToMolBlock.
+  RDKit (`molblock` differential), then the V3000 CTAB. Ratchet 56 -> 58. Next: SDMolSupplier,
+  MolToMolBlock, SGroups.
 
 ## Differential testing
 

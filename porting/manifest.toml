@@ -265,3 +265,6 @@
 
 [module."rdoxide_python::rdmolfiles_molblock".sources]
 "Code/GraphMol/Wrap/rdmolfiles.cpp" = "829058d8e8a382c358d2464cee762f8cff04f75f"
+
+[module."rdoxide::graphmol::file_parsers::mol_file_v3000".sources]
+"Code/GraphMol/FileParsers/MolFileParser.cpp" = "57b330dcf973d1516ae2fbd1f0ef5f4d0d3b1840"

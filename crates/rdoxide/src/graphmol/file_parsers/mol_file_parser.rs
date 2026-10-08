@@ -65,11 +65,11 @@ impl Default for MolFileParserParams {
     }
 }
 
-fn fpe(msg: impl Into<String>) -> RDKitError {
+pub(super) fn fpe(msg: impl Into<String>) -> RDKitError {
     RDKitError::FileParse(msg.into())
 }
 
-fn not_ported(what: &str, line: u32) -> RDKitError {
+pub(super) fn not_ported(what: &str, line: u32) -> RDKitError {
     fpe(format!(
         "{what} on line {line} is not supported by rdoxide yet"
     ))
@@ -77,7 +77,7 @@ fn not_ported(what: &str, line: u32) -> RDKitError {
 
 /// Maps a failed `lexical_cast` to the `FileParseException` upstream
 /// throws; other errors (e.g. `std::out_of_range`) pass through.
-fn cast_err<T>(r: Result<T>, msg: impl FnOnce() -> String) -> Result<T> {
+pub(super) fn cast_err<T>(r: Result<T>, msg: impl FnOnce() -> String) -> Result<T> {
     r.map_err(|e| if is_bad_cast(&e) { fpe(msg()) } else { e })
 }
 
@@ -91,10 +91,10 @@ fn atom_idx(mol: &RWMol, one_based: i64) -> Result<u32> {
     Ok(idx as u32)
 }
 
-const COMPLEX_QUERIES: [&[u8]; 8] = [b"A", b"AH", b"Q", b"QH", b"X", b"XH", b"M", b"MH"];
+pub(super) const COMPLEX_QUERIES: [&[u8]; 8] = [b"A", b"AH", b"Q", b"QH", b"X", b"XH", b"M", b"MH"];
 
 /// `convertComplexNameToQuery`
-fn complex_name_query(symb: &[u8]) -> AtomQuery {
+pub(super) fn complex_name_query(symb: &[u8]) -> AtomQuery {
     match symb {
         b"Q" => make_q_atom_query(),
         b"QH" => make_qh_atom_query(),
@@ -107,15 +107,79 @@ fn complex_name_query(symb: &[u8]) -> AtomQuery {
     }
 }
 
-/// Keys of `GenericGroups::genericMatchers` that fit in the 3-character
-/// V2000 symbol field.
-const GENERIC_GROUPS: [&[u8]; 34] = [
-    b"G", b"GH", b"G*", b"GH*", b"ALK", b"ALH", b"AEL", b"AEH", b"AYL", b"AYH", b"CBC", b"CBH",
-    b"CAL", b"CAH", b"CEL", b"CEH", b"ARY", b"ARH", b"CYC", b"CYH", b"ACY", b"ACH", b"ABC", b"ABH",
-    b"AHC", b"AHH", b"AOX", b"AOH", b"CHC", b"CHH", b"HAR", b"HAH", b"CXX", b"CXH",
+/// Keys of `GenericGroups::genericMatchers`.
+pub(super) const GENERIC_GROUPS: [&[u8]; 68] = [
+    b"Group",
+    b"G",
+    b"GroupH",
+    b"GH",
+    b"Group*",
+    b"G*",
+    b"GroupH*",
+    b"GH*",
+    b"Alkyl",
+    b"ALK",
+    b"AlkylH",
+    b"ALH",
+    b"Alkenyl",
+    b"AEL",
+    b"AlkenylH",
+    b"AEH",
+    b"Alkynyl",
+    b"AYL",
+    b"AlkynylH",
+    b"AYH",
+    b"Carbocyclic",
+    b"CBC",
+    b"CarbocyclicH",
+    b"CBH",
+    b"Carbocycloalkyl",
+    b"CAL",
+    b"CarbocycloalkylH",
+    b"CAH",
+    b"Carbocycloalkenyl",
+    b"CEL",
+    b"CarbocycloalkenylH",
+    b"CEH",
+    b"Carboaryl",
+    b"ARY",
+    b"CarboarylH",
+    b"ARH",
+    b"Cyclic",
+    b"CYC",
+    b"CyclicH",
+    b"CYH",
+    b"Acyclic",
+    b"ACY",
+    b"AcyclicH",
+    b"ACH",
+    b"Carboacyclic",
+    b"ABC",
+    b"CarboacyclicH",
+    b"ABH",
+    b"Heteroacyclic",
+    b"AHC",
+    b"HeteroacyclicH",
+    b"AHH",
+    b"Alkoxy",
+    b"AOX",
+    b"AlkoxyH",
+    b"AOH",
+    b"Heterocyclic",
+    b"CHC",
+    b"HeterocyclicH",
+    b"CHH",
+    b"Heteroaryl",
+    b"HAR",
+    b"HeteroarylH",
+    b"HAH",
+    b"NoCarbonRing",
+    b"CXX",
+    b"NoCarbonRingH",
+    b"CXH",
 ];
 
-fn trim(s: &[u8]) -> &[u8] {
+pub(super) fn trim(s: &[u8]) -> &[u8] {
     let ws = |c: &u8| c.is_ascii_whitespace() || *c == 0x0b;
     let start = s.iter().position(|c| !ws(c)).unwrap_or(s.len());
     let end = s.iter().rposition(|c| !ws(c)).map_or(start, |e| e + 1);
@@ -123,7 +187,7 @@ fn trim(s: &[u8]) -> &[u8] {
 }
 
 /// `lookupAtomicNumber`
-fn lookup_atomic_number(res: &mut Atom, symb: &[u8], strict: bool) -> Result<()> {
+pub(super) fn lookup_atomic_number(res: &mut Atom, symb: &[u8], strict: bool) -> Result<()> {
     let mut t = symb.to_vec();
     if t.len() == 2 && t[1].is_ascii_uppercase() {
         t[1] = t[1].to_ascii_lowercase();
@@ -926,7 +990,11 @@ fn parse_mol_block_properties(
 }
 
 /// `calculate3dFlag`
-fn calculate_3d_flag(mol: &mut RWMol, conf: &Conformer, chirality_possible: bool) -> bool {
+pub(super) fn calculate_3d_flag(
+    mol: &mut RWMol,
+    conf: &Conformer,
+    chirality_possible: bool,
+) -> bool {
     let marked_3d = mol
         .props
         .get(cp::_3DConf)
@@ -1216,7 +1284,29 @@ pub fn mol_from_mol_data_stream(
             params.strict_parsing,
         )?
     } else {
-        return Err(not_ported("a V3000 CTAB", *line));
+        if n_atoms != 0 || n_bonds != 0 {
+            let msg = format!(
+                "V3000 mol blocks should have 0s in the initial counts line. (line: {line})"
+            );
+            if params.strict_parsing {
+                return Err(fpe(msg));
+            }
+            rd_log_warning!("{msg}");
+        }
+        let (expect_mend, expect_macro_atoms) = if params.parsing_scsr_mol {
+            (false, true)
+        } else {
+            (true, false)
+        };
+        super::mol_file_v3000::parse_v3000_ctab(
+            s,
+            line,
+            &mut res,
+            &mut chirality_possible,
+            params.strict_parsing,
+            expect_mend,
+            expect_macro_atoms,
+        )?
     };
     if !file_complete {
         return Err(fpe(format!(

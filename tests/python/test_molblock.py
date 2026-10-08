@@ -7,8 +7,7 @@ import pytest
 from rdkit import Chem
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-UPSTREAM_DATA = os.path.join(HERE, "..", "..", "upstream", "rdkit", "Code", "GraphMol",
-                             "FileParsers", "test_data")
+UPSTREAM_DATA = os.path.join(HERE, "..", "data", "molfiles")
 
 ALANINE = """
      RDKit          2D
@@ -85,3 +84,44 @@ def test_3d():
     assert m.GetConformer().Is3D()
     mh = Chem.MolFromMolFile(os.path.join(UPSTREAM_DATA, "issue123.mol"), removeHs=False)
     assert mh.GetNumAtoms() >= 23
+
+
+V3K = """
+     RDKit          2D
+
+  0  0  0  0  0  0  0  0  0  0999 V3000
+M  V30 BEGIN CTAB
+M  V30 COUNTS 6 5 0 0 0
+M  V30 BEGIN ATOM
+M  V30 1 C -1.299038 -0.750000 0.000000 0
+M  V30 2 C 0.000000 0.000000 0.000000 0
+M  V30 3 O 0.000000 1.500000 0.000000 0
+M  V30 4 C 1.299038 -0.750000 0.000000 0
+M  V30 5 N 1.299038 -2.250000 0.000000 0 CHG=1
+M  V30 6 Cl 2.598076 -0.000000 0.000000 0
+M  V30 END ATOM
+M  V30 BEGIN BOND
+M  V30 1 1 2 1 CFG=3
+M  V30 2 1 2 3
+M  V30 3 1 2 4
+M  V30 4 1 4 5 CFG=1
+M  V30 5 1 4 6
+M  V30 END BOND
+M  V30 BEGIN COLLECTION
+M  V30 MDLV30/STEREL1 ATOMS=(2 2 4)
+M  V30 END COLLECTION
+M  V30 END CTAB
+M  END
+"""
+
+
+def test_v3000():
+    m = Chem.MolFromMolBlock(V3K)
+    assert Chem.MolToSmiles(m) == "C[C@H](O)[C@H]([NH3+])Cl"
+    groups = m.GetStereoGroups()
+    assert len(groups) == 1
+    assert groups[0].GetGroupType() == Chem.StereoGroupType.STEREO_OR
+    assert [a.GetIdx() for a in groups[0].GetAtoms()] == [1, 3]
+    assert groups[0].GetReadId() == 1
+    q = Chem.MolFromMolFile(os.path.join(UPSTREAM_DATA, "AtomQuery1.mol"))
+    assert Chem.MolToSmarts(q) == "[#6]1(:[#6](:[#6](:[#7]:[#6]:[#6]:1-[#6&h{3-}])-[#6])-[#6])-[#6]"

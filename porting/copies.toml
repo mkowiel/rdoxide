@@ -18,3 +18,39 @@ to = "python/rdkit/RDRandom.py"
 [[copy]]
 from = "rdkit/RDConfig.py"
 to = "python/rdkit/RDConfig.py"
+
+[[copy]]
+from = "Code/GraphMol/FileParsers/test_data/chiral1.mol"
+to = "tests/data/molfiles/chiral1.mol"
+
+[[copy]]
+from = "Code/GraphMol/FileParsers/test_data/chiral3.mol"
+to = "tests/data/molfiles/chiral3.mol"
+
+[[copy]]
+from = "Code/GraphMol/FileParsers/test_data/list-query.mol"
+to = "tests/data/molfiles/list-query.mol"
+
+[[copy]]
+from = "Code/GraphMol/FileParsers/test_data/rgroups1.mol"
+to = "tests/data/molfiles/rgroups1.mol"
+
+[[copy]]
+from = "Code/GraphMol/FileParsers/test_data/RingBondQuery.mol"
+to = "tests/data/molfiles/RingBondQuery.mol"
+
+[[copy]]
+from = "Code/GraphMol/FileParsers/test_data/bond-query.mol"
+to = "tests/data/molfiles/bond-query.mol"
+
+[[copy]]
+from = "Code/GraphMol/FileParsers/test_data/chiral_3h.mol"
+to = "tests/data/molfiles/chiral_3h.mol"
+
+[[copy]]
+from = "Code/GraphMol/FileParsers/test_data/issue123.mol"
+to = "tests/data/molfiles/issue123.mol"
+
+[[copy]]
+from = "Code/GraphMol/FileParsers/test_data/AtomQuery1.mol"
+to = "tests/data/molfiles/AtomQuery1.mol"

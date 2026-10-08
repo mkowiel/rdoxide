@@ -21,8 +21,8 @@ RDLogger.DisableLog("rdApp.*")
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
 
 
-def smiles():
-    with open(os.path.join(ROOT, "upstream/rdkit/Data/NCI/first_5K.smi")) as fh:
+def smiles(path="upstream/rdkit/Data/NCI/first_5K.smi"):
+    with open(os.path.join(ROOT, path)) as fh:
         for line in fh:
             parts = line.split()
             if parts:
@@ -57,6 +57,29 @@ def main():
             if i % 20 == 0:
                 mh = Chem.RemoveHs(mh)
             fh.write(Chem.MolToMolBlock(mh) + "$$$$\n")
+    with open(os.path.join(out, "molblocks_v3000.sdf"), "w") as fh:
+        stereo = list(smiles("tests/data/stereo_edge_cases.smi"))
+        for i, smi in enumerate(list(smiles()) + stereo * 3):
+            if i % 3 and i < 5000:
+                continue
+            m = Chem.MolFromSmiles(smi)
+            if m is None:
+                continue
+            if i % 2:
+                m = Chem.AddHs(m)
+            rdDepictor.Compute2DCoords(m)
+            centers = [a.GetIdx() for a in m.GetAtoms()
+                       if a.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED]
+            if centers and (i % 4 == 0 or i >= 5000):
+                rw = Chem.RWMol(m)
+                kind = (Chem.StereoGroupType.STEREO_OR, Chem.StereoGroupType.STEREO_AND,
+                        Chem.StereoGroupType.STEREO_ABSOLUTE)[i % 3]
+                rw.SetStereoGroups([Chem.CreateStereoGroup(kind, rw, centers[:2])])
+                m = rw.GetMol()
+            try:
+                fh.write(Chem.MolToV3KMolBlock(m) + "$$$$\n")
+            except Exception:  # noqa: BLE001
+                pass
     data = os.path.join(ROOT, "upstream/rdkit/Code/GraphMol/FileParsers/test_data")
     with open(os.path.join(out, "molblocks_upstream.sdf"), "w") as fh:
         for f in sorted(glob.glob(os.path.join(data, "*.mol"))):
