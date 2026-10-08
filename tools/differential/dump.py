@@ -101,7 +101,35 @@ def sdf_records(path):
         yield ["setdata", [mrec(m) for m in suppl2]]
 
 
+def molwrite_record(blk):
+    res = {}
+    for key, kw in (("default", {}), ("keepHs", {"removeHs": False}), ("nosanitize", {"sanitize": False})):
+        try:
+            m = Chem.MolFromMolBlock(blk, **kw)
+        except Exception as e:  # noqa: BLE001
+            res[key] = type(e).__name__
+            continue
+        if m is None:
+            res[key] = None
+            continue
+        out = {}
+        for wkey, f in (("block", lambda: Chem.MolToMolBlock(m)),
+                        ("nokekule", lambda: Chem.MolToMolBlock(m, kekulize=False)),
+                        ("v3k", lambda: Chem.MolToV3KMolBlock(m)),
+                        ("v2k", lambda: Chem.MolToV2KMolBlock(m)),
+                        ("nostereo", lambda: Chem.MolToMolBlock(m, includeStereo=False)),
+                        ("roundtrip", lambda: Chem.MolToSmiles(Chem.MolFromMolBlock(Chem.MolToMolBlock(m))))):
+            try:
+                out[wkey] = f()
+            except Exception as e:  # noqa: BLE001
+                out[wkey] = type(e).__name__
+        res[key] = out
+    return res
+
+
 def dump(mode, smi):
+    if mode == "molwrite":
+        return molwrite_record(smi)
     if mode == "molblock":
         res = {}
         for key, kw in (("default", {}), ("nosanitize", {"sanitize": False}),
@@ -325,7 +353,7 @@ def main():
         for rec in sdf_records(path):
             print(json.dumps(rec, default=list))
         return
-    if mode == "molblock":
+    if mode in ("molblock", "molwrite"):
         txt = open(path, encoding="utf-8").read()
         for i, blk in enumerate(txt.split("$$$$\n")):
             if not blk.strip():

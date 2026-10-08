@@ -1,6 +1,7 @@
 //! Port of RDKit `Code/RDGeneral`: properties, errors, logging, versions.
 
 pub mod common_properties;
+pub mod cxx_sort;
 pub mod dict;
 pub mod log;
 pub mod random;

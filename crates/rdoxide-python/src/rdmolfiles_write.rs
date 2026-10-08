@@ -82,14 +82,14 @@ impl PySmilesWriteParams {
 }
 
 /// Positional/keyword argument lookup for the overloaded functions.
-struct Args<'a, 'py> {
-    name: &'static str,
-    args: &'a Bound<'py, PyTuple>,
-    kwargs: Option<&'a Bound<'py, PyDict>>,
+pub(crate) struct Args<'a, 'py> {
+    pub(crate) name: &'static str,
+    pub(crate) args: &'a Bound<'py, PyTuple>,
+    pub(crate) kwargs: Option<&'a Bound<'py, PyDict>>,
 }
 
 impl<'py> Args<'_, 'py> {
-    fn get(&self, pos: usize, key: &str) -> PyResult<Option<Bound<'py, PyAny>>> {
+    pub(crate) fn get(&self, pos: usize, key: &str) -> PyResult<Option<Bound<'py, PyAny>>> {
         let kw = match self.kwargs {
             Some(k) => k.get_item(key)?,
             None => None,
@@ -107,10 +107,10 @@ impl<'py> Args<'_, 'py> {
             (a, b) => Ok(a.or(b)),
         }
     }
-    fn flag(&self, pos: usize, key: &str, default: bool) -> PyResult<bool> {
+    pub(crate) fn flag(&self, pos: usize, key: &str, default: bool) -> PyResult<bool> {
         self.get(pos, key)?.map_or(Ok(default), |v| v.is_truthy())
     }
-    fn int(&self, pos: usize, key: &str, default: i32) -> PyResult<i32> {
+    pub(crate) fn int(&self, pos: usize, key: &str, default: i32) -> PyResult<i32> {
         self.get(pos, key)?.map_or(Ok(default), |v| v.extract())
     }
 }

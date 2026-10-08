@@ -278,3 +278,13 @@
 [module."rdoxide_python::rdmolfiles_sdsupplier".sources]
 "Code/GraphMol/Wrap/SDMolSupplier.cpp" = "abdf72f9df41592ca9b4945f26f228482f6c8233"
 "Code/GraphMol/Wrap/MolSupplier.h" = "a931d5f55aafe8de95c48c9e44fffd2ba0e88d15"
+
+[module."rdoxide::graphmol::file_parsers::mol_file_writer".sources]
+"Code/GraphMol/FileParsers/MolFileWriter.cpp" = "832cbeef027b5177fa63edaa237f384b5875daa1"
+"Code/GraphMol/WedgeBonds.cpp" = "044bdfab9574115913e2f4ff57ae5dc7c99b4dac"
+"Code/GraphMol/Chirality.cpp" = "4ae1eb5d92ea880ef07395a25b33c647ec87b09b"
+"Code/GraphMol/StereoGroup.cpp" = "5e04632e462a4a9991e15f5024df6da194e4961a"
+"Code/GraphMol/Atropisomers.cpp" = "31a89e53044311a590576f635cb7e814d5a940cc"
+
+[module."rdoxide_python::rdmolfiles_molwrite".sources]
+"Code/GraphMol/Wrap/rdmolfiles.cpp" = "829058d8e8a382c358d2464cee762f8cff04f75f"

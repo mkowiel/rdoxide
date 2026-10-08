@@ -7,7 +7,7 @@ name = "rdoxide"
 description = "RDKit, rusted: a pure-Rust drop-in replacement for the RDKit Python API"
 readme = "README.md"
 requires-python = ">=3.10"
-license = "MIT AND BSD-3-Clause"
+license = "MIT AND BSD-3-Clause AND Apache-2.0 WITH LLVM-exception"
 license-files = ["LICENSE", "LICENSES/*", "NOTICE"]
 authors = [{ name = "Marcin Kowiel" }]
 keywords = ["chemistry", "cheminformatics", "rdkit", "rust"]
