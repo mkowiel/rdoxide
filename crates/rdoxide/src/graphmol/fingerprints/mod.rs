@@ -3,6 +3,7 @@
 
 pub mod atom_pair;
 pub mod morgan;
+pub mod rdkit_fp;
 pub mod torsion;
 
 use std::collections::BTreeMap;
@@ -41,29 +42,36 @@ pub fn hash_vect(v: &[u32]) -> u32 {
     seed
 }
 
-/// `boost::random::mt19937` (the explicit parameter list used by
-/// `getFingerprintHelper` is the standard one).
+/// The `boost::random::mersenne_twister<uint32_t, 32, 4, 2, 31, 0x9908b0df,
+/// 11, 7, 0x9d2c5680, 15, 0xefc60000, 18, 3346425566U>` used by
+/// `getFingerprintHelper`: mt19937's tempering with a 4-word state (n=4, m=2).
 #[derive(Debug)]
 pub struct Mt19937 {
-    state: [u32; 624],
+    state: [u32; Self::N],
     idx: usize,
 }
 
 impl Mt19937 {
+    const N: usize = 4;
+    const M: usize = 2;
+
     pub fn new(seed: u32) -> Self {
-        let mut state = [0u32; 624];
+        let mut state = [0u32; Self::N];
         state[0] = seed;
-        for i in 1..624 {
+        for i in 1..Self::N {
             state[i] = 1_812_433_253u32
                 .wrapping_mul(state[i - 1] ^ (state[i - 1] >> 30))
                 .wrapping_add(i as u32);
         }
-        Mt19937 { state, idx: 624 }
+        Mt19937 {
+            state,
+            idx: Self::N,
+        }
     }
     fn twist(&mut self) {
-        for i in 0..624 {
-            let y = (self.state[i] & 0x8000_0000) | (self.state[(i + 1) % 624] & 0x7fff_ffff);
-            let mut v = self.state[(i + 397) % 624] ^ (y >> 1);
+        for i in 0..Self::N {
+            let y = (self.state[i] & 0x8000_0000) | (self.state[(i + 1) % Self::N] & 0x7fff_ffff);
+            let mut v = self.state[(i + Self::M) % Self::N] ^ (y >> 1);
             if y & 1 != 0 {
                 v ^= 0x9908_b0df;
             }
@@ -72,7 +80,7 @@ impl Mt19937 {
         self.idx = 0;
     }
     pub fn next_u32(&mut self) -> u32 {
-        if self.idx >= 624 {
+        if self.idx >= Self::N {
             self.twist();
         }
         let mut y = self.state[self.idx];
@@ -196,6 +204,7 @@ pub enum AtomEnvironment {
     Morgan(morgan::MorganAtomEnv),
     AtomPair(atom_pair::AtomPairAtomEnv),
     Torsion(torsion::TopologicalTorsionAtomEnv),
+    RDKitFP(rdkit_fp::RDKitFPAtomEnv),
 }
 
 impl AtomEnvironment {
@@ -210,6 +219,7 @@ impl AtomEnvironment {
             AtomEnvironment::Morgan(e) => Ok(e.code),
             AtomEnvironment::AtomPair(e) => e.bit_id(args, atom_invs, hash_results),
             AtomEnvironment::Torsion(e) => Ok(e.bit_id),
+            AtomEnvironment::RDKitFP(e) => Ok(e.bit_id),
         }
     }
     fn update_additional_output(
@@ -225,6 +235,7 @@ impl AtomEnvironment {
             }
             AtomEnvironment::AtomPair(e) => e.update_additional_output(ao, bit_id),
             AtomEnvironment::Torsion(e) => e.update_additional_output(ao, bit_id),
+            AtomEnvironment::RDKitFP(e) => e.update_additional_output(ao, bit_id),
         }
     }
 }
@@ -239,6 +250,7 @@ pub enum AtomInvariantsGenerator {
         include_chirality: bool,
         topological_torsion_correction: bool,
     },
+    RDKitFP,
 }
 
 impl AtomInvariantsGenerator {
@@ -255,6 +267,7 @@ impl AtomInvariantsGenerator {
                 *include_chirality,
                 *topological_torsion_correction,
             ),
+            AtomInvariantsGenerator::RDKitFP => Ok(rdkit_fp::rdkit_fp_atom_invariants(mol)),
         }
     }
     pub fn info_string(&self) -> String {
@@ -272,6 +285,7 @@ impl AtomInvariantsGenerator {
                 "AtomPairInvariantGenerator topologicalTorsionCorrection={}",
                 u8::from(*topological_torsion_correction)
             ),
+            AtomInvariantsGenerator::RDKitFP => "RDKitFPAtomInvGenerator".to_string(),
         }
     }
 }
@@ -318,6 +332,7 @@ pub enum EnvGenerator {
     Morgan(morgan::MorganArguments),
     AtomPair(atom_pair::AtomPairArguments),
     TopologicalTorsion(torsion::TopologicalTorsionArguments),
+    RDKitFP(rdkit_fp::RDKitFPArguments),
 }
 
 /// `FingerprintGenerator<OutputType>`; `output_64` selects the OutputType.
@@ -369,6 +384,7 @@ impl FingerprintGenerator {
             EnvGenerator::TopologicalTorsion(t) => {
                 (t.info_string(), "TopologicalTorsionEnvGenerator")
             }
+            EnvGenerator::RDKitFP(r) => (r.info_string(), "RDKitFPEnvGenerator"),
         };
         format!(
             "{}{sep}{}{sep}{}{sep}{}{sep}{}",
@@ -396,6 +412,16 @@ impl FingerprintGenerator {
     ) -> Result<Vec<AtomEnvironment>> {
         let from_atoms = fargs.from_atoms;
         match &self.env {
+            EnvGenerator::RDKitFP(r) => Ok(rdkit_fp::get_environments(
+                mol,
+                r,
+                from_atoms,
+                fargs.ignore_atoms,
+                atom_invs.ok_or_else(|| RDKitError::precondition("bad atomInvariants size"))?,
+            )?
+            .into_iter()
+            .map(AtomEnvironment::RDKitFP)
+            .collect()),
             EnvGenerator::TopologicalTorsion(t) => Ok(torsion::get_environments(
                 mol,
                 t,
@@ -662,7 +688,11 @@ mod tests {
 
     #[test]
     fn mt19937_reference() {
-        // first output of std::mt19937 with the default seed
-        assert_eq!(Mt19937::new(5489).next_u32(), 3_499_211_612);
+        // values observed from RDKit 2026.09.1 (RDKit FP, numBitsPerFeature=2)
+        assert_eq!(Mt19937::new(4_274_652_475).uniform_0_int_max(), 54_413_874);
+        assert_eq!(
+            Mt19937::new(1_524_090_560).uniform_0_int_max(),
+            1_135_572_127
+        );
     }
 }

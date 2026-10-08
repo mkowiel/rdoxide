@@ -6,7 +6,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 |-------|-----------|--------|-------|
 | 0 | Workspace, packaging (maturin, abi3-py310), CI, licenses, NOTICE | ✅ | |
 | 0 | `tools/sync_upstream.py` (fetch/regen/diff/stamp), `porting/manifest.toml` | ✅ | |
-| 0 | Upstream test ratchet (`tools/run_upstream_tests.py`) | ✅ | 155 upstream tests passing |
+| 0 | Upstream test ratchet (`tools/run_upstream_tests.py`) | ✅ | 161 upstream tests passing |
 | 1 | RDGeneral: Dict/RDValue/RDProps | ✅ | |
 | 1 | RDGeneral: RDLog + `rdBase` logging API | ✅ | upstream `UnitTestLogging.py` 32/32 |
 | 1 | RDGeneral: RNG (`boost::minstd_rand`, glibc `rand`) | ✅ | |
@@ -45,11 +45,12 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 8 | SparseIntVect (Int/Long/UInt/ULong): fuzzy &/|, arithmetic, scalar ops (incl. upstream's stored zeros and missing `/=`), pickles, Dice/Tanimoto/Tversky (+ bounds, Bulk*), ConvertToNumpyArray | ✅ | 3000 random pairs identical to the arm64 build; upstream `testSparseIntVect.py` 10/10 incl. legacy pickles |
 | 8 | DiscreteValueVect (+ `DiscreteValueType`), RealValueVect, ComputeL1Norm, ConvertToNumpyArray for all vector types | ✅ | 2000 random pairs identical (incl. error cases); upstream tests 12/12 |
 | 8 | FPBReader, InitFromDaylightString | ⬜ | |
-| 9 | Fingerprint generator framework (bit / sparse / count / sparse-count fingerprints, count simulation, numBitsPerFeature via boost mt19937, fromAtoms, custom invariants, AdditionalOutput incl. atomsPerBit, GetOptions views, bulk + NumPy) and the Morgan generator (`GetMorganGenerator`, `GetMorganAtomInvGen`, `GetMorganBondInvGen`); `rdkit.Chem.rdFingerprintGenerator` | ✅ | differential `morgan` (6 configs + all output kinds): ZINC 10000 + ChEMBL chiral 5000 identical. SparseBitVect now iterates in signed (`std::set<int>`) order |
+| 9 | Fingerprint generator framework (bit / sparse / count / sparse-count fingerprints, count simulation, numBitsPerFeature via boost mersenne_twister (n=4, m=2), fromAtoms, custom invariants, AdditionalOutput incl. atomsPerBit, GetOptions views, bulk + NumPy) and the Morgan generator (`GetMorganGenerator`, `GetMorganAtomInvGen`, `GetMorganBondInvGen`); `rdkit.Chem.rdFingerprintGenerator` | ✅ | differential `morgan` (6 configs + all output kinds): ZINC 10000 + ChEMBL chiral 5000 identical. SparseBitVect now iterates in signed (`std::set<int>`) order |
 | 9 | Atom-pair generator (`GetAtomPairGenerator`, `GetAtomPairAtomInvGen`, `AtomPairFingerprintOptions`; 2D and 3D distances, hashed and unhashed codes), `get3DDistanceMat` | ✅ | differential `atompair` (5 configs + all output kinds): 15000/15000 identical; 3D (`use2D=False`) 490/490 |
 | 9 | Subgraphs: findAllSubgraphsOfLengthN / MtoN, findUniqueSubgraphsOfLengthN (path discriminators), findAllPathsOfLengthN / MtoN (incl. onlyShortestPaths, rooted), findAtomEnvironmentOfRadiusN; rdmolops wrappers | ✅ | differential `subgraphs` 5000/5000 identical. `PathToSubmol` waits for copyMolSubset(BONDS) |
 | 9 | Topological-torsion generator (`GetTopologicalTorsionGenerator`, `TopologicalTorsionFingerprintOptions`; hashed and unhashed codes, onlyShortestPaths, bitPaths) | ✅ | differential `torsion` (6 configs + all output kinds): 15000/15000 identical |
-| 9 | Morgan feature invariants, RDKit FP generator, JSON (de)serialization, GetFPs bulk helpers, legacy `GetMorganFingerprint*` (rdMolDescriptors), MACCS, pattern/layered fingerprints | ⬜ | |
+| 9 | RDKit FP generator (`GetRDKitFPGenerator`, `GetRDKitAtomInvGen`, `RDKitFingerprintOptions`; branched/linear paths, bond orders, query bonds, numBitsPerFeature via upstream's 4-word Mersenne twister) | ✅ | differential `rdkitfp` (6 configs + all output kinds): 5000/5000 identical |
+| 9 | Morgan feature invariants, JSON (de)serialization, GetFPs bulk helpers, legacy `GetMorganFingerprint*` (rdMolDescriptors), MACCS, pattern/layered fingerprints | ⬜ | |
 | 7–13 | see PLAN.md | ⬜ | |
 
 ## Python package files
@@ -147,3 +148,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-08 — Stage 9b: atom-pair generator. Next: Subgraphs (path/subgraph enumeration) → topological torsion + RDKit FP generators.
 * 2026-10-08 — Stage 9c: Subgraphs + rdBase vector types. Next: topological torsion + RDKit FP generators.
 * 2026-10-08 — Stage 9d: topological-torsion generator. CI blocked by GitHub billing (jobs not started); PRs #17/#18 wait. Next: RDKit FP generator.
+* 2026-10-08 — Stage 9e: RDKit FP generator (CI back; #17-#19 merged, merged branches deleted). Next: legacy fingerprint functions (rdMolDescriptors / Chem.RDKFingerprint, AllChem.GetMorganFingerprint*), MACCS, pattern FP.

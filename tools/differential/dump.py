@@ -283,7 +283,36 @@ def torsion_record(smi):
     return res
 
 
+def rdkitfp_record(smi):
+    """RDKit FP generator output (all fingerprint kinds + AdditionalOutput)."""
+    from rdkit.Chem import rdFingerprintGenerator as G
+    m = Chem.MolFromSmiles(smi)
+    if m is None:
+        return None
+    res = {}
+    configs = ({}, {"numBitsPerFeature": 1}, {"numBitsPerFeature": 4, "fpSize": 1024}, {"branchedPaths": False},
+               {"useBondOrder": False, "maxPath": 5}, {"minPath": 2, "maxPath": 4, "countSimulation": True})
+    for i, kw in enumerate(configs):
+        g = G.GetRDKitFPGenerator(**kw)
+        res[f"bits{i}"] = list(g.GetFingerprint(m).GetOnBits())
+    g = G.GetRDKitFPGenerator(maxPath=5)
+    res["sparsecount"] = sorted(g.GetSparseCountFingerprint(m).GetNonzeroElements().items())
+    res["count"] = sorted(g.GetCountFingerprint(m).GetNonzeroElements().items())
+    res["fromatoms"] = list(g.GetFingerprint(m, fromAtoms=[0, 1], ignoreAtoms=[2]).GetOnBits())
+    ao = G.AdditionalOutput()
+    ao.AllocateBitPaths()
+    ao.AllocateAtomCounts()
+    ao.AllocateAtomToBits()
+    ao.AllocateAtomsPerBit()
+    G.GetRDKitFPGenerator(maxPath=4, fpSize=512).GetFingerprint(m, additionalOutput=ao)
+    res["ao"] = [sorted(ao.GetBitPaths().items()), ao.GetAtomCounts(), ao.GetAtomToBits(),
+                 sorted(ao.GetAtomsPerBit().items())]
+    return res
+
+
 def dump(mode, smi):
+    if mode == "rdkitfp":
+        return rdkitfp_record(smi)
     if mode == "torsion":
         return torsion_record(smi)
     if mode == "subgraphs":

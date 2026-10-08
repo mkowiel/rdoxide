@@ -5,6 +5,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple};
 use rdoxide::graphmol::fingerprints::atom_pair::AtomPairArguments;
 use rdoxide::graphmol::fingerprints::morgan::MorganArguments;
+use rdoxide::graphmol::fingerprints::rdkit_fp::RDKitFPArguments;
 use rdoxide::graphmol::fingerprints::torsion::TopologicalTorsionArguments;
 use rdoxide::graphmol::fingerprints::{
     AdditionalOutput, AtomInvariantsGenerator, BondInvariantsGenerator, EnvGenerator,
@@ -468,12 +469,14 @@ impl PyFPGen {
             EnvGenerator::Morgan(_) => 0,
             EnvGenerator::AtomPair(_) => 1,
             EnvGenerator::TopologicalTorsion(_) => 2,
+            EnvGenerator::RDKitFP(_) => 3,
         };
         let init = PyClassInitializer::from(base);
         match kind {
             0 => Ok(Py::new(py, init.add_subclass(PyMorganOptions))?.into_any()),
             1 => Ok(Py::new(py, init.add_subclass(PyAtomPairOptions))?.into_any()),
-            _ => Ok(Py::new(py, init.add_subclass(PyTorsionOptions))?.into_any()),
+            2 => Ok(Py::new(py, init.add_subclass(PyTorsionOptions))?.into_any()),
+            _ => Ok(Py::new(py, init.add_subclass(PyRDKitFPOptions))?.into_any()),
         }
     }
 }
@@ -705,6 +708,145 @@ fn get_topological_torsion_generator(
     })
 }
 
+fn rdkit_fp_args(g: &mut FingerprintGenerator) -> &mut RDKitFPArguments {
+    match &mut g.env {
+        EnvGenerator::RDKitFP(r) => r,
+        _ => unreachable!("RDKitFingerprintOptions of another generator"),
+    }
+}
+
+/// `RDKitFingerprintOptions`
+#[pyclass(name = "RDKitFingerprintOptions", module = "rdkit.Chem.rdFingerprintGenerator", extends = PyFingerprintOptions)]
+#[derive(Debug)]
+pub struct PyRDKitFPOptions;
+
+#[pymethods]
+impl PyRDKitFPOptions {
+    /// minimum path length (in bonds) to be included
+    #[getter(minPath)]
+    fn get_min_path(slf: PyRef<'_, Self>) -> u32 {
+        slf.as_super().with(slf.py(), |g| rdkit_fp_args(g).min_path)
+    }
+    #[setter(minPath)]
+    fn set_min_path(slf: PyRef<'_, Self>, v: u32) {
+        slf.as_super()
+            .with(slf.py(), |g| rdkit_fp_args(g).min_path = v)
+    }
+    /// maximum path length (in bonds) to be included
+    #[getter(maxPath)]
+    fn get_max_path(slf: PyRef<'_, Self>) -> u32 {
+        slf.as_super().with(slf.py(), |g| rdkit_fp_args(g).max_path)
+    }
+    #[setter(maxPath)]
+    fn set_max_path(slf: PyRef<'_, Self>, v: u32) {
+        slf.as_super()
+            .with(slf.py(), |g| rdkit_fp_args(g).max_path = v)
+    }
+    /// use explicit Hs in the paths (if molecule has explicit Hs)
+    #[getter(useHs)]
+    fn get_use_hs(slf: PyRef<'_, Self>) -> bool {
+        slf.as_super().with(slf.py(), |g| rdkit_fp_args(g).use_hs)
+    }
+    #[setter(useHs)]
+    fn set_use_hs(slf: PyRef<'_, Self>, v: bool) {
+        slf.as_super()
+            .with(slf.py(), |g| rdkit_fp_args(g).use_hs = v)
+    }
+    /// generate branched subgraphs, not just linear ones
+    #[getter(branchedPaths)]
+    fn get_branched_paths(slf: PyRef<'_, Self>) -> bool {
+        slf.as_super()
+            .with(slf.py(), |g| rdkit_fp_args(g).branched_paths)
+    }
+    #[setter(branchedPaths)]
+    fn set_branched_paths(slf: PyRef<'_, Self>, v: bool) {
+        slf.as_super()
+            .with(slf.py(), |g| rdkit_fp_args(g).branched_paths = v)
+    }
+    /// include bond orders in the path hashes
+    #[getter(useBondOrder)]
+    fn get_use_bond_order(slf: PyRef<'_, Self>) -> bool {
+        slf.as_super()
+            .with(slf.py(), |g| rdkit_fp_args(g).use_bond_order)
+    }
+    #[setter(useBondOrder)]
+    fn set_use_bond_order(slf: PyRef<'_, Self>, v: bool) {
+        slf.as_super()
+            .with(slf.py(), |g| rdkit_fp_args(g).use_bond_order = v)
+    }
+}
+
+/// Get an RDKit fingerprint generator
+#[pyfunction]
+#[pyo3(name = "GetRDKitFPGenerator", signature = (minPath = 1, maxPath = 7, useHs = true, branchedPaths = true, useBondOrder = true, countSimulation = false, countBounds = None, fpSize = 2048, numBitsPerFeature = 2, atomInvariantsGenerator = None))]
+#[allow(non_snake_case, clippy::too_many_arguments)]
+fn get_rdkit_fp_generator(
+    minPath: u32,
+    maxPath: u32,
+    useHs: bool,
+    branchedPaths: bool,
+    useBondOrder: bool,
+    countSimulation: bool,
+    countBounds: Option<&Bound<'_, PyAny>>,
+    fpSize: u32,
+    numBitsPerFeature: u32,
+    atomInvariantsGenerator: Option<&Bound<'_, PyAny>>,
+) -> PyResult<PyFPGen> {
+    let count_bounds = count_bounds_arg(countBounds)?;
+    if countSimulation && count_bounds.is_empty() {
+        return Err(rdoxide::error::RDKitError::precondition(
+            "bad count bounds provided",
+        ))
+        .py();
+    }
+    if numBitsPerFeature == 0 {
+        return Err(rdoxide::error::RDKitError::precondition(
+            "numBitsPerFeature must be >0",
+        ))
+        .py();
+    }
+    if minPath == 0 {
+        return Err(rdoxide::error::RDKitError::precondition("minPath==0")).py();
+    }
+    if maxPath < minPath {
+        return Err(rdoxide::error::RDKitError::precondition("maxPath<minPath")).py();
+    }
+    let atom_inv_gen = match atomInvariantsGenerator {
+        Some(o) if !o.is_none() => o.extract::<PyRef<'_, PyAtomInvGen>>()?.gen_.clone(),
+        _ => AtomInvariantsGenerator::RDKitFP,
+    };
+    Ok(PyFPGen {
+        gen_: FingerprintGenerator {
+            env: EnvGenerator::RDKitFP(RDKitFPArguments {
+                min_path: minPath,
+                max_path: maxPath,
+                use_hs: useHs,
+                branched_paths: branchedPaths,
+                use_bond_order: useBondOrder,
+            }),
+            args: FingerprintArguments {
+                count_simulation: countSimulation,
+                include_chirality: false,
+                count_bounds,
+                fp_size: fpSize,
+                num_bits_per_feature: numBitsPerFeature,
+            },
+            atom_inv_gen: Some(atom_inv_gen),
+            bond_inv_gen: None,
+            output_64: true,
+        },
+    })
+}
+
+/// Get an RDKit atom invariants generator
+#[pyfunction]
+#[pyo3(name = "GetRDKitAtomInvGen")]
+fn get_rdkit_atom_inv_gen() -> PyAtomInvGen {
+    PyAtomInvGen {
+        gen_: AtomInvariantsGenerator::RDKitFP,
+    }
+}
+
 fn count_bounds_arg(o: Option<&Bound<'_, PyAny>>) -> PyResult<Vec<u32>> {
     match o {
         Some(o) if !o.is_none() => o.extract::<Vec<u32>>(),
@@ -912,6 +1054,9 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyMorganOptions>()?;
     m.add_class::<PyAtomPairOptions>()?;
     m.add_class::<PyTorsionOptions>()?;
+    m.add_class::<PyRDKitFPOptions>()?;
+    m.add_function(wrap_pyfunction!(get_rdkit_fp_generator, m)?)?;
+    m.add_function(wrap_pyfunction!(get_rdkit_atom_inv_gen, m)?)?;
     m.add_function(wrap_pyfunction!(get_topological_torsion_generator, m)?)?;
     m.add_function(wrap_pyfunction!(get_atom_pair_generator, m)?)?;
     m.add_function(wrap_pyfunction!(get_atom_pair_atom_inv_gen, m)?)?;

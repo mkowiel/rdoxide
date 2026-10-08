@@ -57,3 +57,11 @@ def test_topological_torsion_generator():
     assert sorted(g.GetSparseCountFingerprint(m).GetNonzeroElements().items()) == [
         (4437590048, 1), (12893306913, 1)]
     assert g.GetOptions().torsionAtomCount == 4
+
+
+def test_rdkit_fp_generator():
+    m = Chem.MolFromSmiles("c1ccccc1CO")
+    g = G.GetRDKitFPGenerator(maxPath=3, fpSize=512)
+    assert list(g.GetFingerprint(m).GetOnBits()) == [
+        2, 9, 36, 50, 76, 161, 232, 248, 277, 280, 294, 315, 330, 339, 342, 373, 407, 418, 465]
+    assert g.GetOptions().maxPath == 3 and g.GetOptions().numBitsPerFeature == 2
