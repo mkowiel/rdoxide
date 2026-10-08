@@ -95,6 +95,19 @@ macro_rules! flat_vect {
 flat_vect!(PyVectI, "_vecti", i32);
 flat_vect!(PyVectJ, "_vectj", u32);
 flat_vect!(PyVectD, "_vectd", f64);
+// `std::vector<std::string>`; the class name is C++-mangled like the nested ones below
+#[cfg(target_os = "macos")]
+flat_vect!(
+    PyVectStr,
+    "_vectNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEEE",
+    String
+);
+#[cfg(not(target_os = "macos"))]
+flat_vect!(
+    PyVectStr,
+    "_vectNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE",
+    String
+);
 
 #[cfg(target_os = "macos")]
 const LIST_VECTI: &str = "_listNSt3__16vectorIiNS_9allocatorIiEEEE";
@@ -163,6 +176,7 @@ pub fn add_classes(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyVectI>()?;
     m.add_class::<PyVectJ>()?;
     m.add_class::<PyVectD>()?;
+    m.add_class::<PyVectStr>()?;
     m.add_class::<PyListVectI>()?;
     // the mangled name upstream exposes for this class
     let cls = m.getattr("PyListVectI")?;
