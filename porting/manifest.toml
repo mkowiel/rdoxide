@@ -372,6 +372,7 @@
 "Code/GraphMol/Fingerprints/MorganGenerator.h" = "65d296c4e92cb75980b9c92827d7f0c474a3c314"
 
 [module."rdoxide_python::rdfingerprintgenerator".sources]
+"Code/GraphMol/Fingerprints/Wrap/AtomPairWrapper.cpp" = "57953328cc2bb966e44aae3f2f3af0862ae3c790"
 "Code/GraphMol/Fingerprints/Wrap/FingerprintGeneratorWrapper.cpp" = "8d9c7aae0cbb945fb28e2a17eb6092fb2141cb30"
 "Code/GraphMol/Fingerprints/Wrap/MorganWrapper.cpp" = "53ff8af5e17203a23136ef8fe816ba7827d3599e"
 
@@ -379,8 +380,6 @@
 "Code/GraphMol/Fingerprints/AtomPairGenerator.cpp" = "f523c1d8acef0021135130a96724d5ded2ce9822"
 "Code/GraphMol/Fingerprints/AtomPairGenerator.h" = "e30d488458b03abc541af3341e37c6f3d429da6e"
 
-[module."rdoxide_python::rdfingerprintgenerator".sources]
-"Code/GraphMol/Fingerprints/Wrap/AtomPairWrapper.cpp" = "57953328cc2bb966e44aae3f2f3af0862ae3c790"
 
 [module."rdoxide::graphmol::subgraphs".sources]
 "Code/GraphMol/Subgraphs/Subgraphs.cpp" = "5a7c403b1a59772617e03a85ba1691207af787e8"
