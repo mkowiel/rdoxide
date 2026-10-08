@@ -21,7 +21,7 @@ macro_rules! siv_class {
         }
 
         impl $py {
-            fn wrap(v: SparseIntVect) -> Self {
+            pub(crate) fn wrap(v: SparseIntVect) -> Self {
                 $py { v }
             }
         }

@@ -157,7 +157,42 @@ def molwrite_record(blk):
     return res
 
 
+MORGAN_CONFIGS = (
+    {}, {"radius": 2, "fpSize": 1024}, {"includeChirality": True}, {"countSimulation": True},
+    {"useBondTypes": False, "onlyNonzeroInvariants": True},
+    {"includeRedundantEnvironments": True, "radius": 1},
+)
+
+
+def morgan_record(smi):
+    """Morgan generator output (all fingerprint kinds + AdditionalOutput)."""
+    from rdkit.Chem import rdFingerprintGenerator as G
+    m = Chem.MolFromSmiles(smi)
+    if m is None:
+        return None
+    res = {}
+    for i, kw in enumerate(MORGAN_CONFIGS):
+        g = G.GetMorganGenerator(**kw)
+        res[f"bits{i}"] = list(g.GetFingerprint(m).GetOnBits())
+    g = G.GetMorganGenerator()
+    res["sparsecount"] = sorted(g.GetSparseCountFingerprint(m).GetNonzeroElements().items())
+    res["count"] = sorted(g.GetCountFingerprint(m).GetNonzeroElements().items())
+    res["sparse"] = list(G.GetMorganGenerator(countSimulation=True).GetSparseFingerprint(m).GetOnBits())
+    res["fromatoms"] = list(g.GetFingerprint(m, fromAtoms=[0]).GetOnBits())
+    ao = G.AdditionalOutput()
+    ao.AllocateBitInfoMap()
+    ao.AllocateAtomCounts()
+    ao.AllocateAtomToBits()
+    ao.AllocateAtomsPerBit()
+    G.GetMorganGenerator(radius=2, fpSize=1024).GetFingerprint(m, additionalOutput=ao)
+    res["ao"] = [sorted(ao.GetBitInfoMap().items()), ao.GetAtomCounts(), ao.GetAtomToBits(),
+                 sorted(ao.GetAtomsPerBit().items())]
+    return res
+
+
 def dump(mode, smi):
+    if mode == "morgan":
+        return morgan_record(smi)
     if mode == "depict":
         from rdkit.Chem import rdDepictor
         m = Chem.MolFromSmiles(smi)

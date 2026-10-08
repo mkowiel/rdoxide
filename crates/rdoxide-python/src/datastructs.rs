@@ -48,7 +48,7 @@ macro_rules! bitvect_class {
         }
 
         impl $py {
-            fn wrap(bv: $rs) -> Self {
+            pub(crate) fn wrap(bv: $rs) -> Self {
                 $py { bv }
             }
         }

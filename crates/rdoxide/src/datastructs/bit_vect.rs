@@ -434,7 +434,8 @@ impl BitVect for ExplicitBitVect {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct SparseBitVect {
     size: u32,
-    bits: BTreeSet<u32>,
+    /// `std::set<int>`: iteration is in signed order
+    bits: BTreeSet<i32>,
 }
 
 impl SparseBitVect {
@@ -460,22 +461,22 @@ impl BitVect for SparseBitVect {
         if which >= self.size {
             return Err(index_error(which));
         }
-        Ok(self.bits.contains(&which))
+        Ok(self.bits.contains(&(which as i32)))
     }
     fn set_bit(&mut self, which: u32) -> Result<bool> {
         if which >= self.size {
             return Err(index_error(which));
         }
-        Ok(!self.bits.insert(which))
+        Ok(!self.bits.insert(which as i32))
     }
     fn unset_bit(&mut self, which: u32) -> Result<bool> {
         if which >= self.size {
             return Err(index_error(which));
         }
-        Ok(self.bits.remove(&which))
+        Ok(self.bits.remove(&(which as i32)))
     }
     fn on_bits(&self) -> Vec<i32> {
-        self.bits.iter().map(|&b| b as i32).collect()
+        self.bits.iter().copied().collect()
     }
     fn and(&self, o: &Self) -> Self {
         SparseBitVect {
@@ -498,7 +499,10 @@ impl BitVect for SparseBitVect {
     fn not(&self) -> Self {
         SparseBitVect {
             size: self.size,
-            bits: (0..self.size).filter(|b| !self.bits.contains(b)).collect(),
+            bits: (0..self.size)
+                .map(|b| b as i32)
+                .filter(|b| !self.bits.contains(b))
+                .collect(),
         }
     }
 }
