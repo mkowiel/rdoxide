@@ -7,6 +7,7 @@ pub mod fp;
 pub mod log;
 pub mod random;
 pub mod strings;
+pub mod threads;
 pub mod utils;
 
 pub use dict::{Dict, RDProps, RDValue};

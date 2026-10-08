@@ -636,7 +636,7 @@ mol_count_fn!(calc_num_amide_bonds, "CalcNumAmideBonds", u32, |m| {
 mol_count_fn!(calc_num_rings, "CalcNumRings", u32, |m| {
     lip::calc_num_rings(m).py()
 });
-mol_count_fn!(calc_phi, "CalcPhi", f64, |m| { conn::calc_phi(m).py() });
+mol_count_fn!(calc_phi, "CalcPhi", f64, |m| conn::calc_phi(m).py());
 mol_count_fn!(calc_fraction_csp3, "CalcFractionCSP3", f64, |m| {
     lip::calc_fraction_csp3(m).py()
 });

@@ -10,3 +10,11 @@
 When porting a component that carries its own license (anything under
 upstream `External/`, fonts in `Data/Fonts`, ...), copy its license file here,
 add a row to this table and to `NOTICE`.
+
+## Rust crate dependencies
+
+`CRATES.md` lists every crate in `Cargo.lock` with its license. It is generated
+and enforced by `tools/check_licenses.py` (run in CI): only the permissive
+licenses on the script's allow-list are accepted, so adding a dependency under
+any other license needs a deliberate change there. After changing
+dependencies run `python tools/check_licenses.py --write` and commit the result.
