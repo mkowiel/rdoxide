@@ -66,3 +66,7 @@ to = "tests/data/molfiles/BlankPropLines.sdf"
 [[copy]]
 from = "Data/NCI/first_200.props.sdf"
 to = "tests/data/molfiles/first_200.props.sdf"
+
+[[copy]]
+from = "Code/GraphMol/SmilesParse/test_data/BMS-986142_atrop1.cxsmi.expected.sdf"
+to = "tests/data/molfiles/atrop_BMS-986142.sdf"
