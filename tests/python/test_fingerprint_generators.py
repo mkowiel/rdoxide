@@ -49,3 +49,11 @@ def test_atom_pair_generator():
     assert opts.maxDistance == 30
     opts.maxDistance = 1
     assert len(g.GetSparseCountFingerprint(m).GetNonzeroElements()) == 2
+
+
+def test_topological_torsion_generator():
+    m = Chem.MolFromSmiles("CCCCO")
+    g = G.GetTopologicalTorsionGenerator(countSimulation=False)
+    assert sorted(g.GetSparseCountFingerprint(m).GetNonzeroElements().items()) == [
+        (4437590048, 1), (12893306913, 1)]
+    assert g.GetOptions().torsionAtomCount == 4

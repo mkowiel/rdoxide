@@ -5,6 +5,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple};
 use rdoxide::graphmol::fingerprints::atom_pair::AtomPairArguments;
 use rdoxide::graphmol::fingerprints::morgan::MorganArguments;
+use rdoxide::graphmol::fingerprints::torsion::TopologicalTorsionArguments;
 use rdoxide::graphmol::fingerprints::{
     AdditionalOutput, AtomInvariantsGenerator, BondInvariantsGenerator, EnvGenerator,
     FingerprintArguments, FingerprintFuncArguments, FingerprintGenerator,
@@ -463,12 +464,16 @@ impl PyFPGen {
         let base = PyFingerprintOptions {
             owner: slf.unbind(),
         };
-        let is_morgan = matches!(base.owner.borrow(py).gen_.env, EnvGenerator::Morgan(_));
+        let kind = match base.owner.borrow(py).gen_.env {
+            EnvGenerator::Morgan(_) => 0,
+            EnvGenerator::AtomPair(_) => 1,
+            EnvGenerator::TopologicalTorsion(_) => 2,
+        };
         let init = PyClassInitializer::from(base);
-        if is_morgan {
-            Ok(Py::new(py, init.add_subclass(PyMorganOptions))?.into_any())
-        } else {
-            Ok(Py::new(py, init.add_subclass(PyAtomPairOptions))?.into_any())
+        match kind {
+            0 => Ok(Py::new(py, init.add_subclass(PyMorganOptions))?.into_any()),
+            1 => Ok(Py::new(py, init.add_subclass(PyAtomPairOptions))?.into_any()),
+            _ => Ok(Py::new(py, init.add_subclass(PyTorsionOptions))?.into_any()),
         }
     }
 }
@@ -614,6 +619,90 @@ impl PyAtomPairOptions {
         slf.as_super()
             .with(slf.py(), |g| atom_pair_args(g).max_distance = v)
     }
+}
+
+fn torsion_args(g: &mut FingerprintGenerator) -> &mut TopologicalTorsionArguments {
+    match &mut g.env {
+        EnvGenerator::TopologicalTorsion(t) => t,
+        _ => unreachable!("TopologicalTorsionFingerprintOptions of another generator"),
+    }
+}
+
+/// `TopologicalTorsionFingerprintOptions`
+#[pyclass(name = "TopologicalTorsionFingerprintOptions", module = "rdkit.Chem.rdFingerprintGenerator", extends = PyFingerprintOptions)]
+#[derive(Debug)]
+pub struct PyTorsionOptions;
+
+#[pymethods]
+impl PyTorsionOptions {
+    /// number of atoms to be included in the paths
+    #[getter(torsionAtomCount)]
+    fn get_torsion_atom_count(slf: PyRef<'_, Self>) -> u32 {
+        slf.as_super()
+            .with(slf.py(), |g| torsion_args(g).torsion_atom_count)
+    }
+    #[setter(torsionAtomCount)]
+    fn set_torsion_atom_count(slf: PyRef<'_, Self>, v: u32) {
+        slf.as_super()
+            .with(slf.py(), |g| torsion_args(g).torsion_atom_count = v)
+    }
+    /// whether or not to only include paths which are the shortest path between the start and end atoms
+    #[getter(onlyShortestPaths)]
+    fn get_only_shortest_paths(slf: PyRef<'_, Self>) -> bool {
+        slf.as_super()
+            .with(slf.py(), |g| torsion_args(g).only_shortest_paths)
+    }
+    #[setter(onlyShortestPaths)]
+    fn set_only_shortest_paths(slf: PyRef<'_, Self>, v: bool) {
+        slf.as_super()
+            .with(slf.py(), |g| torsion_args(g).only_shortest_paths = v)
+    }
+}
+
+/// Get a topological torsion fingerprint generator
+#[pyfunction]
+#[pyo3(name = "GetTopologicalTorsionGenerator", signature = (includeChirality = false, torsionAtomCount = 4, countSimulation = true, countBounds = None, fpSize = 2048, atomInvariantsGenerator = None))]
+#[allow(non_snake_case)]
+fn get_topological_torsion_generator(
+    includeChirality: bool,
+    torsionAtomCount: u32,
+    countSimulation: bool,
+    countBounds: Option<&Bound<'_, PyAny>>,
+    fpSize: u32,
+    atomInvariantsGenerator: Option<&Bound<'_, PyAny>>,
+) -> PyResult<PyFPGen> {
+    let count_bounds = count_bounds_arg(countBounds)?;
+    if countSimulation && count_bounds.is_empty() {
+        return Err(rdoxide::error::RDKitError::precondition(
+            "bad count bounds provided",
+        ))
+        .py();
+    }
+    let atom_inv_gen = match atomInvariantsGenerator {
+        Some(o) if !o.is_none() => o.extract::<PyRef<'_, PyAtomInvGen>>()?.gen_.clone(),
+        _ => AtomInvariantsGenerator::AtomPair {
+            include_chirality: includeChirality,
+            topological_torsion_correction: true,
+        },
+    };
+    Ok(PyFPGen {
+        gen_: FingerprintGenerator {
+            env: EnvGenerator::TopologicalTorsion(TopologicalTorsionArguments {
+                torsion_atom_count: torsionAtomCount,
+                only_shortest_paths: false,
+            }),
+            args: FingerprintArguments {
+                count_simulation: countSimulation,
+                include_chirality: includeChirality,
+                count_bounds,
+                fp_size: fpSize,
+                num_bits_per_feature: 1,
+            },
+            atom_inv_gen: Some(atom_inv_gen),
+            bond_inv_gen: None,
+            output_64: true,
+        },
+    })
 }
 
 fn count_bounds_arg(o: Option<&Bound<'_, PyAny>>) -> PyResult<Vec<u32>> {
@@ -822,6 +911,8 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyFingerprintOptions>()?;
     m.add_class::<PyMorganOptions>()?;
     m.add_class::<PyAtomPairOptions>()?;
+    m.add_class::<PyTorsionOptions>()?;
+    m.add_function(wrap_pyfunction!(get_topological_torsion_generator, m)?)?;
     m.add_function(wrap_pyfunction!(get_atom_pair_generator, m)?)?;
     m.add_function(wrap_pyfunction!(get_atom_pair_atom_inv_gen, m)?)?;
     m.add_function(wrap_pyfunction!(get_morgan_generator, m)?)?;

@@ -251,7 +251,41 @@ def subgraphs_record(smi):
     return res
 
 
+def torsion_record(smi):
+    """Topological-torsion generator output (all fingerprint kinds + AdditionalOutput)."""
+    from rdkit.Chem import rdFingerprintGenerator as G
+    m = Chem.MolFromSmiles(smi)
+    if m is None:
+        return None
+    res = {}
+    configs = ({}, {"countSimulation": False}, {"includeChirality": True}, {"torsionAtomCount": 3, "fpSize": 512},
+               {"torsionAtomCount": 5}, {"atomInvariantsGenerator": "ap"})
+    for i, kw in enumerate(configs):
+        kw = dict(kw)
+        if kw.get("atomInvariantsGenerator") == "ap":
+            kw["atomInvariantsGenerator"] = G.GetAtomPairAtomInvGen()
+        g = G.GetTopologicalTorsionGenerator(**kw)
+        res[f"bits{i}"] = list(g.GetFingerprint(m).GetOnBits())
+        res[f"sparsecount{i}"] = sorted(g.GetSparseCountFingerprint(m).GetNonzeroElements().items())
+    g = G.GetTopologicalTorsionGenerator()
+    res["count"] = sorted(g.GetCountFingerprint(m).GetNonzeroElements().items())
+    res["fromatoms"] = list(g.GetFingerprint(m, fromAtoms=[0], ignoreAtoms=[2]).GetOnBits())
+    g.GetOptions().onlyShortestPaths = True
+    res["shortest"] = sorted(g.GetSparseCountFingerprint(m).GetNonzeroElements().items())
+    ao = G.AdditionalOutput()
+    ao.AllocateBitPaths()
+    ao.AllocateAtomCounts()
+    ao.AllocateAtomToBits()
+    ao.AllocateAtomsPerBit()
+    G.GetTopologicalTorsionGenerator(countSimulation=False).GetSparseCountFingerprint(m, additionalOutput=ao)
+    res["ao"] = [sorted(ao.GetBitPaths().items()), ao.GetAtomCounts(), ao.GetAtomToBits(),
+                 sorted(ao.GetAtomsPerBit().items())]
+    return res
+
+
 def dump(mode, smi):
+    if mode == "torsion":
+        return torsion_record(smi)
     if mode == "subgraphs":
         return subgraphs_record(smi)
     if mode == "morgan":
