@@ -339,6 +339,52 @@ impl PyAtom {
         self.with(py, |a| a.query_type().to_string())
     }
 
+    /// returns the SMARTS (or SMILES) string for an Atom
+    #[pyo3(name = "GetSmarts", signature = (doKekule = false, allHsExplicit = false, isomericSmiles = true))]
+    #[allow(non_snake_case)]
+    fn get_smarts(
+        &mut self,
+        py: Python<'_>,
+        doKekule: bool,
+        allHsExplicit: bool,
+        isomericSmiles: bool,
+    ) -> PyResult<String> {
+        use rdoxide::graphmol::smiles_parse::smarts_write::{get_atom_smarts, get_atom_smarts_for};
+        use rdoxide::graphmol::smiles_parse::write::{SmilesWriteParams, get_atom_smiles};
+        let smiles_ps = SmilesWriteParams {
+            do_isomeric_smiles: isomericSmiles,
+            do_kekule: doKekule,
+            all_hs_explicit: allHsExplicit,
+            ..SmilesWriteParams::default()
+        };
+        let defaults = SmilesWriteParams::default();
+        let has_query = self.with(py, Atom::has_query)?;
+        match &self.handle {
+            AtomHandle::InMol { .. } => self
+                .with_mol_mut(py, |m, i| {
+                    if has_query {
+                        get_atom_smarts(m, i, &defaults)
+                    } else {
+                        get_atom_smiles(m, i, &smiles_ps)
+                    }
+                })?
+                .py(),
+            AtomHandle::Owned(_) => {
+                if has_query {
+                    self.with_mut(py, |a| get_atom_smarts_for(a, false, &defaults))?
+                        .py()
+                } else {
+                    // upstream works on the free-standing atom; without a
+                    // property cache this raises like upstream does
+                    let a = self.with(py, Atom::copy_detached)?;
+                    let mut tmp = ROMol::new();
+                    tmp.add_atom(a, false);
+                    get_atom_smiles(&tmp, 0, &smiles_ps).py()
+                }
+            }
+        }
+    }
+
     /// returns a text description of the query. Primarily intended for debugging purposes.
     #[pyo3(name = "DescribeQuery")]
     fn describe_query(&self, py: Python<'_>) -> PyResult<String> {

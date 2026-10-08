@@ -337,6 +337,29 @@ impl PyBond {
     }
 
     /// Returns whether or not the bond has an associated query
+    /// returns the SMARTS (or SMILES) string for a Bond
+    #[pyo3(name = "GetSmarts", signature = (allBondsExplicit = false))]
+    #[allow(non_snake_case)]
+    fn get_smarts(&self, py: Python<'_>, allBondsExplicit: bool) -> PyResult<String> {
+        use rdoxide::graphmol::smiles_parse::smarts_write::get_bond_smarts;
+        use rdoxide::graphmol::smiles_parse::write::{SmilesWriteParams, get_bond_smiles};
+        if self.with(py, Bond::has_query)? {
+            return self
+                .with(py, |b| {
+                    get_bond_smarts(b, &SmilesWriteParams::default(), -1)
+                })?
+                .py();
+        }
+        let ps = SmilesWriteParams {
+            do_kekule: false,
+            all_bonds_explicit: allBondsExplicit,
+            do_isomeric_smiles: false,
+            ..SmilesWriteParams::default()
+        };
+        self.with_mol_mut(py, |m, i| get_bond_smiles(m, i, &ps, -1))?
+            .py()
+    }
+
     /// returns a text description of the query. Primarily intended for debugging purposes.
     #[pyo3(name = "DescribeQuery")]
     fn describe_query(&self, py: Python<'_>) -> PyResult<String> {

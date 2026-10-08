@@ -132,3 +132,34 @@ fn recursive_labels() {
     );
     assert_eq!(label_recursive_patterns("[$(C=O)_5]"), "[$(C=O)_5]");
 }
+
+#[test]
+fn smarts_writer() {
+    use rdoxide::graphmol::smiles_parse::smarts_write::{mol_fragment_to_smarts, mol_to_smarts};
+    use rdoxide::graphmol::smiles_parse::write::SmilesWriteParams;
+    let ps = SmilesWriteParams::default();
+    let sma = |s: &str| {
+        let mut m = mol_from_smarts(s, &SmartsParserParams::default())
+            .unwrap()
+            .unwrap();
+        mol_to_smarts(&mut m, &ps).unwrap()
+    };
+    assert_eq!(sma("[C;H2]-,=[N,O]"), "[C&H2]-,=[N,O]");
+    assert_eq!(sma("[!$(C=O)]"), "[!$(C=O)]");
+    assert_eq!(sma("C-!@C"), "C-&!@C");
+    assert_eq!(sma("[2H+:3]"), "[#1&2*&+:3]");
+    assert_eq!(sma("[NH3+]->[Pt]"), "[N&H3&+]->[#78]");
+    assert_eq!(sma("[k{5-6}]"), "[k{5-6}]");
+    let mut m = mol("C[C@H](N)C(=O)O");
+    assert_eq!(
+        mol_to_smarts(&mut m, &ps).unwrap(),
+        "[#6]-[#6@H](-[#7])-[#6](=[#8])-[#8]"
+    );
+    let mut m = mol_from_smarts("[C;H2]-,=[N,O]C", &SmartsParserParams::default())
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        mol_fragment_to_smarts(&mut m, &ps, &[0, 2], None).unwrap(),
+        "[C&H2].C"
+    );
+}
