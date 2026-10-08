@@ -14,3 +14,7 @@ to = "python/rdkit/RDLogger.py"
 [[copy]]
 from = "rdkit/RDRandom.py"
 to = "python/rdkit/RDRandom.py"
+
+[[copy]]
+from = "rdkit/RDConfig.py"
+to = "python/rdkit/RDConfig.py"

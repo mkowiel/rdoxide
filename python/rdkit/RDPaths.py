@@ -1,0 +1,12 @@
+# Equivalent of the RDPaths.py that RDKit's build generates
+# (rdkit/CMakeLists.txt); rdoxide resolves the paths relative to the
+# installed package, like the PyPI wheels of RDKit do.
+import os
+# unset so to trigger exceptions and track use: RDBaseDir=os.environ['RDBASE']
+RDCodeDir = os.path.dirname(os.path.abspath(__file__))
+# not really hard-coded alternative RDCodeDir=os.path.dirname(__file__)
+_share = os.path.join(RDCodeDir, 'share', 'RDKit')
+RDDataDir = os.path.join(_share, 'Data')
+RDDocsDir = os.path.join(_share, 'Docs')
+RDProjDir = os.path.join(_share, 'Projects')
+RDContribDir = os.path.join(_share, 'Contrib')

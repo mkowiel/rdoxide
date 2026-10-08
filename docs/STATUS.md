@@ -36,7 +36,8 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 
 | File | Kind |
 |------|------|
-| `rdkit/__init__.py`, `RDLogger.py`, `RDRandom.py` | verbatim upstream (porting/copies.toml) |
+| `rdkit/__init__.py`, `RDLogger.py`, `RDRandom.py`, `RDConfig.py` | verbatim upstream (porting/copies.toml) |
+| `rdkit/RDPaths.py` | rdoxide's version of the build-generated file (package-relative paths, like the PyPI wheels) |
 | `rdkit/rdBase.py`, `rdkit/Chem/rdchem.py`, `rdkit/Geometry/rdGeometry.py` | shims → `rdkit._rdoxide` |
 | `rdkit/Chem/__init__.py`, `rdkit/Geometry/__init__.py` | provisional (until rdmolfiles/rdmolops/DataStructs exist) |
 
@@ -59,6 +60,9 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 * 2026-10-08 — Stage 5 (core): substructure matching identical to RDKit (match order included).
   Next: what rough_test.py needs to import (Chem/__init__ pieces), then MolPickler and file
   formats (stage 6).
+* 2026-10-08 — RDConfig/RDPaths added. Remaining upstream-test blockers by count: DataStructs
+  (~19 tests), MolBlock/SDMolSupplier/MolToMolBlock (~22), AllChem (11), pickling (3).
+  Next: stage 6 (MolPickler, then mol file reader/writer, SDMolSupplier).
 
 ## Differential testing
 
