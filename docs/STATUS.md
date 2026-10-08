@@ -6,7 +6,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 |-------|-----------|--------|-------|
 | 0 | Workspace, packaging (maturin, abi3-py310), CI, licenses, NOTICE | ✅ | |
 | 0 | `tools/sync_upstream.py` (fetch/regen/diff/stamp), `porting/manifest.toml` | ✅ | |
-| 0 | Upstream test ratchet (`tools/run_upstream_tests.py`) | ✅ | 147 upstream tests passing |
+| 0 | Upstream test ratchet (`tools/run_upstream_tests.py`) | ✅ | 149 upstream tests passing |
 | 1 | RDGeneral: Dict/RDValue/RDProps | ✅ | |
 | 1 | RDGeneral: RDLog + `rdBase` logging API | ✅ | upstream `UnitTestLogging.py` 32/32 |
 | 1 | RDGeneral: RNG (`boost::minstd_rand`, glibc `rand`) | ✅ | |
@@ -45,6 +45,8 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 8 | SparseIntVect (Int/Long/UInt/ULong): fuzzy &/|, arithmetic, scalar ops (incl. upstream's stored zeros and missing `/=`), pickles, Dice/Tanimoto/Tversky (+ bounds, Bulk*), ConvertToNumpyArray | ✅ | 3000 random pairs identical to the arm64 build; upstream `testSparseIntVect.py` 10/10 incl. legacy pickles |
 | 8 | DiscreteValueVect (+ `DiscreteValueType`), RealValueVect, ComputeL1Norm, ConvertToNumpyArray for all vector types | ✅ | 2000 random pairs identical (incl. error cases); upstream tests 12/12 |
 | 8 | FPBReader, InitFromDaylightString | ⬜ | |
+| 9 | Fingerprint generator framework (bit / sparse / count / sparse-count fingerprints, count simulation, numBitsPerFeature via boost mt19937, fromAtoms, custom invariants, AdditionalOutput incl. atomsPerBit, GetOptions views, bulk + NumPy) and the Morgan generator (`GetMorganGenerator`, `GetMorganAtomInvGen`, `GetMorganBondInvGen`); `rdkit.Chem.rdFingerprintGenerator` | ✅ | differential `morgan` (6 configs + all output kinds): ZINC 10000 + ChEMBL chiral 5000 identical. SparseBitVect now iterates in signed (`std::set<int>`) order |
+| 9 | Morgan feature invariants, RDKit / atom-pair / topological-torsion generators, JSON (de)serialization, GetFPs bulk helpers, legacy `GetMorganFingerprint*` (rdMolDescriptors), MACCS, pattern/layered fingerprints | ⬜ | |
 | 7–13 | see PLAN.md | ⬜ | |
 
 ## Python package files
@@ -138,3 +140,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-08 — Stage 8a: DataStructs bit vectors + similarity. Next: SparseIntVect/DiscreteValueVect, then fingerprints (Morgan, RDKit, atom pairs) or SGroups.
 * 2026-10-08 — Stage 8b: SparseIntVect. Next: DiscreteValueVect/RealValueVect, then fingerprints.
 * 2026-10-08 — Stage 8c: DiscreteValueVect, RealValueVect. CI: macOS jobs commented out at the user's request. Next: fingerprints (Morgan, RDKit, atom pairs, topological torsions) or SGroups.
+* 2026-10-08 — Stage 9a: fingerprint generator framework + Morgan. Next: RDKit FP / atom pairs / torsions generators.

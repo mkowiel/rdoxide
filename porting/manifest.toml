@@ -359,3 +359,18 @@
 [module."rdoxide_python::datastructs_vv".sources]
 "Code/DataStructs/Wrap/DiscreteValueVect.cpp" = "9dcf666d1c58f6c25f696c7ba116cad5e237d736"
 "Code/DataStructs/Wrap/RealValueVect.cpp" = "85c62a7c6da4419151111dced5cc92ce47672f0f"
+
+[module."rdoxide::graphmol::fingerprints".sources]
+"Code/GraphMol/Fingerprints/FingerprintGenerator.cpp" = "8800903410b6b11001a6346fd73d0bb64513e86a"
+"Code/GraphMol/Fingerprints/FingerprintGenerator.h" = "50569a404792a269b30ab248ce35694810fdc702"
+"Code/GraphMol/Fingerprints/FingerprintUtil.cpp" = "a9734a535066aa91766ffbf9942da65291347074"
+"Code/GraphMol/Fingerprints/FingerprintUtil.h" = "cd8c57a77fe7ac93006dbf938683a9ae7b8e0688"
+"Code/RDGeneral/hash/hash.hpp" = "0a296f3a3ae2b4872185bb4119ba1d6e2f0c0bd6"
+
+[module."rdoxide::graphmol::fingerprints::morgan".sources]
+"Code/GraphMol/Fingerprints/MorganGenerator.cpp" = "b8ad1f7533ef21883f074aace7d03d2afb8994b1"
+"Code/GraphMol/Fingerprints/MorganGenerator.h" = "65d296c4e92cb75980b9c92827d7f0c474a3c314"
+
+[module."rdoxide_python::rdfingerprintgenerator".sources]
+"Code/GraphMol/Fingerprints/Wrap/FingerprintGeneratorWrapper.cpp" = "8d9c7aae0cbb945fb28e2a17eb6092fb2141cb30"
+"Code/GraphMol/Fingerprints/Wrap/MorganWrapper.cpp" = "53ff8af5e17203a23136ef8fe816ba7827d3599e"
