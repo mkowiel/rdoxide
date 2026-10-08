@@ -380,3 +380,9 @@
 "Code/GraphMol/Fingerprints/AtomPairGenerator.cpp" = "f523c1d8acef0021135130a96724d5ded2ce9822"
 "Code/GraphMol/Fingerprints/AtomPairGenerator.h" = "e30d488458b03abc541af3341e37c6f3d429da6e"
 
+
+[module."rdoxide::graphmol::subgraphs".sources]
+"Code/GraphMol/Subgraphs/Subgraphs.cpp" = "5a7c403b1a59772617e03a85ba1691207af787e8"
+"Code/GraphMol/Subgraphs/Subgraphs.h" = "91a7fe800370a5d55466a82237474c3868ff9077"
+"Code/GraphMol/Subgraphs/SubgraphUtils.cpp" = "871fb0ef2858827922e521b870ff4af068edc52a"
+"Code/GraphMol/Subgraphs/SubgraphUtils.h" = "bd76772bbca551bbe2af9087749be114a9c7ad58"

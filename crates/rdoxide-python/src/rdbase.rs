@@ -225,6 +225,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
         "Module containing basic definitions for wrapped C++ code\n\n",
     )?;
     log::init_logs();
+    crate::vects::add_classes(m)?;
     m.add("rdkitVersion", rdoxide::rdgeneral::RDKIT_VERSION)?;
     m.add("boostVersion", "")?;
     m.add(

@@ -25,6 +25,7 @@ pub mod ring_info;
 pub mod romol;
 pub mod smiles_parse;
 pub mod stereo_group;
+pub mod subgraphs;
 pub mod substruct;
 
 pub use atom::{Atom, ChiralType, HybridizationType, ValenceType};

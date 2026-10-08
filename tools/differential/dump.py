@@ -225,7 +225,35 @@ def atompair_record(smi):
     return res
 
 
+def subgraphs_record(smi):
+    """Subgraph / path enumeration results."""
+    m = Chem.MolFromSmiles(smi)
+    if m is None:
+        return None
+    lst = lambda r: [list(p) for p in r]  # noqa: E731
+    res = {}
+    for n in (1, 2, 3, 4):
+        res[f"sub{n}"] = lst(Chem.FindAllSubgraphsOfLengthN(m, n))
+        res[f"path{n}"] = lst(Chem.FindAllPathsOfLengthN(m, n))
+        res[f"apath{n}"] = lst(Chem.FindAllPathsOfLengthN(m, n + 1, useBonds=False))
+        res[f"spath{n}"] = lst(Chem.FindAllPathsOfLengthN(m, n, onlyShortestPaths=True))
+    res["uniq3"] = lst(Chem.FindUniqueSubgraphsOfLengthN(m, 3))
+    res["uniq3nobo"] = lst(Chem.FindUniqueSubgraphsOfLengthN(m, 3, useBO=False))
+    res["mton"] = [lst(x) for x in Chem.FindAllSubgraphsOfLengthMToN(m, 2, 3)]
+    res["rooted"] = lst(Chem.FindAllSubgraphsOfLengthN(m, 3, rootedAtAtom=0))
+    res["rootedpath"] = lst(Chem.FindAllPathsOfLengthN(m, 3, rootedAtAtom=0))
+    env = []
+    for r in (1, 2, 3):
+        d = {}
+        env.append([list(Chem.FindAtomEnvironmentOfRadiusN(m, r, 0, atomMap=d)), sorted(d.items()),
+                    list(Chem.FindAtomEnvironmentOfRadiusN(m, r + 5, 0, enforceSize=False))])
+    res["env"] = env
+    return res
+
+
 def dump(mode, smi):
+    if mode == "subgraphs":
+        return subgraphs_record(smi)
     if mode == "morgan":
         return morgan_record(smi)
     if mode == "atompair":

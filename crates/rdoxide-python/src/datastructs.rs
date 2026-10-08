@@ -121,8 +121,8 @@ macro_rules! bitvect_class {
             }
             /// Returns a tuple containing IDs of the on bits.
             #[pyo3(name = "GetOnBits")]
-            fn get_on_bits<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
-                PyTuple::new(py, self.bv.on_bits())
+            fn get_on_bits(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+                crate::vects::PyVectI::new_py(py, self.bv.on_bits())
             }
             /// Returns an internal binary representation of the vector.
             #[pyo3(name = "ToBinary")]
@@ -541,24 +541,32 @@ fn bulk_tversky(
 /// Returns a 2-tuple: (B(bv1&bv2) / B(bv1), B(bv1&bv2) / B(bv2))
 #[pyfunction]
 #[pyo3(name = "OnBitProjSimilarity", signature = (bv1, bv2))]
-fn on_bit_proj(bv1: &Bound<'_, PyAny>, bv2: &Bound<'_, PyAny>) -> PyResult<(f64, f64)> {
+fn on_bit_proj(
+    py: Python<'_>,
+    bv1: &Bound<'_, PyAny>,
+    bv2: &Bound<'_, PyAny>,
+) -> PyResult<Py<PyAny>> {
     let r = match extract_pair(bv1, bv2, false)? {
         Pair::E(a, b) => bit_ops::on_bit_proj_similarity(&a, &b),
         Pair::S(a, b) => bit_ops::on_bit_proj_similarity(&a, &b),
     }
     .py()?;
-    Ok((r[0], r[1]))
+    crate::vects::PyVectD::new_py(py, r.to_vec())
 }
 
 #[pyfunction]
 #[pyo3(name = "OffBitProjSimilarity", signature = (bv1, bv2))]
-fn off_bit_proj(bv1: &Bound<'_, PyAny>, bv2: &Bound<'_, PyAny>) -> PyResult<(f64, f64)> {
+fn off_bit_proj(
+    py: Python<'_>,
+    bv1: &Bound<'_, PyAny>,
+    bv2: &Bound<'_, PyAny>,
+) -> PyResult<Py<PyAny>> {
     let r = match extract_pair(bv1, bv2, false)? {
         Pair::E(a, b) => bit_ops::off_bit_proj_similarity(&a, &b),
         Pair::S(a, b) => bit_ops::off_bit_proj_similarity(&a, &b),
     }
     .py()?;
-    Ok((r[0], r[1]))
+    crate::vects::PyVectD::new_py(py, r.to_vec())
 }
 
 /// Returns the total number of bits in common between the two bit vectors
@@ -578,13 +586,13 @@ fn on_bits_in_common<'py>(
     py: Python<'py>,
     bv1: &Bound<'py, PyAny>,
     bv2: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyTuple>> {
+) -> PyResult<Py<PyAny>> {
     let v = match extract_pair(bv1, bv2, false)? {
         Pair::E(a, b) => bit_ops::on_bits_in_common(&a, &b),
         Pair::S(a, b) => bit_ops::on_bits_in_common(&a, &b),
     }
     .py()?;
-    PyTuple::new(py, v)
+    crate::vects::PyVectI::new_py(py, v)
 }
 
 /// Returns the number of off bits in common between the two bit vectors
@@ -594,13 +602,13 @@ fn off_bits_in_common<'py>(
     py: Python<'py>,
     bv1: &Bound<'py, PyAny>,
     bv2: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyTuple>> {
+) -> PyResult<Py<PyAny>> {
     let v = match extract_pair(bv1, bv2, false)? {
         Pair::E(a, b) => bit_ops::off_bits_in_common(&a, &b),
         Pair::S(a, b) => bit_ops::off_bits_in_common(&a, &b),
     }
     .py()?;
-    PyTuple::new(py, v)
+    crate::vects::PyVectI::new_py(py, v)
 }
 
 /// Folds the fingerprint by the provided amount. The default, foldFactor=2, returns a fingerprint that is half the size of the original.
