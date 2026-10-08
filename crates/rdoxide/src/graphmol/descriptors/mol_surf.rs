@@ -14,6 +14,7 @@ use crate::error::{RDKitError, Result};
 use crate::graphmol::atom::Atom;
 use crate::graphmol::bond::BondType;
 use crate::graphmol::descriptors::crippen::get_crippen_atom_contribs;
+use crate::graphmol::partial_charges::gasteiger::{DEFAULT_ITERATIONS, compute_gasteiger_charges};
 use crate::graphmol::periodic_table::PeriodicTable;
 use crate::graphmol::romol::ROMol;
 use crate::rdgeneral::common_properties as cp;
@@ -443,6 +444,9 @@ fn assign_contribs_to_bins(
 }
 
 const SLOGP_BINS: [f64; 11] = [-0.4, -0.2, 0.0, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6];
+const PEOE_BINS: [f64; 13] = [
+    -0.3, -0.25, -0.20, -0.15, -0.10, -0.05, 0.0, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30,
+];
 const SMR_BINS: [f64; 9] = [1.29, 1.82, 2.24, 2.45, 2.75, 3.05, 3.63, 3.8, 4.0];
 
 /// Bins the Labute contributions by `property`, with `default_bins` when no
@@ -473,6 +477,14 @@ pub fn calc_slogp_vsa(mol: &mut ROMol, bins: Option<&[f64]>, force: bool) -> Res
 pub fn calc_smr_vsa(mol: &mut ROMol, bins: Option<&[f64]>, force: bool) -> Result<Vec<f64>> {
     vsa_by_property(mol, bins, &SMR_BINS, force, |m| {
         Ok(get_crippen_atom_contribs(m, force)?.mr)
+    })
+}
+
+/// `calcPEOE_VSA`: Labute contributions binned by the Gasteiger charges
+/// (which are also stored on the atoms).
+pub fn calc_peoe_vsa(mol: &mut ROMol, bins: Option<&[f64]>, force: bool) -> Result<Vec<f64>> {
+    vsa_by_property(mol, bins, &PEOE_BINS, force, |m| {
+        compute_gasteiger_charges(m, DEFAULT_ITERATIONS, false)
     })
 }
 

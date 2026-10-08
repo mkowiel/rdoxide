@@ -444,3 +444,15 @@
 
 [module."rdoxide_python::rdmoldescriptors_molsurf".sources]
 "Code/GraphMol/Descriptors/Wrap/rdMolDescriptors.cpp" = "4d3c2e1d6315579af9f3bf02b1564224fe48b82e"
+
+
+[module."rdoxide::graphmol::partial_charges::gasteiger".sources]
+"Code/GraphMol/PartialCharges/GasteigerCharges.cpp" = "c99b980a4e56ab188710fe0e8b33446d2261d511"
+"Code/GraphMol/PartialCharges/GasteigerCharges.h" = "3f49a44729419721ddaba682c2bd048300d78a7e"
+
+[module."rdoxide::graphmol::partial_charges::gasteiger_params".sources]
+"Code/GraphMol/PartialCharges/GasteigerParams.cpp" = "d0e3e99f808ec480fb8ae7c74df236e75bf7ae91"
+"Code/GraphMol/PartialCharges/GasteigerParams.h" = "a3bf1988ff31b5d4a71152bccc6c5b43c01575a5"
+
+[module."rdoxide_python::rdpartialcharges".sources]
+"Code/GraphMol/PartialCharges/Wrap/rdPartialCharges.cpp" = "a3b8c2ec1de06218315622e327b28b4c133454ac"
