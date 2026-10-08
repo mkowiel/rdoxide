@@ -6,7 +6,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 |-------|-----------|--------|-------|
 | 0 | Workspace, packaging (maturin, abi3-py310), CI, licenses, NOTICE | ✅ | |
 | 0 | `tools/sync_upstream.py` (fetch/regen/diff/stamp), `porting/manifest.toml` | ✅ | |
-| 0 | Upstream test ratchet (`tools/run_upstream_tests.py`) | ✅ | 64 upstream tests passing |
+| 0 | Upstream test ratchet (`tools/run_upstream_tests.py`) | ✅ | 65 upstream tests passing |
 | 1 | RDGeneral: Dict/RDValue/RDProps | ✅ | |
 | 1 | RDGeneral: RDLog + `rdBase` logging API | ✅ | upstream `UnitTestLogging.py` 32/32 |
 | 1 | RDGeneral: RNG (`boost::minstd_rand`, glibc `rand`) | ✅ | |
@@ -36,7 +36,8 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 6 | MolBlock reader, V2000 + V3000 (atom lists, NOT lists, query props HCOUNT/UNSAT/RBCNT/SUBST, RGROUPS, enhanced stereo collections, LINKNODE, OBJ3D skipping, continuation lines): atoms/bonds incl. query atoms (A/Q/X/M/R/*, generic groups, H count), query bonds (5-8, topology), M CHG/RAD/ISO/RGP/ALS/RBC/SUB/UNS/PXA, old atom lists, aliases/values, S SKP, 2D/3D stereo; `MolFromMolBlock`, `MolFromMolFile` | ✅ | differential `molblock` (4 parse variants, byte-identical pickles with all props): 2D 4991/4991, V3000 1876/1876 (116 with stereo groups), 3D 490/490, upstream test_data 349/364 (remaining diffs need SGroups) |
 | 6 | SDMolSupplier (lazy + random access, `$$$$` indexing, data fields, atom/bond property lists, error recovery; Python iteration/indexing/len/SetData/GetItemText/context manager) | ✅ | differential `sdf` (4 parse variants + len/getitem/GetItemText/SetData) on all 389 upstream SD files: identical except 43 files that need SGroups |
 | 6 | MolBlock writer: `MolToMolBlock` (both overloads), `MolToV3KMolBlock`, `MolToV2KMolBlock`, `MolToMolFile`, `MolToV3KMolFile`, `MolWriterParams`; wedging (`pickBondsToWedge`, libc++ `std::sort` tie order), crossed double bonds, parity, query atoms/bonds, atom lists, R groups, enhanced stereo collections | ✅ | differential `molwrite` (5 writer variants x 3 reader variants + roundtrip): 2D 4991/4991, V3000 1876/1876, 3D 490/490, upstream test_data 327/364 (rest need SGroups) |
-| 6 | SGroups (V2000/V3000; also needed for M ZBO/ZCH/HYD/MRV and for writing SMARTS-query / generic-group / zero-order-bond molecules), M APO/LIN, ATTCHORD templates, atropisomer wedging, ForwardSDMolSupplier, SDWriter | ⬜ | reader returns None, writer raises RuntimeError for now |
+| 6 | SDWriter (file name, stdout, Python file objects; SetProps, kekulize, V3000, GetText) | ✅ | differential `sdwrite`: identical on all upstream SD files except those needing SGroups or atropisomer wedging |
+| 6 | SGroups (V2000/V3000; also needed for M ZBO/ZCH/HYD/MRV and for writing SMARTS-query / generic-group / zero-order-bond molecules), M APO/LIN, ATTCHORD templates, atropisomer wedging, ForwardSDMolSupplier | ⬜ | reader returns None, writer raises RuntimeError for now |
 | 7 | 2D coordinates: RDDepict::compute2DCoords (EmbeddedFrag, DepictUtils, fused rings, cis/trans and non-tetrahedral fragments, collision removal: bond/spiro flips, open angles, shorten bonds, path angle expansion, canonical orientation, coordMap, bondLength); `rdDepictor.Compute2DCoords`; `MolToMolBlock` of molecules without conformers | ✅ | differential `depict` (canonOrient on/off coordinates to 6 decimals + MolBlock): NCI 4999/4999, canonSmiles.long + stereo/pickle edge cases 5400/5400 identical to the arm64 build |
 | 7 | Ring-system templates, random flip sampling (nSample/nFlipsPerSample), Compute2DCoordsMimicDistmat, generateDepictionMatching2D/3DStructure, straighten/normalizeDepiction, CoordGen | ⬜ | raise RuntimeError |
 | 7–13 | see PLAN.md | ⬜ | |
@@ -109,7 +110,8 @@ New Python test files are also run against the official wheel to validate expect
 * Floating-point results follow the native RDKit build of the platform: on aarch64 rdoxide fuses
   multiply-adds exactly where clang does (`rdgeneral::fp::fmuladd`), on x86-64 it does not. The
   official arm64 and x86-64 builds themselves differ in the last bits of 2D coordinates (and so in
-  a few depictions); the `depict` differential uses the arm64 build.
+  a few depictions); the `depict` differential uses the arm64 build. Windows' libm can flip the
+  sign of rounded zeros (`-0.0000`) in MolBlocks.
 
 * Where RDKit uses the unstable `std::sort` (e.g. picking wedge bonds), rdoxide reproduces
   libc++'s element order (the macOS/conda-forge reference). RDKit builds that use libstdc++
