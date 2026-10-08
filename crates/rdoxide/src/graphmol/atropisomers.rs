@@ -377,3 +377,292 @@ pub fn detect_atropisomer_chirality(
     }
     Ok(())
 }
+
+// ------------------------------------------------------------------ wedging
+
+use crate::graphmol::file_parsers::mol_file_writer::{WedgeBonds, WedgeInfo};
+
+/// `getBondDirForAtropisomerNoConf`
+fn bond_dir_no_conf(stereo: BondStereo, which_end: usize, which_bond: usize) -> BondDir {
+    let mut flips = 0;
+    if stereo == BondStereo::StereoAtropCW {
+        flips += 1;
+    }
+    if which_bond == 1 {
+        flips += 1;
+    }
+    if which_end == 1 {
+        flips += 1;
+    }
+    if flips % 2 == 1 {
+        BondDir::BeginDash
+    } else {
+        BondDir::BeginWedge
+    }
+}
+
+/// `getBondDirForAtropisomer2d`
+fn bond_dir_2d(
+    vecs: &[Point3D; 2],
+    stereo: BondStereo,
+    which_end: usize,
+    which_bond: usize,
+) -> BondDir {
+    let mut flips = 0;
+    if stereo == BondStereo::StereoAtropCCW {
+        flips += 1;
+    }
+    if which_bond == 1 {
+        flips += 1;
+    }
+    if which_end == 1 {
+        flips += 1;
+    }
+    if vecs[1 - which_end].y < 0.0 {
+        flips += 1;
+    }
+    if flips % 2 == 1 {
+        BondDir::BeginWedge
+    } else {
+        BondDir::BeginDash
+    }
+}
+
+/// `getBondDirForAtropisomer3d`
+fn bond_dir_3d(mol: &ROMol, bond: u32, conf: &Conformer) -> Result<BondDir> {
+    let b = mol.bond(bond);
+    let dz = conf.atom_pos(b.end_atom_idx())?.z - conf.atom_pos(b.begin_atom_idx())?.z;
+    Ok(if dz > REALLY_SMALL_BOND_LEN {
+        BondDir::BeginWedge
+    } else {
+        BondDir::BeginDash
+    })
+}
+
+/// `bond->setEndAtom(begin); bond->setBeginAtom(atom)`: only the bond's
+/// own begin/end indices change (the graph is untouched).
+fn make_begin(mol: &mut ROMol, bond: u32, atom: u32) {
+    let b = mol.bond_mut(bond);
+    if b.begin_atom_idx() != atom {
+        let old = b.begin_atom_idx();
+        b.set_end_atom_idx_unchecked(old);
+        b.set_begin_atom_idx_unchecked(atom);
+    }
+}
+
+#[derive(Clone, Copy, PartialEq)]
+enum Geom {
+    NoConf,
+    TwoD,
+    ThreeD,
+}
+
+/// `WedgeBondFromAtropisomerOneBond{NoConf,2d,3d}`
+fn wedge_one_bond(
+    mol: &mut ROMol,
+    bond: u32,
+    conf: Option<&Conformer>,
+    geom: Geom,
+    wedge: &mut WedgeBonds,
+) -> Result<bool> {
+    let Some(ends) = get_atropisomer_atoms_and_bonds(mol, bond) else {
+        return Ok(false);
+    };
+    for end in &ends {
+        for &eb in &end.1 {
+            if mol.bond(eb).bond_dir() == BondDir::Unknown {
+                return Ok(false);
+            }
+        }
+    }
+    let (bb, be) = (
+        mol.bond(bond).begin_atom_idx(),
+        mol.bond(bond).end_atom_idx(),
+    );
+    let stereo = mol.bond(bond).stereo();
+    let mut vecs = [Point3D::default(); 2];
+    if geom == Geom::TwoD {
+        let conf = conf.expect("2D conformer");
+        let Some((_x, y, z)) = get_bond_frame_of_reference(mol, bond, conf)? else {
+            crate::rd_log_warning!(
+                "Cound not get a frame of reference for an atropisomer bond - atoms are: {bb} {be}"
+            );
+            return Ok(false);
+        };
+        for (i, end) in ends.iter().enumerate() {
+            let Some(v) = get_atrop_isomer_end_vect(mol, end, &y, &z, conf)? else {
+                return Ok(false);
+            };
+            if v.length() < REALLY_SMALL_BOND_LEN {
+                crate::rd_log_warning!(
+                    "Failed to get a representative vector for the defining bond of an atropisomer - atoms are: {bb} {be}"
+                );
+                return Ok(false);
+            }
+            vecs[i] = v;
+        }
+    }
+    let atrop_type = mol.bond(bond).bond_type();
+
+    // bonds that already carry a wedge from the atropisomer atoms
+    let mut use_bonds: Vec<(usize, usize)> = Vec::new();
+    for (we, end) in ends.iter().enumerate() {
+        for (wb, &eb) in end.1.iter().enumerate() {
+            let b = mol.bond(eb);
+            // upstream checks canHaveDirection of the atropisomer bond for
+            // NoConf/2d and of the neighbor bond for 3d
+            let dir_ok = if geom == Geom::ThreeD {
+                can_have_direction(b.bond_type())
+            } else {
+                can_have_direction(atrop_type)
+            };
+            if matches!(b.bond_dir(), BondDir::BeginWedge | BondDir::BeginDash)
+                && b.begin_atom_idx() == end.0
+                && dir_ok
+            {
+                use_bonds.push((we, wb));
+            }
+        }
+    }
+    if !use_bonds.is_empty() {
+        for (we, wb) in use_bonds {
+            let eb = ends[we].1[wb];
+            let d = match geom {
+                Geom::NoConf => bond_dir_no_conf(stereo, we, wb),
+                Geom::TwoD => bond_dir_2d(&vecs, stereo, we, wb),
+                Geom::ThreeD => bond_dir_3d(mol, eb, conf.expect("3D conformer"))?,
+            };
+            mol.bond_mut(eb).set_bond_dir(d);
+        }
+        return Ok(true);
+    }
+
+    let mut best: Option<(usize, u32)> = None;
+    let mut best_single = false;
+    let mut best_ring_count = if geom == Geom::ThreeD {
+        u32::MAX
+    } else {
+        i32::MAX as u32
+    };
+    let mut largest_ring = 0u32;
+    let mut best_dir = BondDir::None;
+    for (we, end) in ends.iter().enumerate() {
+        for (wb, &bt) in end.1.iter().enumerate() {
+            let skip_key = if geom == Geom::ThreeD { bond } else { bt };
+            if !can_have_direction(mol.bond(bt).bond_type()) || wedge.contains_key(&skip_key) {
+                continue;
+            }
+            if geom == Geom::ThreeD {
+                make_begin(mol, bt, end.0);
+            }
+            let b = mol.bond(bt);
+            if b.bond_dir() != BondDir::None {
+                if b.begin_atom_idx() == end.0 {
+                    if geom == Geom::TwoD
+                        && !matches!(b.bond_dir(), BondDir::BeginWedge | BondDir::BeginDash)
+                    {
+                        continue;
+                    }
+                    crate::rd_log_warning!(
+                        "Wedge or hash bond found on atropisomer where not expected - atoms are: {bb} {be}"
+                    );
+                    return Ok(false);
+                }
+                continue;
+            }
+            let is_single = b.bond_type() == BondType::Single;
+            let mut ring_count = mol.ring_info().num_bond_rings(bt)?;
+            let mut ring_size = 0;
+            if geom != Geom::NoConf {
+                if ring_count == 0 {
+                    ring_count = 10;
+                } else {
+                    ring_size = mol.ring_info().min_bond_ring_size(bt)?;
+                    if ring_size > 8 {
+                        ring_size = 0;
+                    }
+                }
+            }
+            let dir_for = |mol: &ROMol| -> Result<BondDir> {
+                Ok(match geom {
+                    Geom::NoConf => bond_dir_no_conf(stereo, we, wb),
+                    Geom::TwoD => bond_dir_2d(&vecs, stereo, we, wb),
+                    Geom::ThreeD => bond_dir_3d(mol, bt, conf.expect("3D conformer"))?,
+                })
+            };
+            if ring_count > best_ring_count {
+                continue;
+            } else if ring_count < best_ring_count
+                || (geom != Geom::NoConf && ring_size > largest_ring)
+            {
+                best = Some((we, bt));
+                best_ring_count = ring_count;
+                largest_ring = ring_size;
+                best_single = is_single;
+                best_dir = dir_for(mol)?;
+            } else if best_single && !is_single {
+                continue;
+            } else if !best_single && is_single {
+                best = Some((we, bt));
+                best_ring_count = ring_count;
+                best_single = true;
+                best_dir = dir_for(mol)?;
+            } else {
+                let d = dir_for(mol)?;
+                if best_dir == BondDir::None
+                    || (best_dir == BondDir::BeginDash && d == BondDir::BeginWedge)
+                {
+                    best = Some((we, bt));
+                    best_ring_count = ring_count;
+                    best_single = is_single;
+                    best_dir = d;
+                }
+            }
+        }
+    }
+    match best {
+        Some((we, bt)) => {
+            make_begin(mol, bt, ends[we].0);
+            mol.bond_mut(bt).set_bond_dir(best_dir);
+            wedge.insert(bt, WedgeInfo::Atropisomer(best_dir));
+            Ok(true)
+        }
+        None => {
+            crate::rd_log_warning!(
+                "Failed to find a good bond to set as UP or DOWN for an atropisomer - atoms are: {bb} {be}"
+            );
+            Ok(false)
+        }
+    }
+}
+
+/// `Atropisomers::wedgeBondsFromAtropisomers`
+pub fn wedge_bonds_from_atropisomers(
+    mol: &mut ROMol,
+    conf: Option<&Conformer>,
+    wedge: &mut WedgeBonds,
+) -> Result<()> {
+    if !mol.ring_info().is_sssr_or_better() {
+        crate::graphmol::find_rings::find_sssr(mol, false, false)?;
+    }
+    for bi in 0..mol.num_bonds() {
+        let b = mol.bond(bi);
+        if b.bond_type() != BondType::Single || !is_atrop(b.stereo()) {
+            continue;
+        }
+        let (bd, ed) = (
+            mol.total_degree(b.begin_atom_idx())?,
+            mol.total_degree(b.end_atom_idx())?,
+        );
+        if !(2..=3).contains(&bd) || !(2..=3).contains(&ed) {
+            continue;
+        }
+        let geom = match conf {
+            Some(c) if c.is_3d() => Geom::ThreeD,
+            Some(_) => Geom::TwoD,
+            None => Geom::NoConf,
+        };
+        wedge_one_bond(mol, bi, conf, geom, wedge)?;
+    }
+    Ok(())
+}

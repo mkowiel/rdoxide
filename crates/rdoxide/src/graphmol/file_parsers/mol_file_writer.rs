@@ -210,34 +210,8 @@ pub fn pick_bonds_to_wedge(mol: &mut ROMol, conf: Option<&Conformer>) -> Result<
             wedge.insert(b, WedgeInfo::Chiral(idx));
         }
     }
-    wedge_bonds_from_atropisomers(mol, conf)?;
+    crate::graphmol::atropisomers::wedge_bonds_from_atropisomers(mol, conf, &mut wedge)?;
     Ok(wedge)
-}
-
-/// `Atropisomers::wedgeBondsFromAtropisomers`: only the candidate check is
-/// ported.
-fn wedge_bonds_from_atropisomers(mol: &mut ROMol, _conf: Option<&Conformer>) -> Result<()> {
-    if !mol.ring_info().is_sssr_or_better() {
-        find_sssr(mol, false, false)?;
-    }
-    for b in mol.bonds() {
-        if b.bond_type() != BondType::Single
-            || !matches!(
-                b.stereo(),
-                BondStereo::StereoAtropCW | BondStereo::StereoAtropCCW
-            )
-        {
-            continue;
-        }
-        let (bd, ed) = (
-            mol.total_degree(b.begin_atom_idx())?,
-            mol.total_degree(b.end_atom_idx())?,
-        );
-        if (2..=3).contains(&bd) && (2..=3).contains(&ed) {
-            return Err(not_ported("wedging atropisomers"));
-        }
-    }
-    Ok(())
 }
 
 /// `detail::determineBondWedgeState(bond, fromAtomIdx, conf)`
