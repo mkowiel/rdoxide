@@ -65,3 +65,13 @@ def test_rdkit_fp_generator():
     assert list(g.GetFingerprint(m).GetOnBits()) == [
         2, 9, 36, 50, 76, 161, 232, 248, 277, 280, 294, 315, 330, 339, 342, 373, 407, 418, 465]
     assert g.GetOptions().maxPath == 3 and g.GetOptions().numBitsPerFeature == 2
+
+
+def test_legacy_rdk_fingerprint():
+    m = Chem.MolFromSmiles("CCO")
+    ab, bi = [], {}
+    fp = Chem.RDKFingerprint(m, maxPath=2, fpSize=64, atomBits=ab, bitInfo=bi)
+    assert list(fp.GetOnBits()) == [0, 28, 31, 44, 50, 59]
+    assert ab == [[28, 44, 0, 31], [28, 44, 59, 50, 0, 31], [59, 50, 0, 31]]
+    assert bi == {0: [[0, 1]], 28: [[0]], 31: [[0, 1]], 44: [[0]], 50: [[1]], 59: [[1]]}
+    assert len(Chem.UnfoldedRDKFingerprintCountBased(m).GetNonzeroElements()) == 3

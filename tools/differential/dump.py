@@ -310,7 +310,30 @@ def rdkitfp_record(smi):
     return res
 
 
+def rdkfingerprint_record(smi):
+    """Legacy Chem.RDKFingerprint / UnfoldedRDKFingerprintCountBased."""
+    m = Chem.MolFromSmiles(smi)
+    if m is None:
+        return None
+    res = {}
+    res["default"] = list(Chem.RDKFingerprint(m).GetOnBits())
+    res["density"] = list(Chem.RDKFingerprint(m, maxPath=5, tgtDensity=0.3, minSize=64).GetOnBits())
+    res["linear"] = list(Chem.RDKFingerprint(m, maxPath=6, nBitsPerHash=1, branchedPaths=False, fpSize=1024).GetOnBits())
+    ab, bi = [], {}
+    res["out"] = list(Chem.RDKFingerprint(m, maxPath=4, fromAtoms=[0], atomBits=ab, bitInfo=bi).GetOnBits())
+    res["ab"] = ab
+    res["bi"] = sorted(bi.items())
+    ab, bi = [], {}
+    u = Chem.UnfoldedRDKFingerprintCountBased(m, maxPath=5, atomBits=ab, bitInfo=bi)
+    res["unfolded"] = sorted(u.GetNonzeroElements().items())
+    res["uab"] = ab
+    res["ubi"] = sorted(bi.items())
+    return res
+
+
 def dump(mode, smi):
+    if mode == "rdkfingerprint":
+        return rdkfingerprint_record(smi)
     if mode == "rdkitfp":
         return rdkitfp_record(smi)
     if mode == "torsion":

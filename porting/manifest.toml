@@ -396,3 +396,7 @@
 [module."rdoxide::graphmol::fingerprints::rdkit_fp".sources]
 "Code/GraphMol/Fingerprints/RDKitFPGenerator.cpp" = "5caebca11fbb204d242604eb0f04353062eb5e32"
 "Code/GraphMol/Fingerprints/RDKitFPGenerator.h" = "144e9abffa69030561b1e49bad25787539153c76"
+
+[module."rdoxide::graphmol::fingerprints::legacy".sources]
+"Code/GraphMol/Fingerprints/Fingerprints.cpp" = "842e2dbe592e21982f3273457874fef95e8b3820"
+"Code/GraphMol/Fingerprints/Fingerprints.h" = "053a0d293d077991107ababd3a7c453d7f064a45"

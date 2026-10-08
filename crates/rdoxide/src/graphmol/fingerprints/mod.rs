@@ -2,6 +2,7 @@
 //! `FingerprintUtil.{h,cpp}`).
 
 pub mod atom_pair;
+pub mod legacy;
 pub mod morgan;
 pub mod rdkit_fp;
 pub mod torsion;

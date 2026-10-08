@@ -68,6 +68,7 @@ Code/GraphMol/Wrap/test_cdxml.py::TestCase::test_cdxml
 Code/GraphMol/Wrap/test_lazy_numpy.py::TestLazyNumpy::test_basic_smiles_roundtrip_without_numpy
 Code/GraphMol/Wrap/test_lazy_numpy.py::TestLazyNumpy::test_chem_import_does_not_load_numpy
 Code/GraphMol/Wrap/test_lazy_numpy.py::TestLazyNumpy::test_conformer_positions_loads_numpy
+Code/GraphMol/Wrap/test_lazy_numpy.py::TestLazyNumpy::test_datastructs_convert_loads_numpy
 rdkit/Chem/Suppliers/UnitTestSDMolSupplier.py::TestCase::test_SDMolSupplier
 rdkit/Chem/Suppliers/UnitTestSDMolSupplier.py::TestCase::test_SDWriter
 rdkit/Chem/UnitTestChem.py::TestCase::testPkl

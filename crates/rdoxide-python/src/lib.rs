@@ -33,6 +33,7 @@ mod rdmolfiles_sdwriter;
 mod rdmolfiles_smarts;
 mod rdmolfiles_write;
 mod rdmolops;
+mod rdmolops_fingerprints;
 mod rdmolops_hs;
 mod rdmolops_subgraphs;
 mod ringinfo;
