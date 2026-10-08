@@ -45,6 +45,9 @@ Code/Geometry/Wrap/testGeometry.py::TestCase::test1aPoint3D
 Code/Geometry/Wrap/testGeometry.py::TestCase::test5PointPickles
 Code/Geometry/Wrap/testGeometry.py::TestCase::test8InitPoint2DFromPoint3D
 Code/Geometry/Wrap/testGeometry.py::TestCase::testPointPickles
+Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testAdditionalOutput
+Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testAtomPairGenerator
+Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testFingerprintOptions
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testMorganGeneratorMultiMol
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testMorganRedundantEnvironments
 Code/GraphMol/Wrap/testConformer.py::TestCase::test0Conformers

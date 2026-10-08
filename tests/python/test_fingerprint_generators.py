@@ -37,3 +37,15 @@ def test_morgan_bulk_and_numpy():
     assert [fp.GetNumOnBits() for fp in fps] == [g.GetFingerprint(m).GetNumOnBits() for m in mols]
     arr = g.GetFingerprintAsNumPy(mols[2])
     assert arr.dtype.name == "uint8" and int(arr.sum()) == fps[2].GetNumOnBits()
+
+
+def test_atom_pair_generator():
+    m = Chem.MolFromSmiles("CCO")
+    g = G.GetAtomPairGenerator(countSimulation=False)
+    assert sorted(g.GetSparseCountFingerprint(m).GetNonzeroElements().items()) == [
+        (558113, 1), (1590306, 1), (1590337, 1)]
+    assert list(g.GetFingerprint(m).GetOnBits()) == [1375, 1423, 1503]
+    opts = g.GetOptions()
+    assert opts.maxDistance == 30
+    opts.maxDistance = 1
+    assert len(g.GetSparseCountFingerprint(m).GetNonzeroElements()) == 2

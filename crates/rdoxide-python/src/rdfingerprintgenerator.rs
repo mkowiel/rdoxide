@@ -3,6 +3,7 @@
 
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple};
+use rdoxide::graphmol::fingerprints::atom_pair::AtomPairArguments;
 use rdoxide::graphmol::fingerprints::morgan::MorganArguments;
 use rdoxide::graphmol::fingerprints::{
     AdditionalOutput, AtomInvariantsGenerator, BondInvariantsGenerator, EnvGenerator,
@@ -462,8 +463,13 @@ impl PyFPGen {
         let base = PyFingerprintOptions {
             owner: slf.unbind(),
         };
-        let obj = PyClassInitializer::from(base).add_subclass(PyMorganOptions);
-        Ok(Py::new(py, obj)?.into_any())
+        let is_morgan = matches!(base.owner.borrow(py).gen_.env, EnvGenerator::Morgan(_));
+        let init = PyClassInitializer::from(base);
+        if is_morgan {
+            Ok(Py::new(py, init.add_subclass(PyMorganOptions))?.into_any())
+        } else {
+            Ok(Py::new(py, init.add_subclass(PyAtomPairOptions))?.into_any())
+        }
     }
 }
 
@@ -558,6 +564,130 @@ pub struct PyMorganOptions;
 fn morgan_args(g: &mut FingerprintGenerator) -> &mut MorganArguments {
     match &mut g.env {
         EnvGenerator::Morgan(m) => m,
+        _ => unreachable!("MorganFingerprintOptions of a non-Morgan generator"),
+    }
+}
+
+fn atom_pair_args(g: &mut FingerprintGenerator) -> &mut AtomPairArguments {
+    match &mut g.env {
+        EnvGenerator::AtomPair(a) => a,
+        _ => unreachable!("AtomPairFingerprintOptions of a non-atom-pair generator"),
+    }
+}
+
+/// `AtomPairFingerprintOptions`
+#[pyclass(name = "AtomPairFingerprintOptions", module = "rdkit.Chem.rdFingerprintGenerator", extends = PyFingerprintOptions)]
+#[derive(Debug)]
+pub struct PyAtomPairOptions;
+
+#[pymethods]
+impl PyAtomPairOptions {
+    /// use 2D distances
+    #[getter(use2D)]
+    fn get_use_2d(slf: PyRef<'_, Self>) -> bool {
+        slf.as_super().with(slf.py(), |g| atom_pair_args(g).use_2d)
+    }
+    #[setter(use2D)]
+    fn set_use_2d(slf: PyRef<'_, Self>, v: bool) {
+        slf.as_super()
+            .with(slf.py(), |g| atom_pair_args(g).use_2d = v)
+    }
+    /// minimum distance to be included
+    #[getter(minDistance)]
+    fn get_min_distance(slf: PyRef<'_, Self>) -> u32 {
+        slf.as_super()
+            .with(slf.py(), |g| atom_pair_args(g).min_distance)
+    }
+    #[setter(minDistance)]
+    fn set_min_distance(slf: PyRef<'_, Self>, v: u32) {
+        slf.as_super()
+            .with(slf.py(), |g| atom_pair_args(g).min_distance = v)
+    }
+    /// maximum distance to be included
+    #[getter(maxDistance)]
+    fn get_max_distance(slf: PyRef<'_, Self>) -> u32 {
+        slf.as_super()
+            .with(slf.py(), |g| atom_pair_args(g).max_distance)
+    }
+    #[setter(maxDistance)]
+    fn set_max_distance(slf: PyRef<'_, Self>, v: u32) {
+        slf.as_super()
+            .with(slf.py(), |g| atom_pair_args(g).max_distance = v)
+    }
+}
+
+fn count_bounds_arg(o: Option<&Bound<'_, PyAny>>) -> PyResult<Vec<u32>> {
+    match o {
+        Some(o) if !o.is_none() => o.extract::<Vec<u32>>(),
+        _ => Ok(vec![1, 2, 4, 8]),
+    }
+}
+
+/// Get an atom pair fingerprint generator
+#[pyfunction]
+#[pyo3(name = "GetAtomPairGenerator", signature = (minDistance = 1, maxDistance = 30, includeChirality = false, use2D = true, countSimulation = true, countBounds = None, fpSize = 2048, atomInvariantsGenerator = None))]
+#[allow(non_snake_case, clippy::too_many_arguments)]
+fn get_atom_pair_generator(
+    minDistance: u32,
+    maxDistance: u32,
+    includeChirality: bool,
+    use2D: bool,
+    countSimulation: bool,
+    countBounds: Option<&Bound<'_, PyAny>>,
+    fpSize: u32,
+    atomInvariantsGenerator: Option<&Bound<'_, PyAny>>,
+) -> PyResult<PyFPGen> {
+    let count_bounds = count_bounds_arg(countBounds)?;
+    if countSimulation && count_bounds.is_empty() {
+        return Err(rdoxide::error::RDKitError::precondition(
+            "bad count bounds provided",
+        ))
+        .py();
+    }
+    if minDistance > maxDistance {
+        return Err(rdoxide::error::RDKitError::precondition(
+            "bad distances provided",
+        ))
+        .py();
+    }
+    let atom_inv_gen = match atomInvariantsGenerator {
+        Some(o) if !o.is_none() => o.extract::<PyRef<'_, PyAtomInvGen>>()?.gen_.clone(),
+        _ => AtomInvariantsGenerator::AtomPair {
+            include_chirality: includeChirality,
+            topological_torsion_correction: false,
+        },
+    };
+    Ok(PyFPGen {
+        gen_: FingerprintGenerator {
+            env: EnvGenerator::AtomPair(AtomPairArguments {
+                use_2d: use2D,
+                min_distance: minDistance,
+                max_distance: maxDistance,
+            }),
+            args: FingerprintArguments {
+                count_simulation: countSimulation,
+                include_chirality: includeChirality,
+                count_bounds,
+                fp_size: fpSize,
+                num_bits_per_feature: 1,
+            },
+            atom_inv_gen: Some(atom_inv_gen),
+            bond_inv_gen: None,
+            output_64: true,
+        },
+    })
+}
+
+/// Get an atom pair atom-invariant generator
+#[pyfunction]
+#[pyo3(name = "GetAtomPairAtomInvGen", signature = (includeChirality = false))]
+#[allow(non_snake_case)]
+fn get_atom_pair_atom_inv_gen(includeChirality: bool) -> PyAtomInvGen {
+    PyAtomInvGen {
+        gen_: AtomInvariantsGenerator::AtomPair {
+            include_chirality: includeChirality,
+            topological_torsion_correction: false,
+        },
     }
 }
 
@@ -691,6 +821,9 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyFPGen>()?;
     m.add_class::<PyFingerprintOptions>()?;
     m.add_class::<PyMorganOptions>()?;
+    m.add_class::<PyAtomPairOptions>()?;
+    m.add_function(wrap_pyfunction!(get_atom_pair_generator, m)?)?;
+    m.add_function(wrap_pyfunction!(get_atom_pair_atom_inv_gen, m)?)?;
     m.add_function(wrap_pyfunction!(get_morgan_generator, m)?)?;
     m.add_function(wrap_pyfunction!(get_morgan_atom_inv_gen, m)?)?;
     m.add_function(wrap_pyfunction!(get_morgan_bond_inv_gen, m)?)?;

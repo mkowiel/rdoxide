@@ -1,6 +1,7 @@
 //! Fingerprint generators (upstream `GraphMol/Fingerprints/FingerprintGenerator.{h,cpp}`,
 //! `FingerprintUtil.{h,cpp}`).
 
+pub mod atom_pair;
 pub mod morgan;
 
 use std::collections::BTreeMap;
@@ -192,17 +193,34 @@ pub struct FingerprintFuncArguments<'a> {
 #[derive(Debug)]
 pub enum AtomEnvironment {
     Morgan(morgan::MorganAtomEnv),
+    AtomPair(atom_pair::AtomPairAtomEnv),
 }
 
 impl AtomEnvironment {
-    fn bit_id(&self) -> u64 {
+    /// `AtomEnvironment::getBitId`
+    fn bit_id(
+        &self,
+        args: &FingerprintArguments,
+        atom_invs: Option<&[u32]>,
+        hash_results: bool,
+    ) -> Result<u64> {
         match self {
-            AtomEnvironment::Morgan(e) => e.code,
+            AtomEnvironment::Morgan(e) => Ok(e.code),
+            AtomEnvironment::AtomPair(e) => e.bit_id(args, atom_invs, hash_results),
         }
     }
-    fn update_additional_output(&self, mol: &ROMol, ao: &mut AdditionalOutput, bit_id: u64) {
+    fn update_additional_output(
+        &self,
+        mol: &ROMol,
+        ao: &mut AdditionalOutput,
+        bit_id: u64,
+    ) -> Result<()> {
         match self {
-            AtomEnvironment::Morgan(e) => e.update_additional_output(mol, ao, bit_id),
+            AtomEnvironment::Morgan(e) => {
+                e.update_additional_output(mol, ao, bit_id);
+                Ok(())
+            }
+            AtomEnvironment::AtomPair(e) => e.update_additional_output(ao, bit_id),
         }
     }
 }
@@ -210,7 +228,13 @@ impl AtomEnvironment {
 /// `AtomInvariantsGenerator`
 #[derive(Clone, Debug)]
 pub enum AtomInvariantsGenerator {
-    Morgan { include_ring_membership: bool },
+    Morgan {
+        include_ring_membership: bool,
+    },
+    AtomPair {
+        include_chirality: bool,
+        topological_torsion_correction: bool,
+    },
 }
 
 impl AtomInvariantsGenerator {
@@ -219,6 +243,14 @@ impl AtomInvariantsGenerator {
             AtomInvariantsGenerator::Morgan {
                 include_ring_membership,
             } => morgan::get_connectivity_invariants(mol, *include_ring_membership),
+            AtomInvariantsGenerator::AtomPair {
+                include_chirality,
+                topological_torsion_correction,
+            } => atom_pair::atom_pair_invariants(
+                mol,
+                *include_chirality,
+                *topological_torsion_correction,
+            ),
         }
     }
     pub fn info_string(&self) -> String {
@@ -228,6 +260,13 @@ impl AtomInvariantsGenerator {
             } => format!(
                 "MorganInvariantGenerator includeRingMembership={}",
                 u8::from(*include_ring_membership)
+            ),
+            AtomInvariantsGenerator::AtomPair {
+                topological_torsion_correction,
+                ..
+            } => format!(
+                "AtomPairInvariantGenerator topologicalTorsionCorrection={}",
+                u8::from(*topological_torsion_correction)
             ),
         }
     }
@@ -273,6 +312,7 @@ impl BondInvariantsGenerator {
 #[derive(Clone, Debug)]
 pub enum EnvGenerator {
     Morgan(morgan::MorganArguments),
+    AtomPair(atom_pair::AtomPairArguments),
 }
 
 /// `FingerprintGenerator<OutputType>`; `output_64` selects the OutputType.
@@ -298,6 +338,14 @@ impl FingerprintGenerator {
     }
     /// `AtomEnvironmentGenerator::getResultSize`
     fn result_size(&self) -> u64 {
+        if let EnvGenerator::AtomPair(_) = self.env {
+            let chiral = if self.args.include_chirality {
+                atom_pair::NUM_CHIRAL_BITS
+            } else {
+                0
+            };
+            return 1u64 << (atom_pair::NUM_ATOM_PAIR_FINGERPRINT_BITS + 2 * chiral);
+        }
         if self.output_64 {
             u64::MAX
         } else {
@@ -309,6 +357,7 @@ impl FingerprintGenerator {
         let sep = " --- ";
         let (args, env) = match &self.env {
             EnvGenerator::Morgan(m) => (m.info_string(), "MorganEnvironmentGenerator"),
+            EnvGenerator::AtomPair(a) => (a.info_string(), "AtomPairEnvironmentGenerator"),
         };
         format!(
             "{}{sep}{}{sep}{}{sep}{}{sep}{}",
@@ -329,11 +378,23 @@ impl FingerprintGenerator {
     fn environments(
         &self,
         mol: &ROMol,
-        from_atoms: Option<&[u32]>,
+        fargs: &FingerprintFuncArguments<'_>,
         atom_invs: Option<&[u32]>,
         bond_invs: Option<&[u32]>,
     ) -> Result<Vec<AtomEnvironment>> {
+        let from_atoms = fargs.from_atoms;
         match &self.env {
+            EnvGenerator::AtomPair(a) => Ok(atom_pair::get_environments(
+                mol,
+                a,
+                from_atoms,
+                fargs.ignore_atoms,
+                fargs.conf_id,
+                fargs.additional_output.as_deref(),
+            )?
+            .into_iter()
+            .map(AtomEnvironment::AtomPair)
+            .collect()),
             EnvGenerator::Morgan(m) => Ok(morgan::get_environments(
                 mol,
                 m,
@@ -385,12 +446,7 @@ impl FingerprintGenerator {
                 .map(|g| g.bond_invariants(mol))
                 .transpose()?,
         };
-        let envs = self.environments(
-            lmol,
-            fargs.from_atoms,
-            atom_invs.as_deref(),
-            bond_invs.as_deref(),
-        )?;
+        let envs = self.environments(lmol, fargs, atom_invs.as_deref(), bond_invs.as_deref())?;
 
         let kind = self.output_kind();
         let len = if fp_size != 0 {
@@ -411,14 +467,14 @@ impl FingerprintGenerator {
         };
         let mut rng = None;
         for env in &envs {
-            let seed = env.bit_id() & mask;
+            let seed = env.bit_id(&self.args, atom_invs.as_deref(), fp_size != 0)? & mask;
             let mut bit_id = seed;
             if fp_size != 0 {
                 bit_id %= fp_size;
             }
             bump(&mut res, bit_id)?;
             if let Some(ao) = fargs.additional_output.as_deref_mut() {
-                env.update_additional_output(lmol, ao, bit_id);
+                env.update_additional_output(lmol, ao, bit_id)?;
             }
             if self.args.num_bits_per_feature > 1 {
                 let rg = rng.insert(Mt19937::new(seed as u32));
@@ -429,7 +485,7 @@ impl FingerprintGenerator {
                     }
                     bump(&mut res, b)?;
                     if let Some(ao) = fargs.additional_output.as_deref_mut() {
-                        env.update_additional_output(lmol, ao, b);
+                        env.update_additional_output(lmol, ao, b)?;
                     }
                 }
             }
