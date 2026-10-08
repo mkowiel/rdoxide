@@ -6,7 +6,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 |-------|-----------|--------|-------|
 | 0 | Workspace, packaging (maturin, abi3-py310), CI, licenses, NOTICE | ✅ | |
 | 0 | `tools/sync_upstream.py` (fetch/regen/diff/stamp), `porting/manifest.toml` | ✅ | |
-| 0 | Upstream test ratchet (`tools/run_upstream_tests.py`) | ✅ | 52 upstream tests passing (incl. `UnitTestSmiles.py`) |
+| 0 | Upstream test ratchet (`tools/run_upstream_tests.py`) | ✅ | 56 upstream tests passing |
 | 1 | RDGeneral: Dict/RDValue/RDProps | ✅ | |
 | 1 | RDGeneral: RDLog + `rdBase` logging API | ✅ | upstream `UnitTestLogging.py` 32/32 |
 | 1 | RDGeneral: RNG (`boost::minstd_rand`, glibc `rand`) | ✅ | |
@@ -30,7 +30,10 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 4 | CXSMILES (read/write) | ⬜ | |
 | 5 | Substructure matching: VF2, `SubstructMatch`/`SubstructMatchCount`, recursive queries, chirality + double-bond stereo, enhanced stereo, query-query matches, aromaticMatchesConjugated/SingleOrDouble, atom/bond properties; `Mol.HasSubstructMatch/GetSubstructMatch/GetSubstructMatches` (both overloads), `SubstructMatchParameters` | ✅ | differential `substruct` (55 queries x 4 variants per molecule + chirality self/mirror) 10312 + 2418 identical |
 | 5 | `extraFinalCheck`/`extraAtomCheck`/`extraBondCheck` callbacks, generic matchers, MolBundle, ResonanceMolSupplier | ⬜ | |
-| 6–13 | see PLAN.md | ⬜ | |
+| 6 | MolPickler (byte-identical pickles; reads versions >= 2 incl. queries, rings, stereo groups, conformers, props): `Mol.ToBinary`, `Mol(pkl[, flags])`, Python `pickle`, `Get/SetDefaultPickleProperties`, `PropertyPickleOptions` | ✅ | differential `pickle`/`picklesmarts` byte-identical on 10312 + 1101 + 1426 + edge cases; upstream canonSmiles.v2.pkl stream reads |
+| 6 | Pickles with SubstanceGroups / monomer info, v1 pickles, ExplicitBitVect property handler | ⬜ | raise RuntimeError for now |
+| 6 | Mol file formats (MolBlock V2000/V3000, SDMolSupplier, SDWriter, ...) | ⬜ | next |
+| 7–13 | see PLAN.md | ⬜ | |
 
 ## Python package files
 
@@ -63,6 +66,8 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 * 2026-10-08 — RDConfig/RDPaths added. Remaining upstream-test blockers by count: DataStructs
   (~19 tests), MolBlock/SDMolSupplier/MolToMolBlock (~22), AllChem (11), pickling (3).
   Next: stage 6 (MolPickler, then mol file reader/writer, SDMolSupplier).
+* 2026-10-08 — Stage 6a: MolPickler byte-identical to RDKit; Python pickling. Ratchet 53 -> 56.
+  Next: MolBlock reader/writer + SDMolSupplier (stage 6b).
 
 ## Differential testing
 
@@ -88,7 +93,6 @@ New Python test files are also run against the official wheel to validate expect
 * Atom/Bond objects returned from a Mol hold a reference to the Python Mol plus
   an index (upstream holds a C++ pointer); after removing atoms the index may
   point at a different atom (upstream: dangling pointer).
-* `Mol(pickle)` / `ToBinary` not available until MolPickler (stage 6).
 * `Atom.IsInRing()` needs stage 3 (`findSSSR`).
 * `MolFragmentToSmiles(mol, params, atomsToUse)` with `params` passed positionally works
   in rdoxide; upstream's Boost overload resolution raises AttributeError for it (keyword

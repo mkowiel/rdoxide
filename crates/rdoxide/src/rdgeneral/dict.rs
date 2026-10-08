@@ -189,6 +189,11 @@ impl Dict {
         self.data.retain(|(k, _)| k != key);
     }
 
+    /// `Dict::extend`: appends the pairs without checking for existing keys.
+    pub fn extend_pairs(&mut self, pairs: Vec<(String, RDValue)>) {
+        self.data.extend(pairs);
+    }
+
     pub fn reset(&mut self) {
         self.data.clear();
     }

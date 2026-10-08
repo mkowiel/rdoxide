@@ -241,3 +241,8 @@
 [module."rdoxide_python::substruct".sources]
 "Code/GraphMol/Wrap/Mol.cpp" = "8c57aa57c2e1af86142c97971f50947f8974a678"
 "Code/GraphMol/Wrap/substructmethods.h" = "3e103d11aff40d13eff013b8c705eb95abee1fba"
+
+[module."rdoxide::graphmol::pickle".sources]
+"Code/GraphMol/MolPickler.h" = "cde12436c1c300c02c32da14f884643fa0ece630"
+"Code/GraphMol/MolPickler.cpp" = "fe6ad6bbbaaf36c48457e269458323ea63db4b8d"
+"Code/RDGeneral/StreamOps.h" = "e4ea5443f1eef66d03fb2deb8f2d82f79aa017bf"

@@ -262,6 +262,20 @@ fn tossit() -> PyResult<()> {
     Err(pyo3::exceptions::PyIndexError::new_err("1"))
 }
 
+/// Get the current global mol pickler options.
+#[pyfunction]
+#[pyo3(name = "GetDefaultPickleProperties")]
+fn get_default_pickle_properties() -> u32 {
+    rdoxide::graphmol::pickle::get_default_pickle_properties()
+}
+
+/// Set the current global mol pickler options.
+#[pyfunction]
+#[pyo3(name = "SetDefaultPickleProperties")]
+fn set_default_pickle_properties(arg1: u32) {
+    rdoxide::graphmol::pickle::set_default_pickle_properties(arg1)
+}
+
 pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add(
         "__doc__",
@@ -285,6 +299,25 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     add_enum(m, "BondDir", &PyBondDir::members(), None)?;
     add_enum(m, "BondStereo", &PyBondStereo::members(), None)?;
     add_enum(m, "StereoGroupType", &PyStereoGroupType::members(), None)?;
+    add_enum(
+        m,
+        "PropertyPickleOptions",
+        &[
+            ("NoProps", 0),
+            ("MolProps", 0x1),
+            ("AtomProps", 0x2),
+            ("BondProps", 0x4),
+            ("QueryAtomData", 0x2),
+            ("PrivateProps", 0x10),
+            ("ComputedProps", 0x20),
+            ("AllProps", 0xFFFF),
+            ("CoordsAsDouble", 0x10000),
+            ("NoConformers", 0x20000),
+        ],
+        None,
+    )?;
+    m.add_function(wrap_pyfunction!(get_default_pickle_properties, m)?)?;
+    m.add_function(wrap_pyfunction!(set_default_pickle_properties, m)?)?;
 
     let py = m.py();
     m.add_class::<SanitizeCause>()?;
