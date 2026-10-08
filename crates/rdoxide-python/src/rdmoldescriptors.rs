@@ -5,9 +5,11 @@
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
+use rdoxide::graphmol::descriptors::connectivity::{self as conn, PHI_VERSION};
 use rdoxide::graphmol::descriptors::crippen::{
     CRIPPEN_VERSION, calc_crippen_descriptors, get_crippen_atom_contribs,
 };
+use rdoxide::graphmol::descriptors::lipinski::{self as lip, NumRotatableBondsOptions};
 use rdoxide::graphmol::fingerprints::atom_pair::{CODE_SIZE, get_atom_code, get_atom_pair_code};
 use rdoxide::graphmol::fingerprints::legacy::{self, BitInfoMap, MorganKind, MorganResult};
 use rdoxide::graphmol::fingerprints::morgan::{
@@ -17,6 +19,7 @@ use rdoxide::graphmol::fingerprints::morgan::{
 use crate::atom::PyAtom;
 use crate::datastructs::PyExplicitBitVect;
 use crate::datastructs_siv::{PyIntSIV, PyLongSIV, PyUIntSIV};
+use crate::enums::add_enum_exported;
 use crate::errors::IntoPyResult;
 use crate::mol::PyMol;
 
@@ -528,16 +531,17 @@ fn get_maccs_keys_fingerprint(mol: PyRef<'_, PyMol>) -> PyResult<PyExplicitBitVe
 #[pyfunction]
 #[pyo3(
     name = "_CalcCrippenContribs",
-    signature = (mol, force = false, atomTypes = None, atomTypeLabels = None)
+    signature = (mol, force = None, atomTypes = None, atomTypeLabels = None)
 )]
 #[allow(non_snake_case)]
 fn calc_crippen_contribs<'py>(
     py: Python<'py>,
     mol: &Bound<'py, PyMol>,
-    force: bool,
+    force: Option<&Bound<'py, PyAny>>,
     atomTypes: Option<Bound<'py, PyList>>,
     atomTypeLabels: Option<Bound<'py, PyList>>,
 ) -> PyResult<Bound<'py, PyList>> {
+    let force = bool_arg(force, false)?;
     let mut m = mol.borrow_mut();
     let n = m.mol.num_atoms() as usize;
     let n_types = atomTypes.as_ref().map_or(0, |l| l.len());
@@ -574,22 +578,269 @@ fn calc_crippen_contribs<'py>(
     Ok(contribs)
 }
 
+/// A bool-typed argument with a default. Upstream's Boost.Python bool converter
+/// accepts any object, converting it by truthiness (`includeHs=1` is `True`).
+fn bool_arg(v: Option<&Bound<'_, PyAny>>, default: bool) -> PyResult<bool> {
+    v.map_or(Ok(default), |v| v.is_truthy())
+}
+
 /// `CalcCrippenDescriptors(mol, includeHs=True, force=False)`: the Wildman-Crippen
 /// (logP, MR) pair of a molecule.
 #[pyfunction]
 #[pyo3(
     name = "CalcCrippenDescriptors",
-    signature = (mol, includeHs = true, force = false)
+    signature = (mol, includeHs = None, force = None)
 )]
 #[allow(non_snake_case)]
 fn calc_crippen_descriptors_py(
     mol: &Bound<'_, PyMol>,
-    includeHs: bool,
-    force: bool,
+    includeHs: Option<&Bound<'_, PyAny>>,
+    force: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<(f64, f64)> {
+    let include_hs = bool_arg(includeHs, true)?;
+    let force = bool_arg(force, false)?;
     let mut m = mol.borrow_mut();
-    calc_crippen_descriptors(&mut m.mol, includeHs, force).py()
+    calc_crippen_descriptors(&mut m.mol, include_hs, force).py()
 }
+
+/// Defines `(mol) -> count` functions over a shared molecule borrow.
+macro_rules! mol_count_fn {
+    ($fname:ident, $pyname:literal, $ret:ty, |$m:ident| $body:expr) => {
+        #[pyfunction]
+        #[pyo3(name = $pyname, signature = (mol))]
+        #[allow(non_snake_case)]
+        fn $fname(mol: &Bound<'_, PyMol>) -> PyResult<$ret> {
+            let mol_ref = mol.borrow();
+            let $m = &mol_ref.mol;
+            $body
+        }
+    };
+}
+
+mol_count_fn!(calc_num_lipinski_hba, "CalcNumLipinskiHBA", u32, |m| Ok(
+    lip::calc_lipinski_hba(m)
+));
+mol_count_fn!(calc_num_lipinski_hbd, "CalcNumLipinskiHBD", u32, |m| {
+    lip::calc_lipinski_hbd(m).py()
+});
+mol_count_fn!(calc_num_hbd, "CalcNumHBD", u32, |m| lip::calc_num_hbd(m)
+    .py());
+mol_count_fn!(calc_num_hba, "CalcNumHBA", u32, |m| lip::calc_num_hba(m)
+    .py());
+mol_count_fn!(calc_num_heteroatoms, "CalcNumHeteroatoms", u32, |m| {
+    lip::calc_num_heteroatoms(m).py()
+});
+mol_count_fn!(calc_num_amide_bonds, "CalcNumAmideBonds", u32, |m| {
+    lip::calc_num_amide_bonds(m).py()
+});
+mol_count_fn!(calc_num_rings, "CalcNumRings", u32, |m| {
+    lip::calc_num_rings(m).py()
+});
+mol_count_fn!(calc_phi, "CalcPhi", f64, |m| { conn::calc_phi(m).py() });
+mol_count_fn!(calc_fraction_csp3, "CalcFractionCSP3", f64, |m| {
+    lip::calc_fraction_csp3(m).py()
+});
+mol_count_fn!(calc_num_heterocycles, "CalcNumHeterocycles", u32, |m| Ok(
+    lip::calc_num_heterocycles(m)
+));
+mol_count_fn!(
+    calc_num_aromatic_rings,
+    "CalcNumAromaticRings",
+    u32,
+    |m| Ok(lip::calc_num_aromatic_rings(m))
+);
+mol_count_fn!(
+    calc_num_saturated_rings,
+    "CalcNumSaturatedRings",
+    u32,
+    |m| Ok(lip::calc_num_saturated_rings(m))
+);
+mol_count_fn!(
+    calc_num_aliphatic_rings,
+    "CalcNumAliphaticRings",
+    u32,
+    |m| Ok(lip::calc_num_aliphatic_rings(m))
+);
+mol_count_fn!(
+    calc_num_aromatic_heterocycles,
+    "CalcNumAromaticHeterocycles",
+    u32,
+    |m| Ok(lip::calc_num_aromatic_heterocycles(m))
+);
+mol_count_fn!(
+    calc_num_aromatic_carbocycles,
+    "CalcNumAromaticCarbocycles",
+    u32,
+    |m| Ok(lip::calc_num_aromatic_carbocycles(m))
+);
+mol_count_fn!(
+    calc_num_aliphatic_heterocycles,
+    "CalcNumAliphaticHeterocycles",
+    u32,
+    |m| Ok(lip::calc_num_aliphatic_heterocycles(m))
+);
+mol_count_fn!(
+    calc_num_aliphatic_carbocycles,
+    "CalcNumAliphaticCarbocycles",
+    u32,
+    |m| Ok(lip::calc_num_aliphatic_carbocycles(m))
+);
+mol_count_fn!(
+    calc_num_saturated_heterocycles,
+    "CalcNumSaturatedHeterocycles",
+    u32,
+    |m| Ok(lip::calc_num_saturated_heterocycles(m))
+);
+mol_count_fn!(
+    calc_num_saturated_carbocycles,
+    "CalcNumSaturatedCarbocycles",
+    u32,
+    |m| Ok(lip::calc_num_saturated_carbocycles(m))
+);
+mol_count_fn!(
+    calc_num_atom_stereo_centers,
+    "CalcNumAtomStereoCenters",
+    u32,
+    |m| lip::num_atom_stereo_centers(m).py()
+);
+mol_count_fn!(
+    calc_num_unspecified_atom_stereo_centers,
+    "CalcNumUnspecifiedAtomStereoCenters",
+    u32,
+    |m| lip::num_unspecified_atom_stereo_centers(m).py()
+);
+
+/// `CalcNumRotatableBonds(mol, strict=Default)`. Upstream tries the bool overload
+/// first, so a plain value is converted by truthiness (`True` is `Strict`); only
+/// `NumRotatableBondsOptions` members select the other definitions.
+#[pyfunction]
+#[pyo3(name = "CalcNumRotatableBonds", signature = (mol, strict = None))]
+fn calc_num_rotatable_bonds_py(
+    mol: &Bound<'_, PyMol>,
+    strict: Option<&Bound<'_, PyAny>>,
+) -> PyResult<u32> {
+    let opt = match strict {
+        None => NumRotatableBondsOptions::Default,
+        Some(v) if v.get_type().name()?.to_cow()? != "NumRotatableBondsOptions" => {
+            if v.is_truthy()? {
+                NumRotatableBondsOptions::Strict
+            } else {
+                NumRotatableBondsOptions::NonStrict
+            }
+        }
+        Some(v) => match v.extract::<i32>()? {
+            -1 => NumRotatableBondsOptions::Default,
+            0 => NumRotatableBondsOptions::NonStrict,
+            1 => NumRotatableBondsOptions::Strict,
+            2 => NumRotatableBondsOptions::StrictLinkages,
+            // any other value takes the final branch of upstream's definition switch
+            _ => NumRotatableBondsOptions::StrictLinkages,
+        },
+    };
+    lip::calc_num_rotatable_bonds(&mol.borrow().mol, opt).py()
+}
+
+/// `CalcNumSpiroAtoms(mol, atoms=None)`: appends the spiro atoms to `atoms` when given.
+#[pyfunction]
+#[pyo3(name = "CalcNumSpiroAtoms", signature = (mol, atoms = None))]
+fn calc_num_spiro_atoms_py(
+    mol: &Bound<'_, PyMol>,
+    atoms: Option<Bound<'_, PyList>>,
+) -> PyResult<u32> {
+    let found = lip::spiro_atoms(&mut mol.borrow_mut().mol).py()?;
+    if let Some(list) = atoms {
+        for a in &found {
+            list.append(*a)?;
+        }
+    }
+    Ok(found.len() as u32)
+}
+
+/// `CalcNumBridgeheadAtoms(mol, atoms=None)`: appends the bridgehead atoms to `atoms` when given.
+#[pyfunction]
+#[pyo3(name = "CalcNumBridgeheadAtoms", signature = (mol, atoms = None))]
+fn calc_num_bridgehead_atoms_py(
+    mol: &Bound<'_, PyMol>,
+    atoms: Option<Bound<'_, PyList>>,
+) -> PyResult<u32> {
+    let found = lip::bridgehead_atoms(&mut mol.borrow_mut().mol).py()?;
+    if let Some(list) = atoms {
+        for a in &found {
+            list.append(*a)?;
+        }
+    }
+    Ok(found.len() as u32)
+}
+
+/// Version strings of the Lipinski-style descriptors (`_<Name>_version`).
+const LIPINSKI_VERSIONS: &[(&str, &str)] = &[
+    ("_CalcNumLipinskiHBA_version", lip::LIPINSKI_HBA_VERSION),
+    ("_CalcNumLipinskiHBD_version", lip::LIPINSKI_HBD_VERSION),
+    (
+        "_CalcNumRotatableBonds_version",
+        lip::NUM_ROTATABLE_BONDS_VERSION,
+    ),
+    ("_CalcNumHBD_version", lip::NUM_HBD_VERSION),
+    ("_CalcNumHBA_version", lip::NUM_HBA_VERSION),
+    ("_CalcNumHeteroatoms_version", lip::NUM_HETEROATOMS_VERSION),
+    ("_CalcNumAmideBonds_version", lip::NUM_AMIDE_BONDS_VERSION),
+    ("_CalcFractionCSP3_version", lip::FRACTION_CSP3_VERSION),
+    ("_CalcNumRings_version", lip::NUM_RINGS_VERSION),
+    ("_CalcPhi_version", PHI_VERSION),
+    (
+        "_CalcNumHeterocycles_version",
+        lip::NUM_HETEROCYCLES_VERSION,
+    ),
+    (
+        "_CalcNumAromaticRings_version",
+        lip::NUM_AROMATIC_RINGS_VERSION,
+    ),
+    (
+        "_CalcNumSaturatedRings_version",
+        lip::NUM_SATURATED_RINGS_VERSION,
+    ),
+    (
+        "_CalcNumAliphaticRings_version",
+        lip::NUM_ALIPHATIC_RINGS_VERSION,
+    ),
+    (
+        "_CalcNumAromaticHeterocycles_version",
+        lip::NUM_AROMATIC_HETEROCYCLES_VERSION,
+    ),
+    (
+        "_CalcNumAromaticCarbocycles_version",
+        lip::NUM_AROMATIC_CARBOCYCLES_VERSION,
+    ),
+    (
+        "_CalcNumSaturatedHeterocycles_version",
+        lip::NUM_SATURATED_HETEROCYCLES_VERSION,
+    ),
+    (
+        "_CalcNumSaturatedCarbocycles_version",
+        lip::NUM_SATURATED_CARBOCYCLES_VERSION,
+    ),
+    (
+        "_CalcNumAliphaticHeterocycles_version",
+        lip::NUM_ALIPHATIC_HETEROCYCLES_VERSION,
+    ),
+    (
+        "_CalcNumAliphaticCarbocycles_version",
+        lip::NUM_ALIPHATIC_CARBOCYCLES_VERSION,
+    ),
+    ("_CalcNumSpiroAtoms_version", lip::NUM_SPIRO_ATOMS_VERSION),
+    (
+        "_CalcNumBridgeheadAtoms_version",
+        lip::NUM_BRIDGEHEAD_ATOMS_VERSION,
+    ),
+    (
+        "_CalcNumAtomStereoCenters_version",
+        lip::NUM_ATOM_STEREO_CENTERS_VERSION,
+    ),
+    (
+        "_CalcNumUnspecifiedAtomStereoCenters_version",
+        lip::NUM_UNSPECIFIED_ATOM_STEREO_CENTERS_VERSION,
+    ),
+];
 
 pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add(
@@ -600,6 +851,47 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_morgan_fingerprint, m)?)?;
     m.add_function(wrap_pyfunction!(get_maccs_keys_fingerprint, m)?)?;
     m.add_function(wrap_pyfunction!(calc_crippen_contribs, m)?)?;
+    m.add_function(wrap_pyfunction!(calc_num_lipinski_hba, m)?)?;
+    m.add_function(wrap_pyfunction!(calc_num_lipinski_hbd, m)?)?;
+    m.add_function(wrap_pyfunction!(calc_num_rotatable_bonds_py, m)?)?;
+    m.add_function(wrap_pyfunction!(calc_num_hbd, m)?)?;
+    m.add_function(wrap_pyfunction!(calc_num_hba, m)?)?;
+    m.add_function(wrap_pyfunction!(calc_num_heteroatoms, m)?)?;
+    m.add_function(wrap_pyfunction!(calc_num_amide_bonds, m)?)?;
+    m.add_function(wrap_pyfunction!(calc_num_rings, m)?)?;
+    m.add_function(wrap_pyfunction!(calc_phi, m)?)?;
+    m.add_function(wrap_pyfunction!(calc_fraction_csp3, m)?)?;
+    m.add_function(wrap_pyfunction!(calc_num_heterocycles, m)?)?;
+    m.add_function(wrap_pyfunction!(calc_num_aromatic_rings, m)?)?;
+    m.add_function(wrap_pyfunction!(calc_num_saturated_rings, m)?)?;
+    m.add_function(wrap_pyfunction!(calc_num_aliphatic_rings, m)?)?;
+    m.add_function(wrap_pyfunction!(calc_num_aromatic_heterocycles, m)?)?;
+    m.add_function(wrap_pyfunction!(calc_num_aromatic_carbocycles, m)?)?;
+    m.add_function(wrap_pyfunction!(calc_num_aliphatic_heterocycles, m)?)?;
+    m.add_function(wrap_pyfunction!(calc_num_aliphatic_carbocycles, m)?)?;
+    m.add_function(wrap_pyfunction!(calc_num_saturated_heterocycles, m)?)?;
+    m.add_function(wrap_pyfunction!(calc_num_saturated_carbocycles, m)?)?;
+    m.add_function(wrap_pyfunction!(calc_num_spiro_atoms_py, m)?)?;
+    m.add_function(wrap_pyfunction!(calc_num_bridgehead_atoms_py, m)?)?;
+    m.add_function(wrap_pyfunction!(calc_num_atom_stereo_centers, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        calc_num_unspecified_atom_stereo_centers,
+        m
+    )?)?;
+    for (name, version) in LIPINSKI_VERSIONS {
+        m.add(*name, *version)?;
+    }
+    add_enum_exported(
+        m,
+        "NumRotatableBondsOptions",
+        &[
+            ("Default", -1),
+            ("NonStrict", 0),
+            ("Strict", 1),
+            ("StrictLinkages", 2),
+        ],
+        None,
+    )?;
     m.add_function(wrap_pyfunction!(calc_crippen_descriptors_py, m)?)?;
     m.add("_CalcCrippenDescriptors_version", CRIPPEN_VERSION)?;
     m.add_function(wrap_pyfunction!(get_hashed_morgan_fingerprint, m)?)?;

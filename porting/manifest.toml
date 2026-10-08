@@ -419,3 +419,7 @@
 [module."rdoxide::geometry::transform3d".sources]
 "Code/Geometry/Transform3D.cpp" = "037ca6a16e994454198c7724e3f9d68582eee660"
 "Code/Geometry/Transform3D.h" = "8738264bcc2cbdae1cc46cab813315128118f904"
+
+[module."rdoxide::graphmol::descriptors::lipinski".sources]
+"Code/GraphMol/Descriptors/Lipinski.cpp" = "a64fd400dcf9beb0b38953db241a290d6501f806"
+"Code/GraphMol/Descriptors/Lipinski.h" = "9acfde68b709cd71c20213c762656c6d400e1d41"

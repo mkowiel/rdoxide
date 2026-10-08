@@ -456,7 +456,51 @@ def crippen_record(smi):
     return res
 
 
+def lipinski_record(smi):
+    """rdMolDescriptors counts (Lipinski.cpp), with the rotatable-bond modes and the atom lists."""
+    from rdkit.Chem import rdMolDescriptors as D
+    m = Chem.MolFromSmiles(smi)
+    if m is None:
+        return None
+
+    def attempt(fn):
+        try:
+            return fn()
+        except Exception as e:  # noqa: BLE001
+            return type(e).__name__
+
+    E = D.NumRotatableBondsOptions
+    res = {}
+    for name in ("CalcNumLipinskiHBA", "CalcNumLipinskiHBD", "CalcNumHBD", "CalcNumHBA", "CalcNumHeteroatoms",
+                 "CalcNumAmideBonds", "CalcNumRings", "CalcFractionCSP3", "CalcNumHeterocycles",
+                 "CalcNumAromaticRings", "CalcNumSaturatedRings", "CalcNumAliphaticRings",
+                 "CalcNumAromaticHeterocycles", "CalcNumAromaticCarbocycles", "CalcNumAliphaticHeterocycles",
+                 "CalcNumAliphaticCarbocycles", "CalcNumSaturatedHeterocycles", "CalcNumSaturatedCarbocycles",
+                 "CalcNumAtomStereoCenters", "CalcNumUnspecifiedAtomStereoCenters"):
+        res[name] = attempt(lambda: getattr(D, name)(Chem.Mol(m)))
+    res["rotDefault"] = attempt(lambda: D.CalcNumRotatableBonds(Chem.Mol(m)))
+    for key, opt in (("rotNonStrict", E.NonStrict), ("rotStrict", E.Strict), ("rotLinkages", E.StrictLinkages),
+                     ("rotBoolTrue", True), ("rotBoolFalse", False)):
+        res[key] = attempt(lambda: D.CalcNumRotatableBonds(Chem.Mol(m), opt))
+
+    def with_list(fn):
+        atoms = []
+        n = fn(Chem.Mol(m), atoms)
+        return [n, atoms]
+    res["spiro"] = attempt(lambda: with_list(D.CalcNumSpiroAtoms))
+    res["bridgehead"] = attempt(lambda: with_list(D.CalcNumBridgeheadAtoms))
+
+    def unassigned():
+        mm = Chem.Mol(m)
+        mm.ClearProp("_StereochemDone")
+        return [D.CalcNumAtomStereoCenters(mm), D.CalcNumUnspecifiedAtomStereoCenters(mm)]
+    res["stereoUnassigned"] = attempt(unassigned)
+    return res
+
+
 def dump(mode, smi):
+    if mode == "lipinski":
+        return lipinski_record(smi)
     if mode == "crippen":
         return crippen_record(smi)
     if mode == "addhs":

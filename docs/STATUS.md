@@ -56,7 +56,9 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 9 | MACCS keys (`rdMolDescriptors.GetMACCSKeysFingerprint`, verbatim `Chem/MACCSkeys.py`); `maccs.rs` is generated from upstream `MACCS.cpp` by `tools/gen_maccs.py` (then `cargo fmt`) | ✅ | differential `maccs` 15300/15300 identical |
 | 10a | Wildman-Crippen logP/MR: `CalcCrippenDescriptors` (includeHs, cached sums), `_CalcCrippenContribs` (atom types and labels, cache semantics), `rdkit.Chem.Crippen` (verbatim `MolLogP`/`MolMR`) | ✅ | differential `crippen` 15000/15000 (ZINC 10k + chiral 5k); upstream `UnitTestCrippen` 5/6 (`testIssue80` needs `Lipinski`) |
 | 10a | `Transform3D` (identity, rotations, point transform) for addHs coordinates; the rest of Transform3D waits for its consumers | 🟡 | covered by `addhs3d` |
-| 10a | Lipinski, MolWt/ExactMolWt, TPSA, Labute ASA, atom and ring counts, rest of `rdMolDescriptors`/`Descriptors`, ... | ⬜ | next |
+| 10b | Lipinski counts: HBA/HBD (Lipinski and SMARTS variants), rotatable bonds (all four definitions; `Default` is Strict as in the released build), heteroatoms, amide bonds, ring families, FractionCSP3, spiro/bridgehead atoms, stereo-center counts | ✅ | differential `lipinski` 15300/15300 identical (NCI 300 + ZINC 10k + chiral 5k); upstream bool/enum argument handling reproduced |
+| 10b | `CalcPhi` (needs the Hall-Kier alpha table from ConnectivityDescriptors) and verbatim `Chem/Lipinski.py` (imports every ring count at import time) | ⬜ | next; upstream `testIssue80` waits for it |
+| 10a | MolWt/ExactMolWt, TPSA, Labute ASA, rest of `rdMolDescriptors`/`Descriptors`, ... | ⬜ | next |
 | 9 | LayeredFingerprint, PatternFingerprint, JSON (de)serialization, GetFPs bulk helpers | ⬜ | |
 | 7–13 | see PLAN.md | ⬜ | |
 
@@ -162,3 +164,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-08 — Stage 9g: rdMolDescriptors legacy fingerprints. Next: MACCS keys, then descriptors (rdMolDescriptors / Descriptors).
 * 2026-10-08 — Stage 9h: MACCS keys. Next: descriptors (rdMolDescriptors: CalcNumAtoms, formula, MW, ring counts, Lipinski counts, TPSA, logP/MR (Crippen), ...).
 * 2026-10-08 — Stage 10a (part 1): Crippen logP/MR (`CalcCrippenDescriptors`, `_CalcCrippenContribs`, `rdkit.Chem.Crippen`) and addHs (with coordinates) identical to RDKit; ratchet 169. Next: Lipinski and the other descriptors (MolWt, TPSA, counts), then the rest of `rdMolDescriptors`.
+* 2026-10-08 — Stage 10b: Lipinski counts identical to RDKit (rotatable-bond definitions with the released strict default, bool/enum argument handling, spiro/bridgehead lists). Next: CalcPhi and verbatim Lipinski.py, then MolWt/TPSA/Labute ASA.
