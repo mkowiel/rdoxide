@@ -141,6 +141,40 @@ def dump(mode, smi):
         run("bond_smarts", lambda: [b.GetSmarts() for b in m.GetBonds()])
         run("roundtrip", lambda: Chem.MolToSmarts(Chem.MolFromSmarts(Chem.MolToSmarts(m))))
         return out
+    if mode == "substruct":
+        m = Chem.MolFromSmiles(smi)
+        if m is None:
+            return None
+        out = []
+        qs = GENERIC_QUERIES + [QUERIES[(QUERY_OFFSET + k) % len(QUERIES)] for k in range(25)]
+        for qsma in qs:
+            q = Chem.MolFromSmarts(qsma)
+            if q is None:
+                continue
+            rec = [qsma]
+            for f in (lambda: m.GetSubstructMatches(q),
+                      lambda: m.GetSubstructMatches(q, uniquify=False, maxMatches=50),
+                      lambda: m.GetSubstructMatches(q, useChirality=True),
+                      lambda: m.HasSubstructMatch(q)):
+                try:
+                    rec.append(f())
+                except Exception as e:  # noqa: BLE001
+                    rec.append("EXC:" + type(e).__name__)
+            out.append(rec)
+        # chirality: the molecule against itself and against its mirror image
+        mirror = Chem.Mol(m)
+        for a in mirror.GetAtoms():
+            if a.GetChiralTag() == Chem.ChiralType.CHI_TETRAHEDRAL_CW:
+                a.SetChiralTag(Chem.ChiralType.CHI_TETRAHEDRAL_CCW)
+            elif a.GetChiralTag() == Chem.ChiralType.CHI_TETRAHEDRAL_CCW:
+                a.SetChiralTag(Chem.ChiralType.CHI_TETRAHEDRAL_CW)
+        for q in (m, mirror):
+            try:
+                out.append([m.GetSubstructMatches(q, useChirality=True, uniquify=False, maxMatches=20),
+                            m.HasSubstructMatch(q, useChirality=True)])
+            except Exception as e:  # noqa: BLE001
+                out.append("EXC:" + type(e).__name__)
+        return out
     if mode == "smiles":
         m = Chem.MolFromSmiles(smi)
         if m is None:
@@ -173,10 +207,27 @@ def dump(mode, smi):
     raise SystemExit(f"unknown mode {mode}")
 
 
+QUERIES = []
+QUERY_OFFSET = 0
+GENERIC_QUERIES = [
+    "*", "C", "c", "[#6]~[#6]", "C=O", "[OH]", "[#7]", "c1ccccc1", "C1CCCCC1", "[R]", "[R2]",
+    "[!R]~[R]", "*~*~*", "[#6](~[#8])~[#8]", "[$(C=O)]", "[$([#6]~[#7])]~*", "[a;r6]", "[x3]",
+    "C-,=C", "[C,c]:,-[N,n]", "**(*)*", "[D3]", "[#6;!$([#6]=O)]", "c:c", "C@C", "C!@C",
+    "[N,O;!H0]", "*1~*~*~1", "[$(*~[#8]),$(*~[#7])]", "[#6]=,:[#6]-[#6]",
+]
+
+
 def main():
+    global QUERY_OFFSET
     mode, path = sys.argv[1], sys.argv[2]
+    if mode == "substruct":
+        import os
+        qpath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "tests", "data",
+                             "substruct_queries.smarts")
+        QUERIES.extend(l.split()[0] for l in open(qpath) if l.strip())
     with open(path) as fh:
         for line in fh:
+            QUERY_OFFSET = (QUERY_OFFSET + 7) % max(1, len(QUERIES) or 1)
             parts = line.split()
             if not parts or parts[0].lower() == "smiles":
                 continue

@@ -5,6 +5,7 @@ Code/GraphMol/Wrap/test_cdxml.py::TestCase::test_cdxml
 Code/GraphMol/Wrap/test_lazy_numpy.py::TestLazyNumpy::test_basic_smiles_roundtrip_without_numpy
 Code/GraphMol/Wrap/test_lazy_numpy.py::TestLazyNumpy::test_chem_import_does_not_load_numpy
 Code/GraphMol/Wrap/test_lazy_numpy.py::TestLazyNumpy::test_conformer_positions_loads_numpy
+rdkit/Chem/UnitTestChem.py::TestCase::testRings
 rdkit/Chem/UnitTestChemAtom.py::TestCase::test1Implicit
 rdkit/Chem/UnitTestChemAtom.py::TestCase::test2BondIter
 rdkit/Chem/UnitTestChemAtom.py::TestCase::test3GetBond

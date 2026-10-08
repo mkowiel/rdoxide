@@ -136,6 +136,9 @@ pub struct Query<F: QueryTarget> {
 }
 
 pub type AtomQuery = Query<AtomFn>;
+
+/// Match results of recursive queries, keyed by [`Query::node_key`].
+pub type RecursionSets = std::collections::HashMap<usize, BTreeSet<i32>>;
 pub type BondQuery = Query<BondFn>;
 
 impl<F: QueryTarget> Query<F> {
@@ -173,6 +176,18 @@ impl<F: QueryTarget> Query<F> {
 
     /// `Match(what)`
     pub fn matches(&self, mol: &ROMol, idx: u32) -> Result<bool> {
+        self.matches_with(mol, idx, None)
+    }
+
+    /// `Match(what)` where the sets of recursive (`$(...)`) queries come
+    /// from `recursion` (keyed by the address of the query node) when given;
+    /// upstream fills those sets in place during substructure matching.
+    pub fn matches_with(
+        &self,
+        mol: &ROMol,
+        idx: u32,
+        recursion: Option<&RecursionSets>,
+    ) -> Result<bool> {
         let cmp_val = |q: &Self| -> Result<i32> { Ok(query_cmp(q.val, q.data(mol, idx)?, q.tol)) };
         let res = match &self.kind {
             QueryKind::Base { always_true } => {
@@ -197,13 +212,18 @@ impl<F: QueryTarget> Query<F> {
                 let ur = if *upper_open { u > 0 } else { u >= 0 };
                 lr && ur
             }
-            QueryKind::Set(set) | QueryKind::Recursive { set, .. } => {
-                set.contains(&self.data(mol, idx)?)
+            QueryKind::Set(set) => set.contains(&self.data(mol, idx)?),
+            QueryKind::Recursive { set, .. } => {
+                let v = self.data(mol, idx)?;
+                match recursion {
+                    Some(r) => r.get(&self.node_key()).is_some_and(|s| s.contains(&v)),
+                    None => set.contains(&v),
+                }
             }
             QueryKind::And => {
                 let mut r = true;
                 for c in &self.children {
-                    if !c.matches(mol, idx)? {
+                    if !c.matches_with(mol, idx, recursion)? {
                         r = false;
                         break;
                     }
@@ -213,7 +233,7 @@ impl<F: QueryTarget> Query<F> {
             QueryKind::Or => {
                 let mut r = false;
                 for c in &self.children {
-                    if c.matches(mol, idx)? {
+                    if c.matches_with(mol, idx, recursion)? {
                         r = true;
                         break;
                     }
@@ -223,7 +243,7 @@ impl<F: QueryTarget> Query<F> {
             QueryKind::XOr => {
                 let mut r = false;
                 for c in &self.children {
-                    if c.matches(mol, idx)? {
+                    if c.matches_with(mol, idx, recursion)? {
                         if r {
                             r = false;
                             break;
@@ -248,6 +268,11 @@ impl<F: QueryTarget> Query<F> {
             },
         };
         Ok(res != self.negate)
+    }
+
+    /// Identity of this query node (used to key recursive-query results).
+    pub fn node_key(&self) -> usize {
+        self as *const Self as usize
     }
 
     /// `getFullDescription()`
