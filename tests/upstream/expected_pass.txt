@@ -47,10 +47,16 @@ Code/Geometry/Wrap/testGeometry.py::TestCase::test8InitPoint2DFromPoint3D
 Code/Geometry/Wrap/testGeometry.py::TestCase::testPointPickles
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testAdditionalOutput
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testAtomPairGenerator
+Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testCountBounds
+Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testFingerprintGeneratorOptionsLifetime
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testFingerprintOptions
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testGetAtomsPerBit
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testMorganGeneratorMultiMol
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testMorganRedundantEnvironments
+Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testNumBitsPerFeature
+Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testNumpyFingerprints
+Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testRDKitFPGenerator
+Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testRDKitFPGeneratorAndFromAtoms
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testTopologicalTorsionGenerator
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testTopologicalTorsionShortestPaths
 Code/GraphMol/Wrap/testConformer.py::TestCase::test0Conformers
