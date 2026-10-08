@@ -1,0 +1,2 @@
+# test inputs are compared byte-for-byte with RDKit output: keep them as-is
+tests/data/** -text

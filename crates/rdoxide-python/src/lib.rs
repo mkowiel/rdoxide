@@ -22,6 +22,7 @@ mod rdbase;
 mod rdchem;
 mod rdmolfiles;
 mod rdmolfiles_molblock;
+mod rdmolfiles_sdsupplier;
 mod rdmolfiles_smarts;
 mod rdmolfiles_write;
 mod rdmolops;

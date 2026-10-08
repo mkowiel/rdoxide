@@ -5,6 +5,7 @@ Code/GraphMol/Wrap/test_cdxml.py::TestCase::test_cdxml
 Code/GraphMol/Wrap/test_lazy_numpy.py::TestLazyNumpy::test_basic_smiles_roundtrip_without_numpy
 Code/GraphMol/Wrap/test_lazy_numpy.py::TestLazyNumpy::test_chem_import_does_not_load_numpy
 Code/GraphMol/Wrap/test_lazy_numpy.py::TestLazyNumpy::test_conformer_positions_loads_numpy
+rdkit/Chem/Suppliers/UnitTestSDMolSupplier.py::TestCase::test_SDMolSupplier
 rdkit/Chem/UnitTestChem.py::TestCase::testPkl
 rdkit/Chem/UnitTestChem.py::TestCase::testPkl1
 rdkit/Chem/UnitTestChem.py::TestCase::testPkl2
@@ -26,6 +27,7 @@ rdkit/Chem/UnitTestSmiles.py::TestCase::testLinear1
 rdkit/Chem/UnitTestSmiles.py::TestCase::testProblems
 rdkit/Chem/UnitTestSmiles.py::TestCase::testRings1
 rdkit/Chem/UnitTestSmiles.py::TestCase::testRings2
+rdkit/Chem/UnitTestSuppliers.py::TestCase::test1SDSupplier
 rdkit/UnitTestLogging.py::TestCaptureErrorLog::testBasicCapture
 rdkit/UnitTestLogging.py::TestCaptureErrorLog::testEmptyWhenNothingLogged
 rdkit/UnitTestLogging.py::TestCaptureErrorLog::testLoggingRestoredAfterContextExit

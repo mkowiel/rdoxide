@@ -49,6 +49,58 @@ def molblock_record(blk, **kw):
     return rec
 
 
+def sdf_records(path):
+    """Everything an SDMolSupplier reports for one SD file."""
+    def mrec(m):
+        if m is None:
+            return None
+        props = m.GetPropsAsDict(includePrivate=False, includeComputed=False)
+        return {"smiles": Chem.MolToSmiles(m), "props": sorted((k, str(v)) for k, v in props.items()),
+                "atomprops": [sorted((k, str(v)) for k, v in a.GetPropsAsDict(False, False).items())
+                              for a in m.GetAtoms()],
+                "bondprops": [sorted((k, str(v)) for k, v in b.GetPropsAsDict(False, False).items())
+                              for b in m.GetBonds()]}
+
+    def guard(f):
+        try:
+            return f()
+        except Exception as e:  # noqa: BLE001
+            return {"exception": type(e).__name__}
+
+    for key, kw in (("default", {}), ("keepHs", {"removeHs": False}),
+                    ("lax", {"strictParsing": False}), ("nosanitize", {"sanitize": False})):
+        try:
+            suppl = Chem.SDMolSupplier(path, **kw)
+        except Exception as e:  # noqa: BLE001
+            yield [f"{key} open", type(e).__name__]
+            continue
+        mols = []
+        while True:
+            try:
+                m = next(suppl)
+            except StopIteration:
+                break
+            except Exception as e:  # noqa: BLE001
+                mols.append({"exception": type(e).__name__})
+                break
+            mols.append(mrec(m))
+            if len(mols) > 2000:
+                break
+        yield [f"{key} iterate", mols]
+        if key != "default":
+            continue
+        suppl = Chem.SDMolSupplier(path, **kw)
+        n = guard(lambda: len(suppl))
+        yield ["len", n]
+        idxs = [0, 1, 3, -1, 7, 2]
+        yield ["getitem", [guard(lambda i=i: mrec(suppl[i])) for i in idxs]]
+        yield ["text", [guard(lambda i=i: suppl.GetItemText(i)) for i in (0, 2, 1)]]
+        yield ["after", [guard(lambda: mrec(next(suppl))), guard(lambda: suppl.atEnd())]]
+        suppl2 = Chem.SDMolSupplier()
+        suppl2.SetData(open(path, encoding="utf-8", errors="replace").read(), **kw)
+        yield ["setdata", [mrec(m) for m in suppl2]]
+
+
 def dump(mode, smi):
     if mode == "molblock":
         res = {}
@@ -269,6 +321,10 @@ def main():
         qpath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "tests", "data",
                              "substruct_queries.smarts")
         QUERIES.extend(l.split()[0] for l in open(qpath) if l.strip())
+    if mode == "sdf":
+        for rec in sdf_records(path):
+            print(json.dumps(rec, default=list))
+        return
     if mode == "molblock":
         txt = open(path, encoding="utf-8").read()
         for i, blk in enumerate(txt.split("$$$$\n")):

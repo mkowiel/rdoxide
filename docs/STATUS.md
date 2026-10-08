@@ -6,7 +6,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 |-------|-----------|--------|-------|
 | 0 | Workspace, packaging (maturin, abi3-py310), CI, licenses, NOTICE | ✅ | |
 | 0 | `tools/sync_upstream.py` (fetch/regen/diff/stamp), `porting/manifest.toml` | ✅ | |
-| 0 | Upstream test ratchet (`tools/run_upstream_tests.py`) | ✅ | 58 upstream tests passing |
+| 0 | Upstream test ratchet (`tools/run_upstream_tests.py`) | ✅ | 60 upstream tests passing |
 | 1 | RDGeneral: Dict/RDValue/RDProps | ✅ | |
 | 1 | RDGeneral: RDLog + `rdBase` logging API | ✅ | upstream `UnitTestLogging.py` 32/32 |
 | 1 | RDGeneral: RNG (`boost::minstd_rand`, glibc `rand`) | ✅ | |
@@ -34,7 +34,8 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 6 | MolPickler (byte-identical pickles; reads versions >= 2 incl. queries, rings, stereo groups, conformers, props): `Mol.ToBinary`, `Mol(pkl[, flags])`, Python `pickle`, `Get/SetDefaultPickleProperties`, `PropertyPickleOptions` | ✅ | differential `pickle`/`picklesmarts` byte-identical on 10312 + 1101 + 1426 + edge cases; upstream canonSmiles.v2.pkl stream reads |
 | 6 | Pickles with SubstanceGroups / monomer info, v1 pickles, ExplicitBitVect property handler | ⬜ | raise RuntimeError for now |
 | 6 | MolBlock reader, V2000 + V3000 (atom lists, NOT lists, query props HCOUNT/UNSAT/RBCNT/SUBST, RGROUPS, enhanced stereo collections, LINKNODE, OBJ3D skipping, continuation lines): atoms/bonds incl. query atoms (A/Q/X/M/R/*, generic groups, H count), query bonds (5-8, topology), M CHG/RAD/ISO/RGP/ALS/RBC/SUB/UNS/PXA, old atom lists, aliases/values, S SKP, 2D/3D stereo; `MolFromMolBlock`, `MolFromMolFile` | ✅ | differential `molblock` (4 parse variants, byte-identical pickles with all props): 2D 4991/4991, V3000 1876/1876 (116 with stereo groups), 3D 490/490, upstream test_data 349/364 (remaining diffs need SGroups) |
-| 6 | SGroups (V2000/V3000; also needed for M ZBO/ZCH/HYD/MRV), M APO/LIN, ATTCHORD templates, SDMolSupplier, MolToMolBlock, SDWriter | ⬜ | parse as failures (None) for now; next |
+| 6 | SDMolSupplier (lazy + random access, `$$$$` indexing, data fields, atom/bond property lists, error recovery; Python iteration/indexing/len/SetData/GetItemText/context manager) | ✅ | differential `sdf` (4 parse variants + len/getitem/GetItemText/SetData) on all 389 upstream SD files: identical except 43 files that need SGroups |
+| 6 | SGroups (V2000/V3000; also needed for M ZBO/ZCH/HYD/MRV), M APO/LIN, ATTCHORD templates, ForwardSDMolSupplier, MolToMolBlock, SDWriter | ⬜ | parse as failures (None) for now; next |
 | 7–13 | see PLAN.md | ⬜ | |
 
 ## Python package files
@@ -73,6 +74,8 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 * 2026-10-08 — Stage 6b (part 1): V2000 MolBlock reader + stereo from coordinates identical to
   RDKit (`molblock` differential), then the V3000 CTAB. Ratchet 56 -> 58. Next: SDMolSupplier,
   MolToMolBlock, SGroups.
+* 2026-10-08 — Stage 6c: SDMolSupplier identical to RDKit (`sdf` differential). Ratchet 58 -> 60.
+  Next: MolToMolBlock/SDWriter, then SGroups.
 
 ## Differential testing
 

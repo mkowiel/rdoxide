@@ -36,8 +36,27 @@ pub fn as_uint(v: &RDValue) -> Option<u32> {
     })
 }
 
+/// `boost::lexical_cast<double>`: like Rust's parser, but an overflowing
+/// exponent is a failure rather than infinity.
+pub fn lexical_double(t: &str) -> Option<f64> {
+    let d = t.parse::<f64>().ok()?;
+    if d.is_infinite() {
+        let u = t.trim_start_matches(['+', '-']).to_ascii_lowercase();
+        if !u.starts_with("inf") {
+            return None;
+        }
+    }
+    Some(d)
+}
+
 pub fn as_double(v: &RDValue) -> Option<f64> {
-    lexical(v, RDValue::as_double)
+    if let Some(x) = v.as_double() {
+        return Some(x);
+    }
+    match v {
+        RDValue::String(s) => lexical_double(s.trim_end()),
+        _ => None,
+    }
 }
 
 pub fn as_bool(v: &RDValue) -> Option<bool> {
@@ -108,7 +127,7 @@ pub fn rdvalue_to_py(
                 if let Ok(i) = t.parse::<i32>() {
                     return Ok(i.into_pyobject(py)?.into_any().unbind());
                 }
-                if let Ok(d) = t.parse::<f64>() {
+                if let Some(d) = lexical_double(t) {
                     return Ok(d.into_pyobject(py)?.into_any().unbind());
                 }
             }
