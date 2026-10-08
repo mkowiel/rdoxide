@@ -548,6 +548,46 @@ def molsurf_record(smi):
     }
 
 
+def gasteiger_record(smi):
+    """Gasteiger charges (rdPartialCharges) with several iteration counts, and PEOE_VSA_."""
+    from rdkit.Chem import rdMolDescriptors as D
+    from rdkit.Chem import rdPartialCharges as P
+    m = Chem.MolFromSmiles(smi)
+    if m is None:
+        return None
+
+    def attempt(fn):
+        try:
+            return fn()
+        except Exception as e:  # noqa: BLE001
+            return type(e).__name__
+
+    def charges(mol, *args, **kwargs):
+        P.ComputeGasteigerCharges(mol, *args, **kwargs)
+        return [[a.GetProp("_GasteigerCharge"), a.GetProp("_GasteigerHCharge"),
+                 a.GetDoubleProp("_GasteigerCharge"), a.GetDoubleProp("_GasteigerHCharge")]
+                for a in mol.GetAtoms()]
+
+    def charged(mol):
+        mm = Chem.RWMol(mol)
+        if mm.GetNumAtoms():
+            mm.GetAtomWithIdx(0).SetFormalCharge(mm.GetAtomWithIdx(0).GetFormalCharge() + 1)
+            mm.UpdatePropertyCache(strict=False)
+        return mm
+
+    return {
+        "default": attempt(lambda: charges(Chem.Mol(m))),
+        "iter0": attempt(lambda: charges(Chem.Mol(m), 0)),
+        "iter3": attempt(lambda: charges(Chem.Mol(m), 3)),
+        "iter30": attempt(lambda: charges(Chem.Mol(m), nIter=30)),
+        "throw": attempt(lambda: charges(Chem.Mol(m), 12, True)),
+        "withHs": attempt(lambda: charges(Chem.AddHs(m))),
+        "charged": attempt(lambda: charges(charged(m))),
+        "peoeVsa": attempt(lambda: D.PEOE_VSA_(Chem.Mol(m))),
+        "peoeVsaBins": attempt(lambda: D.PEOE_VSA_(Chem.Mol(m), [-0.1, 0.1])),
+    }
+
+
 def lipinski_record(smi):
     """rdMolDescriptors counts (Lipinski.cpp), with the rotatable-bond modes and the atom lists."""
     from rdkit.Chem import rdMolDescriptors as D
@@ -597,6 +637,8 @@ def dump(mode, smi):
         return molprops_record(smi)
     if mode == "molsurf":
         return molsurf_record(smi)
+    if mode == "gasteiger":
+        return gasteiger_record(smi)
     if mode == "crippen":
         return crippen_record(smi)
     if mode == "addhs":

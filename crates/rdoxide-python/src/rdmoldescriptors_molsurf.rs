@@ -127,6 +127,22 @@ fn smr_vsa<'py>(
     )
 }
 
+/// `PEOE_VSA_(mol, bins=[], force=False)`
+#[pyfunction]
+#[pyo3(name = "PEOE_VSA_", signature = (mol, bins = None, force = None))]
+fn peoe_vsa<'py>(
+    py: Python<'py>,
+    mol: &Bound<'py, PyMol>,
+    bins: Option<&Bound<'py, PyAny>>,
+    force: Option<&Bound<'py, PyAny>>,
+) -> PyResult<Bound<'py, PyList>> {
+    let (bins, force) = (optional_bins(bins)?, bool_arg(force, false)?);
+    to_list(
+        py,
+        surf::calc_peoe_vsa(&mut mol.borrow_mut().mol, bins.as_deref(), force).py()?,
+    )
+}
+
 /// `CustomProp_VSA_(mol, customPropName, bins, force=False)`
 #[pyfunction]
 #[pyo3(name = "CustomProp_VSA_", signature = (mol, customPropName, bins, force = None))]
@@ -152,6 +168,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(calc_tpsa_contribs, m)?)?;
     m.add_function(wrap_pyfunction!(slogp_vsa, m)?)?;
     m.add_function(wrap_pyfunction!(smr_vsa, m)?)?;
+    m.add_function(wrap_pyfunction!(peoe_vsa, m)?)?;
     m.add_function(wrap_pyfunction!(custom_prop_vsa, m)?)?;
     m.add("_CalcLabuteASA_version", LABUTE_ASA_VERSION)?;
     m.add("_CalcTPSA_version", TPSA_VERSION)?;

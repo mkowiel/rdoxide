@@ -106,3 +106,7 @@ to = "python/rdkit/Chem/Crippen.py"
 [[copy]]
 from = "rdkit/Chem/Lipinski.py"
 to = "python/rdkit/Chem/Lipinski.py"
+
+[[copy]]
+from = "rdkit/Chem/MolSurf.py"
+to = "python/rdkit/Chem/MolSurf.py"

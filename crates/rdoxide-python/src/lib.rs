@@ -39,6 +39,7 @@ mod rdmolops;
 mod rdmolops_fingerprints;
 mod rdmolops_hs;
 mod rdmolops_subgraphs;
+mod rdpartialcharges;
 mod ringinfo;
 mod stereo_group;
 mod substruct;
@@ -86,6 +87,12 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
         "rdFingerprintGenerator",
         "rdkit.Chem.rdFingerprintGenerator",
         rdfingerprintgenerator::init,
+    )?;
+    add_submodule(
+        m,
+        "rdPartialCharges",
+        "rdkit.Chem.rdPartialCharges",
+        rdpartialcharges::init,
     )?;
     add_submodule(
         m,
