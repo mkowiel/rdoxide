@@ -335,8 +335,14 @@ impl PyAtom {
     }
 
     #[pyo3(name = "GetQueryType")]
-    fn get_query_type(&self) -> &'static str {
-        ""
+    fn get_query_type(&self, py: Python<'_>) -> PyResult<String> {
+        self.with(py, |a| a.query_type().to_string())
+    }
+
+    /// returns a text description of the query. Primarily intended for debugging purposes.
+    #[pyo3(name = "DescribeQuery")]
+    fn describe_query(&self, py: Python<'_>) -> PyResult<String> {
+        self.with(py, |a| a.query().map_or(String::new(), |q| q.describe(0)))
     }
 
     #[pyo3(name = "SetChiralTag")]

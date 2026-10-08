@@ -427,3 +427,46 @@ pub fn set_double_bond_neighbor_directions(mol: &mut ROMol, conf: Option<usize>)
     }
     Ok(())
 }
+
+/// `Chirality::getNeighboringDirectedBond`
+fn neighboring_directed_bond(mol: &ROMol, atom: u32) -> Option<u32> {
+    mol.atom_bond_indices(atom).find(|&b| {
+        let bd = mol.bond(b);
+        bd.bond_type() != BondType::Double && is_dir(bd.bond_dir())
+    })
+}
+
+/// `MolOps::setBondStereoFromDirections`
+pub fn set_bond_stereo_from_directions(mol: &mut ROMol) -> Result<()> {
+    mol.clear_prop("_needsDetectBondStereo");
+    for bi in 0..mol.num_bonds() {
+        let b = mol.bond(bi);
+        if b.bond_type() != BondType::Double || b.stereo() == BondStereo::StereoAny {
+            continue;
+        }
+        let (beg, end) = (b.begin_atom_idx(), b.end_atom_idx());
+        let (Some(at_begin), Some(at_end)) = (
+            neighboring_directed_bond(mol, beg),
+            neighboring_directed_bond(mol, end),
+        ) else {
+            continue;
+        };
+        let begin_side_atom = mol.bond(at_begin).other_atom_idx(beg)?;
+        let end_side_atom = mol.bond(at_end).other_atom_idx(end)?;
+        let mut begin_dir = mol.bond(at_begin).bond_dir();
+        if mol.bond(at_begin).begin_atom_idx() == beg {
+            begin_dir = opposite(begin_dir);
+        }
+        let mut end_dir = mol.bond(at_end).bond_dir();
+        if mol.bond(at_end).end_atom_idx() == end {
+            end_dir = opposite(end_dir);
+        }
+        mol.set_bond_stereo_atoms(bi, begin_side_atom, end_side_atom)?;
+        mol.bond_mut(bi).set_stereo(if begin_dir == end_dir {
+            BondStereo::StereoTrans
+        } else {
+            BondStereo::StereoCis
+        })?;
+    }
+    Ok(())
+}

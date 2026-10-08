@@ -24,7 +24,9 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 4 | SMILES parser (lexer + grammar + SmilesParseOps, non-tetrahedral stereo) | ✅ | differential: 10312/10312 identical to RDKit (sanitize=False) |
 | 4 | `MolFromSmiles` sanitize/removeHs/stereo path (defaults) | ✅ | differential `molfromsmiles` identical |
 | 4 | SMILES writer + canonical SMILES (Canon.cpp DFS, SmilesWrite.cpp, getMolFrags/copyMolSubset): `MolToSmiles` (both overloads), `MolFragmentToSmiles`, `MolToRandomSmilesVect`, `SmilesWriteParams` | ✅ | differential `smiles` (canonical, output order, non-canonical, kekule, non-isomeric, explicit, rooted, random, fragment, roundtrip) 10312 + 35973 identical |
-| 4 | CXSMILES (read/write), SMARTS, query atoms/bonds (`~`) | ⬜ | |
+| 4 | Query model (Query/*, QueryOps, QueryAtom/QueryBond expandQuery, null-query algebra), SMARTS parser (`MolFromSmarts`, `AtomFromSmarts`, `BondFromSmarts`, `SmartsParserParams`), `DescribeQuery` | ✅ | differential `smarts` (atoms, bonds, query descriptions) 1275 library SMARTS + 151 edge cases identical |
+| 4 | SMARTS writer (`MolToSmarts`, `GetSmarts`), `mergeQueryHs`, Python `QueryAtom`/`QueryBond` classes, `rdqueries` | ⬜ | `mergeHs=True` currently returns None |
+| 4 | CXSMILES (read/write) | ⬜ | |
 | 5–13 | see PLAN.md | ⬜ | |
 
 ## Python package files
@@ -47,6 +49,8 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
   canonicalizeFragment, MolToSmiles/MolFragmentToSmiles) → rough_test.py imports.
 * 2026-10-08 — Stage 4b: SMILES writer identical to RDKit. Next: SMARTS + query atoms/bonds
   (needed by rough_test.py imports and substructure search), then CXSMILES.
+* 2026-10-08 — Stage 4c (part 1): query model + SMARTS parser identical to RDKit. Next: SMARTS
+  writer, mergeQueryHs, then substructure matching (stage 5).
 
 ## Differential testing
 
@@ -59,7 +63,8 @@ selected with `--ref-python` or `RDOXIDE_REF_PYTHON`. (PyPI only has
 2026.03.x, which predates the RDL-based SSSR, so it is not a valid oracle for
 ring order.)
 
-Current results: `parse`, `rings`, `sanitize`, `ranks`, `molfromsmiles`, `smiles`: 10312/10312 each.
+Current results: `parse`, `rings`, `sanitize`, `ranks`, `molfromsmiles`, `smiles`: 10312/10312 each;
+`smarts`: 1275/1275 (RDKit's SMARTS libraries) + `tests/data/smarts_edge_cases.smarts`.
 `molfromsmiles` (atoms, bonds, stereo props `_CIPCode`/`_CIPRank`/`_ringStereoAtoms`/
 `_ChiralityPossible`) also matches on 35140 molecules from the stereo-rich upstream
 corpora (zinc, ChEMBL, idorsia enumeration, MMFF) and on `tests/data/stereo_edge_cases.smi`.

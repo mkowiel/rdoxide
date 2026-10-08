@@ -13,6 +13,7 @@ pub mod kekulize;
 pub mod mol_ops;
 pub mod new_canon;
 pub mod periodic_table;
+pub mod queries;
 pub mod query_ops;
 pub mod ring_info;
 pub mod romol;

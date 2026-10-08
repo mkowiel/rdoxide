@@ -146,6 +146,8 @@ pub struct Atom {
     /// whether the atom belongs to a molecule (`dp_mol != nullptr`)
     pub(crate) has_owner: bool,
     pub(crate) props: Dict,
+    /// `QueryAtom::dp_query` (a `QueryAtom` is an atom with a query)
+    pub(crate) query: Option<Box<crate::graphmol::queries::AtomQuery>>,
 }
 
 impl Default for Atom {
@@ -182,6 +184,7 @@ impl Atom {
             flags: 0,
             has_owner: false,
             props: Dict::new(),
+            query: None,
         }
     }
 
@@ -269,7 +272,19 @@ impl Atom {
         self.has_owner
     }
     pub fn has_query(&self) -> bool {
-        false
+        self.query.is_some()
+    }
+    /// `getQuery()`
+    pub fn query(&self) -> Option<&crate::graphmol::queries::AtomQuery> {
+        self.query.as_deref()
+    }
+    /// `setQuery()`
+    pub fn set_query(&mut self, q: Option<crate::graphmol::queries::AtomQuery>) {
+        self.query = q.map(Box::new);
+    }
+    /// `getQueryType()` (the type label of the query)
+    pub fn query_type(&self) -> &str {
+        self.query.as_deref().map_or("", |q| q.type_label.as_str())
     }
 
     /// `getSymbol()`: dummy atoms may carry a `dummyLabel`.
