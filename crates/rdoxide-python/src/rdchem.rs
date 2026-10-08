@@ -268,6 +268,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
         "Module containing the core chemistry functionality of the RDKit",
     )?;
     m.add_class::<PyPeriodicTable>()?;
+    crate::substruct::init(m)?;
     m.add_function(wrap_pyfunction!(get_periodic_table, m)?)?;
 
     use crate::enums::add_enum;

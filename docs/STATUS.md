@@ -28,7 +28,9 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 4 | SMARTS writer: `MolToSmarts` (both overloads), `MolFragmentToSmarts`, `Atom/Bond.GetSmarts` | ✅ | differential `smarts` (+ writer: default, non-isomeric, rooted, fragment, per-atom/bond, roundtrip) 1426/1426; `smiles` mode also checks `MolToSmarts` of plain molecules |
 | 4 | `mergeQueryHs`, Python `QueryAtom`/`QueryBond` classes, `rdqueries` | ⬜ | `mergeHs=True` currently returns None |
 | 4 | CXSMILES (read/write) | ⬜ | |
-| 5–13 | see PLAN.md | ⬜ | |
+| 5 | Substructure matching: VF2, `SubstructMatch`/`SubstructMatchCount`, recursive queries, chirality + double-bond stereo, enhanced stereo, query-query matches, aromaticMatchesConjugated/SingleOrDouble, atom/bond properties; `Mol.HasSubstructMatch/GetSubstructMatch/GetSubstructMatches` (both overloads), `SubstructMatchParameters` | ✅ | differential `substruct` (55 queries x 4 variants per molecule + chirality self/mirror) 10312 + 2418 identical |
+| 5 | `extraFinalCheck`/`extraAtomCheck`/`extraBondCheck` callbacks, generic matchers, MolBundle, ResonanceMolSupplier | ⬜ | |
+| 6–13 | see PLAN.md | ⬜ | |
 
 ## Python package files
 
@@ -54,6 +56,9 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 * 2026-10-08 — Stage 4c (part 2): SMARTS writer identical to RDKit. Next: substructure matching
   (stage 5: vf2, SubstructMatch, HasSubstructMatch/GetSubstructMatch(es), recursive queries),
   then mergeQueryHs + QueryAtom classes.
+* 2026-10-08 — Stage 5 (core): substructure matching identical to RDKit (match order included).
+  Next: what rough_test.py needs to import (Chem/__init__ pieces), then MolPickler and file
+  formats (stage 6).
 
 ## Differential testing
 
@@ -67,7 +72,8 @@ selected with `--ref-python` or `RDOXIDE_REF_PYTHON`. (PyPI only has
 ring order.)
 
 Current results: `parse`, `rings`, `sanitize`, `ranks`, `molfromsmiles`, `smiles`: 10312/10312 each;
-`smarts`: 1275/1275 (RDKit's SMARTS libraries) + `tests/data/smarts_edge_cases.smarts`.
+`smarts`: 1426/1426 (RDKit's SMARTS libraries + `tests/data/smarts_edge_cases.smarts`);
+`substruct`: 10312/10312 + 2418/2418 stereo-rich (queries in `tests/data/substruct_queries.smarts`).
 `molfromsmiles` (atoms, bonds, stereo props `_CIPCode`/`_CIPRank`/`_ringStereoAtoms`/
 `_ChiralityPossible`) also matches on 35140 molecules from the stereo-rich upstream
 corpora (zinc, ChEMBL, idorsia enumeration, MMFF) and on `tests/data/stereo_edge_cases.smi`.

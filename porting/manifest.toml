@@ -230,3 +230,14 @@
 [module."rdoxide::graphmol::smiles_parse::smarts_write".sources]
 "Code/GraphMol/SmilesParse/SmartsWrite.h" = "060abe2a9fb0a34b9260d608c777670db60d629e"
 "Code/GraphMol/SmilesParse/SmartsWrite.cpp" = "44c4c747bb6c8e1e9fc9e3d9caf22aef1bf34264"
+
+[module."rdoxide::graphmol::substruct".sources]
+"Code/GraphMol/Substruct/vf2.hpp" = "03aebed47b9c79c598e963450aa6dbb44d111538"
+"Code/GraphMol/Substruct/SubstructMatch.h" = "2a9e5be635bb2f34c25aa11990f874fe18c091b0"
+"Code/GraphMol/Substruct/SubstructMatch.cpp" = "3da4d71491736b8d670c823224a6473b7fd605cc"
+"Code/GraphMol/Substruct/SubstructUtils.cpp" = "7766d6ea469775fa6dd84aed34e6d877f085e397"
+"Code/GraphMol/Substruct/SubstructDetails.h" = "32d110771874efe026e167aa9c4fefdff061fef3"
+
+[module."rdoxide_python::substruct".sources]
+"Code/GraphMol/Wrap/Mol.cpp" = "8c57aa57c2e1af86142c97971f50947f8974a678"
+"Code/GraphMol/Wrap/substructmethods.h" = "3e103d11aff40d13eff013b8c705eb95abee1fba"
