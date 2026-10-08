@@ -268,3 +268,13 @@
 
 [module."rdoxide::graphmol::file_parsers::mol_file_v3000".sources]
 "Code/GraphMol/FileParsers/MolFileParser.cpp" = "57b330dcf973d1516ae2fbd1f0ef5f4d0d3b1840"
+
+[module."rdoxide::graphmol::file_parsers::sd_mol_supplier".sources]
+"Code/GraphMol/FileParsers/ForwardSDMolSupplier.cpp" = "164fcbdde57a6e18228aedac866314bcc2d5bb5a"
+"Code/GraphMol/FileParsers/SDMolSupplier.cpp" = "09c9d8fde9ad6305805707cffccb0cd8b7e809a4"
+"Code/GraphMol/FileParsers/MolSupplier.h" = "04206aa3d7994e418959c9426c6135501c5f5e70"
+"Code/GraphMol/FileParsers/FileParserUtils.h" = "d90299415251376de0854f1132d9517ea892724a"
+
+[module."rdoxide_python::rdmolfiles_sdsupplier".sources]
+"Code/GraphMol/Wrap/SDMolSupplier.cpp" = "abdf72f9df41592ca9b4945f26f228482f6c8233"
+"Code/GraphMol/Wrap/MolSupplier.h" = "a931d5f55aafe8de95c48c9e44fffd2ba0e88d15"

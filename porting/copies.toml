@@ -54,3 +54,15 @@ to = "tests/data/molfiles/issue123.mol"
 [[copy]]
 from = "Code/GraphMol/FileParsers/test_data/AtomQuery1.mol"
 to = "tests/data/molfiles/AtomQuery1.mol"
+
+[[copy]]
+from = "Code/GraphMol/FileParsers/test_data/esters.prop_name_trunc.sdf"
+to = "tests/data/molfiles/esters.prop_name_trunc.sdf"
+
+[[copy]]
+from = "Code/GraphMol/FileParsers/test_data/BlankPropLines.sdf"
+to = "tests/data/molfiles/BlankPropLines.sdf"
+
+[[copy]]
+from = "Data/NCI/first_200.props.sdf"
+to = "tests/data/molfiles/first_200.props.sdf"

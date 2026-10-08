@@ -41,6 +41,30 @@ impl<'a> LineStream<'a> {
     pub fn data(&self) -> &'a [u8] {
         self.data
     }
+    /// A stream over `data` with a saved `(pos, eof, fail)` state.
+    pub fn with_state(data: &'a [u8], state: (usize, bool, bool)) -> Self {
+        LineStream {
+            data,
+            pos: state.0,
+            eof: state.1,
+            fail: state.2,
+        }
+    }
+    /// `(pos, eof, fail)`
+    pub fn state(&self) -> (usize, bool, bool) {
+        (self.pos, self.eof, self.fail)
+    }
+    /// `tellg()`: `None` (upstream -1) once the stream has failed.
+    pub fn tellg(&self) -> Option<usize> {
+        if self.fail { None } else { Some(self.pos) }
+    }
+    /// `seekg(pos)` without `clear()`: clears eof, fails on a failed stream.
+    pub fn seekg(&mut self, pos: usize) {
+        if !self.fail {
+            self.pos = pos.min(self.data.len());
+            self.eof = false;
+        }
+    }
     /// Reposition (`seekg` + `clear()`).
     pub fn seek(&mut self, pos: usize) {
         self.pos = pos.min(self.data.len());
@@ -51,6 +75,15 @@ impl<'a> LineStream<'a> {
     /// `getLine(std::istream*)`: `std::getline` plus removal of one
     /// trailing `'\r'`.
     pub fn get_line(&mut self) -> Vec<u8> {
+        let mut line = self.getline_raw();
+        if line.last() == Some(&b'\r') {
+            line.pop();
+        }
+        line
+    }
+
+    /// `std::getline` (the line keeps a trailing `'\r'`).
+    pub fn getline_raw(&mut self) -> Vec<u8> {
         if self.fail || self.eof {
             self.fail = true;
             return Vec::new();
@@ -61,7 +94,7 @@ impl<'a> LineStream<'a> {
             return Vec::new();
         }
         let rest = &self.data[self.pos..];
-        let mut line = match rest.iter().position(|&c| c == b'\n') {
+        match rest.iter().position(|&c| c == b'\n') {
             Some(nl) => {
                 self.pos += nl + 1;
                 rest[..nl].to_vec()
@@ -71,11 +104,7 @@ impl<'a> LineStream<'a> {
                 self.eof = true;
                 rest.to_vec()
             }
-        };
-        if line.last() == Some(&b'\r') {
-            line.pop();
         }
-        line
     }
 }
 

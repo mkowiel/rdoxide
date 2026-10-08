@@ -32,7 +32,7 @@ def run(python, mode, path):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("mode", choices=["parse", "rings", "sanitize", "ranks", "molfromsmiles", "smiles", "smarts", "substruct", "pickle", "picklesmarts", "molblock"])
+    ap.add_argument("mode", choices=["parse", "rings", "sanitize", "ranks", "molfromsmiles", "smiles", "smarts", "substruct", "pickle", "picklesmarts", "molblock", "sdf"])
     ap.add_argument("files", nargs="*")
     ap.add_argument("--limit", type=int, default=20, help="number of differences to print")
     ap.add_argument("--ref-python", default=os.environ.get("RDOXIDE_REF_PYTHON", str(ROOT / ".venv-ref/bin/python")),
@@ -44,13 +44,19 @@ def main():
     for f in files:
         ref = run(args.ref_python, args.mode, f)
         test = run(args.test_python, args.mode, f)
-        for (smi, r), (smi2, t) in zip(ref, test):
-            assert smi == smi2
+        if len(ref) != len(test):
             total += 1
+            ndiff += 1
+            print(f"DIFF {f}: {len(ref)} records vs {len(test)}")
+            continue
+        for (smi, r), (smi2, t) in zip(ref, test):
+            total += 1
+            if smi != smi2:
+                r, t = [smi, r], [smi2, t]
             if r != t:
                 ndiff += 1
                 if ndiff <= args.limit:
-                    print(f"DIFF {smi}\n  ref:  {json.dumps(r)[:400]}\n  test: {json.dumps(t)[:400]}")
+                    print(f"DIFF {f.name if args.mode == 'sdf' else ''} {smi}\n  ref:  {json.dumps(r)[:400]}\n  test: {json.dumps(t)[:400]}")
     print(f"{args.mode}: {total - ndiff}/{total} identical")
     return 1 if ndiff else 0
 
