@@ -20,6 +20,7 @@ mod perception;
 mod props;
 mod rdbase;
 mod rdchem;
+mod rddepictor;
 mod rdmolfiles;
 mod rdmolfiles_molblock;
 mod rdmolfiles_molwrite;
@@ -62,5 +63,6 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
     add_submodule(m, "rdchem", "rdkit.Chem.rdchem", rdchem::init)?;
     add_submodule(m, "rdmolfiles", "rdkit.Chem.rdmolfiles", rdmolfiles::init)?;
     add_submodule(m, "rdmolops", "rdkit.Chem.rdmolops", rdmolops::init)?;
+    add_submodule(m, "rdDepictor", "rdkit.Chem.rdDepictor", rddepictor::init)?;
     Ok(())
 }

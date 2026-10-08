@@ -55,6 +55,7 @@ fn without_coordinates() {
     };
     let out = mol_to_mol_block(&mol, &p, -1).unwrap();
     assert!(out.starts_with("\n     RDKit          \n\n  7  7  0  0"));
-    // 2D coordinate generation is not ported yet
-    assert!(mol_to_mol_block(&mol, &MolWriterParams::default(), -1).is_err());
+    // with stereo, 2D coordinates are generated first
+    let out = mol_to_mol_block(&mol, &MolWriterParams::default(), -1).unwrap();
+    assert!(out.starts_with("\n     RDKit          2D\n\n  7  7  0  0"));
 }

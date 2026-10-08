@@ -37,7 +37,8 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 6 | SDMolSupplier (lazy + random access, `$$$$` indexing, data fields, atom/bond property lists, error recovery; Python iteration/indexing/len/SetData/GetItemText/context manager) | ✅ | differential `sdf` (4 parse variants + len/getitem/GetItemText/SetData) on all 389 upstream SD files: identical except 43 files that need SGroups |
 | 6 | MolBlock writer: `MolToMolBlock` (both overloads), `MolToV3KMolBlock`, `MolToV2KMolBlock`, `MolToMolFile`, `MolToV3KMolFile`, `MolWriterParams`; wedging (`pickBondsToWedge`, libc++ `std::sort` tie order), crossed double bonds, parity, query atoms/bonds, atom lists, R groups, enhanced stereo collections | ✅ | differential `molwrite` (5 writer variants x 3 reader variants + roundtrip): 2D 4991/4991, V3000 1876/1876, 3D 490/490, upstream test_data 327/364 (rest need SGroups) |
 | 6 | SGroups (V2000/V3000; also needed for M ZBO/ZCH/HYD/MRV and for writing SMARTS-query / generic-group / zero-order-bond molecules), M APO/LIN, ATTCHORD templates, atropisomer wedging, ForwardSDMolSupplier, SDWriter | ⬜ | reader returns None, writer raises RuntimeError for now |
-| 7 | 2D coordinates (RDDepict::compute2DCoords): needed by `MolToMolBlock` of molecules without conformers | ⬜ | `MolToMolBlock(mol)` without coordinates raises RuntimeError unless `includeStereo=False` |
+| 7 | 2D coordinates: RDDepict::compute2DCoords (EmbeddedFrag, DepictUtils, fused rings, cis/trans and non-tetrahedral fragments, collision removal: bond/spiro flips, open angles, shorten bonds, path angle expansion, canonical orientation, coordMap, bondLength); `rdDepictor.Compute2DCoords`; `MolToMolBlock` of molecules without conformers | ✅ | differential `depict` (canonOrient on/off coordinates to 6 decimals + MolBlock): NCI 4999/4999, canonSmiles.long + stereo/pickle edge cases 5400/5400 identical to the arm64 build |
+| 7 | Ring-system templates, random flip sampling (nSample/nFlipsPerSample), Compute2DCoordsMimicDistmat, generateDepictionMatching2D/3DStructure, straighten/normalizeDepiction, CoordGen | ⬜ | raise RuntimeError |
 | 7–13 | see PLAN.md | ⬜ | |
 
 ## Python package files
@@ -104,6 +105,11 @@ corpora (zinc, ChEMBL, idorsia enumeration, MMFF) and on `tests/data/stereo_edge
 New Python test files are also run against the official wheel to validate expectations.
 
 ## Known deviations (to revisit)
+
+* Floating-point results follow the native RDKit build of the platform: on aarch64 rdoxide fuses
+  multiply-adds exactly where clang does (`rdgeneral::fp::fmuladd`), on x86-64 it does not. The
+  official arm64 and x86-64 builds themselves differ in the last bits of 2D coordinates (and so in
+  a few depictions); the `depict` differential uses the arm64 build.
 
 * Where RDKit uses the unstable `std::sort` (e.g. picking wedge bonds), rdoxide reproduces
   libc++'s element order (the macOS/conda-forge reference). RDKit builds that use libstdc++
