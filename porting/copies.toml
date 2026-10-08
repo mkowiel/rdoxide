@@ -70,3 +70,27 @@ to = "tests/data/molfiles/first_200.props.sdf"
 [[copy]]
 from = "Code/GraphMol/SmilesParse/test_data/BMS-986142_atrop1.cxsmi.expected.sdf"
 to = "tests/data/molfiles/atrop_BMS-986142.sdf"
+
+[[copy]]
+from = "rdkit/DataStructs/__init__.py"
+to = "python/rdkit/DataStructs/__init__.py"
+
+[[copy]]
+from = "rdkit/DataStructs/TopNContainer.py"
+to = "python/rdkit/DataStructs/TopNContainer.py"
+
+[[copy]]
+from = "rdkit/DataStructs/BitUtils.py"
+to = "python/rdkit/DataStructs/BitUtils.py"
+
+[[copy]]
+from = "rdkit/DataStructs/VectCollection.py"
+to = "python/rdkit/DataStructs/VectCollection.py"
+
+[[copy]]
+from = "rdkit/DataStructs/LazySignature.py"
+to = "python/rdkit/DataStructs/LazySignature.py"
+
+[[copy]]
+from = "rdkit/DataStructs/BitEnsemble.py"
+to = "python/rdkit/DataStructs/BitEnsemble.py"
