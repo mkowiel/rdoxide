@@ -174,9 +174,6 @@
 [module."rdoxide::graphmol::chirality::bond_dirs".sources]
 "Code/GraphMol/Chirality.cpp" = "4ae1eb5d92ea880ef07395a25b33c647ec87b09b"
 
-[module."rdoxide::graphmol::query_ops".sources]
-"Code/GraphMol/QueryOps.cpp" = "1f093329f2fa6643fa16a706b3ca97ad48cbfe2e"
-
 [module."rdoxide::graphmol::mol_ops::add_hs".sources]
 "Code/GraphMol/AddHs.cpp" = "ac653bc04e5c317b9803d986fcdef668fb17759e"
 "Code/GraphMol/MolOps.h" = "c5a0698d6bf73d26329ac02a32ac4b694ca2d10f"
@@ -246,3 +243,25 @@
 "Code/GraphMol/MolPickler.h" = "cde12436c1c300c02c32da14f884643fa0ece630"
 "Code/GraphMol/MolPickler.cpp" = "fe6ad6bbbaaf36c48457e269458323ea63db4b8d"
 "Code/RDGeneral/StreamOps.h" = "e4ea5443f1eef66d03fb2deb8f2d82f79aa017bf"
+
+[module."rdoxide::graphmol::file_parsers::mol_file_parser".sources]
+"Code/GraphMol/FileParsers/MolFileParser.cpp" = "57b330dcf973d1516ae2fbd1f0ef5f4d0d3b1840"
+"Code/GraphMol/FileParsers/FileParserUtils.h" = "d90299415251376de0854f1132d9517ea892724a"
+
+[module."rdoxide::graphmol::file_parsers::utils".sources]
+"Code/GraphMol/FileParsers/MolFileParser.cpp" = "57b330dcf973d1516ae2fbd1f0ef5f4d0d3b1840"
+"Code/RDGeneral/StreamOps.h" = "e4ea5443f1eef66d03fb2deb8f2d82f79aa017bf"
+
+[module."rdoxide::graphmol::atropisomers".sources]
+"Code/GraphMol/Atropisomers.cpp" = "31a89e53044311a590576f635cb7e814d5a940cc"
+
+[module."rdoxide::graphmol::chirality::from_coords".sources]
+"Code/GraphMol/Chirality.cpp" = "4ae1eb5d92ea880ef07395a25b33c647ec87b09b"
+
+[module."rdoxide::graphmol::query_ops".sources]
+"Code/GraphMol/QueryOps.cpp" = "1f093329f2fa6643fa16a706b3ca97ad48cbfe2e"
+"Code/GraphMol/QueryAtom.h" = "695b562fd1b46417345eeef45509496780b2407d"
+"Code/GraphMol/QueryBond.h" = "1265f25b5e4fb05e41ac0c80b908ab604cb98eaa"
+
+[module."rdoxide_python::rdmolfiles_molblock".sources]
+"Code/GraphMol/Wrap/rdmolfiles.cpp" = "829058d8e8a382c358d2464cee762f8cff04f75f"

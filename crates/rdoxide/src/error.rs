@@ -17,6 +17,11 @@ pub enum RDKitError {
     /// `std::runtime_error` and friends (e.g. `MolPicklerException`) ->
     /// `RuntimeError` with the plain message.
     Runtime(String),
+    /// `FileParseException` -> `RuntimeError` (most Python readers catch it
+    /// and return `None`).
+    FileParse(String),
+    /// `BadFileException` -> `OSError`
+    BadFile(String),
     /// Sanitization failures (`MolSanitizeException` hierarchy).
     Sanitize(SanitizeError),
 }
@@ -84,7 +89,9 @@ impl fmt::Display for RDKitError {
             RDKitError::Value(m)
             | RDKitError::Key(m)
             | RDKitError::Index(m)
-            | RDKitError::Runtime(m) => f.write_str(m),
+            | RDKitError::Runtime(m)
+            | RDKitError::FileParse(m)
+            | RDKitError::BadFile(m) => f.write_str(m),
             RDKitError::Sanitize(e) => match e {
                 SanitizeError::Generic { message }
                 | SanitizeError::AtomValence { message, .. }

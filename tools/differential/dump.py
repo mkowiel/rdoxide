@@ -34,7 +34,31 @@ def bond_record(b):
             int(b.GetStereo()), list(b.GetStereoAtoms()), b.GetIsAromatic()]
 
 
+def molblock_record(blk, **kw):
+    m = Chem.MolFromMolBlock(blk, **kw)
+    if m is None:
+        return None
+    rec = {"smiles": Chem.MolToSmiles(m),
+           "atoms": [atom_record(a) + [private_props(a)] for a in m.GetAtoms()],
+           "bonds": [bond_record(b) + [private_props(b)] for b in m.GetBonds()],
+           "mol": private_props(m)}
+    try:
+        rec["pickle"] = m.ToBinary(Chem.PropertyPickleOptions.AllProps).hex()
+    except Exception as e:  # noqa: BLE001
+        rec["pickle"] = type(e).__name__
+    return rec
+
+
 def dump(mode, smi):
+    if mode == "molblock":
+        res = {}
+        for key, kw in (("default", {}), ("nosanitize", {"sanitize": False}),
+                        ("keepHs", {"removeHs": False}), ("lax", {"strictParsing": False})):
+            try:
+                res[key] = molblock_record(smi, **kw)
+            except Exception as e:  # noqa: BLE001
+                res[key] = {"exception": type(e).__name__}
+        return res
     if mode == "parse":
         p = Chem.SmilesParserParams()
         p.sanitize = False
@@ -245,6 +269,17 @@ def main():
         qpath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "tests", "data",
                              "substruct_queries.smarts")
         QUERIES.extend(l.split()[0] for l in open(qpath) if l.strip())
+    if mode == "molblock":
+        txt = open(path, encoding="utf-8").read()
+        for i, blk in enumerate(txt.split("$$$$\n")):
+            if not blk.strip():
+                continue
+            try:
+                res = dump(mode, blk)
+            except Exception as e:  # noqa: BLE001
+                res = {"exception": type(e).__name__}
+            print(json.dumps([f"#{i} {blk.splitlines()[0][:40] if blk else ''}", res], default=list))
+        return
     with open(path) as fh:
         for line in fh:
             QUERY_OFFSET = (QUERY_OFFSET + 7) % max(1, len(QUERIES) or 1)

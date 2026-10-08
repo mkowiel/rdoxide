@@ -155,7 +155,7 @@ impl<F: QueryTarget> Query<F> {
         }
     }
 
-    fn with(kind: QueryKind, val: i32, func: F, descr: &str) -> Self {
+    pub fn with(kind: QueryKind, val: i32, func: F, descr: &str) -> Self {
         let mut q = Query::new(kind);
         q.val = val;
         q.data_func = Some(func);

@@ -10,6 +10,9 @@ use std::collections::{BTreeSet, VecDeque};
 
 use super::nontetrahedral::has_non_tetrahedral_stereo;
 use crate::graphmol::atom::{ChiralType, HybridizationType, ValenceType};
+use crate::graphmol::atropisomers::{
+    cleanup_atropisomer_stereo_groups, detect_atropisomer_chirality,
+};
 use crate::graphmol::bond::{BondDir, BondStereo, BondType};
 use crate::graphmol::conjug_hybrid::atom_has_conjugated_bond;
 use crate::graphmol::find_rings::{SymmetrizeSSSRAlgorithm, fast_find_rings, symmetrize_sssr};
@@ -803,115 +806,14 @@ fn is_atrop(s: BondStereo) -> bool {
     matches!(s, BondStereo::StereoAtropCW | BondStereo::StereoAtropCCW)
 }
 
-/// `Atropisomers::detectAtropisomerChirality(mol, conf, replaceExistingTags)`
-///
-/// Only the candidate-selection part is ported so far; it returns early for
-/// every molecule without wedged bonds (i.e. everything SMILES can express).
-fn detect_atropisomer_chirality(mol: &mut ROMol, replace_existing_tags: bool) -> Result<()> {
-    let has_conf = mol.num_conformers() > 0;
-    let is_3d = has_conf && mol.conformers()[0].is_3d();
-    let mut bonds_to_try = BTreeSet::new();
-    if replace_existing_tags && is_3d {
-        for b in mol.bonds() {
-            if is_atrop(b.stereo()) {
-                bonds_to_try.insert(b.idx());
-            }
-        }
-    }
-    for b in mol.bonds() {
-        if can_have_direction(b.bond_type())
-            && matches!(b.bond_dir(), BondDir::BeginDash | BondDir::BeginWedge)
-        {
-            for nb in mol.atom_bond_indices(b.begin_atom_idx()) {
-                if nb == b.idx() {
-                    continue;
-                }
-                if !replace_existing_tags && is_atrop(mol.bond(nb).stereo()) {
-                    continue;
-                }
-                bonds_to_try.insert(nb);
-            }
-        }
-    }
-    if replace_existing_tags {
-        for &b in &bonds_to_try {
-            if is_atrop(mol.bond(b).stereo()) {
-                mol.bond_mut(b).set_stereo(BondStereo::StereoNone)?;
-            }
-        }
-    }
-    if bonds_to_try.is_empty() {
-        return Ok(());
-    }
-    let mut any = false;
-    for &b in &bonds_to_try {
-        let (bg, en) = (mol.bond(b).begin_atom_idx(), mol.bond(b).end_atom_idx());
-        for a in [bg, en] {
-            if mol.atom(a).needs_update_property_cache() {
-                mol.update_atom_property_cache(a, false)?;
-            }
-        }
-        let bond = mol.bond(b);
-        let (bd, ed) = (mol.total_degree(bg)?, mol.total_degree(en)?);
-        if bond.bond_type() == BondType::Single
-            && bond.stereo() != BondStereo::StereoAny
-            && (2..=3).contains(&bd)
-            && (2..=3).contains(&ed)
-        {
-            any = true;
-            break;
-        }
-    }
-    if !any {
-        return Ok(());
-    }
-    Err(RDKitError::invariant(
-        "atropisomer perception from wedged bonds is not ported yet",
-    ))
-}
-
-/// `canHaveDirection` (Atropisomers.cpp)
-fn can_have_direction(t: BondType) -> bool {
-    matches!(t, BondType::Single | BondType::Aromatic)
-}
-
-/// `Atropisomers::cleanupAtropisomerStereoGroups`
-fn cleanup_atropisomer_stereo_groups(mol: &mut ROMol) -> Result<()> {
-    let mut new = Vec::new();
-    for sg in mol.stereo_groups() {
-        let mut ok_atoms = Vec::new();
-        let mut ok_bonds: Vec<u32> = Vec::new();
-        for &a in sg.atoms() {
-            let mut found = false;
-            for b in mol.atom_bond_indices(a) {
-                if is_atrop(mol.bond(b).stereo()) {
-                    found = true;
-                    if !ok_bonds.contains(&b) {
-                        ok_bonds.push(b);
-                    }
-                }
-            }
-            if !found {
-                ok_atoms.push(a);
-            }
-        }
-        if ok_bonds.is_empty() {
-            new.push(sg.clone());
-        } else {
-            new.push(crate::graphmol::stereo_group::StereoGroup::new(
-                sg.group_type(),
-                ok_atoms,
-                ok_bonds,
-                0,
-            )?);
-        }
-    }
-    mol.set_stereo_groups(new)
-}
-
 /// `detectAtropisomersPostSanitization`
 fn detect_atropisomers_post_sanitization(mol: &mut ROMol, clean_it: bool) -> Result<()> {
-    detect_atropisomer_chirality(mol, clean_it)?;
+    let conf = if mol.num_conformers() > 0 {
+        Some(0)
+    } else {
+        None
+    };
+    detect_atropisomer_chirality(mol, conf, clean_it)?;
     if !clean_it || !mol.ring_info().is_sssr_or_better() {
         return Ok(());
     }

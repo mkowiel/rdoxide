@@ -2,12 +2,14 @@
 
 pub mod aromaticity;
 pub mod atom;
+pub mod atropisomers;
 pub mod bond;
 pub mod canon;
 pub mod chirality;
 pub mod conformer;
 pub mod conjug_hybrid;
 pub mod debug;
+pub mod file_parsers;
 pub mod find_rings;
 pub mod kekulize;
 pub mod mol_ops;
