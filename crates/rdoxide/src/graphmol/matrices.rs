@@ -88,3 +88,20 @@ pub fn get_shortest_path(mol: &ROMol, aid1: u32, aid2: u32) -> Result<Vec<u32>> 
     }
     Ok(res.into())
 }
+
+/// `get3DDistanceMat(mol, confId)` (no atom weights): row-major `n x n`
+/// matrix of Euclidean distances in conformer `conf_id`.
+pub fn get_3d_distance_mat(mol: &ROMol, conf_id: i32) -> Result<Vec<f64>> {
+    let conf = mol.conformer(conf_id)?;
+    let pos = conf.positions();
+    let n = mol.num_atoms() as usize;
+    let mut d = vec![0.0; n * n];
+    for i in 0..n {
+        for j in i + 1..n {
+            let dist = (pos[i] - pos[j]).length();
+            d[i * n + j] = dist;
+            d[j * n + i] = dist;
+        }
+    }
+    Ok(d)
+}

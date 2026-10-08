@@ -190,9 +190,46 @@ def morgan_record(smi):
     return res
 
 
+ATOMPAIR_CONFIGS = (
+    {}, {"countSimulation": False}, {"includeChirality": True}, {"minDistance": 2, "maxDistance": 5, "fpSize": 512},
+    {"atomInvariantsGenerator": "chiral"},
+)
+
+
+def atompair_record(smi):
+    """Atom-pair generator output (all fingerprint kinds + AdditionalOutput)."""
+    from rdkit.Chem import rdFingerprintGenerator as G
+    m = Chem.MolFromSmiles(smi)
+    if m is None:
+        return None
+    res = {}
+    for i, kw in enumerate(ATOMPAIR_CONFIGS):
+        kw = dict(kw)
+        if kw.get("atomInvariantsGenerator") == "chiral":
+            kw["atomInvariantsGenerator"] = G.GetAtomPairAtomInvGen(includeChirality=True)
+        g = G.GetAtomPairGenerator(**kw)
+        res[f"bits{i}"] = list(g.GetFingerprint(m).GetOnBits())
+        res[f"sparsecount{i}"] = sorted(g.GetSparseCountFingerprint(m).GetNonzeroElements().items())
+    g = G.GetAtomPairGenerator()
+    res["count"] = sorted(g.GetCountFingerprint(m).GetNonzeroElements().items())
+    res["sparse"] = list(g.GetSparseFingerprint(m).GetOnBits())
+    res["fromatoms"] = list(g.GetFingerprint(m, fromAtoms=[0], ignoreAtoms=[1]).GetOnBits())
+    ao = G.AdditionalOutput()
+    ao.AllocateBitInfoMap()
+    ao.AllocateAtomCounts()
+    ao.AllocateAtomToBits()
+    ao.AllocateAtomsPerBit()
+    G.GetAtomPairGenerator(countSimulation=False).GetSparseCountFingerprint(m, additionalOutput=ao)
+    res["ao"] = [sorted(ao.GetBitInfoMap().items()), ao.GetAtomCounts(), ao.GetAtomToBits(),
+                 sorted(ao.GetAtomsPerBit().items())]
+    return res
+
+
 def dump(mode, smi):
     if mode == "morgan":
         return morgan_record(smi)
+    if mode == "atompair":
+        return atompair_record(smi)
     if mode == "depict":
         from rdkit.Chem import rdDepictor
         m = Chem.MolFromSmiles(smi)
