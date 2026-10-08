@@ -68,3 +68,111 @@ pub fn query_is_atom_bridgehead(mol: &ROMol, atom: u32) -> bool {
     }
     true
 }
+
+// ------------------------------------------------------------------ query atoms/bonds
+
+use crate::Result;
+use crate::graphmol::atom::Atom;
+use crate::graphmol::bond::Bond;
+use crate::graphmol::queries::{
+    AtomQuery, BondQuery, CompositeQueryType, expand_query, make_atom_formal_charge_query,
+    make_atom_isotope_query, make_atom_mass_query, make_atom_num_query,
+    make_atom_num_radical_electrons_query, make_bond_order_equals_query,
+};
+use crate::rdgeneral::RDProps;
+use crate::rdgeneral::common_properties as cp;
+
+/// `QueryAtom::expandQuery(what, how, maintainOrder)` on an atom that
+/// already has a query.
+pub fn atom_expand_query(
+    atom: &mut Atom,
+    what: AtomQuery,
+    how: CompositeQueryType,
+    maintain_order: bool,
+) -> Result<()> {
+    let current = atom
+        .query
+        .take()
+        .ok_or_else(|| crate::RDKitError::precondition("atom has no query"))?;
+    let q = expand_query(*current, what, how, maintain_order, "Atom")?;
+    atom.set_query(Some(q));
+    Ok(())
+}
+
+/// `QueryBond::expandQuery(what, how, maintainOrder)`
+pub fn bond_expand_query(
+    bond: &mut Bond,
+    what: BondQuery,
+    how: CompositeQueryType,
+    maintain_order: bool,
+) -> Result<()> {
+    let current = bond
+        .query
+        .take()
+        .ok_or_else(|| crate::RDKitError::precondition("bond has no query"))?;
+    let q = expand_query(*current, what, how, maintain_order, "Bond")?;
+    bond.set_query(Some(q));
+    Ok(())
+}
+
+/// `QueryAtom(const Atom &other)`: a query atom equivalent to `other`.
+pub fn query_atom_from_atom(other: &Atom) -> Result<Atom> {
+    let mut a = other.copy_detached();
+    if other.has_query() {
+        return Ok(a);
+    }
+    a.set_query(Some(make_atom_num_query(other.atomic_num() as i32)));
+    let and = CompositeQueryType::And;
+    if other.isotope() != 0 {
+        atom_expand_query(
+            &mut a,
+            make_atom_isotope_query(other.isotope() as i32),
+            and,
+            true,
+        )?;
+    }
+    if other.formal_charge() != 0 {
+        atom_expand_query(
+            &mut a,
+            make_atom_formal_charge_query(other.formal_charge()),
+            and,
+            true,
+        )?;
+    }
+    if other.num_radical_electrons() != 0 {
+        atom_expand_query(
+            &mut a,
+            make_atom_num_radical_electrons_query(other.num_radical_electrons() as i32),
+            and,
+            true,
+        )?;
+    }
+    Ok(a)
+}
+
+/// `QueryBond(const Bond &other)`
+pub fn query_bond_from_bond(other: &Bond) -> Bond {
+    let mut b = other.copy_detached();
+    if !other.has_query() {
+        b.set_query(Some(make_bond_order_equals_query(other.bond_type())));
+    }
+    b
+}
+
+/// `QueryOps::replaceAtomWithQueryAtom`
+pub fn replace_atom_with_query_atom(mol: &mut ROMol, idx: u32) -> Result<()> {
+    if mol.get_atom(idx)?.has_query() {
+        return Ok(());
+    }
+    let atom = mol.atom(idx);
+    let mut qa = query_atom_from_atom(atom)?;
+    if atom.has_prop(cp::_hasMassQuery) {
+        atom_expand_query(
+            &mut qa,
+            make_atom_mass_query(atom.mass() as i32),
+            CompositeQueryType::And,
+            true,
+        )?;
+    }
+    mol.replace_atom(idx, &qa, false)
+}

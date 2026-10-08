@@ -18,6 +18,8 @@ rdkit/Chem/UnitTestChemBond.py::TestCase::test1Get
 rdkit/Chem/UnitTestChemBond.py::TestCase::test2Setters
 rdkit/Chem/UnitTestChemBond.py::TestCase::test3Props
 rdkit/Chem/UnitTestChemBond.py::TestCase::test4Props2
+rdkit/Chem/UnitTestChemSmarts.py::TestCase::testMatch
+rdkit/Chem/UnitTestChemSmarts.py::TestCase::testOrder
 rdkit/Chem/UnitTestSmiles.py::TestCase::testFailures
 rdkit/Chem/UnitTestSmiles.py::TestCase::testHighSymmetry
 rdkit/Chem/UnitTestSmiles.py::TestCase::testLinear1
