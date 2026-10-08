@@ -319,6 +319,31 @@ fn should_remove_h(mol: &RWMol, atom: u32, ps: &RemoveHsParameters) -> Result<bo
     Ok(true)
 }
 
+/// The parameters `MolOps::removeAllHs` uses: remove every hydrogen.
+pub fn remove_all_hs_parameters() -> RemoveHsParameters {
+    RemoveHsParameters {
+        remove_degree_zero: true,
+        remove_higher_degrees: true,
+        remove_only_h_neighbors: true,
+        remove_isotopes: true,
+        remove_dummy_neighbors: true,
+        remove_defining_bond_stereo: true,
+        remove_with_wedged_bond: true,
+        remove_with_query: true,
+        remove_nonimplicit: true,
+        remove_in_sgroups: true,
+        show_warnings: false,
+        remove_hydrides: true,
+        remove_nontetrahedral_neighbors: true,
+        ..Default::default()
+    }
+}
+
+/// `MolOps::removeAllHs(RWMol &mol, bool sanitize)`
+pub fn remove_all_hs(mol: &mut RWMol, sanitize: bool) -> Result<()> {
+    remove_hs(mol, &remove_all_hs_parameters(), sanitize)
+}
+
 /// `MolOps::removeHs(RWMol &mol, const RemoveHsParameters &ps, bool sanitize)`
 pub fn remove_hs(mol: &mut RWMol, ps: &RemoveHsParameters, sanitize: bool) -> Result<()> {
     if ps.remove_and_track_isotopes {

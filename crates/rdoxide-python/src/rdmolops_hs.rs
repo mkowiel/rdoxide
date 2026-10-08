@@ -5,7 +5,7 @@ use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple};
 use rdoxide::graphmol::chirality::{self, bond_dirs, legacy};
-use rdoxide::graphmol::mol_ops::add_hs::{AddHsParameters, add_hs};
+use rdoxide::graphmol::mol_ops::add_hs::{AddHsParameters, add_hs, remove_all_hs_parameters};
 use rdoxide::graphmol::mol_ops::{RemoveHsParameters, remove_hs};
 use rdoxide::graphmol::romol::ROMol;
 
@@ -212,22 +212,7 @@ fn py_remove_hs(args: &Bound<'_, PyTuple>, kwargs: Option<&Bound<'_, PyDict>>) -
 #[pyfunction]
 #[pyo3(name = "RemoveAllHs", signature = (mol, sanitize = true))]
 fn py_remove_all_hs(mol: PyRef<'_, PyMol>, sanitize: bool) -> PyResult<PyMol> {
-    let ps = RemoveHsParameters {
-        remove_degree_zero: true,
-        remove_higher_degrees: true,
-        remove_only_h_neighbors: true,
-        remove_isotopes: true,
-        remove_dummy_neighbors: true,
-        remove_defining_bond_stereo: true,
-        remove_with_wedged_bond: true,
-        remove_with_query: true,
-        remove_nonimplicit: true,
-        remove_in_sgroups: true,
-        show_warnings: false,
-        remove_hydrides: true,
-        remove_nontetrahedral_neighbors: true,
-        ..Default::default()
-    };
+    let ps = remove_all_hs_parameters();
     run_remove_hs(&mol.mol, &ps, sanitize)
 }
 

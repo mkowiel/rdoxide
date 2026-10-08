@@ -27,6 +27,7 @@ mod rddepictor;
 mod rdfingerprintgenerator;
 mod rdinfotheory;
 mod rdmoldescriptors;
+mod rdmoldescriptors_bcut;
 mod rdmoldescriptors_connectivity;
 mod rdmoldescriptors_molsurf;
 mod rdmoldescriptors_property;
