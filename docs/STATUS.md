@@ -25,7 +25,8 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 4 | `MolFromSmiles` sanitize/removeHs/stereo path (defaults) | ✅ | differential `molfromsmiles` identical |
 | 4 | SMILES writer + canonical SMILES (Canon.cpp DFS, SmilesWrite.cpp, getMolFrags/copyMolSubset): `MolToSmiles` (both overloads), `MolFragmentToSmiles`, `MolToRandomSmilesVect`, `SmilesWriteParams` | ✅ | differential `smiles` (canonical, output order, non-canonical, kekule, non-isomeric, explicit, rooted, random, fragment, roundtrip) 10312 + 35973 identical |
 | 4 | Query model (Query/*, QueryOps, QueryAtom/QueryBond expandQuery, null-query algebra), SMARTS parser (`MolFromSmarts`, `AtomFromSmarts`, `BondFromSmarts`, `SmartsParserParams`), `DescribeQuery` | ✅ | differential `smarts` (atoms, bonds, query descriptions) 1275 library SMARTS + 151 edge cases identical |
-| 4 | SMARTS writer (`MolToSmarts`, `GetSmarts`), `mergeQueryHs`, Python `QueryAtom`/`QueryBond` classes, `rdqueries` | ⬜ | `mergeHs=True` currently returns None |
+| 4 | SMARTS writer: `MolToSmarts` (both overloads), `MolFragmentToSmarts`, `Atom/Bond.GetSmarts` | ✅ | differential `smarts` (+ writer: default, non-isomeric, rooted, fragment, per-atom/bond, roundtrip) 1426/1426; `smiles` mode also checks `MolToSmarts` of plain molecules |
+| 4 | `mergeQueryHs`, Python `QueryAtom`/`QueryBond` classes, `rdqueries` | ⬜ | `mergeHs=True` currently returns None |
 | 4 | CXSMILES (read/write) | ⬜ | |
 | 5–13 | see PLAN.md | ⬜ | |
 
@@ -49,8 +50,10 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
   canonicalizeFragment, MolToSmiles/MolFragmentToSmiles) → rough_test.py imports.
 * 2026-10-08 — Stage 4b: SMILES writer identical to RDKit. Next: SMARTS + query atoms/bonds
   (needed by rough_test.py imports and substructure search), then CXSMILES.
-* 2026-10-08 — Stage 4c (part 1): query model + SMARTS parser identical to RDKit. Next: SMARTS
-  writer, mergeQueryHs, then substructure matching (stage 5).
+* 2026-10-08 — Stage 4c (part 1): query model + SMARTS parser identical to RDKit.
+* 2026-10-08 — Stage 4c (part 2): SMARTS writer identical to RDKit. Next: substructure matching
+  (stage 5: vf2, SubstructMatch, HasSubstructMatch/GetSubstructMatch(es), recursive queries),
+  then mergeQueryHs + QueryAtom classes.
 
 ## Differential testing
 

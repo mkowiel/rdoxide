@@ -226,3 +226,7 @@
 
 [module."rdoxide_python::rdmolfiles_smarts".sources]
 "Code/GraphMol/Wrap/rdmolfiles.cpp" = "829058d8e8a382c358d2464cee762f8cff04f75f"
+
+[module."rdoxide::graphmol::smiles_parse::smarts_write".sources]
+"Code/GraphMol/SmilesParse/SmartsWrite.h" = "060abe2a9fb0a34b9260d608c777670db60d629e"
+"Code/GraphMol/SmilesParse/SmartsWrite.cpp" = "44c4c747bb6c8e1e9fc9e3d9caf22aef1bf34264"

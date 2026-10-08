@@ -124,7 +124,23 @@ def dump(mode, smi):
         atoms = [atom_record(a) + [a.GetQueryType(), a.DescribeQuery(), a.GetAtomMapNum()]
                  for a in m.GetAtoms()]
         bonds = [bond_record(b) + [b.DescribeQuery()] for b in m.GetBonds()]
-        return {"atoms": atoms, "bonds": bonds}
+        out = {"atoms": atoms, "bonds": bonds}
+
+        def run(key, f):
+            try:
+                out[key] = f()
+            except Exception as e:  # noqa: BLE001
+                out[key] = "EXC:" + type(e).__name__
+
+        run("smarts", lambda: Chem.MolToSmarts(m))
+        run("order", lambda: list(m.GetPropsAsDict(True, True)["_smilesAtomOutputOrder"]))
+        run("noniso", lambda: Chem.MolToSmarts(m, isomericSmiles=False))
+        run("rooted", lambda: Chem.MolToSmarts(m, rootedAtAtom=m.GetNumAtoms() - 1))
+        run("fragment", lambda: Chem.MolFragmentToSmarts(m, atomsToUse=list(range(max(1, m.GetNumAtoms() // 2)))))
+        run("atom_smarts", lambda: [a.GetSmarts() for a in m.GetAtoms()])
+        run("bond_smarts", lambda: [b.GetSmarts() for b in m.GetBonds()])
+        run("roundtrip", lambda: Chem.MolToSmarts(Chem.MolFromSmarts(Chem.MolToSmarts(m))))
+        return out
     if mode == "smiles":
         m = Chem.MolFromSmiles(smi)
         if m is None:
@@ -151,6 +167,8 @@ def dump(mode, smi):
         run("fragment_kekule", lambda: Chem.MolFragmentToSmiles(
             Chem.Mol(m), atomsToUse=list(range(n)), kekuleSmiles=True, canonical=False))
         run("roundtrip", lambda: Chem.MolToSmiles(Chem.MolFromSmiles(Chem.MolToSmiles(m))))
+        run("tosmarts", lambda: Chem.MolToSmarts(m))
+        run("atom_smarts", lambda: [a.GetSmarts() for a in m.GetAtoms()])
         return out
     raise SystemExit(f"unknown mode {mode}")
 

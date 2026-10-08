@@ -349,7 +349,94 @@ fn py_mol_to_random_smiles_vect<'py>(
     PyList::new(py, res)
 }
 
+/// Returns a SMARTS string for a molecule
+///   ARGUMENTS:
+///
+///     - mol: the molecule
+///     - isomericSmiles: (optional) include information about stereochemistry in
+///       the SMARTS.  Defaults to true.
+///     - rootedAtAtom: (optional) the atom index to start the SMARTS from.
+///       Defaults to -1.
+///
+///   RETURNS:
+///
+///     a string
+///
+/// Alternatively: MolToSmarts(mol, params) with a SmilesWriteParams object.
+#[pyfunction]
+#[pyo3(name = "MolToSmarts", signature = (*args, **kwargs))]
+fn py_mol_to_smarts(
+    py: Python<'_>,
+    args: &Bound<'_, PyTuple>,
+    kwargs: Option<&Bound<'_, PyDict>>,
+) -> PyResult<String> {
+    use rdoxide::graphmol::smiles_parse::smarts_write::mol_to_smarts;
+    let a = Args {
+        name: "MolToSmarts",
+        args,
+        kwargs,
+    };
+    let mol = a
+        .get(0, "mol")?
+        .ok_or_else(|| PyTypeError::new_err("MolToSmarts() missing required argument 'mol'"))?;
+    let params = match a.get(1, "params")?.and_then(|p| {
+        p.cast::<PySmilesWriteParams>()
+            .ok()
+            .map(|p| p.borrow().to_core())
+    }) {
+        Some(p) => p,
+        None => SmilesWriteParams {
+            do_isomeric_smiles: a.flag(1, "isomericSmiles", true)?,
+            rooted_at_atom: a.int(2, "rootedAtAtom", -1)?,
+            ..SmilesWriteParams::default()
+        },
+    };
+    let mol = mol.cast::<PyMol>()?;
+    let mut m = mol.borrow_mut();
+    let core = &mut m.mol;
+    py.detach(|| mol_to_smarts(core, &params)).py()
+}
+
+/// Returns a SMARTS string for a fragment of a molecule
+///   ARGUMENTS:
+///
+///     - mol: the molecule
+///     - atomsToUse: indices of atoms to include in the SMARTS string
+///     - bondsToUse: indices of bonds to include in the SMARTS string (optional)
+///     - isomericSmarts: (optional) include information about stereochemistry in
+///       the SMARTS.  Defaults to true.
+///
+///   RETURNS:
+///
+///     a string
+#[pyfunction]
+#[pyo3(name = "MolFragmentToSmarts", signature = (mol, atomsToUse, bondsToUse = None, isomericSmarts = true))]
+#[allow(non_snake_case)]
+fn py_mol_fragment_to_smarts(
+    py: Python<'_>,
+    mut mol: PyRefMut<'_, PyMol>,
+    atomsToUse: Bound<'_, PyAny>,
+    bondsToUse: Option<Bound<'_, PyAny>>,
+    isomericSmarts: bool,
+) -> PyResult<String> {
+    use rdoxide::graphmol::smiles_parse::smarts_write::mol_fragment_to_smarts;
+    let (na, nb) = (mol.mol.num_atoms() as usize, mol.mol.num_bonds() as usize);
+    let atoms = int_vect(Some(atomsToUse), na)?
+        .filter(|v| !v.is_empty())
+        .ok_or_else(|| PyValueError::new_err("atomsToUse argument must be non-empty"))?;
+    let bonds = int_vect(bondsToUse, nb)?;
+    let params = SmilesWriteParams {
+        do_isomeric_smiles: isomericSmarts,
+        ..SmilesWriteParams::default()
+    };
+    let core = &mut mol.mol;
+    py.detach(|| mol_fragment_to_smarts(core, &params, &atoms, bonds.as_deref()))
+        .py()
+}
+
 pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(py_mol_to_smarts, m)?)?;
+    m.add_function(wrap_pyfunction!(py_mol_fragment_to_smarts, m)?)?;
     m.add_class::<PySmilesWriteParams>()?;
     m.add_function(wrap_pyfunction!(py_mol_to_smiles, m)?)?;
     m.add_function(wrap_pyfunction!(py_mol_fragment_to_smiles, m)?)?;

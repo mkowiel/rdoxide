@@ -7,6 +7,7 @@ pub mod lexer;
 pub mod ops;
 pub mod parser;
 pub mod smarts;
+pub mod smarts_write;
 pub mod write;
 
 use std::collections::BTreeMap;
