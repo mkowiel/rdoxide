@@ -51,6 +51,7 @@ Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testCountBounds
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testFingerprintGeneratorOptionsLifetime
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testFingerprintOptions
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testGetAtomsPerBit
+Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testMorganGenerator
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testMorganGeneratorMultiMol
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testMorganRedundantEnvironments
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testNumBitsPerFeature

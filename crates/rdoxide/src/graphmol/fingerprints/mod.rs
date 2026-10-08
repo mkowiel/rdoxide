@@ -252,6 +252,10 @@ pub enum AtomInvariantsGenerator {
         topological_torsion_correction: bool,
     },
     RDKitFP,
+    /// `MorganFeatureAtomInvGenerator` (`None`: the default feature SMARTS)
+    MorganFeature {
+        patterns: Option<Vec<ROMol>>,
+    },
 }
 
 impl AtomInvariantsGenerator {
@@ -269,6 +273,9 @@ impl AtomInvariantsGenerator {
                 *topological_torsion_correction,
             ),
             AtomInvariantsGenerator::RDKitFP => Ok(rdkit_fp::rdkit_fp_atom_invariants(mol)),
+            AtomInvariantsGenerator::MorganFeature { patterns } => {
+                morgan::get_feature_invariants(mol, patterns.as_deref())
+            }
         }
     }
     pub fn info_string(&self) -> String {
@@ -287,6 +294,9 @@ impl AtomInvariantsGenerator {
                 u8::from(*topological_torsion_correction)
             ),
             AtomInvariantsGenerator::RDKitFP => "RDKitFPAtomInvGenerator".to_string(),
+            AtomInvariantsGenerator::MorganFeature { .. } => {
+                "MorganFeatureInvariantGenerator".to_string()
+            }
         }
     }
 }

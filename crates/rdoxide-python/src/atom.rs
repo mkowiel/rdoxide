@@ -49,6 +49,24 @@ impl PyAtom {
         )
     }
 
+    /// Run `f` on the owning molecule and this atom's index (error for
+    /// free-standing atoms).
+    pub fn with_owner<R>(
+        &self,
+        f: impl FnOnce(&rdoxide::graphmol::romol::ROMol, u32) -> PyResult<R>,
+    ) -> PyResult<R> {
+        match &self.handle {
+            AtomHandle::Owned(_) => Err(no_owner()),
+            AtomHandle::InMol { mol, idx } => Python::attach(|py| {
+                let m = mol.bind(py).borrow();
+                if *idx >= m.mol.num_atoms() {
+                    return Err(gone());
+                }
+                f(&m.mol, *idx)
+            }),
+        }
+    }
+
     /// Run `f` on the atom.
     pub fn with<R>(&self, py: Python<'_>, f: impl FnOnce(&Atom) -> R) -> PyResult<R> {
         match &self.handle {

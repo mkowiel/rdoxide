@@ -1032,6 +1032,26 @@ fn get_morgan_atom_inv_gen(includeRingMembership: bool) -> PyAtomInvGen {
     }
 }
 
+/// Get a morgan feature atom invariants generator
+#[pyfunction]
+#[pyo3(name = "GetMorganFeatureAtomInvGen", signature = (patterns = None))]
+fn get_morgan_feature_atom_inv_gen(patterns: Option<&Bound<'_, PyAny>>) -> PyResult<PyAtomInvGen> {
+    let pats = match patterns {
+        // upstream silently ignores anything that is not a sequence of molecules
+        Some(p) if !p.is_none() => p
+            .try_iter()
+            .and_then(|it| {
+                it.map(|m| Ok(m?.extract::<PyRef<'_, PyMol>>()?.mol.clone()))
+                    .collect::<PyResult<Vec<_>>>()
+            })
+            .ok(),
+        _ => None,
+    };
+    Ok(PyAtomInvGen {
+        gen_: AtomInvariantsGenerator::MorganFeature { patterns: pats },
+    })
+}
+
 /// Get a morgan bond invariants generator
 #[pyfunction]
 #[pyo3(name = "GetMorganBondInvGen", signature = (useBondTypes = true, useChirality = false))]
@@ -1063,5 +1083,6 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_morgan_generator, m)?)?;
     m.add_function(wrap_pyfunction!(get_morgan_atom_inv_gen, m)?)?;
     m.add_function(wrap_pyfunction!(get_morgan_bond_inv_gen, m)?)?;
+    m.add_function(wrap_pyfunction!(get_morgan_feature_atom_inv_gen, m)?)?;
     Ok(())
 }

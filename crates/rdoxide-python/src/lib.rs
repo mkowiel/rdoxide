@@ -25,6 +25,7 @@ mod rdbase;
 mod rdchem;
 mod rddepictor;
 mod rdfingerprintgenerator;
+mod rdmoldescriptors;
 mod rdmolfiles;
 mod rdmolfiles_molblock;
 mod rdmolfiles_molwrite;
@@ -72,6 +73,12 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
     add_submodule(m, "rdmolfiles", "rdkit.Chem.rdmolfiles", rdmolfiles::init)?;
     add_submodule(m, "rdmolops", "rdkit.Chem.rdmolops", rdmolops::init)?;
     add_submodule(m, "rdDepictor", "rdkit.Chem.rdDepictor", rddepictor::init)?;
+    add_submodule(
+        m,
+        "rdMolDescriptors",
+        "rdkit.Chem.rdMolDescriptors",
+        rdmoldescriptors::init,
+    )?;
     add_submodule(
         m,
         "rdFingerprintGenerator",

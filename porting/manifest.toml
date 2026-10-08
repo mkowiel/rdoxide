@@ -398,5 +398,12 @@
 "Code/GraphMol/Fingerprints/RDKitFPGenerator.h" = "144e9abffa69030561b1e49bad25787539153c76"
 
 [module."rdoxide::graphmol::fingerprints::legacy".sources]
+"Code/GraphMol/Fingerprints/AtomPairs.cpp" = "60eb33eaf77e8f762e3bf0460f8e48be1a92a796"
+"Code/GraphMol/Fingerprints/AtomPairs.h" = "614b70fbbbd913ca48bb53dc1f9c12a9b09775b1"
+"Code/GraphMol/Fingerprints/MorganFingerprints.cpp" = "c93ef2c874a0183e8fffb4ad4e337850ae84930c"
+"Code/GraphMol/Fingerprints/MorganFingerprints.h" = "1cdb791152a372d75d817aac9dfd460376f7d19d"
 "Code/GraphMol/Fingerprints/Fingerprints.cpp" = "842e2dbe592e21982f3273457874fef95e8b3820"
 "Code/GraphMol/Fingerprints/Fingerprints.h" = "053a0d293d077991107ababd3a7c453d7f064a45"
+
+[module."rdoxide_python::rdmoldescriptors".sources]
+"Code/GraphMol/Descriptors/Wrap/rdMolDescriptors.cpp" = "4d3c2e1d6315579af9f3bf02b1564224fe48b82e"
