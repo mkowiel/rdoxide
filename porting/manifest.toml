@@ -437,3 +437,10 @@
 [module."rdoxide_python::rdmoldescriptors_props".sources]
 "Code/GraphMol/Descriptors/MolDescriptors.cpp" = "5529fa1ecd5217a2f4cf6dd7819bbd9df4f2f450"
 "Code/GraphMol/Descriptors/MolDescriptors.h" = "274525c5fbdb54adb090a30fcf366c17d351ed1f"
+
+[module."rdoxide::graphmol::descriptors::mol_surf".sources]
+"Code/GraphMol/Descriptors/MolSurf.cpp" = "03c712bce40ed037bf5b35cbe8f8d7cbc709dd74"
+"Code/GraphMol/Descriptors/MolSurf.h" = "7f9ebf97f8151cb33b45303ae03e6f80f32f57c1"
+
+[module."rdoxide_python::rdmoldescriptors_molsurf".sources]
+"Code/GraphMol/Descriptors/Wrap/rdMolDescriptors.cpp" = "4d3c2e1d6315579af9f3bf02b1564224fe48b82e"

@@ -3,3 +3,4 @@
 pub mod connectivity;
 pub mod crippen;
 pub mod lipinski;
+pub mod mol_surf;

@@ -61,7 +61,9 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 10b | Lipinski counts: HBA/HBD (Lipinski and SMARTS variants), rotatable bonds (all four definitions; `Default` is Strict as in the released build), heteroatoms, amide bonds, ring families, FractionCSP3, spiro/bridgehead atoms, stereo-center counts | ✅ | differential `lipinski` 15300/15300 identical (NCI 300 + ZINC 10k + chiral 5k); upstream bool/enum argument handling reproduced |
 | 10b | `CalcPhi` (Hall-Kier alpha, kappa helpers of ConnectivityDescriptors) and verbatim `Chem/Lipinski.py` | ✅ | identical to RDKit on 14 molecules; upstream `UnitTestLipinski` 2/3 (`testLipinskiLong` is skipped, and fails on the reference build too: its regression data predates the strict default) |
 | 10e | `_CalcMolWt`, `CalcExactMolWt`, `CalcMolFormula` (Hill order, isotopes, D/T), `CalcNumHeavyAtoms`, `CalcNumAtoms` (`MolOps::getAvgMolWt`/`getExactMolWt`/`getMolFormula`) | ✅ | differential `molprops` 15312/15312 identical (also with explicit Hs, isotopes, charges); bool arguments take truthy values |
-| 10a | TPSA, Labute ASA, rest of `rdMolDescriptors`/`Descriptors` (needs those for the `Descriptors` module), ... | ⬜ | next |
+| 10f | `CalcLabuteASA`, `_CalcLabuteASAContribs`, `CalcTPSA` (+ `includeSandP`), `_CalcTPSAContribs`, `SlogP_VSA_`, `SMR_VSA_`, `CustomProp_VSA_` (`MolSurf.cpp`; `std::upper_bound` search reproduced for user bins; per-mol caches like upstream) | ✅ | differential `molsurf` 15312/15312 bit-identical (NCI, ZINC, chiral set) |
+| 10g | Gasteiger charges (`rdPartialCharges`), `PEOE_VSA_`, verbatim `Chem/MolSurf.py` | ⬜ | next; `MolSurf.py` imports `rdPartialCharges` |
+| 10a | rest of `rdMolDescriptors` (Chi/Kappa, MQNs, ...) and the `Descriptors` module | ⬜ | |
 | 9 | LayeredFingerprint, PatternFingerprint, JSON (de)serialization, GetFPs bulk helpers | ⬜ | |
 | 7–13 | see PLAN.md | ⬜ | |
 
@@ -170,3 +172,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-08 — Stage 10b: Lipinski counts identical to RDKit (rotatable-bond definitions with the released strict default, bool/enum argument handling, spiro/bridgehead lists). Next: CalcPhi and verbatim Lipinski.py, then MolWt/TPSA/Labute ASA.
 * 2026-10-09 — Stage 10c: CalcPhi and verbatim Lipinski.py; Crippen/AddHs-style bool arguments accept any truthy value like Boost.Python; multi-core batch fingerprints (`numThreads`); crate license audit in CI. Ratchet 172. Next: MolWt/ExactMolWt, TPSA, Labute ASA.
 * 2026-10-09 — Stage 10e: MolWt/ExactMolWt/formula/atom counts identical to RDKit (`molprops` differential). Next: TPSA, Labute ASA (MolSurf), then the `Descriptors` module.
+* 2026-10-09 — Stage 10f: Labute ASA, TPSA and the SlogP/SMR/custom VSA binnings identical to RDKit (`molsurf` differential). Next: Gasteiger charges, `PEOE_VSA_`, verbatim `MolSurf.py`.
