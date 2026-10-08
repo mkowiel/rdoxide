@@ -492,3 +492,10 @@
 
 [module."python::rdkit.Chem.AllChem".sources]
 "rdkit/Chem/AllChem.py" = "25c893b1b335fe25af3736d4c1b1413e69d4f1db"
+
+[module."rdoxide::graphmol::file_parsers::smiles_mol_supplier".sources]
+"Code/GraphMol/FileParsers/SmilesMolSupplier.cpp" = "dfae84e8f6e59a412d058073c36f5fc9fb3c55d2"
+
+[module."rdoxide_python::rdmolfiles_smisupplier".sources]
+"Code/GraphMol/Wrap/SmilesMolSupplier.cpp" = "c53a84e8b6ae88bb60cd8cc8b97d422c51baa1aa"
+"Code/GraphMol/Wrap/MolSupplier.h" = "a931d5f55aafe8de95c48c9e44fffd2ba0e88d15"

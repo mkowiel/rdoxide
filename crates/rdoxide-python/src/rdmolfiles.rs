@@ -245,6 +245,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     crate::rdmolfiles_molblock::init(m)?;
     crate::rdmolfiles_molwrite::init(m)?;
     crate::rdmolfiles_sdsupplier::init(m)?;
+    crate::rdmolfiles_smisupplier::init(m)?;
     crate::rdmolfiles_sdwriter::init(m)?;
     m.add_function(wrap_pyfunction!(mol_from_smiles, m)?)?;
     m.add_function(wrap_pyfunction!(canonical_rank_atoms, m)?)?;
