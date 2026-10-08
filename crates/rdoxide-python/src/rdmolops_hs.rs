@@ -4,7 +4,7 @@
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple};
-use rdoxide::graphmol::chirality::{bond_dirs, legacy};
+use rdoxide::graphmol::chirality::{self, bond_dirs, legacy};
 use rdoxide::graphmol::mol_ops::add_hs::{AddHsParameters, add_hs};
 use rdoxide::graphmol::mol_ops::{RemoveHsParameters, remove_hs};
 use rdoxide::graphmol::romol::ROMol;
@@ -419,7 +419,41 @@ fn py_add_hs(args: &Bound<'_, PyTuple>, kwargs: Option<&Bound<'_, PyDict>>) -> P
     Ok(PyMol { mol: res })
 }
 
+/// toggles recognition of non-tetrahedral chirality from 3D structures
+#[pyfunction]
+#[pyo3(name = "SetAllowNontetrahedralChirality", signature = (val))]
+fn py_set_allow_nontetrahedral_chirality(val: &Bound<'_, PyAny>) -> PyResult<()> {
+    chirality::set_allow_nontetrahedral_chirality(val.is_truthy()?);
+    Ok(())
+}
+
+/// returns whether or not recognition of non-tetrahedral chirality from 3D structures is enabled
+#[pyfunction]
+#[pyo3(name = "GetAllowNontetrahedralChirality")]
+fn py_get_allow_nontetrahedral_chirality() -> bool {
+    chirality::get_allow_nontetrahedral_chirality()
+}
+
+/// sets usage of the legacy stereo perception code
+#[pyfunction]
+#[pyo3(name = "SetUseLegacyStereoPerception", signature = (val))]
+fn py_set_use_legacy_stereo_perception(val: &Bound<'_, PyAny>) -> PyResult<()> {
+    chirality::set_use_legacy_stereo_perception(val.is_truthy()?);
+    Ok(())
+}
+
+/// returns whether or not the legacy stereo perception code is being used
+#[pyfunction]
+#[pyo3(name = "GetUseLegacyStereoPerception")]
+fn py_get_use_legacy_stereo_perception() -> bool {
+    chirality::get_use_legacy_stereo_perception()
+}
+
 pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(py_set_allow_nontetrahedral_chirality, m)?)?;
+    m.add_function(wrap_pyfunction!(py_get_allow_nontetrahedral_chirality, m)?)?;
+    m.add_function(wrap_pyfunction!(py_set_use_legacy_stereo_perception, m)?)?;
+    m.add_function(wrap_pyfunction!(py_get_use_legacy_stereo_perception, m)?)?;
     m.add_class::<PyRemoveHsParameters>()?;
     m.add_class::<PyAddHsParameters>()?;
     m.add_function(wrap_pyfunction!(py_add_hs, m)?)?;

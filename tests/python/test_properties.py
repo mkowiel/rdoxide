@@ -97,10 +97,9 @@ def test_descriptors_module_computes_most_descriptors(mol):
   assert len(Descriptors._descList) >= 200
   values = {}
   for name, fn in Descriptors._descList:
-    try:
-      values[name] = fn(mol)
-    except AttributeError:
-      pass  # needs natives that are not ported yet
+    if name == "SPS":
+      continue  # needs the new stereo perception, which is not ported yet
+    values[name] = fn(mol)
   assert values["MolWt"] == pytest.approx(151.165)
   assert values["NumHDonors"] == 2
   assert values["fr_phenol"] == 1

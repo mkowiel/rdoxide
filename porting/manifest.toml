@@ -473,3 +473,12 @@
 
 [module."rdoxide_python::rdinfotheory".sources]
 "Code/ML/InfoTheory/Wrap/rdInfoTheory.cpp" = "322bdfe23f255f17eddc63dde93cc263ecd5956f"
+
+[module."rdoxide::graphmol::chem_transforms".sources]
+"Code/GraphMol/ChemTransforms/ChemTransforms.cpp" = "6171788687c941a6d9f36aa79e397aa0475681f0"
+
+[module."rdoxide_python::rdmolops_matrices".sources]
+"Code/GraphMol/Wrap/MolOps.cpp" = "2dc7ae10c4ce7523938a4db10e31215cfe2162db"
+
+[module."rdoxide_python::rdmolops_transforms".sources]
+"Code/GraphMol/Wrap/MolOps.cpp" = "2dc7ae10c4ce7523938a4db10e31215cfe2162db"

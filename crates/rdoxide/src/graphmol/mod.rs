@@ -5,6 +5,7 @@ pub mod atom;
 pub mod atropisomers;
 pub mod bond;
 pub mod canon;
+pub mod chem_transforms;
 pub mod chirality;
 pub mod conformer;
 pub mod conjug_hybrid;
