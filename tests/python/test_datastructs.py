@@ -70,3 +70,32 @@ def test_text_and_fold():
     assert DS.FingerprintSimilarity(a, DS.FoldFingerprint(a)) == 1.0
     assert DS.ConvertToExplicit(_bv(16, [0, 9], DS.SparseBitVect)) == a
     assert (a + a).GetNumBits() == 32
+
+
+@pytest.mark.parametrize(
+    "cls",
+    [DS.IntSparseIntVect, DS.LongSparseIntVect, DS.UIntSparseIntVect, DS.ULongSparseIntVect],
+)
+def test_sparse_int_vect(cls):
+    v1 = cls(5)
+    for i, x in [(0, 2), (2, 1), (3, 4), (4, 6)]:
+        v1[i] = x
+    v2 = cls(5)
+    for i, x in [(1, 2), (2, 3), (3, 4), (4, 4)]:
+        v2[i] = x
+    assert DS.DiceSimilarity(v1, v2) == 18.0 / 26.0
+    assert DS.TanimotoSimilarity(v1, v2) == 0.5294117647058824
+    assert DS.BulkDiceSimilarity(v1, [v1, v2]) == [1.0, 18.0 / 26.0]
+    assert (v1 & v2).GetNonzeroElements() == {2: 1, 3: 4, 4: 4}
+    assert (v1 | v2).GetNonzeroElements() == {0: 2, 1: 2, 2: 3, 3: 4, 4: 6}
+    assert (v1 - v1).GetNonzeroElements() == {}
+    assert v1.GetTotalVal() == 13 and v1.ToList() == [2, 0, 1, 4, 6]
+    assert list(v1) == [2, 0, 1, 4, 6]
+    assert pickle.loads(pickle.dumps(v1)) == v1
+    assert cls(v1.ToBinary()) == v1
+    with pytest.raises(IndexError):
+        v1[5]
+    v1 *= 0
+    assert v1.GetNonzeroElements() == {0: 0, 2: 0, 3: 0, 4: 0}
+    with pytest.raises(TypeError):
+        v1 /= 2

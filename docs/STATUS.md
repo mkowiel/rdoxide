@@ -6,7 +6,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 |-------|-----------|--------|-------|
 | 0 | Workspace, packaging (maturin, abi3-py310), CI, licenses, NOTICE | ✅ | |
 | 0 | `tools/sync_upstream.py` (fetch/regen/diff/stamp), `porting/manifest.toml` | ✅ | |
-| 0 | Upstream test ratchet (`tools/run_upstream_tests.py`) | ✅ | 124 upstream tests passing |
+| 0 | Upstream test ratchet (`tools/run_upstream_tests.py`) | ✅ | 135 upstream tests passing |
 | 1 | RDGeneral: Dict/RDValue/RDProps | ✅ | |
 | 1 | RDGeneral: RDLog + `rdBase` logging API | ✅ | upstream `UnitTestLogging.py` 32/32 |
 | 1 | RDGeneral: RNG (`boost::minstd_rand`, glibc `rand`) | ✅ | |
@@ -42,7 +42,8 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 7 | 2D coordinates: RDDepict::compute2DCoords (EmbeddedFrag, DepictUtils, fused rings, cis/trans and non-tetrahedral fragments, collision removal: bond/spiro flips, open angles, shorten bonds, path angle expansion, canonical orientation, coordMap, bondLength); `rdDepictor.Compute2DCoords`; `MolToMolBlock` of molecules without conformers | ✅ | differential `depict` (canonOrient on/off coordinates to 6 decimals + MolBlock): NCI 4999/4999, canonSmiles.long + stereo/pickle edge cases 5400/5400 identical to the arm64 build |
 | 7 | Ring-system templates, random flip sampling (nSample/nFlipsPerSample), Compute2DCoordsMimicDistmat, generateDepictionMatching2D/3DStructure, straighten/normalizeDepiction, CoordGen | ⬜ | raise RuntimeError |
 | 8 | DataStructs: ExplicitBitVect, SparseBitVect (bit ops, pickles byte-identical, base64, indexing), all similarity metrics + Bulk*/\*Neighbors, Tversky, on/off-bit projections, FoldFingerprint, AllProbeBitsMatch, text/FPS/binary conversions, ConvertToNumpyArray; `rdkit.DataStructs` Python package (verbatim upstream pure-Python modules) | ✅ | 3000 random pairs identical to the arm64 build (x86 differs in last bits through FMA, as upstream does); upstream `testBV.py` and `UnitTestcBitVect.py` pass. Lists of ints/doubles are returned as tuples until `rdBase._vecti`/`_vectd` exist |
-| 8 | DiscreteValueVect, RealValueVect, SparseIntVect, FPBReader, InitFromDaylightString | ⬜ | |
+| 8 | SparseIntVect (Int/Long/UInt/ULong): fuzzy &/|, arithmetic, scalar ops (incl. upstream's stored zeros and missing `/=`), pickles, Dice/Tanimoto/Tversky (+ bounds, Bulk*), ConvertToNumpyArray | ✅ | 3000 random pairs identical to the arm64 build; upstream `testSparseIntVect.py` 10/10 incl. legacy pickles |
+| 8 | DiscreteValueVect, RealValueVect, FPBReader, InitFromDaylightString | ⬜ | |
 | 7–13 | see PLAN.md | ⬜ | |
 
 ## Python package files
@@ -134,3 +135,4 @@ New Python test files are also run against the official wheel to validate expect
 * `Chem.SetAllowNontetrahedralChirality` & co. keep the value in-process;
   upstream also writes it to the process environment.
 * 2026-10-08 — Stage 8a: DataStructs bit vectors + similarity. Next: SparseIntVect/DiscreteValueVect, then fingerprints (Morgan, RDKit, atom pairs) or SGroups.
+* 2026-10-08 — Stage 8b: SparseIntVect. Next: DiscreteValueVect/RealValueVect, then fingerprints.

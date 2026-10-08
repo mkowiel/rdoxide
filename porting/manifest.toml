@@ -342,3 +342,9 @@
 "Code/DataStructs/Wrap/wrap_ExplicitBV.cpp" = "90eabc9c0e97a3f2a2ebde9621a17c5a9d871ccc"
 "Code/DataStructs/Wrap/wrap_SparseBV.cpp" = "a6a1b885ffd3ae6731dd2086ee6ededf50b90b64"
 "Code/DataStructs/Wrap/wrap_Utils.cpp" = "eb020c2fe13c558f63b01cfc746c9966e839a62c"
+
+[module."rdoxide::datastructs::sparse_int_vect".sources]
+"Code/DataStructs/SparseIntVect.h" = "7a74d453be5f24957516f56fcb1d0a699d19f38d"
+
+[module."rdoxide_python::datastructs_siv".sources]
+"Code/DataStructs/Wrap/SparseIntVect.cpp" = "694a25495d6c3ed1fddaef32a2228328f6ffec0e"

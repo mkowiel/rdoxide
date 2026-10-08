@@ -14,6 +14,7 @@ use rdoxide::datastructs::{
     BitVect, ExplicitBitVect, SparseBitVect, convert_to_explicit, from_bit_string,
 };
 
+use crate::datastructs_siv as siv;
 use crate::errors::IntoPyResult;
 
 /// Accepts str or bytes like `std::string` arguments of the wrappers.
@@ -289,14 +290,29 @@ fn wrapped<T: BitOpsVect>(a: &T, b: &T, m: Metric, dist: bool) -> PyResult<f64> 
     similarity_wrapper(a, b, |x, y| similarity(m, x, y), dist).py()
 }
 
+/// Metrics that also have a SparseIntVect overload.
+fn siv_metric(name: &str) -> Option<siv::SivMetric> {
+    match name {
+        "DiceSimilarity" => Some(siv::SivMetric::Dice),
+        "TanimotoSimilarity" => Some(siv::SivMetric::Tanimoto),
+        _ => None,
+    }
+}
+
 macro_rules! metric_fns {
     ($( $fname:ident, $bulk:ident, $nbr:ident, $nbr_sparse:ident, $pyname:literal, $pybulk:literal, $pynbr:literal, $pynbrs:literal, $metric:expr, $doc:literal; )*) => {
         $(
             #[doc = $doc]
             #[pyfunction]
-            #[pyo3(name = $pyname, signature = (bv1, bv2, returnDistance = false))]
+            #[pyo3(name = $pyname, signature = (bv1, bv2, returnDistance = false, bounds = None))]
             #[allow(non_snake_case)]
-            fn $fname(bv1: &Bound<'_, PyAny>, bv2: &Bound<'_, PyAny>, returnDistance: bool) -> PyResult<f64> {
+            fn $fname(bv1: &Bound<'_, PyAny>, bv2: &Bound<'_, PyAny>, returnDistance: bool, bounds: Option<f64>) -> PyResult<f64> {
+                if let Some(m) = siv_metric($pyname) && let Some(r) = siv::try_similarity(m, bv1, bv2, returnDistance, bounds.unwrap_or(0.0))? {
+                    return Ok(r);
+                }
+                if bounds.is_some() {
+                    return Err(PyTypeError::new_err(concat!($pyname, "() got an unexpected keyword argument 'bounds'")));
+                }
                 match extract_pair(bv1, bv2, true)? {
                     Pair::E(a, b) => wrapped(&a, &b, $metric, returnDistance),
                     Pair::S(a, b) => wrapped(&a, &b, $metric, returnDistance),
@@ -308,6 +324,9 @@ macro_rules! metric_fns {
             #[pyo3(name = $pybulk, signature = (bv1, bvList, returnDistance = false))]
             #[allow(non_snake_case)]
             fn $bulk(bv1: &Bound<'_, PyAny>, bvList: &Bound<'_, PyAny>, returnDistance: bool) -> PyResult<Vec<f64>> {
+                if let Some(m) = siv_metric($pyname) && let Some(r) = siv::try_bulk(m, bv1, bvList, returnDistance)? {
+                    return Ok(r);
+                }
                 bulk(bv1, bvList, returnDistance, |p| match p {
                     Pair::E(a, b) => similarity($metric, &a, &b),
                     Pair::S(a, b) => similarity($metric, &a, &b),
@@ -468,7 +487,7 @@ fn bulk_e(
 
 /// B(bv1&bv2) / (a*B(bv1)+b*B(bv2)+(1-a-b)*B(bv1&bv2)
 #[pyfunction]
-#[pyo3(name = "TverskySimilarity", signature = (bv1, bv2, a, b, returnDistance = false))]
+#[pyo3(name = "TverskySimilarity", signature = (bv1, bv2, a, b, returnDistance = false, bounds = None))]
 #[allow(non_snake_case)]
 fn tversky_similarity(
     bv1: &Bound<'_, PyAny>,
@@ -476,7 +495,18 @@ fn tversky_similarity(
     a: f64,
     b: f64,
     returnDistance: bool,
+    bounds: Option<f64>,
 ) -> PyResult<f64> {
+    if let Some(r) =
+        siv::try_similarity(siv::SivMetric::Tversky(a, b), bv1, bv2, returnDistance, 0.0)?
+    {
+        return Ok(r);
+    }
+    if bounds.is_some() {
+        return Err(PyTypeError::new_err(
+            "TverskySimilarity() got an unexpected keyword argument 'bounds'",
+        ));
+    }
     match extract_pair(bv1, bv2, true)? {
         Pair::E(x, y) => {
             similarity_wrapper(&x, &y, |p, q| tversky(p, q, a, b), returnDistance).py()
@@ -498,6 +528,9 @@ fn bulk_tversky(
     b: f64,
     returnDistance: bool,
 ) -> PyResult<Vec<f64>> {
+    if let Some(r) = siv::try_bulk(siv::SivMetric::Tversky(a, b), bv1, bvList, returnDistance)? {
+        return Ok(r);
+    }
     bulk(bv1, bvList, returnDistance, |p| match p {
         Pair::E(x, y) => tversky(&x, &y, a, b),
         Pair::S(x, y) => tversky(&x, &y, a, b),
@@ -671,11 +704,22 @@ fn create_from_binary(fps: &Bound<'_, PyAny>) -> PyResult<PyExplicitBitVect> {
 #[pyfunction]
 #[pyo3(name = "ConvertToNumpyArray", signature = (bv, destArray))]
 #[allow(non_snake_case)]
-fn convert_to_numpy(
-    bv: PyRef<'_, PyExplicitBitVect>,
-    destArray: &Bound<'_, PyAny>,
-) -> PyResult<()> {
-    let n = bv.bv.num_bits() as usize;
+fn convert_to_numpy(bv: &Bound<'_, PyAny>, destArray: &Bound<'_, PyAny>) -> PyResult<()> {
+    let vals: Vec<i64> = if let Some(v) = siv::get_siv(bv) {
+        let mut vals = vec![0i64; v.length() as usize];
+        for (&k, &x) in v.nonzero_elements() {
+            vals[k as usize] = x as i64;
+        }
+        vals
+    } else {
+        let bv = bv.extract::<PyRef<'_, PyExplicitBitVect>>()?;
+        let mut vals = vec![0i64; bv.bv.num_bits() as usize];
+        for b in bv.bv.on_bits() {
+            vals[b as usize] = 1;
+        }
+        vals
+    };
+    let n = vals.len();
     destArray.call_method1("resize", ((n,),)).or_else(|_| {
         destArray.call_method(
             "resize",
@@ -683,10 +727,6 @@ fn convert_to_numpy(
             Some(&[("refcheck", false)].into_py_dict(destArray.py())?),
         )
     })?;
-    let mut vals = vec![0i64; n];
-    for b in bv.bv.on_bits() {
-        vals[b as usize] = 1;
-    }
     for (i, v) in vals.into_iter().enumerate() {
         destArray.set_item(i, v)?;
     }
@@ -702,6 +742,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     )?;
     m.add_class::<PyExplicitBitVect>()?;
     m.add_class::<PySparseBitVect>()?;
+    siv::add_classes(m)?;
     add_metric_fns(m)?;
     for f in [
         wrap_pyfunction!(on_bit_similarity, m)?,

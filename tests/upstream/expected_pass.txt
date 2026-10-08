@@ -18,6 +18,17 @@ Code/DataStructs/Wrap/testBV.py::TestCase::test5FromBitString
 Code/DataStructs/Wrap/testBV.py::TestCase::test6BulkOps
 Code/DataStructs/Wrap/testBV.py::TestCase::test7FPS
 Code/DataStructs/Wrap/testBV.py::TestCase::test8BinText
+Code/DataStructs/Wrap/testBV.py::TestCase::test9ToNumpy
+Code/DataStructs/Wrap/testSparseIntVect.py::TestCase::test1Int
+Code/DataStructs/Wrap/testSparseIntVect.py::TestCase::test2Long
+Code/DataStructs/Wrap/testSparseIntVect.py::TestCase::test3LegacyPickle1
+Code/DataStructs/Wrap/testSparseIntVect.py::TestCase::test3LegacyPickle2
+Code/DataStructs/Wrap/testSparseIntVect.py::TestCase::test4Update
+Code/DataStructs/Wrap/testSparseIntVect.py::TestCase::test5Dice
+Code/DataStructs/Wrap/testSparseIntVect.py::TestCase::test6BulkDice
+Code/DataStructs/Wrap/testSparseIntVect.py::TestCase::test6BulkTversky
+Code/DataStructs/Wrap/testSparseIntVect.py::TestCase::test7ToList
+Code/DataStructs/Wrap/testSparseIntVect.py::TestCase::testPickle1
 Code/Geometry/Wrap/testGeometry.py::TestCase::test1aPoint3D
 Code/Geometry/Wrap/testGeometry.py::TestCase::test5PointPickles
 Code/Geometry/Wrap/testGeometry.py::TestCase::test8InitPoint2DFromPoint3D
