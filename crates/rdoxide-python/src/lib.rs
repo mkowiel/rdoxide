@@ -25,6 +25,7 @@ mod rdmolfiles;
 mod rdmolfiles_molblock;
 mod rdmolfiles_molwrite;
 mod rdmolfiles_sdsupplier;
+mod rdmolfiles_sdwriter;
 mod rdmolfiles_smarts;
 mod rdmolfiles_write;
 mod rdmolops;

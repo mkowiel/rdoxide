@@ -49,6 +49,36 @@ def molblock_record(blk, **kw):
     return rec
 
 
+def sdwrite_records(path):
+    """SDWriter output for the molecules of an SD file."""
+    import io
+    try:
+        mols = [m for m in Chem.SDMolSupplier(path) if m is not None][:300]
+    except Exception as e:  # noqa: BLE001
+        yield ["open", type(e).__name__]
+        return
+    for key, setup in (("default", lambda w: None), ("v3000", lambda w: w.SetForceV3000(True)),
+                       ("nokekule", lambda w: w.SetKekulize(False)),
+                       ("props", lambda w: w.SetProps(["NAME", "ID", "AMW", "missing"]))):
+        sio = io.StringIO()
+        w = Chem.SDWriter(sio)
+        setup(w)
+        out = []
+        for m in mols:
+            try:
+                w.write(m)
+            except Exception as e:  # noqa: BLE001
+                out.append(type(e).__name__)
+        w.flush()
+        yield [key, [sio.getvalue(), out, w.NumMols()]]
+    def text(m):
+        try:
+            return Chem.SDWriter.GetText(m)
+        except Exception as e:  # noqa: BLE001
+            return type(e).__name__
+    yield ["gettext", [text(m) for m in mols[:20]]]
+
+
 def sdf_records(path):
     """Everything an SDMolSupplier reports for one SD file."""
     def mrec(m):
@@ -368,6 +398,10 @@ def main():
         qpath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "tests", "data",
                              "substruct_queries.smarts")
         QUERIES.extend(l.split()[0] for l in open(qpath) if l.strip())
+    if mode == "sdwrite":
+        for rec in sdwrite_records(path):
+            print(json.dumps(rec, default=list))
+        return
     if mode == "sdf":
         for rec in sdf_records(path):
             print(json.dumps(rec, default=list))

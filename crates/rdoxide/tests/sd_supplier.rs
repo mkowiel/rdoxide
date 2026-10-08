@@ -87,3 +87,28 @@ fn bad_input() {
     assert_eq!(s.length().unwrap(), 0);
     assert!(s.at_end().unwrap());
 }
+
+#[test]
+fn writer_roundtrip() {
+    use rdoxide::graphmol::file_parsers::sd_writer::mol_to_sd_text;
+    let mut s =
+        SDMolSupplier::from_file(&data("first_200.props.sdf"), MolFileParserParams::default())
+            .unwrap();
+    let mut text = String::new();
+    let mut smiles = Vec::new();
+    for i in 0..5 {
+        let mut m = s.next_mol().unwrap().unwrap();
+        text += &mol_to_sd_text(&m, -1, true, false, i, None).unwrap();
+        smiles.push(mol_to_smiles(&mut m, &SmilesWriteParams::default()).unwrap());
+    }
+    assert!(text.contains(">  <AMW>  (1) \n122.12344\n\n"));
+    let mut back = SDMolSupplier::default();
+    back.set_data(text.as_bytes(), MolFileParserParams::default());
+    let mut again = Vec::new();
+    while !back.at_end().unwrap() {
+        let mut m = back.next_mol().unwrap().unwrap();
+        assert!(!prop(&m, "NUM_RINGS").is_empty());
+        again.push(mol_to_smiles(&mut m, &SmilesWriteParams::default()).unwrap());
+    }
+    assert_eq!(again, smiles);
+}

@@ -311,3 +311,10 @@
 
 [module."rdoxide_python::rddepictor".sources]
 "Code/GraphMol/Depictor/Wrap/rdDepictor.cpp" = "698ee36508e4dba886c48637bfdafc9fbb0c35fc"
+
+[module."rdoxide::graphmol::file_parsers::sd_writer".sources]
+"Code/GraphMol/FileParsers/SDWriter.cpp" = "a2f3949be241ae0eabda34572090ae88bc657c78"
+"Code/GraphMol/FileParsers/MolWriters.h" = "81f419c173ddedfd1790a39da4c1acbdf3061955"
+
+[module."rdoxide_python::rdmolfiles_sdwriter".sources]
+"Code/GraphMol/Wrap/SDWriter.cpp" = "88a92d85958a621ba2c4972fe4278fbcd5ac3753"

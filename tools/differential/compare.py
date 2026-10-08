@@ -32,7 +32,7 @@ def run(python, mode, path):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("mode", choices=["parse", "rings", "sanitize", "ranks", "molfromsmiles", "smiles", "smarts", "substruct", "pickle", "picklesmarts", "molblock", "sdf", "molwrite", "depict"])
+    ap.add_argument("mode", choices=["parse", "rings", "sanitize", "ranks", "molfromsmiles", "smiles", "smarts", "substruct", "pickle", "picklesmarts", "molblock", "sdf", "molwrite", "depict", "sdwrite"])
     ap.add_argument("files", nargs="*")
     ap.add_argument("--limit", type=int, default=20, help="number of differences to print")
     ap.add_argument("--ref-python", default=os.environ.get("RDOXIDE_REF_PYTHON", str(ROOT / ".venv-ref/bin/python")),
@@ -56,7 +56,7 @@ def main():
             if r != t:
                 ndiff += 1
                 if ndiff <= args.limit:
-                    print(f"DIFF {f.name if args.mode == 'sdf' else ''} {smi}\n  ref:  {json.dumps(r)[:400]}\n  test: {json.dumps(t)[:400]}")
+                    print(f"DIFF {f.name if args.mode in ('sdf', 'sdwrite') else ''} {smi}\n  ref:  {json.dumps(r)[:400]}\n  test: {json.dumps(t)[:400]}")
     print(f"{args.mode}: {total - ndiff}/{total} identical")
     return 1 if ndiff else 0
 
