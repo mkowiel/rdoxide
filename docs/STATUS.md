@@ -8,7 +8,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 0 | `tools/sync_upstream.py` (fetch/regen/diff/stamp), `porting/manifest.toml` | ✅ | |
 | 0 | Multi-core: `rdgeneral::threads` (`getNumThreadsToUse`, order-preserving `par_map` on scoped threads, no dependency); `rdFingerprintGenerator.Get*Fingerprints(mols, numThreads)` run in parallel with the GIL released | ✅ | results independent of the thread count; 20k molecules RDKit-FP 2.4s -> 0.4s on 14 cores. Other batch APIs adopt `par_map` as they are ported |
 | 0 | Dependency license audit (`tools/check_licenses.py`, `LICENSES/CRATES.md`, CI step) | ✅ | permissive-only allow-list; 53 crates |
-| 0 | Upstream test ratchet (`tools/run_upstream_tests.py`) | ✅ | 231 upstream tests passing |
+| 0 | Upstream test ratchet (`tools/run_upstream_tests.py`) | ✅ | 253 upstream tests passing |
 | 1 | RDGeneral: Dict/RDValue/RDProps | ✅ | |
 | 1 | RDGeneral: RDLog + `rdBase` logging API | ✅ | upstream `UnitTestLogging.py` 32/32 |
 | 1 | RDGeneral: RNG (`boost::minstd_rand`, glibc `rand`) | ✅ | |
@@ -65,6 +65,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 10g | Gasteiger charges (`rdPartialCharges.ComputeGasteigerCharges`, parameter tables, conjugated charge sharing), `PEOE_VSA_`, verbatim `Chem/MolSurf.py` | ✅ | differential `gasteiger` 15312/15312 identical (string and double properties); upstream `UnitTestSurf` 9/13 + 4 long tests that also pass with `doLong` (one of them fails identically on the reference: bad SMILES in its data), `testPartialCharges` 6/7 |
 | 10h | Connectivity descriptors: `CalcChi{0..4}{v,n}`, `CalcChiNv`/`CalcChiNn`, `CalcHallKierAlpha` (with `atomContribs`), `CalcKappa1/2/3` (+ `CalcPhi` moved to its own binding module); the HK deltas / nVals caches follow upstream (including its unsigned `nOuter - nHs`) | ✅ | differential `connectivity` 15312/15312 identical (plain and explicit-H forms) |
 | 11a | `Descriptors` module prerequisites: property registry (`rdMolDescriptors.Properties`, `PythonPropertyFunctor`, `PropertyRangeQuery`, `MakePropertyRangeQuery`; 43 built-in functors in upstream order, Python-defined functors via `RegisterProperty`), `rdkit.ML.InfoTheory.rdInfoTheory` (`InfoEntropy`, `InfoGain`, `ChiSquare`), `_vect<string>` type, `FragmentDescriptors.csv` data file; verbatim `Descriptors.py`, `Fragments.py`, `GraphDescriptors.py`, `Graphs.py`, `QED.py`, `SpacialScore.py`, `Descriptors3D.py`, `EState/*`, `ChemUtils` | 🟡 | `from rdkit.Chem import Descriptors` works with 209 of 217 descriptors listed; 178 of them evaluate (rest need `GetDistanceMatrix`, `DeleteSubstructs`, `FindPotentialStereoBonds`); `BCUT2D_*` (8) missing; `InfoBitRanker`/`BitCorrMatGenerator` not ported |
+| 11b | `Chem.GetDistanceMatrix` (bond orders, atom weights; Floyd-Warshall with upstream's operation order), `GetAdjacencyMatrix`, `Get3DDistanceMatrix` with upstream's computed-property caching (`DistanceMatrix`, `_Paths`, `force`, `prefix`); `DeleteSubstructs`; `FindPotentialStereoBonds`; `Get/SetUseLegacyStereoPerception`, `Get/SetAllowNontetrahedralChirality`; `_vect<string>` for string-vector props; pure-Python tail of `Chem/__init__.py` (`FindMolChiralCenters`, `CanonSmiles`, ...) | ✅ | differential `matrices`, `transforms` and `descriptors` (all 200+ `Descriptors._descList` values on 10312 molecules) identical. `SPS` waits for the new stereo perception (`FindPotentialStereo`), `BCUT2D_*` for BCUT2D |
 | 10a | rest of `rdMolDescriptors` (MQNs, BCUT, AUTOCORR2D, ...) and the `Descriptors` module (needs EState, QED, SpacialScore, GraphDescriptors) | ⬜ | next |
 | 9 | LayeredFingerprint, PatternFingerprint, JSON (de)serialization, GetFPs bulk helpers | ⬜ | |
 | 7–13 | see PLAN.md | ⬜ | |
@@ -155,8 +156,6 @@ New Python test files are also run against the official wheel to validate expect
 * `MolFragmentToSmiles(mol, params, atomsToUse)` with `params` passed positionally works
   in rdoxide; upstream's Boost overload resolution raises AttributeError for it (keyword
   form works in both).
-* `GetPropsAsDict(includePrivate=True, includeComputed=True)` returns `__computedProps`
-  as a list (upstream: a `_vectSt6string` wrapper).
 * `Chem.SetAllowNontetrahedralChirality` & co. keep the value in-process;
   upstream also writes it to the process environment.
 * 2026-10-08 — Stage 8a: DataStructs bit vectors + similarity. Next: SparseIntVect/DiscreteValueVect, then fingerprints (Morgan, RDKit, atom pairs) or SGroups.
@@ -178,3 +177,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-09 — Stage 10g: Gasteiger charges, `PEOE_VSA_` and verbatim MolSurf.py identical to RDKit (`gasteiger` differential). Next: the rest of `rdMolDescriptors` (Chi/Kappa, MQNs, ...) and the `Descriptors` module.
 * 2026-10-09 — Stage 10h: Chi/Kappa/Hall-Kier connectivity descriptors identical to RDKit (`connectivity` differential; `res += a*b` of Chi1 is fused on arm64). Next: the `Descriptors` module prerequisites (EState, GraphDescriptors, ...).
 * 2026-10-09 — Stage 11a: `Descriptors` module imports (property registry, InfoTheory, Fragments data, verbatim pure-Python modules). Ratchet 231. Next: `GetDistanceMatrix`, `DeleteSubstructs`, `FindPotentialStereoBonds` (EState, GraphDescriptors, QED, SPS), then BCUT2D.
+* 2026-10-09 — Stage 11b: distance/adjacency matrices, DeleteSubstructs, FindPotentialStereoBonds; every `Descriptors` value but SPS and BCUT2D identical to RDKit. Ratchet 253. Next: BCUT2D, AUTOCORR2D, new stereo perception (SPS), then the remaining `rdMolDescriptors` functions (MQNs, ...).

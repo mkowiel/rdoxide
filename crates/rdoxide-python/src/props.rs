@@ -137,7 +137,7 @@ pub fn rdvalue_to_py(
         RDValue::VecUnsignedInt(x) => x.clone().into_pyobject(py)?.into_any().unbind(),
         RDValue::VecDouble(x) => x.clone().into_pyobject(py)?.into_any().unbind(),
         RDValue::VecFloat(x) => x.clone().into_pyobject(py)?.into_any().unbind(),
-        RDValue::VecString(x) => x.clone().into_pyobject(py)?.into_any().unbind(),
+        RDValue::VecString(x) => crate::vects::PyVectStr::new_py(py, x.clone())?,
     })
 }
 
@@ -182,7 +182,7 @@ pub fn props_as_dict<'py>(
     let res = PyDict::new(py);
     let keys = d.get_prop_list(include_private, include_computed);
     for (k, v) in d.iter() {
-        if keys.iter().any(|x| x == k) {
+        if keys.iter().any(|x| x == k) && !rdoxide::graphmol::matrices::is_matrix_cache_prop(k) {
             res.set_item(k, rdvalue_to_py(py, v, auto_convert_strings)?)?;
         }
     }

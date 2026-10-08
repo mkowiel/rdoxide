@@ -620,6 +620,86 @@ def connectivity_record(smi):
     return {"plain": record(m), "withHs": record(Chem.AddHs(m))}
 
 
+def matrices_record(smi):
+    """Distance/adjacency matrices (Matrices.cpp) as digests of the raw bytes, plus the cache property names."""
+    import hashlib
+    m = Chem.MolFromSmiles(smi)
+    if m is None:
+        return None
+
+    def digest(fn):
+        try:
+            arr = fn()
+            return [str(arr.dtype), list(arr.shape), hashlib.md5(arr.tobytes()).hexdigest()]
+        except Exception as e:  # noqa: BLE001
+            return type(e).__name__
+
+    def record(mol):
+        res = {}
+        for useBO in (False, True):
+            for wts in (False, True):
+                res["dist%d%d" % (useBO, wts)] = digest(
+                    lambda: Chem.GetDistanceMatrix(Chem.Mol(mol), useBO=useBO, useAtomWts=wts))
+            res["adj%d" % useBO] = digest(lambda: Chem.GetAdjacencyMatrix(Chem.Mol(mol), useBO=useBO))
+        res["adjEmpty"] = digest(lambda: Chem.GetAdjacencyMatrix(Chem.Mol(mol), emptyVal=-1))
+        cached = Chem.Mol(mol)
+        Chem.GetDistanceMatrix(cached)
+        Chem.GetAdjacencyMatrix(cached, useBO=True)
+        res["props"] = sorted(cached.GetPropNames(includePrivate=True, includeComputed=True))
+        return res
+
+    return {"plain": record(m), "withHs": record(Chem.AddHs(m))}
+
+
+def transforms_record(smi):
+    """DeleteSubstructs (ChemTransforms.cpp) and FindPotentialStereoBonds (Chirality.cpp)."""
+    m = Chem.MolFromSmiles(smi)
+    if m is None:
+        return None
+
+    def attempt(fn):
+        try:
+            return fn()
+        except Exception as e:  # noqa: BLE001
+            return type(e).__name__
+
+    res = {}
+    for name, sma in (("hetero", "[!#6;!#1]"), ("carbonyl", "C=O"), ("halogen", "[F,Cl,Br,I]"), ("ring", "[R]"),
+                      ("chiral", "[C@,C@@]"), ("methyl", "[CH3]"), ("arom", "a")):
+        q = Chem.MolFromSmarts(sma)
+        for opts in ((False, False), (True, False), (False, True)):
+            res["del-%s-%d%d" % ((name,) + tuple(map(int, opts)))] = attempt(
+                lambda: Chem.MolToSmiles(Chem.DeleteSubstructs(m, q, onlyFrags=opts[0], useChirality=opts[1])))
+
+    def potential(clean, hs=False):
+        mm = Chem.AddHs(m) if hs else Chem.Mol(m)
+        Chem.FindPotentialStereoBonds(mm, cleanIt=clean)
+        return [[b.GetIdx(), str(b.GetStereo()), list(b.GetStereoAtoms())] for b in mm.GetBonds()
+                if b.GetBondType() == Chem.BondType.DOUBLE] + [sorted(mm.GetPropNames(True, True))]
+    res["potential"] = attempt(lambda: potential(False))
+    res["potentialClean"] = attempt(lambda: potential(True))
+    res["potentialHs"] = attempt(lambda: potential(False, hs=True))
+    return res
+
+
+def descriptors_record(smi):
+    """Every descriptor of rdkit.Chem.Descriptors (minus the ones rdoxide cannot compute yet)."""
+    from rdkit.Chem import Descriptors
+    m = Chem.MolFromSmiles(smi)
+    if m is None:
+        return None
+    skip = {"SPS"}
+    res = {}
+    for name, fn in Descriptors._descList:
+        if name in skip or name.startswith("BCUT2D"):
+            continue
+        try:
+            res[name] = fn(Chem.Mol(m))
+        except Exception as e:  # noqa: BLE001
+            res[name] = type(e).__name__
+    return res
+
+
 def lipinski_record(smi):
     """rdMolDescriptors counts (Lipinski.cpp), with the rotatable-bond modes and the atom lists."""
     from rdkit.Chem import rdMolDescriptors as D
@@ -673,6 +753,12 @@ def dump(mode, smi):
         return gasteiger_record(smi)
     if mode == "connectivity":
         return connectivity_record(smi)
+    if mode == "matrices":
+        return matrices_record(smi)
+    if mode == "transforms":
+        return transforms_record(smi)
+    if mode == "descriptors":
+        return descriptors_record(smi)
     if mode == "crippen":
         return crippen_record(smi)
     if mode == "addhs":

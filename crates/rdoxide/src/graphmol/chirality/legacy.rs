@@ -519,6 +519,107 @@ fn find_atom_neighbor_dir_helper(
     Ok(())
 }
 
+/// `Chirality::findAtomNeighborsHelper(mol, atom, refBond, neighbors, false, true)`:
+/// the other ends of the single and aromatic bonds on `atom` except `ref_bond`.
+fn find_atom_neighbors_with_aromatic(mol: &ROMol, atom: u32, ref_bond: u32) -> Result<Vec<u32>> {
+    let mut neighbors = Vec::new();
+    for b in mol.atom_bond_indices(atom) {
+        if b == ref_bond {
+            continue;
+        }
+        let bond = mol.bond(b);
+        if matches!(bond.bond_type(), BondType::Single | BondType::Aromatic) {
+            neighbors.push(bond.other_atom_idx(atom)?);
+        }
+    }
+    Ok(neighbors)
+}
+
+/// `MolOps::findPotentialStereoBonds`: marks non-ring double bonds whose ends
+/// carry distinguishable substituents as `STEREOANY` and records the stereo
+/// atoms (the higher-ranked neighbor on each end). Ring double bonds are
+/// ignored.
+pub fn find_potential_stereo_bonds(mol: &mut ROMol, clean_it: bool) -> Result<()> {
+    if mol.has_prop(cp::_BondsPotentialStereo) && !clean_it {
+        return Ok(());
+    }
+    let mut ranks: Vec<u32> = vec![0; mol.num_atoms() as usize];
+    let mut cip_done = false;
+    for bi in 0..mol.num_bonds() {
+        let bond = mol.bond(bi);
+        if bond.bond_type() != BondType::Double || mol.ring_info().num_bond_rings(bi)? != 0 {
+            continue;
+        }
+        // only if we are cleaning, nothing is set yet, or it is STEREOANY
+        // without the stereo atoms
+        if !(clean_it
+            || bond.stereo() == BondStereo::StereoNone
+            || (bond.stereo() == BondStereo::StereoAny && bond.stereo_atoms().len() != 2))
+        {
+            continue;
+        }
+        let (beg, end) = (bond.begin_atom_idx(), bond.end_atom_idx());
+        mol.bond_mut(bi).set_stereo(BondStereo::StereoNone)?;
+        // we're only going to handle 2 or three coordinate atoms:
+        if !matches!(mol.atom_degree(beg), 2 | 3) || !matches!(mol.atom_degree(end), 2 | 3) {
+            continue;
+        }
+        if !cip_done {
+            if !mol.atom(beg).has_prop(cp::_CIPRank) {
+                assign_atom_cip_ranks(mol, &mut ranks)?;
+            } else {
+                // no need to recompute if we don't need to recompute. :-)
+                for ai in 0..mol.num_atoms() {
+                    ranks[ai as usize] = mol
+                        .atom(ai)
+                        .get_prop(cp::_CIPRank)
+                        .and_then(RDValue::as_uint)
+                        .ok_or_else(|| RDKitError::Key(cp::_CIPRank.to_string()))?;
+                }
+            }
+            cip_done = true;
+        }
+        let beg_nbrs = find_atom_neighbors_with_aromatic(mol, beg, bi)?;
+        let end_nbrs = find_atom_neighbors_with_aromatic(mol, end, bi)?;
+        if beg_nbrs.is_empty() || end_nbrs.is_empty() {
+            continue;
+        }
+        let rank = |a: u32| ranks[a as usize];
+        // the neighbor with the higher rank of a pair
+        let higher = |n: &[u32]| if rank(n[0]) > rank(n[1]) { n[0] } else { n[1] };
+        let mut stereo_atoms: Vec<i32> = Vec::new();
+        if beg_nbrs.len() == 2 && end_nbrs.len() == 2 {
+            // both ends have two other neighbors: ranks must differ on both
+            if rank(beg_nbrs[0]) != rank(beg_nbrs[1]) && rank(end_nbrs[0]) != rank(end_nbrs[1]) {
+                stereo_atoms.push(higher(&beg_nbrs) as i32);
+                stereo_atoms.push(higher(&end_nbrs) as i32);
+            }
+        } else if beg_nbrs.len() == 2 {
+            if rank(beg_nbrs[0]) != rank(beg_nbrs[1]) {
+                stereo_atoms.push(higher(&beg_nbrs) as i32);
+                stereo_atoms.push(end_nbrs[0] as i32);
+            }
+        } else if end_nbrs.len() == 2 {
+            if rank(end_nbrs[0]) != rank(end_nbrs[1]) {
+                stereo_atoms.push(beg_nbrs[0] as i32);
+                stereo_atoms.push(higher(&end_nbrs) as i32);
+            }
+        } else {
+            // one neighbor on each end: the ranks do not matter
+            stereo_atoms.push(beg_nbrs[0] as i32);
+            stereo_atoms.push(end_nbrs[0] as i32);
+        }
+        // mark this double bond as a potential stereo bond
+        let bond = mol.bond_mut(bi);
+        bond.stereo_atoms_mut().extend_from_slice(&stereo_atoms);
+        if !bond.stereo_atoms().is_empty() {
+            bond.set_stereo(BondStereo::StereoAny)?;
+        }
+    }
+    mol.set_prop(cp::_BondsPotentialStereo, 1, true)?;
+    Ok(())
+}
+
 /// `Chirality::assignBondStereoCodes`: returns (unassigned bonds remain,
 /// any bond was assigned).
 fn assign_bond_stereo_codes(mol: &mut ROMol, ranks: &mut Vec<u32>) -> Result<(bool, bool)> {
