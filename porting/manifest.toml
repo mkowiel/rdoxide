@@ -411,3 +411,11 @@
 [module."rdoxide::graphmol::fingerprints::maccs".sources]
 "Code/GraphMol/Fingerprints/MACCS.cpp" = "ec288e546c26da06c4bc0fa7bc2d36b544854886"
 "Code/GraphMol/Fingerprints/MACCS.h" = "f004a6c933308b564ec19feb8f72706e9cc50819"
+
+[module."rdoxide::graphmol::descriptors::crippen".sources]
+"Code/GraphMol/Descriptors/Crippen.cpp" = "92346372ebcbd3bd54a54737a751e3f4eb66e82f"
+"Code/GraphMol/Descriptors/Crippen.h" = "42a846c1803c55cc0e96dbfc3a3d7c5807b18128"
+
+[module."rdoxide::geometry::transform3d".sources]
+"Code/Geometry/Transform3D.cpp" = "037ca6a16e994454198c7724e3f9d68582eee660"
+"Code/Geometry/Transform3D.h" = "8738264bcc2cbdae1cc46cab813315128118f904"

@@ -60,6 +60,7 @@ Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testRDKitFPGenerato
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testRDKitFPGeneratorAndFromAtoms
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testTopologicalTorsionGenerator
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testTopologicalTorsionShortestPaths
+Code/GraphMol/Wrap/testConformer.py::TestCase::test0AddHds
 Code/GraphMol/Wrap/testConformer.py::TestCase::test0Conformers
 Code/GraphMol/Wrap/testConformer.py::TestCase::test2Issue217
 Code/GraphMol/Wrap/testConformer.py::TestCase::test3Exceptions
@@ -87,6 +88,11 @@ rdkit/Chem/UnitTestChemBond.py::TestCase::test3Props
 rdkit/Chem/UnitTestChemBond.py::TestCase::test4Props2
 rdkit/Chem/UnitTestChemSmarts.py::TestCase::testMatch
 rdkit/Chem/UnitTestChemSmarts.py::TestCase::testOrder
+rdkit/Chem/UnitTestCrippen.py::TestCase::testDetails
+rdkit/Chem/UnitTestCrippen.py::TestCase::testDetails2
+rdkit/Chem/UnitTestCrippen.py::TestCase::testIssue1749494
+rdkit/Chem/UnitTestCrippen.py::TestCase::testLogP
+rdkit/Chem/UnitTestCrippen.py::TestCase::testRepeat
 rdkit/Chem/UnitTestSmiles.py::TestCase::testFailures
 rdkit/Chem/UnitTestSmiles.py::TestCase::testHighSymmetry
 rdkit/Chem/UnitTestSmiles.py::TestCase::testLinear1

@@ -374,3 +374,312 @@ pub fn remove_hs(mol: &mut RWMol, ps: &RemoveHsParameters, sanitize: bool) -> Re
     }
     Ok(())
 }
+
+// ---------------------------------------------------------------------------
+// addHs
+
+use crate::geometry::point::Point3D;
+use crate::geometry::transform3d::Transform3D;
+use crate::graphmol::atom::{Atom, HybridizationType};
+
+const SQ_DIST_ZERO_TOL: f64 = 1.0e-4;
+
+/// `MolOps::AddHsParameters`
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct AddHsParameters {
+    pub explicit_only: bool,
+    pub add_coords: bool,
+    pub add_residue_info: bool,
+    pub skip_queries: bool,
+}
+
+/// anonymous-namespace `getAtomNeighborNot`: first neighbor of `atom` that is not `other`
+fn atom_neighbor_not(mol: &RWMol, atom: u32, other: u32) -> Result<u32> {
+    mol.atom_neighbors(atom)
+        .find(|&n| n != other)
+        .ok_or_else(|| RDKitError::invariant("no neighbor found"))
+}
+
+/// anonymous-namespace `pickBisector`
+fn pick_bisector(nbr1: &Point3D, nbr2: &Point3D, nbr3: &Point3D) -> Point3D {
+    let mut dir = *nbr2 + *nbr3;
+    if dir.length_sq() < SQ_DIST_ZERO_TOL {
+        dir = *nbr2;
+        std::mem::swap(&mut dir.x, &mut dir.y);
+        dir.x *= -1.0;
+    }
+    if dir.dot_product(nbr1) < 0.0 {
+        dir *= -1.0;
+    }
+    dir
+}
+
+/// `MolOps::setTerminalAtomCoords`: places terminal atom `idx` bonded to `other_idx`.
+pub fn set_terminal_atom_coords(mol: &mut RWMol, idx: u32, other_idx: u32) -> Result<()> {
+    if other_idx == idx {
+        return Err(RDKitError::precondition("degenerate atoms"));
+    }
+    let pt = PeriodicTable::get();
+    let bond_length = pt.get_rb0(1)? + pt.get_rb0(mol.atom(other_idx).atomic_num())?;
+    let other_nbrs: Vec<u32> = mol.atom_neighbors(other_idx).collect();
+    let hyb = mol.atom(other_idx).hybridization();
+    // upstream keeps these across the conformer loop
+    let mut dir = Point3D::default();
+    let mut perp = Point3D::default();
+    let mut other_pos = Point3D::default();
+    let scale = |is3d: bool| if is3d { bond_length } else { 1.0 };
+    match other_nbrs.len() {
+        1 => {
+            for conf in mol.conformers_mut() {
+                if conf.is_3d() {
+                    dir.z = 1.0;
+                } else {
+                    dir.x = 1.0;
+                }
+                other_pos = conf.atom_pos(other_idx)?;
+                conf.set_atom_pos(idx, other_pos + dir * scale(conf.is_3d()))?;
+            }
+        }
+        2 => {
+            let nbr1 = atom_neighbor_not(mol, other_idx, idx)?;
+            let nbr2 = if mol.atom_neighbors(nbr1).count() > 1 {
+                let nb = mol
+                    .get_bond_between_atoms(other_idx, nbr1)?
+                    .expect("neighbors are bonded");
+                if nb.is_aromatic() || nb.bond_type() == BondType::Double || nb.is_conjugated() {
+                    Some(atom_neighbor_not(mol, nbr1, other_idx)?)
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+            for conf in mol.conformers_mut() {
+                other_pos = conf.atom_pos(other_idx)?;
+                let nbr1_pos = conf.atom_pos(nbr1)?;
+                let mut nbr1_vect = nbr1_pos - other_pos;
+                if nbr1_vect.length_sq() < SQ_DIST_ZERO_TOL {
+                    conf.set_atom_pos(idx, other_pos)?;
+                    continue;
+                }
+                nbr1_vect.normalize()?;
+                nbr1_vect *= -1.0;
+                let is3d = conf.is_3d();
+                match hyb {
+                    HybridizationType::SP3 => {
+                        if is3d {
+                            perp = nbr1_vect.get_perpendicular()?;
+                        } else {
+                            perp.z = 1.0;
+                        }
+                        let mut tf = Transform3D::identity();
+                        tf.set_rotation((180.0 - 109.471) * std::f64::consts::PI / 180.0, &perp);
+                        dir = tf.transform_point(&nbr1_vect);
+                    }
+                    HybridizationType::SP2 => {
+                        if is3d {
+                            perp = nbr1_vect.get_perpendicular()?;
+                        } else {
+                            perp.z = 1.0;
+                        }
+                        if let Some(n2) = nbr2 {
+                            let nbr2_vect = nbr1_pos.direction_vector(&conf.atom_pos(n2)?)?;
+                            let cross = nbr2_vect.cross_product(&nbr1_vect);
+                            if cross.length_sq() >= SQ_DIST_ZERO_TOL {
+                                perp = cross;
+                            }
+                        }
+                        perp.normalize()?;
+                        let mut tf = Transform3D::identity();
+                        tf.set_rotation(60.0 * std::f64::consts::PI / 180.0, &perp);
+                        dir = tf.transform_point(&nbr1_vect);
+                    }
+                    _ => dir = nbr1_vect,
+                }
+                conf.set_atom_pos(idx, other_pos + dir * scale(is3d))?;
+            }
+        }
+        3 => {
+            let others: Vec<u32> = other_nbrs.iter().copied().filter(|&n| n != idx).collect();
+            let (nbr1, nbr2) = (others[0], others[1]);
+            for conf in mol.conformers_mut() {
+                other_pos = conf.atom_pos(other_idx)?;
+                let mut v1 = other_pos - conf.atom_pos(nbr1)?;
+                let mut v2 = other_pos - conf.atom_pos(nbr2)?;
+                if v1.length_sq() < SQ_DIST_ZERO_TOL || v2.length_sq() < SQ_DIST_ZERO_TOL {
+                    conf.set_atom_pos(idx, other_pos)?;
+                    continue;
+                }
+                v1.normalize()?;
+                v2.normalize()?;
+                dir = v1 + v2;
+                if dir.length_sq() < SQ_DIST_ZERO_TOL {
+                    continue;
+                }
+                dir.normalize()?;
+                if conf.is_3d() {
+                    if hyb == HybridizationType::SP3 {
+                        let nbr_perp = v1.cross_product(&v2);
+                        let mut axis = nbr_perp.cross_product(&dir);
+                        axis.normalize()?;
+                        let mut tf = Transform3D::identity();
+                        tf.set_rotation((109.471 / 2.0) * std::f64::consts::PI / 180.0, &axis);
+                        dir = tf.transform_point(&dir);
+                    }
+                    conf.set_atom_pos(idx, other_pos + dir * bond_length)?;
+                } else {
+                    conf.set_atom_pos(idx, other_pos + dir)?;
+                }
+            }
+        }
+        4 => {
+            let others: Vec<u32> = other_nbrs.iter().copied().filter(|&n| n != idx).collect();
+            let (nbr1, nbr2, nbr3) = (others[0], others[1], others[2]);
+            let other_atom = mol.atom(other_idx);
+            let has_cip = other_atom.get_prop(cp::_CIPCode).is_some();
+            let chiral = other_atom.chiral_tag();
+            for conf in mol.conformers_mut() {
+                other_pos = conf.atom_pos(other_idx)?;
+                let mut v1 = other_pos - conf.atom_pos(nbr1)?;
+                let mut v2 = other_pos - conf.atom_pos(nbr2)?;
+                let mut v3 = other_pos - conf.atom_pos(nbr3)?;
+                if v1.length_sq() < SQ_DIST_ZERO_TOL
+                    || v2.length_sq() < SQ_DIST_ZERO_TOL
+                    || v3.length_sq() < SQ_DIST_ZERO_TOL
+                {
+                    conf.set_atom_pos(idx, other_pos)?;
+                    continue;
+                }
+                v1.normalize()?;
+                v2.normalize()?;
+                v3.normalize()?;
+                if conf.is_3d() {
+                    if v3.dot_product(&v1.cross_product(&v2)).abs() < 0.1 {
+                        dir = v1.cross_product(&v2);
+                        if dir.length_sq() < SQ_DIST_ZERO_TOL {
+                            dir = v1.cross_product(&v3) * -1.0;
+                        }
+                        if dir.length_sq() < SQ_DIST_ZERO_TOL {
+                            dir = v2.cross_product(&v3);
+                        }
+                        if dir.length_sq() < SQ_DIST_ZERO_TOL {
+                            continue;
+                        }
+                        if has_cip {
+                            let a = dir - v3;
+                            let b = v1 - v3;
+                            let c = v2 - v3;
+                            let vol = a.dot_product(&b.cross_product(&c));
+                            if (chiral == ChiralType::TetrahedralCCW && vol < 0.0)
+                                || (chiral == ChiralType::TetrahedralCW && vol > 0.0)
+                            {
+                                dir *= -1.0;
+                            }
+                        }
+                    } else {
+                        dir = v1 + v2 + v3;
+                    }
+                } else {
+                    let a12 = v1.angle_to(&v2);
+                    let a13 = v1.angle_to(&v3);
+                    let a23 = v2.angle_to(&v3);
+                    let (s1, s2, s3) = (a12 + a13, a12 + a23, a13 + a23);
+                    dir = if s1 <= s2 && s1 <= s3 {
+                        pick_bisector(&v1, &v2, &v3)
+                    } else if s2 <= s1 && s2 <= s3 {
+                        pick_bisector(&v2, &v1, &v3)
+                    } else {
+                        pick_bisector(&v3, &v1, &v2)
+                    };
+                }
+                dir.normalize()?;
+                let s = scale(conf.is_3d());
+                conf.set_atom_pos(idx, other_pos + dir * s)?;
+            }
+        }
+        _ => {
+            let p = other_pos + dir * bond_length;
+            for conf in mol.conformers_mut() {
+                conf.set_atom_pos(idx, p)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// anonymous-namespace `isQueryAtom`
+fn is_query_atom(mol: &RWMol, idx: u32) -> bool {
+    mol.atom(idx).has_query() || mol.atom_bonds(idx).any(|b| b.has_query())
+}
+
+/// `MolOps::addHs(RWMol&, params, onlyOnAtoms)`
+pub fn add_hs(
+    mol: &mut RWMol,
+    params: &AddHsParameters,
+    only_on_atoms: Option<&[u32]>,
+) -> Result<()> {
+    mol.clear_computed_props(false);
+    let n = mol.num_atoms();
+    let mut on_atoms = vec![only_on_atoms.is_none(); n as usize];
+    if let Some(oa) = only_on_atoms {
+        for &a in oa {
+            *on_atoms
+                .get_mut(a as usize)
+                .ok_or_else(|| RDKitError::Index(format!("Index Error: {a}")))? = true;
+        }
+    }
+    let mut n_expl = vec![0u32; n as usize];
+    let mut n_impl = vec![0u32; n as usize];
+    for i in 0..n {
+        n_expl[i as usize] = mol.atom(i).num_explicit_hs();
+        n_impl[i as usize] = mol.atom(i).num_implicit_hs()?;
+        if on_atoms[i as usize] && params.skip_queries && is_query_atom(mol, i) {
+            on_atoms[i as usize] = false;
+        }
+    }
+    for aidx in 0..n {
+        if !on_atoms[aidx as usize] {
+            continue;
+        }
+        let iso_hs: Vec<u32> = match mol.atom(aidx).get_prop(cp::_isotopicHs) {
+            Some(v) => {
+                let v = match v {
+                    crate::rdgeneral::RDValue::VecUnsignedInt(v) => v.clone(),
+                    _ => Vec::new(),
+                };
+                mol.atom_mut(aidx).clear_prop(cp::_isotopicHs);
+                v
+            }
+            None => Vec::new(),
+        };
+        let mut iso = iso_hs.iter();
+        mol.atom_mut(aidx).clear_computed_props();
+        let n_h = n_expl[aidx as usize]
+            + if params.explicit_only {
+                0
+            } else {
+                n_impl[aidx as usize]
+            };
+        for i in 0..n_h {
+            let new_idx = mol.add_atom(Atom::new(1), false);
+            mol.add_bond(aidx, new_idx, BondType::Single)?;
+            if i >= n_expl[aidx as usize] {
+                mol.atom_mut(new_idx)
+                    .set_prop(cp::isImplicit, 1i32, false)?;
+            }
+            mol.update_atom_property_cache(new_idx, true)?;
+            if params.add_coords {
+                set_terminal_atom_coords(mol, new_idx, aidx)?;
+            }
+            if let Some(&iv) = iso.next() {
+                mol.atom_mut(new_idx).set_isotope(iv);
+            }
+        }
+        mol.atom_mut(aidx).set_num_explicit_hs(0);
+        mol.update_atom_property_cache(aidx, false)?;
+        if iso.next().is_some() {
+            crate::rd_log_warning!("extra H isotope information found on atom {aidx}");
+        }
+    }
+    Ok(())
+}
