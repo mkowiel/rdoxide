@@ -17,5 +17,6 @@ pub mod graphmol;
 pub mod ml;
 pub mod numerics;
 pub mod rdgeneral;
+pub mod sim_div_pickers;
 
 pub use error::{RDKitError, Result, SanitizeError};

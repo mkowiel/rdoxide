@@ -4,6 +4,8 @@
 //! Ported from RDKit `Code/RDGeneral/utils.{h,cpp}` (BSD-3-Clause).
 //!
 //! * [`MinStdRand`]: `boost::minstd_rand` (the global `RDKit::getRandomGenerator`).
+//! * [`MersenneTwister`]: `boost::random::mersenne_twister` (`boost::mt19937` is
+//!   [`Mt19937`]) with `boost::uniform_int`.
 //! * [`CRand`]: glibc's `rand()`/`srand()` (TYPE_3 additive feedback), the
 //!   generator behind `rdBase.SeedRandomNumberGenerator` on Linux builds.
 
@@ -156,5 +158,116 @@ mod tests {
         assert_eq!(r.rand(), 1_804_289_383);
         assert_eq!(r.rand(), 846_930_886);
         assert_eq!(r.rand(), 1_681_692_777);
+    }
+}
+
+/// `boost::random::mersenne_twister` with 32-bit words, mt19937's tempering
+/// and `N`/`M` state words (`boost::mt19937` is `N = 624, M = 397`;
+/// fingerprint bit generation uses `N = 4, M = 2`).
+#[derive(Debug, Clone)]
+pub struct MersenneTwister<const N: usize, const M: usize> {
+    state: [u32; N],
+    idx: usize,
+}
+
+/// `boost::mt19937`
+pub type Mt19937 = MersenneTwister<624, 397>;
+
+impl<const N: usize, const M: usize> MersenneTwister<N, M> {
+    pub fn new(seed: u32) -> Self {
+        let mut state = [0u32; N];
+        state[0] = seed;
+        for i in 1..N {
+            state[i] = 1_812_433_253u32
+                .wrapping_mul(state[i - 1] ^ (state[i - 1] >> 30))
+                .wrapping_add(i as u32);
+        }
+        MersenneTwister { state, idx: N }
+    }
+
+    /// Re-seeds the generator (`generator.seed(value)`).
+    pub fn seed(&mut self, seed: u32) {
+        *self = Self::new(seed);
+    }
+
+    fn twist(&mut self) {
+        for i in 0..N {
+            let y = (self.state[i] & 0x8000_0000) | (self.state[(i + 1) % N] & 0x7fff_ffff);
+            let mut v = self.state[(i + M) % N] ^ (y >> 1);
+            if y & 1 != 0 {
+                v ^= 0x9908_b0df;
+            }
+            self.state[i] = v;
+        }
+        self.idx = 0;
+    }
+
+    /// The next raw 32-bit output.
+    pub fn next_u32(&mut self) -> u32 {
+        if self.idx >= N {
+            self.twist();
+        }
+        let mut y = self.state[self.idx];
+        self.idx += 1;
+        y ^= y >> 11;
+        y ^= (y << 7) & 0x9d2c_5680;
+        y ^= (y << 15) & 0xefc6_0000;
+        y ^ (y >> 18)
+    }
+
+    /// `boost::uniform_int<int>(lo, hi)(engine)`: the bucket-rejection method
+    /// of `boost::random::detail::generate_uniform_int` for a 32-bit engine.
+    pub fn uniform_int(&mut self, lo: i32, hi: i32) -> i32 {
+        assert!(lo <= hi, "uniform_int: empty range");
+        let range = (hi as i64 - lo as i64) as u32;
+        if range == 0 {
+            return lo;
+        }
+        let result = if range == u32::MAX {
+            self.next_u32()
+        } else {
+            // engine range [0, 2^32 - 1] is wider than the requested one
+            let mut bucket_size = u32::MAX / (range + 1);
+            if u32::MAX % (range + 1) == range {
+                bucket_size += 1;
+            }
+            loop {
+                let r = self.next_u32() / bucket_size;
+                if r <= range {
+                    break r;
+                }
+            }
+        };
+        (lo as i64 + i64::from(result)) as i32
+    }
+}
+
+#[cfg(test)]
+mod mersenne_tests {
+    use super::*;
+
+    #[test]
+    fn mt19937_reference_values() {
+        // the first outputs of std::mt19937 seeded with 5489
+        let mut mt = Mt19937::new(5489);
+        assert_eq!(mt.next_u32(), 3_499_211_612);
+        assert_eq!(mt.next_u32(), 581_869_302);
+        // and the 10000th output of the default-seeded engine required by the C++ standard
+        let mut mt = Mt19937::new(5489);
+        let tenthousandth = (0..10_000).map(|_| mt.next_u32()).last().unwrap();
+        assert_eq!(tenthousandth, 4_123_659_995);
+    }
+
+    #[test]
+    fn uniform_int_stays_in_range_and_handles_degenerate_ranges() {
+        let mut mt = Mt19937::new(42);
+        assert_eq!(mt.uniform_int(7, 7), 7);
+        for _ in 0..1000 {
+            assert!((0..10).contains(&mt.uniform_int(0, 9)));
+        }
+        assert_eq!(
+            Mt19937::new(1).uniform_int(i32::MIN, i32::MAX),
+            Mt19937::new(1).next_u32() as i32 ^ i32::MIN
+        );
     }
 }

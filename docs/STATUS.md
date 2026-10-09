@@ -100,6 +100,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 9 | `PatternFingerprint` (`Chem.PatternFingerprint`, tautomer mode, `_PatternFingerprint_version`; `atomCounts`/`setOnlyBits` validated but unused as upstream) | ✅ | differential `patternfp` 11892/11892 identical (SMILES- and SMARTS-parsed molecules, 3 size/tautomer variants; reference RDKit 2026.03.6) |
 | 9 | `LayeredFingerprint` (`Chem.LayeredFingerprint`, all six layers, `atomCounts` write-back, `setOnlyBits`, `fromAtoms`, `LayeredFingerprint_substructLayers`, `_LayeredFingerprint_version`) | ✅ | differential `layeredfp` 11892/11892 identical (5 argument variants incl. atomCounts/setOnlyBits, SMILES and SMARTS molecules). Unbranched paths without `fromAtoms` deliberately differ: upstream passes `useBonds=false` there and crashes |
 | 9 | JSON (de)serialization, GetFPs bulk helpers | ⬜ | |
+| 11 | `rdSimDivPickers`: `MaxMinPicker` (`Pick` from a packed distance matrix, `LazyPick`, `LazyBitVectorPick`, `...WithThreshold`; seeding with boost `mt19937` + `uniform_int`) and `LeaderPicker` (`LazyPick`, `LazyBitVectorPick` with `numThreads`: the distances of each round are computed in parallel, the picks do not depend on the thread count); `rdkit.SimDivFilters` package | 🟡 | picks identical to the reference for 90 seeded scenarios (distance matrix, callbacks, bit vectors, thresholds, first picks, error types). `HierarchicalClusterPicker` (needs the Murtagh clustering code) not ported yet |
 | 7–13 | see PLAN.md | ⬜ | |
 
 ## Python package files

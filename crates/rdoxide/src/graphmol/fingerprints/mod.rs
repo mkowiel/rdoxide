@@ -18,6 +18,7 @@ use crate::error::{RDKitError, Result};
 use crate::graphmol::romol::ROMol;
 use crate::rdgeneral::RDProps;
 use crate::rdgeneral::common_properties as cp;
+use crate::rdgeneral::random::MersenneTwister;
 
 /// `gboost::hash_combine` with RDKit's 32-bit `hash_result_t`.
 #[inline]
@@ -46,60 +47,9 @@ pub fn hash_vect(v: &[u32]) -> u32 {
     seed
 }
 
-/// The `boost::random::mersenne_twister<uint32_t, 32, 4, 2, 31, 0x9908b0df,
-/// 11, 7, 0x9d2c5680, 15, 0xefc60000, 18, 3346425566U>` used by
-/// `getFingerprintHelper`: mt19937's tempering with a 4-word state (n=4, m=2).
-#[derive(Debug)]
-pub struct Mt19937 {
-    state: [u32; Self::N],
-    idx: usize,
-}
-
-impl Mt19937 {
-    const N: usize = 4;
-    const M: usize = 2;
-
-    pub fn new(seed: u32) -> Self {
-        let mut state = [0u32; Self::N];
-        state[0] = seed;
-        for i in 1..Self::N {
-            state[i] = 1_812_433_253u32
-                .wrapping_mul(state[i - 1] ^ (state[i - 1] >> 30))
-                .wrapping_add(i as u32);
-        }
-        Mt19937 {
-            state,
-            idx: Self::N,
-        }
-    }
-    fn twist(&mut self) {
-        for i in 0..Self::N {
-            let y = (self.state[i] & 0x8000_0000) | (self.state[(i + 1) % Self::N] & 0x7fff_ffff);
-            let mut v = self.state[(i + Self::M) % Self::N] ^ (y >> 1);
-            if y & 1 != 0 {
-                v ^= 0x9908_b0df;
-            }
-            self.state[i] = v;
-        }
-        self.idx = 0;
-    }
-    pub fn next_u32(&mut self) -> u32 {
-        if self.idx >= Self::N {
-            self.twist();
-        }
-        let mut y = self.state[self.idx];
-        self.idx += 1;
-        y ^= y >> 11;
-        y ^= (y << 7) & 0x9d2c_5680;
-        y ^= (y << 15) & 0xefc6_0000;
-        y ^ (y >> 18)
-    }
-    /// `boost::uniform_int<>(0, INT_MAX)` driven by this engine: the engine
-    /// range is twice the target range, so values fall into buckets of two.
-    pub fn uniform_0_int_max(&mut self) -> u32 {
-        self.next_u32() / 2
-    }
-}
+/// The 4-word `boost::random::mersenne_twister` of `getFingerprintHelper`
+/// (n = 4, m = 2, mt19937's tempering and multiplier 3346425566).
+pub type Mt19937 = MersenneTwister<4, 2>;
 
 /// `FingerprintArguments` (common part).
 #[derive(Clone, Debug)]
@@ -549,7 +499,7 @@ impl FingerprintGenerator {
             if self.args.num_bits_per_feature > 1 {
                 let rg = rng.insert(Mt19937::new(seed as u32));
                 for _ in 1..self.args.num_bits_per_feature {
-                    let mut b = u64::from(rg.uniform_0_int_max()) & mask;
+                    let mut b = u64::from(rg.uniform_int(0, i32::MAX).unsigned_abs()) & mask;
                     if fp_size != 0 {
                         b %= fp_size;
                     }
@@ -703,9 +653,16 @@ mod tests {
     #[test]
     fn mt19937_reference() {
         // values observed from RDKit 2026.09.1 (RDKit FP, numBitsPerFeature=2)
-        assert_eq!(Mt19937::new(4_274_652_475).uniform_0_int_max(), 54_413_874);
         assert_eq!(
-            Mt19937::new(1_524_090_560).uniform_0_int_max(),
+            Mt19937::new(4_274_652_475)
+                .uniform_int(0, i32::MAX)
+                .unsigned_abs(),
+            54_413_874
+        );
+        assert_eq!(
+            Mt19937::new(1_524_090_560)
+                .uniform_int(0, i32::MAX)
+                .unsigned_abs(),
             1_135_572_127
         );
     }
