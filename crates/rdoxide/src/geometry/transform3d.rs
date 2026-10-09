@@ -86,6 +86,43 @@ impl Transform3D {
         self.data = res;
     }
 
+    /// `SetRotationFromQuaternion`: the rotation part of the matrix for the
+    /// (not necessarily normalized) quaternion `q`.
+    pub fn set_rotation_from_quaternion(&mut self, q: &[f64; 4]) {
+        let (q00, q11, q22, q33) = (q[0] * q[0], q[1] * q[1], q[2] * q[2], q[3] * q[3]);
+        let sum_sq = q00 + q11 + q22 + q33;
+        let (q01, q02, q03) = (2.0 * q[0] * q[1], 2.0 * q[0] * q[2], 2.0 * q[0] * q[3]);
+        let (q12, q13, q23) = (2.0 * q[1] * q[2], 2.0 * q[1] * q[3], 2.0 * q[2] * q[3]);
+        let d = &mut self.data;
+        d[0] = (q00 + q11 - q22 - q33) / sum_sq;
+        d[1] = (q12 + q03) / sum_sq;
+        d[2] = (q13 - q02) / sum_sq;
+
+        d[4] = (q12 - q03) / sum_sq;
+        d[5] = (q00 - q11 + q22 - q33) / sum_sq;
+        d[6] = (q23 + q01) / sum_sq;
+
+        d[8] = (q13 + q02) / sum_sq;
+        d[9] = (q23 - q01) / sum_sq;
+        d[10] = (q00 - q11 - q22 + q33) / sum_sq;
+    }
+
+    /// `Reflect`: negates the rotation part (the translation is kept).
+    pub fn reflect(&mut self) {
+        for i in 0..3 {
+            for j in 0..3 {
+                self.data[i * 4 + j] *= -1.0;
+            }
+        }
+    }
+
+    /// `operator*(t1, t2)`: the transformation applying `rhs` first.
+    pub fn compose(&self, rhs: &Transform3D) -> Transform3D {
+        let mut res = self.clone();
+        res.mul_assign(rhs);
+        res
+    }
+
     /// `TransformPoint` / `operator*(Transform3D, Point3D)`
     pub fn transform_point(&self, p: &Point3D) -> Point3D {
         let d = &self.data;
