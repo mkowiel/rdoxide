@@ -643,3 +643,11 @@
 [module."rdoxide_python::rdmolops_subset".sources]
 "Code/GraphMol/Wrap/MolOps.cpp" = "2dc7ae10c4ce7523938a4db10e31215cfe2162db"
 "Code/GraphMol/Subgraphs/SubgraphUtils.cpp" = "871fb0ef2858827922e521b870ff4af068edc52a"
+
+[module."rdoxide::graphmol::chirality::stereo_groups".sources]
+"Code/GraphMol/Chirality.cpp" = "4ae1eb5d92ea880ef07395a25b33c647ec87b09b"
+"Code/GraphMol/FileParsers/MolFileStereochem.cpp" = "b3d1160d4a0913a8b7cfe0f491e23ed68b35f87c"
+
+[module."rdoxide_python::rdmolops_stereo_groups".sources]
+"Code/GraphMol/Wrap/MolOps.cpp" = "2dc7ae10c4ce7523938a4db10e31215cfe2162db"
+"Code/GraphMol/Wrap/ChiralityOps.cpp" = "a4f1c978314b55631ee748e8ff6c9a85613ccd8f"

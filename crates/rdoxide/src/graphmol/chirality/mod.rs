@@ -5,6 +5,7 @@ pub mod bond_dirs;
 pub mod from_coords;
 pub mod legacy;
 pub mod nontetrahedral;
+pub mod stereo_groups;
 
 use std::sync::atomic::{AtomicU8, Ordering};
 

@@ -54,6 +54,7 @@ mod rdmolops_fingerprints;
 mod rdmolops_fragments;
 mod rdmolops_hs;
 mod rdmolops_matrices;
+mod rdmolops_stereo_groups;
 mod rdmolops_stereo_misc;
 mod rdmolops_structure;
 mod rdmolops_subgraphs;

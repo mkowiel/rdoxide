@@ -25,7 +25,7 @@ use crate::graphmol::queries::{
 };
 use crate::graphmol::romol::{ROMol, RWMol};
 use crate::graphmol::smiles_parse::write::in_organic_subset;
-use crate::graphmol::stereo_group::{StereoGroup, StereoGroupType};
+use crate::graphmol::stereo_group::{StereoGroup, StereoGroupType, assign_stereo_group_ids};
 use crate::graphmol::wedge_bonds::{
     WedgeBonds, WedgeInfo, determine_bond_wedge_state, pick_bonds_to_wedge,
 };
@@ -915,52 +915,6 @@ fn v3000_bond_line(
         }
     }
     Ok(ss)
-}
-
-/// `assignStereoGroupIds`
-pub fn assign_stereo_group_ids(groups: &mut [StereoGroup]) {
-    fn store(ids: &mut Vec<bool>, sg: &mut StereoGroup) {
-        let id = sg.write_id() as usize;
-        if id == 0 {
-            return;
-        }
-        if id >= ids.len() {
-            ids.resize(id + 1, false);
-        }
-        if ids[id] {
-            crate::rd_log_warning!(
-                "StereoGroup ID {id} is used by more than one group, and will be reassined"
-            );
-            sg.set_write_id(0);
-        } else {
-            ids[id] = true;
-        }
-    }
-    fn assign(ids: &[bool], next: &mut u32, sg: &mut StereoGroup) {
-        if sg.write_id() == 0 {
-            *next += 1;
-            while (*next as usize) < ids.len() && ids[*next as usize] {
-                *next += 1;
-            }
-            sg.set_write_id(*next);
-        }
-    }
-    let (mut and_ids, mut or_ids) = (Vec::new(), Vec::new());
-    for sg in groups.iter_mut() {
-        match sg.group_type() {
-            StereoGroupType::And => store(&mut and_ids, sg),
-            StereoGroupType::Or => store(&mut or_ids, sg),
-            StereoGroupType::Absolute => {}
-        }
-    }
-    let (mut and_id, mut or_id) = (0, 0);
-    for sg in groups.iter_mut() {
-        match sg.group_type() {
-            StereoGroupType::And => assign(&and_ids, &mut and_id, sg),
-            StereoGroupType::Or => assign(&or_ids, &mut or_id, sg),
-            StereoGroupType::Absolute => {}
-        }
-    }
 }
 
 /// `Atropisomers::getAllAtomIdsForStereoGroup`

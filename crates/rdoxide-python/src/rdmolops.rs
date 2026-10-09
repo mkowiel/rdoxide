@@ -298,6 +298,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     crate::rdmolops_subgraphs::add(m)?;
     crate::rdmolops_fingerprints::add(m)?;
     crate::rdmolops_matrices::add(m)?;
+    crate::rdmolops_stereo_groups::add(m)?;
     crate::rdmolops_stereo_misc::add(m)?;
     crate::rdmolops_structure::add(m)?;
     crate::rdmolops_subset::add(m)?;
