@@ -19,6 +19,7 @@ pub mod find_rings;
 pub mod fingerprints;
 pub mod kekulize;
 pub mod matrices;
+pub mod mmpa;
 pub mod mol_enumerator;
 pub mod mol_hash;
 pub mod mol_ops;

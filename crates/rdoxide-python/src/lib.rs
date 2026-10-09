@@ -34,6 +34,7 @@ mod rdenumeratestereoisomers;
 mod rdfingerprintgenerator;
 mod rdinfotheory;
 mod rdmetricmatrixcalc;
+mod rdmmpa;
 mod rdmoldescriptors;
 mod rdmoldescriptors_3d;
 mod rdmoldescriptors_autocorr;
@@ -152,6 +153,7 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
         rdsubstructlibrary::init,
     )?;
     add_submodule(m, "rdMolHash", "rdkit.Chem.rdMolHash", rdmolhash::init)?;
+    add_submodule(m, "rdMMPA", "rdkit.Chem.rdMMPA", rdmmpa::init)?;
     add_submodule(
         m,
         "rdEnumerateStereoisomers",

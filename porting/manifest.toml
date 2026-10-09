@@ -793,3 +793,10 @@
 
 [module."rdoxide_python::rdenumeratestereoisomers".sources]
 "Code/GraphMol/EnumerateStereoisomers/Wrap/rdEnumerateStereoisomers.cpp" = "ac981759a35782681eb18c27ed32e71f4bf2c9c9"
+
+[module."rdoxide::graphmol::mmpa".sources]
+"Code/GraphMol/MMPA/MMPA.cpp" = "e906039dfae86676826c7a1175889f6cac8503a4"
+"Code/GraphMol/MMPA/MMPA.h" = "a982a62aa4f68d6a2a8569f4df1faa93335895df"
+
+[module."rdoxide_python::rdmmpa".sources]
+"Code/GraphMol/MMPA/Wrap/rdMMPA.cpp" = "3039cee9ff8fb71ffae461defa7f207e817ce473"
