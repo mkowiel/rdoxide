@@ -1,10 +1,13 @@
 //! `rdkit.Geometry.rdGeometry` — port of upstream `Code/Geometry/Wrap/Point.cpp`
 //! (Point3D, Point2D so far).
 
-use pyo3::exceptions::{PyIndexError, PyRuntimeError};
+use pyo3::exceptions::{PyIndexError, PyRuntimeError, PyTypeError};
 use pyo3::prelude::*;
 use pyo3::types::PyTuple;
-use rdoxide::geometry::{Point2D, Point3D};
+use rdoxide::geometry::point::{compute_dihedral_angle, compute_signed_dihedral_angle};
+use rdoxide::geometry::{Point2D, Point3D, PointND};
+
+use crate::errors::IntoPyResult;
 
 /// A class to represent a three-dimensional point
 /// The x, y, and z coordinates can be read and written using either attributes
@@ -279,6 +282,210 @@ impl PyPoint2D {
     fn dot_product(&self, other: PyRef<'_, PyPoint2D>) -> f64 {
         self.p.dot_product(&other.p)
     }
+    fn __iadd__(&mut self, o: PyRef<'_, PyPoint2D>) {
+        self.p += o.p;
+    }
+    fn __isub__(&mut self, o: PyRef<'_, PyPoint2D>) {
+        self.p -= o.p;
+    }
+    fn __imul__(&mut self, s: f64) {
+        self.p *= s;
+    }
+    fn __itruediv__(&mut self, s: f64) {
+        self.p.x /= s;
+        self.p.y /= s;
+    }
+    /// Normalize the vector (using L2 norm)
+    #[pyo3(name = "Normalize")]
+    fn normalize(&mut self) -> PyResult<()> {
+        self.p
+            .normalize()
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+    }
+    /// determines the angle between a vector to this point (between 0 and PI)
+    #[pyo3(name = "AngleTo")]
+    fn angle_to(&self, other: PyRef<'_, PyPoint2D>) -> PyResult<f64> {
+        self.p.angle_to(&other.p).py()
+    }
+    /// determines the signed angle between a vector to this point (between 0 and 2*PI)
+    #[pyo3(name = "SignedAngleTo")]
+    fn signed_angle_to(&self, other: PyRef<'_, PyPoint2D>) -> PyResult<f64> {
+        self.p.signed_angle_to(&other.p).py()
+    }
+    /// return a normalized direction vector from this point to another
+    #[pyo3(name = "DirectionVector")]
+    fn direction_vector(&self, other: PyRef<'_, PyPoint2D>) -> PyResult<Self> {
+        Ok(PyPoint2D {
+            p: self.p.direction_vector(&other.p).py()?,
+        })
+    }
+}
+
+/// A class to represent an N-dimensional point
+#[pyclass(
+    name = "PointND",
+    module = "rdkit.Geometry.rdGeometry",
+    subclass,
+    skip_from_py_object
+)]
+#[derive(Debug, Clone)]
+pub struct PyPointND {
+    pub p: PointND,
+}
+
+impl PyPointND {
+    /// A Python index (negative counts from the end) as a position.
+    fn position(&self, idx: i64) -> PyResult<usize> {
+        let dim = self.p.dimension() as i64;
+        if idx >= dim || idx < -dim {
+            return Err(index_error(idx));
+        }
+        Ok(if idx < 0 { idx + dim } else { idx } as usize)
+    }
+}
+
+#[pymethods]
+impl PyPointND {
+    #[new]
+    #[pyo3(signature = (dim))]
+    fn py_new(dim: u32) -> Self {
+        PyPointND {
+            p: PointND::new(dim as usize),
+        }
+    }
+    fn __getitem__(&self, idx: i64) -> PyResult<f64> {
+        self.p.get(self.position(idx)?).py()
+    }
+    fn __setitem__(&mut self, idx: i64, val: f64) -> PyResult<()> {
+        let pos = self.position(idx)?;
+        self.p.set(pos, val).py()
+    }
+    fn __len__(&self) -> usize {
+        self.p.dimension()
+    }
+    fn __add__(&self, o: PyRef<'_, PyPointND>) -> PyResult<Self> {
+        let mut p = self.p.clone();
+        p.add_assign(&o.p).py()?;
+        Ok(PyPointND { p })
+    }
+    fn __sub__(&self, o: PyRef<'_, PyPointND>) -> PyResult<Self> {
+        let mut p = self.p.clone();
+        p.sub_assign(&o.p).py()?;
+        Ok(PyPointND { p })
+    }
+    fn __mul__(&self, s: f64) -> Self {
+        let mut p = self.p.clone();
+        p *= s;
+        PyPointND { p }
+    }
+    fn __truediv__(&self, s: f64) -> Self {
+        let mut p = self.p.clone();
+        p /= s;
+        PyPointND { p }
+    }
+    fn __iadd__(&mut self, o: PyRef<'_, PyPointND>) -> PyResult<()> {
+        self.p.add_assign(&o.p).py()
+    }
+    fn __isub__(&mut self, o: PyRef<'_, PyPointND>) -> PyResult<()> {
+        self.p.sub_assign(&o.p).py()
+    }
+    fn __imul__(&mut self, s: f64) {
+        self.p *= s;
+    }
+    fn __itruediv__(&mut self, s: f64) {
+        self.p /= s;
+    }
+    /// Normalize the vector (using L2 norm)
+    #[pyo3(name = "Normalize")]
+    fn normalize(&mut self) -> PyResult<()> {
+        self.p
+            .normalize()
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+    }
+    /// Length of the vector
+    #[pyo3(name = "Length")]
+    fn length(&self) -> f64 {
+        self.p.length()
+    }
+    /// Square of the length
+    #[pyo3(name = "LengthSq")]
+    fn length_sq(&self) -> f64 {
+        self.p.length_sq()
+    }
+    /// Dot product with another point
+    #[pyo3(name = "DotProduct")]
+    fn dot_product(&self, other: PyRef<'_, PyPointND>) -> PyResult<f64> {
+        self.p.dot_product(&other.p).py()
+    }
+    /// determines the angle between a vector to this point (between 0 and PI)
+    #[pyo3(name = "AngleTo")]
+    fn angle_to(&self, other: PyRef<'_, PyPointND>) -> PyResult<f64> {
+        self.p.angle_to(&other.p).py()
+    }
+    /// return a normalized direction vector from this point to another
+    #[pyo3(name = "DirectionVector")]
+    fn direction_vector(&self, other: PyRef<'_, PyPointND>) -> PyResult<Self> {
+        Ok(PyPointND {
+            p: self.p.direction_vector(&other.p).py()?,
+        })
+    }
+    /// Distance from this point to another point (upstream binds the Point3D
+    /// implementation, so this only ever raises for PointND arguments)
+    #[pyo3(name = "Distance")]
+    fn distance(&self, pt2: &Bound<'_, PyAny>) -> PyResult<f64> {
+        let _ = pt2;
+        Err(PyTypeError::new_err(
+            "Distance() is only defined for Point3D arguments",
+        ))
+    }
+    fn __getinitargs__(&self) -> (usize,) {
+        (self.p.dimension(),)
+    }
+    fn __getstate__<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
+        PyTuple::new(py, self.p.as_slice())
+    }
+    fn __setstate__(&mut self, state: Vec<f64>) -> PyResult<()> {
+        for (i, v) in state.into_iter().enumerate() {
+            self.p.set(i, v).py()?;
+        }
+        Ok(())
+    }
+    fn __reduce__<'py>(slf: &Bound<'py, Self>) -> PyResult<Bound<'py, PyTuple>> {
+        let py = slf.py();
+        let this = slf.borrow();
+        PyTuple::new(
+            py,
+            [
+                slf.get_type().into_any(),
+                PyTuple::new(py, [this.p.dimension()])?.into_any(),
+                PyTuple::new(py, this.p.as_slice())?.into_any(),
+            ],
+        )
+    }
+}
+
+/// calculates the dihedral angle determined by four Point3D objects
+#[pyfunction]
+#[pyo3(name = "ComputeDihedralAngle", signature = (pt1, pt2, pt3, pt4))]
+fn py_compute_dihedral_angle(
+    pt1: PyRef<'_, PyPoint3D>,
+    pt2: PyRef<'_, PyPoint3D>,
+    pt3: PyRef<'_, PyPoint3D>,
+    pt4: PyRef<'_, PyPoint3D>,
+) -> f64 {
+    compute_dihedral_angle(&pt1.p, &pt2.p, &pt3.p, &pt4.p)
+}
+
+/// calculates the signed dihedral angle determined by four Point3D objects
+#[pyfunction]
+#[pyo3(name = "ComputeSignedDihedralAngle", signature = (pt1, pt2, pt3, pt4))]
+fn py_compute_signed_dihedral_angle(
+    pt1: PyRef<'_, PyPoint3D>,
+    pt2: PyRef<'_, PyPoint3D>,
+    pt3: PyRef<'_, PyPoint3D>,
+    pt4: PyRef<'_, PyPoint3D>,
+) -> f64 {
+    compute_signed_dihedral_angle(&pt1.p, &pt2.p, &pt3.p, &pt4.p)
 }
 
 pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -288,5 +495,9 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     )?;
     m.add_class::<PyPoint3D>()?;
     m.add_class::<PyPoint2D>()?;
+    m.add_class::<PyPointND>()?;
+    m.add_function(wrap_pyfunction!(py_compute_dihedral_angle, m)?)?;
+    m.add_function(wrap_pyfunction!(py_compute_signed_dihedral_angle, m)?)?;
+    crate::geometry_grids::init(m)?;
     Ok(())
 }

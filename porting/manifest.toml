@@ -106,6 +106,20 @@
 [module."rdoxide_python::geometry".sources]
 "Code/Geometry/Wrap/Point.cpp" = "5a5cbaf1521dfdad08ed24641946f1f37e8c35f4"
 
+[module."rdoxide::geometry::grid".sources]
+"Code/Geometry/Grid3D.h" = "87b2499a3fe73e77dd451561d41a03d194086a2f"
+"Code/Geometry/UniformGrid3D.h" = "c1cd3032b407209b129ce1d14a91f1cfbf297ee9"
+"Code/Geometry/UniformGrid3D.cpp" = "68af35a6aa9851e540a001ba99090aaa05c35d37"
+"Code/Geometry/UniformRealValueGrid3D.h" = "26c92babb2a4a4c75651b8ae1877df4c282b27a3"
+"Code/Geometry/UniformRealValueGrid3D.cpp" = "1cb18dfe53f29e6106ffcb53dfce984d1c6f0c2d"
+"Code/Geometry/GridUtils.h" = "8e76cdcf4120d5c72b49c67feaf1022375f8e137"
+"Code/Geometry/GridUtils.cpp" = "49dc0b3bf9973ebc8c75096f93722af84d3497fb"
+
+[module."rdoxide_python::geometry_grids".sources]
+"Code/Geometry/Wrap/UniformGrid3D.cpp" = "79104aa0cf6813b54adca5504cc5c6e503aa0b99"
+"Code/Geometry/Wrap/UniformRealValueGrid3D.cpp" = "644658475b04e414478d176cbbfeb9b58cf9da6b"
+"Code/Geometry/Wrap/rdGeometry.cpp" = "1868be120afedde6ad8ce78e16c3a0fc6851b03f"
+
 [module."python::rdkit.Geometry.__init__".sources]
 "rdkit/Geometry/__init__.py" = "ce2a8f5aae4528ae84fd9797869a16395a612e46"
 

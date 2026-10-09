@@ -18,6 +18,7 @@ mod enums;
 mod enums_impl;
 mod errors;
 mod geometry;
+mod geometry_grids;
 mod mol;
 mod perception;
 mod props;

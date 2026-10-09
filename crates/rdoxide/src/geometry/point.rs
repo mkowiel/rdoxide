@@ -277,6 +277,117 @@ impl MulAssign<f64> for Point2D {
     }
 }
 
+/// An N-dimensional point (`RDGeom::PointND`, backed by `RDNumeric::Vector<double>`).
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct PointND {
+    data: Vec<f64>,
+}
+
+impl PointND {
+    pub fn new(dim: usize) -> Self {
+        PointND {
+            data: vec![0.0; dim],
+        }
+    }
+    pub fn from_vec(data: Vec<f64>) -> Self {
+        PointND { data }
+    }
+    pub fn dimension(&self) -> usize {
+        self.data.len()
+    }
+    pub fn as_slice(&self) -> &[f64] {
+        &self.data
+    }
+    pub fn get(&self, i: usize) -> Result<f64> {
+        self.data
+            .get(i)
+            .copied()
+            .ok_or_else(|| RDKitError::precondition("bad index"))
+    }
+    pub fn set(&mut self, i: usize, v: f64) -> Result<()> {
+        *self
+            .data
+            .get_mut(i)
+            .ok_or_else(|| RDKitError::precondition("bad index"))? = v;
+        Ok(())
+    }
+    pub fn length_sq(&self) -> f64 {
+        self.data.iter().fold(0.0, |res, &v| fmuladd(v, v, res))
+    }
+    pub fn length(&self) -> f64 {
+        self.length_sq().sqrt()
+    }
+    pub fn normalize(&mut self) -> Result<()> {
+        let val = self.length();
+        if val < ZERO_TOLERANCE {
+            return Err(RDKitError::Runtime(
+                "Cannot normalize a zero length vector".into(),
+            ));
+        }
+        *self /= val;
+        Ok(())
+    }
+    fn check_size(&self, other: &PointND, what: &str) -> Result<()> {
+        if self.dimension() != other.dimension() {
+            return Err(RDKitError::precondition(format!(
+                "Size mismatch in vector {what}"
+            )));
+        }
+        Ok(())
+    }
+    pub fn add_assign(&mut self, other: &PointND) -> Result<()> {
+        self.check_size(other, "addition")?;
+        for (a, b) in self.data.iter_mut().zip(&other.data) {
+            *a += b;
+        }
+        Ok(())
+    }
+    pub fn sub_assign(&mut self, other: &PointND) -> Result<()> {
+        self.check_size(other, "subtraction")?;
+        for (a, b) in self.data.iter_mut().zip(&other.data) {
+            *a -= b;
+        }
+        Ok(())
+    }
+    pub fn dot_product(&self, other: &PointND) -> Result<f64> {
+        self.check_size(other, "doct product")?;
+        Ok(self
+            .data
+            .iter()
+            .zip(&other.data)
+            .fold(0.0, |res, (&a, &b)| fmuladd(a, b, res)))
+    }
+    pub fn angle_to(&self, other: &PointND) -> Result<f64> {
+        let mut dp = self.dot_product(other)?;
+        let (n1, n2) = (self.length(), other.length());
+        if n1 > 1.0e-8 && n2 > 1.0e-8 {
+            dp /= n1 * n2;
+        }
+        Ok(dp.clamp(-1.0, 1.0).acos())
+    }
+    /// A normalized vector from this point to `other`.
+    pub fn direction_vector(&self, other: &PointND) -> Result<PointND> {
+        if self.dimension() != other.dimension() {
+            return Err(RDKitError::precondition("Point dimensions do not match"));
+        }
+        let mut np = other.clone();
+        np.sub_assign(self)?;
+        np.normalize()?;
+        Ok(np)
+    }
+}
+
+impl MulAssign<f64> for PointND {
+    fn mul_assign(&mut self, s: f64) {
+        self.data.iter_mut().for_each(|v| *v *= s);
+    }
+}
+impl DivAssign<f64> for PointND {
+    fn div_assign(&mut self, s: f64) {
+        self.data.iter_mut().for_each(|v| *v /= s);
+    }
+}
+
 /// `RDGeom::computeDihedralAngle` (point.cpp): unsigned dihedral, in [0, PI].
 pub fn compute_dihedral_angle(pt1: &Point3D, pt2: &Point3D, pt3: &Point3D, pt4: &Point3D) -> f64 {
     let beg_end = *pt3 - *pt2;
@@ -309,6 +420,20 @@ pub fn compute_signed_dihedral_angle(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn point_nd() {
+        let mut a = PointND::from_vec(vec![3.0, 0.0, 0.0, 4.0]);
+        assert_eq!(a.length(), 5.0);
+        assert!(a.add_assign(&PointND::new(3)).is_err());
+        a.normalize().unwrap();
+        assert!((a.length() - 1.0).abs() < 1e-15);
+        assert!(PointND::new(2).normalize().is_err());
+        let b = PointND::from_vec(vec![0.0, 1.0, 0.0, 0.0]);
+        assert!((b.angle_to(&b).unwrap()).abs() < 1e-7);
+        let d = PointND::new(4).direction_vector(&b).unwrap();
+        assert_eq!(d.as_slice(), b.as_slice());
+    }
 
     #[test]
     fn basics() {
