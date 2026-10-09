@@ -128,6 +128,7 @@ Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testRDKitFPGenerato
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testTopologicalTorsionGenerator
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testTopologicalTorsionShortestPaths
 Code/GraphMol/MolHash/Wrap/testMolHash.py::TestCase::test1
+Code/GraphMol/MolHash/Wrap/testMolHash.py::TestCase::testCxSmiles
 Code/GraphMol/MolHash/Wrap/testMolHash.py::TestCase::testProtomerV2
 Code/GraphMol/MolHash/Wrap/testMolHash.py::TestCase::testTautomerV2
 Code/GraphMol/MolTransforms/Wrap/testMolTransforms.py::TestCase::test1Canonicalization
