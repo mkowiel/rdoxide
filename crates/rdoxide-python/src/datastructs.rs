@@ -20,7 +20,7 @@ use crate::errors::IntoPyResult;
 use pyo3::IntoPyObjectExt;
 
 /// Accepts str or bytes like `std::string` arguments of the wrappers.
-fn bytes_arg(o: &Bound<'_, PyAny>) -> PyResult<Vec<u8>> {
+pub(crate) fn bytes_arg(o: &Bound<'_, PyAny>) -> PyResult<Vec<u8>> {
     if let Ok(s) = o.extract::<String>() {
         return Ok(s.into_bytes());
     }
@@ -776,6 +776,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyExplicitBitVect>()?;
     m.add_class::<PySparseBitVect>()?;
     siv::add_classes(m)?;
+    crate::datastructs_fpb::add_classes(m)?;
     crate::datastructs_vv::add_classes(m)?;
     add_metric_fns(m)?;
     for f in [

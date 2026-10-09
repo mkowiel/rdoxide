@@ -25,6 +25,15 @@ Code/DataStructs/Wrap/testDiscreteValueVect.py::TestCase::test3Pickles
 Code/DataStructs/Wrap/testDiscreteValueVect.py::TestCase::test4DiscreteVectOps
 Code/DataStructs/Wrap/testDiscreteValueVect.py::TestCase::test9ToNumpy
 Code/DataStructs/Wrap/testDiscreteValueVect.py::TestCase::testIterator
+Code/DataStructs/Wrap/testFPB.py::TestCase::test1Basics
+Code/DataStructs/Wrap/testFPB.py::TestCase::test2Tanimoto
+Code/DataStructs/Wrap/testFPB.py::TestCase::test3Tversky
+Code/DataStructs/Wrap/testFPB.py::TestCase::test4Contains
+Code/DataStructs/Wrap/testFPB.py::TestCase::test5Contains
+Code/DataStructs/Wrap/testFPB.py::TestCase::test6MultiFPBReaderTani
+Code/DataStructs/Wrap/testFPB.py::TestCase::test7MultiFPBReaderContains
+Code/DataStructs/Wrap/testFPB.py::TestCase::test8MultiFPBReaderContainsInitOnSearch
+Code/DataStructs/Wrap/testFPB.py::TestCase::test9MultiFPBReaderEdges
 Code/DataStructs/Wrap/testRealValueVect.py::TestCase::test1Real
 Code/DataStructs/Wrap/testRealValueVect.py::TestCase::test2RealVectDistances
 Code/DataStructs/Wrap/testRealValueVect.py::TestCase::test3Pickles

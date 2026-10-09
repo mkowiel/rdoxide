@@ -2,6 +2,9 @@
 
 pub mod bit_ops;
 pub mod bit_vect;
+pub mod bitmap;
+pub mod fpb_reader;
+pub mod multi_fpb_reader;
 pub mod sparse_int_vect;
 pub mod value_vects;
 

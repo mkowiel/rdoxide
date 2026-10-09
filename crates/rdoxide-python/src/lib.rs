@@ -11,6 +11,7 @@ mod atom;
 mod bond;
 mod conformer;
 mod datastructs;
+mod datastructs_fpb;
 mod datastructs_siv;
 mod datastructs_vv;
 mod debug;
