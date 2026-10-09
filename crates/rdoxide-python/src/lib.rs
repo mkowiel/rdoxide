@@ -24,6 +24,7 @@ mod mol;
 mod perception;
 mod props;
 mod pyconv;
+mod rdabbreviations;
 mod rdbase;
 mod rdchem;
 mod rdchem_atom_funcs;
@@ -155,6 +156,12 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
     )?;
     add_submodule(m, "rdMolHash", "rdkit.Chem.rdMolHash", rdmolhash::init)?;
     add_submodule(m, "rdMMPA", "rdkit.Chem.rdMMPA", rdmmpa::init)?;
+    add_submodule(
+        m,
+        "rdAbbreviations",
+        "rdkit.Chem.rdAbbreviations",
+        rdabbreviations::init,
+    )?;
     add_submodule(
         m,
         "rdMHFPFingerprint",

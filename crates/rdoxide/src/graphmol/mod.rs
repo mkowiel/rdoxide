@@ -1,5 +1,6 @@
 //! Port of RDKit `Code/GraphMol`.
 
+pub mod abbreviations;
 pub mod adjust_query;
 pub mod aromaticity;
 pub mod atom;

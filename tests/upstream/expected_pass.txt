@@ -75,6 +75,13 @@ Code/Geometry/Wrap/testGeometry.py::TestCase::test8InitPoint2DFromPoint3D
 Code/Geometry/Wrap/testGeometry.py::TestCase::test9RealGridOps
 Code/Geometry/Wrap/testGeometry.py::TestCase::testPointPickles
 Code/Geometry/Wrap/testGeometry.py::TestCase::testSymmetry
+Code/GraphMol/Abbreviations/Wrap/testAbbreviations.py::TestCase::testAbbreviationsAndLinkers
+Code/GraphMol/Abbreviations/Wrap/testAbbreviations.py::TestCase::testAbbreviationsSubstanceGroups
+Code/GraphMol/Abbreviations/Wrap/testAbbreviations.py::TestCase::testCondense
+Code/GraphMol/Abbreviations/Wrap/testAbbreviations.py::TestCase::testCondenseLinkers
+Code/GraphMol/Abbreviations/Wrap/testAbbreviations.py::TestCase::testGithub3692
+Code/GraphMol/Abbreviations/Wrap/testAbbreviations.py::TestCase::testLabel
+Code/GraphMol/Abbreviations/Wrap/testAbbreviations.py::TestCase::testParsingAbbrevs
 Code/GraphMol/Descriptors/Wrap/test3D.py::TestCase::test1AUTOCORR2D
 Code/GraphMol/Descriptors/Wrap/test3D.py::TestCase::test2AUTOCORR3D
 Code/GraphMol/Descriptors/Wrap/test3D.py::TestCase::test3GETAWAY
