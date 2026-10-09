@@ -1,14 +1,16 @@
-//! `CalcAUTOCORR3D`, `CalcRDF`, `CalcMORSE` and `CalcCoulombMat` of `rdkit.Chem.rdMolDescriptors`
+//! `CalcAUTOCORR3D`, `CalcRDF`, `CalcMORSE`, `CalcCoulombMat` and `CalcEEMcharges` and `CalcWHIM` of `rdkit.Chem.rdMolDescriptors`
 //! (upstream `Descriptors/AUTOCORR3D.cpp`, `RDF.cpp`, `MORSE.cpp`,
-//! `CoulombMat.cpp` and their
+//! `CoulombMat.cpp`, `EEM.cpp`, `WHIM.cpp` and their
 //! wrappers in `Wrap/rdMolDescriptors.cpp`).
 
 use pyo3::prelude::*;
 use pyo3::types::PyTuple;
 use rdoxide::graphmol::descriptors::autocorr3d::{AUTOCORR3D_VERSION, autocorr3d};
 use rdoxide::graphmol::descriptors::coulomb_mat::{COULOMB_MAT_VERSION, coulomb_mat};
+use rdoxide::graphmol::descriptors::eem::{EEM_VERSION, eem};
 use rdoxide::graphmol::descriptors::morse::{MORSE_VERSION, morse};
 use rdoxide::graphmol::descriptors::rdf::{RDF_VERSION, rdf};
+use rdoxide::graphmol::descriptors::whim::{WHIM_VERSION, whim};
 
 use crate::errors::IntoPyResult;
 use crate::mol::PyMol;
@@ -84,12 +86,45 @@ fn calc_coulomb_mat<'py>(
     PyTuple::new(py, rows)
 }
 
+/// Returns EEM atomic partial charges
+#[pyfunction]
+#[pyo3(name = "CalcEEMcharges", signature = (mol, confId = -1))]
+#[allow(non_snake_case)]
+fn calc_eem_charges(py: Python<'_>, mol: &Bound<'_, PyMol>, confId: i32) -> PyResult<Vec<f64>> {
+    let m = mol.borrow();
+    let core = &m.mol;
+    require_conformer(core, "Code/GraphMol/Descriptors/EEM.cpp", 235)?;
+    py.detach(|| eem(core, confId)).py()
+}
+
+/// Returns the WHIM descriptors vector
+#[pyfunction]
+#[pyo3(name = "CalcWHIM", signature = (mol, confId = -1, thresh = 0.001, CustomAtomProperty = ""))]
+#[allow(non_snake_case)]
+fn calc_whim(
+    py: Python<'_>,
+    mol: &Bound<'_, PyMol>,
+    confId: i32,
+    thresh: f64,
+    CustomAtomProperty: &str,
+) -> PyResult<Vec<f64>> {
+    let m = mol.borrow();
+    let core = &m.mol;
+    require_conformer(core, "Code/GraphMol/Descriptors/WHIM.cpp", 382)?;
+    py.detach(|| whim(core, confId, thresh, CustomAtomProperty))
+        .py()
+}
+
 pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("_CalcAUTOCORR3D_version", AUTOCORR3D_VERSION)?;
     m.add("_CalcRDF_version", RDF_VERSION)?;
     m.add("_CalcMORSE_version", MORSE_VERSION)?;
     m.add("_CalcCoulombMat_version", COULOMB_MAT_VERSION)?;
     m.add_function(wrap_pyfunction!(calc_coulomb_mat, m)?)?;
+    m.add("_CalcEMMcharges_version", EEM_VERSION)?;
+    m.add_function(wrap_pyfunction!(calc_eem_charges, m)?)?;
+    m.add("_CalcWHIM_version", WHIM_VERSION)?;
+    m.add_function(wrap_pyfunction!(calc_whim, m)?)?;
     m.add_function(wrap_pyfunction!(calc_autocorr3d, m)?)?;
     m.add_function(wrap_pyfunction!(calc_rdf, m)?)?;
     m.add_function(wrap_pyfunction!(calc_morse, m)?)

@@ -6,6 +6,8 @@
 //! results already depend on the SIMD width it was built with.
 
 pub mod eigen_3x3;
+pub mod full_piv_lu;
+pub mod jacobi_svd;
 
 use crate::{RDKitError, Result};
 

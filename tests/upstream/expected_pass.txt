@@ -65,6 +65,7 @@ Code/GraphMol/Descriptors/Wrap/test3D.py::TestCase::test1AUTOCORR2D
 Code/GraphMol/Descriptors/Wrap/test3D.py::TestCase::test2AUTOCORR3D
 Code/GraphMol/Descriptors/Wrap/test3D.py::TestCase::test4MORSE
 Code/GraphMol/Descriptors/Wrap/test3D.py::TestCase::test5RDF
+Code/GraphMol/Descriptors/Wrap/test3D.py::TestCase::test6WHIM
 Code/GraphMol/Descriptors/Wrap/test3D.py::TestCase::testGithub2037
 Code/GraphMol/Descriptors/Wrap/test3D.py::TestCase::testGithub4167
 Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testAtomPairOptions
