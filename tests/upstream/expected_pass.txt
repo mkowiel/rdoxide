@@ -186,6 +186,7 @@ rdkit/Chem/UnitTestCrippen.py::TestCase::testIssue80
 rdkit/Chem/UnitTestCrippen.py::TestCase::testLogP
 rdkit/Chem/UnitTestCrippen.py::TestCase::testRepeat
 rdkit/Chem/UnitTestDescriptors.py::DocTestCase::runTest
+rdkit/Chem/UnitTestDescriptors.py::TestCase::testGet3DMolDescriptors
 rdkit/Chem/UnitTestDescriptors.py::TestCase::testGetMolDescriptors
 rdkit/Chem/UnitTestDescriptors.py::TestCase::testMQN
 rdkit/Chem/UnitTestDescriptors.py::TestCase::testMQNDetails

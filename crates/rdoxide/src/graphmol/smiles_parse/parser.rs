@@ -379,6 +379,11 @@ impl<'a> SmilesParser<'a> {
                 }
                 Some(b)
             }
+            Tok::AnyBond => {
+                let mut b = Bond::new(BondType::Unspecified);
+                b.set_query(Some(crate::graphmol::queries::make_bond_null_query()));
+                Some(b)
+            }
             _ => None,
         }
     }
@@ -476,7 +481,7 @@ impl<'a> SmilesParser<'a> {
                     let a = self.atomd()?;
                     self.add_implicit_bond(&mut mol, a, false)?;
                 }
-                Tok::Bond { .. } => {
+                Tok::Bond { .. } | Tok::AnyBond => {
                     self.bump();
                     let bond = self.bond_from_token(&t).expect("bond token");
                     if Self::starts_atom(&self.look) {
@@ -493,10 +498,6 @@ impl<'a> SmilesParser<'a> {
                     } else {
                         return Err(self.syntax_error());
                     }
-                }
-                Tok::AnyBond => {
-                    // query bonds arrive with the SMARTS/query machinery (stage 4)
-                    return Err(self.syntax_error());
                 }
                 Tok::Minus => {
                     self.bump();
@@ -531,7 +532,7 @@ impl<'a> SmilesParser<'a> {
                     if Self::starts_atom(&t2) {
                         let a = self.atomd()?;
                         self.add_implicit_bond(&mut mol, a, false)?;
-                    } else if let Tok::Bond { .. } = t2 {
+                    } else if matches!(t2, Tok::Bond { .. } | Tok::AnyBond) {
                         self.bump();
                         let bond = self.bond_from_token(&t2).expect("bond token");
                         let a = self.atomd()?;
