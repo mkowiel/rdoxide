@@ -1,8 +1,9 @@
 //! `rdkit.Chem.rdFingerprintGenerator` (upstream
 //! `GraphMol/Fingerprints/Wrap/{FingerprintGeneratorWrapper,MorganWrapper}.cpp`).
 
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyTuple};
+use pyo3::types::{PyDict, PyList, PyTuple};
 use rdoxide::graphmol::fingerprints::atom_pair::AtomPairArguments;
 use rdoxide::graphmol::fingerprints::morgan::MorganArguments;
 use rdoxide::graphmol::fingerprints::rdkit_fp::RDKitFPArguments;
@@ -16,6 +17,7 @@ use rdoxide::rdgeneral::threads::par_map;
 
 use crate::datastructs::{PyExplicitBitVect, PySparseBitVect};
 use crate::datastructs_siv::{PyUIntSIV, PyULongSIV};
+use crate::enums::add_enum_exported;
 use crate::errors::IntoPyResult;
 use crate::mol::PyMol;
 
@@ -483,9 +485,6 @@ impl PyFPGen {
 }
 
 impl PyFPGen {
-    /// Runs `f` over every molecule of `mols` (`None` entries stay `None`) on
-    /// `numThreads` threads with the GIL released. Results keep the input
-    /// order and the first error in that order is raised.
     fn bulk<'py, T>(
         &self,
         py: Python<'py>,
@@ -496,32 +495,116 @@ impl PyFPGen {
     where
         T: pyo3::PyClass + Into<PyClassInitializer<T>> + Send,
     {
-        let mut borrowed = Vec::new();
-        for m in mols.try_iter()? {
-            let m = m?;
-            borrowed.push(if m.is_none() {
-                None
-            } else {
-                Some(m.extract::<PyRef<'_, PyMol>>()?)
-            });
-        }
-        let refs: Vec<Option<&ROMol>> = borrowed
-            .iter()
-            .map(|m| m.as_ref().map(|m| &m.mol))
-            .collect();
-        let gen_ = &self.gen_;
-        let results =
-            py.detach(|| par_map(&refs, num_threads, |m| m.map(|m| f(gen_, m)).transpose()));
-        let mut out = Vec::with_capacity(results.len());
-        for r in results {
-            out.push(match r.py()? {
-                Some(v) => Py::new(py, v)?.into_any(),
-                None => py.None(),
-            });
-        }
-        PyTuple::new(py, out)
+        bulk_map(py, &self.gen_, mols, num_threads, f)
     }
 }
+
+/// Runs `f` over every molecule of `mols` (`None` entries stay `None`) on
+/// `num_threads` threads with the GIL released. Results keep the input order
+/// and the first error in that order is raised.
+fn bulk_map<'py, T>(
+    py: Python<'py>,
+    gen_: &FingerprintGenerator,
+    mols: &Bound<'py, PyAny>,
+    num_threads: i32,
+    f: impl Fn(&FingerprintGenerator, &ROMol) -> rdoxide::error::Result<T> + Sync,
+) -> PyResult<Bound<'py, PyTuple>>
+where
+    T: pyo3::PyClass + Into<PyClassInitializer<T>> + Send,
+{
+    let mut borrowed = Vec::new();
+    for m in mols.try_iter()? {
+        let m = m?;
+        borrowed.push(if m.is_none() {
+            None
+        } else {
+            Some(m.extract::<PyRef<'_, PyMol>>()?)
+        });
+    }
+    let refs: Vec<Option<&ROMol>> = borrowed
+        .iter()
+        .map(|m| m.as_ref().map(|m| &m.mol))
+        .collect();
+    let results = py.detach(|| par_map(&refs, num_threads, |m| m.map(|m| f(gen_, m)).transpose()));
+    let mut out = Vec::with_capacity(results.len());
+    for r in results {
+        out.push(match r.py()? {
+            Some(v) => Py::new(py, v)?.into_any(),
+            None => py.None(),
+        });
+    }
+    PyTuple::new(py, out)
+}
+
+/// The generator `FPType` stands for, with the upstream defaults of the
+/// matching `Get*Generator` function (Morgan uses radius 2).
+fn default_generator(py: Python<'_>, kind: i64) -> PyResult<FingerprintGenerator> {
+    let module = py.import("rdkit.Chem.rdFingerprintGenerator")?;
+    let (factory, args) = match kind {
+        FP_RDKIT => ("GetRDKitFPGenerator", PyTuple::empty(py)),
+        FP_MORGAN => ("GetMorganGenerator", PyTuple::new(py, [2u32])?),
+        FP_ATOM_PAIR => ("GetAtomPairGenerator", PyTuple::empty(py)),
+        FP_TORSION => ("GetTopologicalTorsionGenerator", PyTuple::empty(py)),
+        _ => {
+            return Err(PyValueError::new_err(
+                "Fingerprint type not implemented for bulk generation",
+            ));
+        }
+    };
+    let gen_ = module.getattr(factory)?.call1(args)?;
+    Ok(gen_.extract::<PyRef<'_, PyFPGen>>()?.gen_.clone())
+}
+
+const FP_RDKIT: i64 = 1;
+const FP_MORGAN: i64 = 2;
+const FP_ATOM_PAIR: i64 = 3;
+const FP_TORSION: i64 = 4;
+
+macro_rules! bulk_function {
+    ($(#[$doc:meta])* $fn_name:ident, $py_name:literal, $method:ident, $wrap:ty) => {
+        $(#[$doc])*
+        #[pyfunction]
+        #[pyo3(name = $py_name, signature = (molecules = None, fpType = None, numThreads = 0))]
+        #[allow(non_snake_case)]
+        fn $fn_name<'py>(
+            py: Python<'py>,
+            molecules: Option<&Bound<'py, PyAny>>,
+            fpType: Option<&Bound<'py, PyAny>>,
+            numThreads: i32,
+        ) -> PyResult<Bound<'py, PyList>> {
+            let kind = match fpType {
+                Some(t) => t
+                    .extract::<i64>()
+                    .or_else(|_| t.getattr("real")?.extract::<i64>())?,
+                None => FP_MORGAN,
+            };
+            let gen_ = default_generator(py, kind)?;
+            let none = PyList::empty(py);
+            let mols = molecules.unwrap_or(none.as_any());
+            let res = bulk_map(py, &gen_, mols, numThreads, |g, m| {
+                Ok(<$wrap>::wrap(g.$method(m, &mut Default::default())?))
+            })?;
+            PyList::new(py, res)
+        }
+    };
+}
+
+bulk_function!(
+    /// Generates sparse count fingerprints for a list of molecules.
+    py_sparse_count_fps, "GetSparseCountFPs", sparse_count_fingerprint, PyULongSIV
+);
+bulk_function!(
+    /// Generates sparse bit fingerprints for a list of molecules.
+    py_sparse_fps, "GetSparseFPs", sparse_fingerprint, PySparseBitVect
+);
+bulk_function!(
+    /// Generates count fingerprints for a list of molecules.
+    py_count_fps, "GetCountFPs", count_fingerprint, PyUIntSIV
+);
+bulk_function!(
+    /// Generates fingerprints for a list of molecules.
+    py_fps, "GetFPs", fingerprint, PyExplicitBitVect
+);
 
 /// `FingerprintOptions`: a view on the options of its generator.
 #[pyclass(
@@ -1096,6 +1179,21 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyAtomPairOptions>()?;
     m.add_class::<PyTorsionOptions>()?;
     m.add_class::<PyRDKitFPOptions>()?;
+    add_enum_exported(
+        m,
+        "FPType",
+        &[
+            ("RDKitFP", FP_RDKIT),
+            ("MorganFP", FP_MORGAN),
+            ("AtomPairFP", FP_ATOM_PAIR),
+            ("TopologicalTorsionFP", FP_TORSION),
+        ],
+        None,
+    )?;
+    m.add_function(wrap_pyfunction!(py_sparse_count_fps, m)?)?;
+    m.add_function(wrap_pyfunction!(py_sparse_fps, m)?)?;
+    m.add_function(wrap_pyfunction!(py_count_fps, m)?)?;
+    m.add_function(wrap_pyfunction!(py_fps, m)?)?;
     m.add_function(wrap_pyfunction!(get_rdkit_fp_generator, m)?)?;
     m.add_function(wrap_pyfunction!(get_rdkit_atom_inv_gen, m)?)?;
     m.add_function(wrap_pyfunction!(get_topological_torsion_generator, m)?)?;

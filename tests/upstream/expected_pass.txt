@@ -114,6 +114,7 @@ Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testUSR
 Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testUSRCAT
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testAdditionalOutput
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testAtomPairGenerator
+Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testBulk
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testCountBounds
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testFingerprintGeneratorOptionsLifetime
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testFingerprintOptions
