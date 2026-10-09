@@ -123,3 +123,21 @@ fn polymer_and_data_substance_groups() {
     // groups with unknown types do not parse
     assert!(parse_with("CC |Sg:zzz:0|", true, true).is_none());
 }
+
+#[test]
+fn link_nodes_become_a_property() {
+    let link_nodes = |s: &str| {
+        parse(s)
+            .get_prop(cp::molFileLinkNodes)
+            .map(|v| v.to_rd_string())
+            .unwrap_or_default()
+    };
+    // the outer atoms are implied for an atom with two neighbors
+    assert_eq!(link_nodes("OC1CCCC1 |LN:4:1.3|"), "1 3 2 5 4 5 6");
+    assert_eq!(
+        link_nodes("FC1CCC(O)C1 |LN:1:1.3.2.6,4:1.4.3.6|"),
+        "1 3 2 2 3 2 7|1 4 2 5 4 5 7"
+    );
+    // more than two neighbors need the outer atoms
+    assert!(parse_with("FC1CCC(O)C1 |LN:1:1.3|", true, true).is_none());
+}

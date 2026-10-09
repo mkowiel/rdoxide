@@ -2,7 +2,6 @@
 //! (upstream `SmilesParse/CXSmilesOps.cpp`, the `SmilesWrite` half, and
 //! `MolToCXSmiles` of `SmilesWrite.cpp`).
 //!
-//! Not ported: the link-node (`LN:`) block, which needs `MolEnumerator`.
 
 use std::collections::BTreeMap;
 
@@ -17,6 +16,7 @@ use crate::graphmol::chirality::legacy::assign_stereochemistry;
 use crate::graphmol::conformer::Conformer;
 use crate::graphmol::file_parsers::mol_file_writer::get_mol_file_bond_stereo_info;
 use crate::graphmol::kekulize::{DEFAULT_MAX_BACKTRACKS, kekulize};
+use crate::graphmol::mol_enumerator::link_node::get_mol_link_nodes;
 use crate::graphmol::mol_ops::cleanup_stereo_groups;
 use crate::graphmol::romol::ROMol;
 use crate::graphmol::stereo_group::{StereoGroup, StereoGroupType, assign_stereo_group_ids};
@@ -724,6 +724,35 @@ fn ringbond_cistrans_block(mol: &ROMol, atom_order: &[u32], bond_order: &[u32]) 
     c + &t + &ctu
 }
 
+/// `LN:atom:min.max[.outer1.outer2]` for every link node. Upstream maps the
+/// atoms through `atomOrder[atom]`, not through the inverse order; the same
+/// is done on purpose.
+fn linknodes_block(mol: &ROMol, atom_order: &[u32]) -> String {
+    let nodes = get_mol_link_nodes(mol, false).unwrap_or_default();
+    if nodes.is_empty() {
+        return String::new();
+    }
+    let mut res = String::from("LN:");
+    for ln in &nodes {
+        let (atom, outer1) = ln.bond_atoms[0];
+        res += &format!(
+            "{}:{}.{}",
+            atom_order[atom as usize], ln.min_rep, ln.max_rep
+        );
+        if mol.atom_degree(atom) > 2 {
+            res += &format!(
+                ".{}.{}",
+                atom_order[outer1 as usize], atom_order[ln.bond_atoms[1].1 as usize]
+            );
+        }
+        res.push(',');
+    }
+    if res.ends_with(',') {
+        res.pop();
+    }
+    res
+}
+
 fn append_to_extension(addition: &str, base: &mut String) {
     if !addition.is_empty() {
         if base.len() > 1 {
@@ -854,6 +883,9 @@ pub fn get_cx_extensions(mol: &mut ROMol, flags: u32) -> Result<String> {
     }
     if flags & f::ZERO_BONDS != 0 {
         append_to_extension(&zero_bonds_block(mol, &bond_order), &mut res);
+    }
+    if flags & f::LINKNODES != 0 {
+        append_to_extension(&linknodes_block(mol, &atom_order), &mut res);
     }
     if flags & f::ENHANCEDSTEREO != 0 {
         append_to_extension(
