@@ -1,10 +1,12 @@
-//! Diversity pickers (upstream `Code/SimDivPickers`): MaxMin and Leader.
+//! Diversity pickers (upstream `Code/SimDivPickers`): MaxMin, Leader and
+//! hierarchical clustering.
 //!
 //! Both pickers work on a pool of `pool_size` items identified by their
 //! index, and only need the distance between two items, which a caller
 //! supplies as a function (or as a packed distance matrix, see
 //! [`dist_from_ltm`]).
 
+pub mod hierarchical;
 pub mod leader;
 pub mod max_min;
 

@@ -9,11 +9,13 @@ use pyo3::types::PyTuple;
 use rdoxide::RDKitError;
 use rdoxide::datastructs::ExplicitBitVect;
 use rdoxide::datastructs::bit_ops::{Metric, similarity};
-use rdoxide::sim_div_pickers::{leader, max_min};
+use rdoxide::ml::cluster::murtagh::Linkage;
+use rdoxide::sim_div_pickers::{hierarchical, leader, max_min};
 
 use crate::datastructs::PyExplicitBitVect;
+use crate::enums::add_enum_exported;
 use crate::errors::IntoPyResult;
-use crate::vects::PyVectI;
+use crate::vects::{PyVectI, PyVectVectI};
 
 /// A Python function `f(i, j) -> float` as a pool distance. The first
 /// failure of the function is kept so that it can be re-raised after the
@@ -394,6 +396,97 @@ impl PyLeaderPicker {
     }
 }
 
+/// The 1-D distance matrix of the hierarchical picker as a private copy
+/// (the clustering overwrites its input).
+fn copied_distance_matrix(py: Python<'_>, dist_mat: &Bound<'_, PyAny>) -> PyResult<Vec<f64>> {
+    let np = py.import("numpy")?;
+    if !dist_mat.is_instance(&np.getattr("ndarray")?)? {
+        return Err(PyValueError::new_err(
+            "distance mat argument must be a numpy matrix",
+        ));
+    }
+    if dist_mat.getattr("ndim")?.extract::<usize>()? != 1 {
+        return Err(PyValueError::new_err(
+            "distance mat argument must be one-dimensional",
+        ));
+    }
+    np.call_method1("array", (dist_mat, "float64"))?
+        .call_method0("tolist")?
+        .extract()
+}
+
+/// A class for diversity picking of items using Hierarchical Clustering
+#[pyclass(
+    name = "HierarchicalClusterPicker",
+    module = "rdkit.SimDivFilters.rdSimDivPickers",
+    dict
+)]
+#[derive(Debug)]
+pub struct PyHierarchicalClusterPicker {
+    method: Linkage,
+}
+
+#[pymethods]
+impl PyHierarchicalClusterPicker {
+    #[new]
+    #[pyo3(signature = (clusterMethod))]
+    #[allow(non_snake_case)]
+    fn new(clusterMethod: i64) -> PyResult<Self> {
+        let method = Linkage::from_option(clusterMethod)
+            .ok_or_else(|| PyValueError::new_err("clusterMethod must be a ClusterMethod value"))?;
+        Ok(PyHierarchicalClusterPicker { method })
+    }
+
+    /// Pick a diverse subset of items from a pool of items using hierarchical
+    /// clustering
+    ///
+    /// ARGUMENTS:
+    ///   - distMat: 1D distance matrix (only the lower triangle elements)
+    ///   - poolSize: number of items in the pool
+    ///   - pickSize: number of items to pick from the pool
+    #[pyo3(name = "Pick", signature = (distMat, poolSize, pickSize))]
+    #[allow(non_snake_case)]
+    fn pick(
+        &self,
+        py: Python<'_>,
+        distMat: &Bound<'_, PyAny>,
+        poolSize: u32,
+        pickSize: u32,
+    ) -> PyResult<Py<PyAny>> {
+        if pickSize >= poolSize {
+            return Err(PyValueError::new_err("pickSize must be less than poolSize"));
+        }
+        let mat = copied_distance_matrix(py, distMat)?;
+        let picks = py
+            .detach(|| hierarchical::pick(&mat, poolSize, pickSize, self.method))
+            .py()?;
+        picks_vect(py, picks)
+    }
+
+    /// Return a list of clusters of item from the pool using hierarchical
+    /// clustering
+    ///
+    /// ARGUMENTS:
+    ///   - distMat: 1D distance matrix (only the lower triangle elements)
+    ///   - poolSize: number of items in the pool
+    ///   - pickSize: number of items to pick from the pool
+    #[pyo3(name = "Cluster", signature = (distMat, poolSize, pickSize))]
+    #[allow(non_snake_case)]
+    fn cluster(
+        &self,
+        py: Python<'_>,
+        distMat: &Bound<'_, PyAny>,
+        poolSize: u32,
+        pickSize: u32,
+    ) -> PyResult<Py<PyAny>> {
+        let mat = copied_distance_matrix(py, distMat)?;
+        let clusters = py
+            .detach(|| hierarchical::cluster(&mat, poolSize, pickSize, self.method))
+            .py()?;
+        PyVectVectI::new_py(py, clusters)
+    }
+}
+
 pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add(
         "__doc__",
@@ -401,5 +494,20 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     )?;
     m.add_class::<PyMaxMinPicker>()?;
     m.add_class::<PyLeaderPicker>()?;
+    m.add_class::<PyHierarchicalClusterPicker>()?;
+    add_enum_exported(
+        m,
+        "ClusterMethod",
+        &[
+            ("WARD", Linkage::Ward as i64),
+            ("SLINK", Linkage::Slink as i64),
+            ("CLINK", Linkage::Clink as i64),
+            ("UPGMA", Linkage::Upgma as i64),
+            ("MCQUITTY", Linkage::McQuitty as i64),
+            ("GOWER", Linkage::Gower as i64),
+            ("CENTROID", Linkage::Centroid as i64),
+        ],
+        None,
+    )?;
     Ok(())
 }

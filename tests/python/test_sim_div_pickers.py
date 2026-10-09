@@ -51,3 +51,19 @@ def test_errors():
         picker.Pick([0.1, 0.2, 0.3], 3, 2)  # not a numpy array
     with pytest.raises(ZeroDivisionError):
         picker.LazyPick(lambda i, j: 1 / 0, 5, 2)
+
+
+def test_hierarchical_picker():
+    pts = np.array([0.0, 1.0, 3.0, 7.0, 8.0, 15.0, 16.5])
+    dists = np.array([abs(pts[i] - pts[j]) for i in range(7) for j in range(i)])
+    ward = pickers.HierarchicalClusterPicker(pickers.ClusterMethod.WARD)
+    assert [list(c) for c in ward.Cluster(dists, 7, 3)] == [[0, 1, 2], [3, 4], [5, 6]]
+    assert list(ward.Pick(dists, 7, 3)) == [1, 3, 5]
+    slink = pickers.HierarchicalClusterPicker(pickers.SLINK)
+    assert list(slink.Pick(dists, 7, 3)) == [0, 3, 5]
+    assert int(pickers.CENTROID) == 7
+    before = dists.copy()
+    ward.Pick(dists, 7, 3)
+    assert (dists == before).all()  # the picker works on a copy
+    with pytest.raises(ValueError):
+        ward.Pick(dists, 7, 7)
