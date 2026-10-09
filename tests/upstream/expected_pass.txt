@@ -100,6 +100,7 @@ Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testMolWt
 Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testMorganFingerprints
 Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testNumRotatableBonds
 Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testNumStereoCenters
+Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testOxidationNumbers
 Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testPairValues
 Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testProperties
 Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testPropertiesMatchCalculators

@@ -42,6 +42,7 @@ LICENSES/RDKit-ChemReactions-Novartis-BSD-3-Clause.txt   RDKit ChemReactions
 LICENSES/RDKit-PBF-InstituteOfCancerResearch-BSD-3-Clause.txt  RDKit PBF descriptor (Institute of Cancer Research)
 LICENSES/RDKit-Descriptors3D-Godin-BSD-3-Clause.txt       RDKit AUTOCORR/WHIM/RDF/... descriptors
                                                          (Guillaume Godin, Institute of Cancer Research)
+LICENSES/linchemin-MIT.txt                                linchemin (oxidation numbers algorithm, descriptors/oxidation_numbers.rs)
 LICENSES/Eigen-MPL-2.0.txt                                Eigen (numerics/eigen_3x3.rs symmetric eigensolver,
                                                          numerics/full_piv_lu.rs, numerics/jacobi_svd.rs,
                                                          numerics/dense.rs),

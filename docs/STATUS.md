@@ -250,3 +250,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-09 — Stage 14a: pure-Python `rdkit.Chem` modules copied verbatim (ReducedGraphs, Randomize, SaltRemover, PropertyMol, FragmentMatcher, FunctionalGroups, TorsionFingerprints, SATIS, RegistrationHash, FastSDMolSupplier); ratchet 460/632.
 * 2026-10-09 — Stage 14b: Chem.CanonicalizeEnhancedStereo (unlocks upstream RegistrationHash tests).
 * 2026-10-09 — Stage 14c: bulk fingerprint functions (GetFPs/GetCountFPs/GetSparseFPs/GetSparseCountFPs, FPType), multithreaded and order-preserving.
+* 2026-10-09 — Stage 14d: CalcOxidationNumbers (adds LICENSES/linchemin-MIT.txt).

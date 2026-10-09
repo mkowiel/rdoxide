@@ -14,6 +14,7 @@ pub mod mol_data_3d;
 pub mod mol_surf;
 pub mod morse;
 pub mod mqn;
+pub mod oxidation_numbers;
 pub mod pbf;
 pub mod pmi;
 pub mod property;
