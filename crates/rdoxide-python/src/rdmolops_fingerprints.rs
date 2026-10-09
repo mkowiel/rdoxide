@@ -1,5 +1,5 @@
 //! Legacy path fingerprints of `rdkit.Chem.rdmolops` (`RDKFingerprint`,
-//! `UnfoldedRDKFingerprintCountBased`, `PatternFingerprint`; upstream
+//! `UnfoldedRDKFingerprintCountBased`, `PatternFingerprint`, `LayeredFingerprint`; upstream
 //! `GraphMol/Wrap/MolOps.cpp`).
 
 use pyo3::exceptions::PyValueError;
@@ -7,6 +7,10 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 use rdoxide::datastructs::BitVect;
 use rdoxide::error::RDKitError;
+use rdoxide::graphmol::fingerprints::layered::{
+    LAYERED_FINGERPRINT_MOL_VERSION, LayeredFingerprintArgs, SUBSTRUCT_LAYERS,
+    layered_fingerprint_mol,
+};
 use rdoxide::graphmol::fingerprints::legacy::{
     PathFpOutput, rdk_fingerprint_mol, unfolded_rdk_fingerprint_mol,
 };
@@ -143,6 +147,75 @@ fn unfolded_rdk_fingerprint(
     Ok(PyULongSIV::wrap(fp))
 }
 
+/// `atomCounts` argument of the screening fingerprints: `None` when absent or
+/// empty, otherwise the (unsigned) values, which must cover all atoms.
+fn read_atom_counts(counts: Option<&Bound<'_, PyAny>>, n_atoms: u32) -> PyResult<Option<Vec<u32>>> {
+    let Some(counts) = counts.filter(|c| c.is_truthy().unwrap_or(false)) else {
+        return Ok(None);
+    };
+    if (counts.len()? as u32) < n_atoms {
+        return Err(PyValueError::new_err(
+            "atomCounts shorter than the number of atoms",
+        ));
+    }
+    counts
+        .try_iter()?
+        .map(|item| item?.extract::<u32>())
+        .collect::<PyResult<Vec<_>>>()
+        .map(Some)
+}
+
+/// Returns a layered fingerprint for a molecule
+///
+/// NOTE: This function is experimental. The API or results may change from
+///   release to release.
+///
+/// Layer definitions:
+///    - 0x01: pure topology
+///    - 0x02: bond order
+///    - 0x04: atom types
+///    - 0x08: presence of rings
+///    - 0x10: ring sizes
+///    - 0x20: aromaticity
+#[pyfunction]
+#[pyo3(name = "LayeredFingerprint", signature = (mol, layerFlags = 0xFFFF_FFFF, minPath = 1, maxPath = 7, fpSize = 2048, atomCounts = None, setOnlyBits = None, branchedPaths = true, fromAtoms = None))]
+#[allow(non_snake_case, clippy::too_many_arguments)]
+fn layered_fingerprint(
+    mol: PyRef<'_, PyMol>,
+    layerFlags: u32,
+    minPath: u32,
+    maxPath: u32,
+    fpSize: u32,
+    atomCounts: Option<&Bound<'_, PyAny>>,
+    setOnlyBits: Option<PyRef<'_, PyExplicitBitVect>>,
+    branchedPaths: bool,
+    fromAtoms: Option<&Bound<'_, PyAny>>,
+) -> PyResult<PyExplicitBitVect> {
+    let from = python_object_to_vect(fromAtoms, Some(mol.mol.num_atoms()))?;
+    let mut counts = read_atom_counts(atomCounts, mol.mol.num_atoms())?;
+    let args = LayeredFingerprintArgs {
+        layer_flags: layerFlags,
+        min_path: minPath,
+        max_path: maxPath,
+        fp_size: fpSize,
+        branched_paths: branchedPaths,
+        from_atoms: from.as_deref(),
+    };
+    let bv = layered_fingerprint_mol(
+        &mol.mol,
+        &args,
+        counts.as_deref_mut(),
+        setOnlyBits.as_deref().map(|b| &b.bv),
+    )
+    .py()?;
+    if let (Some(counts), Some(list)) = (counts, atomCounts) {
+        for (i, c) in counts.into_iter().enumerate() {
+            list.set_item(i, c)?;
+        }
+    }
+    Ok(PyExplicitBitVect::wrap(bv))
+}
+
 /// A fingerprint using SMARTS patterns
 ///
 /// NOTE: This function is experimental. The API or results may change from
@@ -158,16 +231,7 @@ fn pattern_fingerprint(
     tautomerFingerprints: bool,
 ) -> PyResult<PyExplicitBitVect> {
     // upstream validates both arguments but neither changes the result
-    if let Some(counts) = atomCounts.filter(|c| c.is_truthy().unwrap_or(false)) {
-        if (counts.len()? as u32) < mol.mol.num_atoms() {
-            return Err(PyValueError::new_err(
-                "atomCounts shorter than the number of atoms",
-            ));
-        }
-        for item in counts.try_iter()? {
-            item?.extract::<u32>()?;
-        }
-    }
+    read_atom_counts(atomCounts, mol.mol.num_atoms())?;
     if setOnlyBits.is_some_and(|b| b.bv.num_bits() != fpSize) {
         return Err(RDKitError::precondition("bad setOnlyBits size")).py();
     }
@@ -178,6 +242,12 @@ fn pattern_fingerprint(
 pub fn add(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(rdk_fingerprint, m)?)?;
     m.add_function(wrap_pyfunction!(pattern_fingerprint, m)?)?;
+    m.add_function(wrap_pyfunction!(layered_fingerprint, m)?)?;
+    m.add(
+        "_LayeredFingerprint_version",
+        LAYERED_FINGERPRINT_MOL_VERSION,
+    )?;
+    m.add("LayeredFingerprint_substructLayers", SUBSTRUCT_LAYERS)?;
     m.add(
         "_PatternFingerprint_version",
         PATTERN_FINGERPRINT_MOL_VERSION,

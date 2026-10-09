@@ -97,7 +97,8 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 12a | `SmilesMolSupplier` (lazy + random access over delimited text: title line, name/SMILES columns, delimiter set, property columns, comment/blank lines, CRLF, `std::istream` state emulation incl. upstream's quirks), `SmilesMolSupplierFromText`; Python iteration/indexing/len/SetData/GetItemText/context manager | ✅ | 22 scenario transcripts (basic, no title, tabs, name column -1, columns swapped, unsanitized, CRLF, no final newline, empty, comment-only, extra columns, short lines, files, bad/empty files, `GetItemText` before `next`) identical to RDKit incl. error messages |
 | 10a | rest of `rdMolDescriptors` (MQNs, BCUT, AUTOCORR2D, ...) and the `Descriptors` module (needs EState, QED, SpacialScore, GraphDescriptors) | ⬜ | next |
 | 9 | `PatternFingerprint` (`Chem.PatternFingerprint`, tautomer mode, `_PatternFingerprint_version`; `atomCounts`/`setOnlyBits` validated but unused as upstream) | ✅ | differential `patternfp` 11892/11892 identical (SMILES- and SMARTS-parsed molecules, 3 size/tautomer variants; reference RDKit 2026.03.6) |
-| 9 | LayeredFingerprint, JSON (de)serialization, GetFPs bulk helpers | ⬜ | |
+| 9 | `LayeredFingerprint` (`Chem.LayeredFingerprint`, all six layers, `atomCounts` write-back, `setOnlyBits`, `fromAtoms`, `LayeredFingerprint_substructLayers`, `_LayeredFingerprint_version`) | ✅ | differential `layeredfp` 11892/11892 identical (5 argument variants incl. atomCounts/setOnlyBits, SMILES and SMARTS molecules). Unbranched paths without `fromAtoms` deliberately differ: upstream passes `useBonds=false` there and crashes |
+| 9 | JSON (de)serialization, GetFPs bulk helpers | ⬜ | |
 | 7–13 | see PLAN.md | ⬜ | |
 
 ## Python package files
