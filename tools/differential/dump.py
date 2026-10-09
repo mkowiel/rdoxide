@@ -325,6 +325,39 @@ def patternfp_record(smi):
     return rec or None
 
 
+LAYERED_VARIANTS = (
+    {},
+    {"layerFlags": 0x07},
+    {"layerFlags": 0x38, "maxPath": 5, "fpSize": 512},
+    {"layerFlags": 0x2A, "branchedPaths": False, "fromAtoms": [0, 1]},  # unrooted unbranched crashes upstream
+    {"minPath": 2, "maxPath": 4, "fromAtoms": [0]},
+)
+
+
+def layeredfp_record(smi):
+    """LayeredFingerprint (bits + atomCounts) of the SMILES- and SMARTS-parsed molecule."""
+    from rdkit import DataStructs, RDLogger
+    RDLogger.DisableLog("rdApp.*")
+    rec = {}
+    for kind, mol in (("smiles", Chem.MolFromSmiles(smi)), ("smarts", Chem.MolFromSmarts(smi))):
+        if mol is None or mol.GetNumAtoms() > 40:
+            continue
+        out = []
+        for kw in LAYERED_VARIANTS:
+            counts = [0] * mol.GetNumAtoms()
+            fp = Chem.LayeredFingerprint(mol, atomCounts=counts, **kw)
+            # setOnlyBits: drop the first on-bit of the result and compute again
+            mask = DataStructs.ExplicitBitVect(fp.GetNumBits())
+            for bit in list(fp.GetOnBits())[1:]:
+                mask.SetBit(bit)
+            masked_counts = [0] * mol.GetNumAtoms()
+            masked = Chem.LayeredFingerprint(mol, setOnlyBits=mask, atomCounts=masked_counts, **kw)
+            out.append([list(masked.GetOnBits()), masked_counts])
+            out.append([list(fp.GetOnBits()), counts])
+        rec[kind] = out
+    return rec or None
+
+
 def rdkfingerprint_record(smi):
     """Legacy Chem.RDKFingerprint / UnfoldedRDKFingerprintCountBased."""
     m = Chem.MolFromSmiles(smi)
@@ -785,6 +818,8 @@ def dump(mode, smi):
     if mode == "addhs3d":
         m = Chem.MolFromMolBlock(smi)
         return None if m is None else addhs_records(m)
+    if mode == "layeredfp":
+        return layeredfp_record(smi)
     if mode == "patternfp":
         return patternfp_record(smi)
     if mode == "maccs":

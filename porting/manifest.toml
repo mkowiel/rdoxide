@@ -452,6 +452,10 @@
 [module."rdoxide_python::rdmoldescriptors".sources]
 "Code/GraphMol/Descriptors/Wrap/rdMolDescriptors.cpp" = "4d3c2e1d6315579af9f3bf02b1564224fe48b82e"
 
+[module."rdoxide::graphmol::fingerprints::layered".sources]
+"Code/GraphMol/Fingerprints/Fingerprints.cpp" = "842e2dbe592e21982f3273457874fef95e8b3820"
+"Code/GraphMol/Fingerprints/Fingerprints.h" = "053a0d293d077991107ababd3a7c453d7f064a45"
+
 [module."rdoxide::graphmol::fingerprints::pattern".sources]
 "Code/GraphMol/Fingerprints/PatternFingerprints.cpp" = "b4545f65e7d87cf633b6d5fe030a77a88b4c299b"
 
