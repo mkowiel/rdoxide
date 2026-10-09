@@ -15,7 +15,7 @@ pub mod sequence_parser;
 mod sequence_tables;
 pub mod sequence_writer;
 mod sgroup_parsing;
-mod sgroup_writing;
+pub(crate) mod sgroup_writing;
 pub mod smiles_mol_supplier;
 pub mod smiles_writer;
 pub mod utils;

@@ -141,3 +141,53 @@ def test_substruct_params_are_live():
 
 def test_allchem_exports():
   assert AllChem.ReactionFromSmarts is rdChemReactions.ReactionFromSmarts
+
+
+SMARTS_WITH_AGENT = "[C:1](=[O:2])O.[N:3]>[Pd]>[C:1](=[O:2])[N:3]"
+ROUND_TRIP = "[#6:1](=[#8:2])[#8].[#7:3]>[Pd]>[#6:1](=[#8:2])[#7:3]"
+
+
+def test_rxn_block_v2000():
+  rxn = rdChemReactions.ReactionFromSmarts(SMARTS_WITH_AGENT)
+  block = rdChemReactions.ReactionToRxnBlock(rxn)
+  assert block.startswith("$RXN\n\n      RDKit\n\n  3  1\n$MOL\n")
+  assert block.count("$MOL") == 4
+  back = rdChemReactions.ReactionFromRxnBlock(rdChemReactions.ReactionToRxnBlock(rxn, True))
+  assert (back.GetNumReactantTemplates(), back.GetNumAgentTemplates(),
+          back.GetNumProductTemplates()) == (2, 1, 1)
+  assert rdChemReactions.ReactionToSmarts(back) == ROUND_TRIP
+  assert not back._getImplicitPropertiesFlag()
+
+
+def test_rxn_block_v3000():
+  rxn = rdChemReactions.ReactionFromSmarts(SMARTS_WITH_AGENT)
+  block = rdChemReactions.ReactionToV3KRxnBlock(rxn, True)
+  assert block.startswith("$RXN V3000\n\n      RDKit\n\nM  V30 COUNTS 2 1 1\nM  V30 BEGIN REACTANT\n")
+  assert "M  V30 BEGIN AGENT" in block
+  assert rdChemReactions.ReactionToRxnBlock(rxn, False, True).startswith("$RXN V3000")
+  back = rdChemReactions.ReactionFromRxnBlock(block)
+  assert rdChemReactions.ReactionToSmarts(back) == ROUND_TRIP
+
+
+@pytest.mark.parametrize("block", ["", "$RXN\n", "x", "$RXN\n\n  RDKit\n\n  1  1\n", "$RXN\n\n  RDKit\n\n  a  1\n$MOL\n"])
+def test_bad_rxn_blocks(block):
+  with pytest.raises(ValueError, match="ChemicalReactionParserException|ChemicalParserException"):
+    rdChemReactions.ReactionFromRxnBlock(block)
+
+
+def test_rxn_file(tmp_path):
+  rxn = rdChemReactions.ReactionFromSmarts(AMIDE)
+  path = tmp_path / "amide.rxn"
+  path.write_text(rdChemReactions.ReactionToRxnBlock(rxn))
+  back = rdChemReactions.ReactionFromRxnFile(str(path))
+  assert rdChemReactions.ReactionToSmarts(back) == "[#6:1](=[#8:2])[#8].[#7:3]>>[#6:1](=[#8:2])[#7:3]"
+  assert rdChemReactions.ReactionFromRxnFile(str(tmp_path / "missing.rxn")) is None
+
+
+def test_reaction_molecule_round_trip():
+  rxn = rdChemReactions.ReactionFromSmarts(SMARTS_WITH_AGENT)
+  mol = rdChemReactions.ReactionToMolecule(rxn)
+  back = rdChemReactions.ReactionFromMolecule(mol)
+  assert (back.GetNumReactantTemplates(), back.GetNumAgentTemplates(),
+          back.GetNumProductTemplates()) == (2, 1, 1)
+  assert rdChemReactions.ReactionToSmarts(back) == rdChemReactions.ReactionToSmarts(rxn)

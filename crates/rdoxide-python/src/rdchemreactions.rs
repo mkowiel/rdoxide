@@ -12,10 +12,13 @@ use pyo3::types::{PyBool, PyDict, PyList, PyTuple};
 use rdoxide::graphmol::chem_reactions::daylight::{
     ReactionSmartsParserParams, reaction_from_smarts, reaction_from_smiles,
 };
-use rdoxide::graphmol::chem_reactions::writer::{
-    reaction_to_rxn_mol, reaction_to_smarts, reaction_to_smiles,
+use rdoxide::graphmol::chem_reactions::mdl::{
+    reaction_from_rxn_block, reaction_from_rxn_file, reaction_from_rxn_mol, reaction_to_rxn_block,
+    reaction_to_rxn_mol, reaction_to_v3k_rxn_block,
 };
+use rdoxide::graphmol::chem_reactions::writer::{reaction_to_smarts, reaction_to_smiles};
 use rdoxide::graphmol::chem_reactions::{self as cr, ChemicalReaction, runner};
+use rdoxide::graphmol::file_parsers::MolFileParserParams;
 use rdoxide::graphmol::romol::ROMol;
 use rdoxide::graphmol::smiles_parse::write::SmilesWriteParams;
 
@@ -509,9 +512,16 @@ fn py_reaction_from_smiles(
 }
 
 /// `ReactionToSmarts(reaction[, params])` / `ReactionToSmiles(reaction[, canonical | params])`
-fn write_params(arg: Option<&Bound<'_, PyAny>>, allow_bool: bool) -> PyResult<SmilesWriteParams> {
+fn write_params(
+    arg: Option<&Bound<'_, PyAny>>,
+    allow_bool: bool,
+    default_canonical: bool,
+) -> PyResult<SmilesWriteParams> {
     match arg {
-        None => Ok(SmilesWriteParams::default()),
+        None => Ok(SmilesWriteParams {
+            canonical: default_canonical,
+            ..SmilesWriteParams::default()
+        }),
         Some(a) => {
             if let Ok(p) = a.extract::<PyRef<'_, PySmilesWriteParams>>() {
                 Ok(p.to_core())
@@ -536,7 +546,7 @@ fn py_reaction_to_smarts(
     reaction: &Bound<'_, PyChemicalReaction>,
     params: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<String> {
-    let params = write_params(params, false)?;
+    let params = write_params(params, false, false)?;
     reaction_to_smarts(&reaction.borrow().rxn, &params).py()
 }
 
@@ -547,7 +557,7 @@ fn py_reaction_to_smiles(
     reaction: &Bound<'_, PyChemicalReaction>,
     params: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<String> {
-    let params = write_params(params, true)?;
+    let params = write_params(params, true, true)?;
     reaction_to_smiles(&reaction.borrow().rxn, &params).py()
 }
 
@@ -558,6 +568,83 @@ fn py_reaction_to_molecule(reaction: &Bound<'_, PyChemicalReaction>) -> PyResult
     Ok(PyMol {
         mol: reaction_to_rxn_mol(&reaction.borrow().rxn).py()?,
     })
+}
+
+fn rxn_parser_params(sanitize: bool, remove_hs: bool, strict_parsing: bool) -> MolFileParserParams {
+    MolFileParserParams {
+        sanitize,
+        remove_hs,
+        strict_parsing,
+        ..MolFileParserParams::default()
+    }
+}
+
+/// construct a ChemicalReaction from an MDL rxn file
+#[pyfunction]
+#[pyo3(name = "ReactionFromRxnFile", signature = (filename, sanitize = false, removeHs = false, strictParsing = true))]
+#[allow(non_snake_case)]
+fn py_reaction_from_rxn_file(
+    py: Python<'_>,
+    filename: &str,
+    sanitize: bool,
+    removeHs: bool,
+    strictParsing: bool,
+) -> PyResult<Option<PyChemicalReaction>> {
+    let params = rxn_parser_params(sanitize, removeHs, strictParsing);
+    let rxn = py
+        .detach(|| reaction_from_rxn_file(filename, &params))
+        .py()?;
+    Ok(rxn.map(PyChemicalReaction::new))
+}
+
+/// construct a ChemicalReaction from a string in MDL rxn format
+#[pyfunction]
+#[pyo3(name = "ReactionFromRxnBlock", signature = (rxnblock, sanitize = false, removeHs = false, strictParsing = true))]
+#[allow(non_snake_case)]
+fn py_reaction_from_rxn_block(
+    py: Python<'_>,
+    rxnblock: &str,
+    sanitize: bool,
+    removeHs: bool,
+    strictParsing: bool,
+) -> PyResult<PyChemicalReaction> {
+    let params = rxn_parser_params(sanitize, removeHs, strictParsing);
+    let rxn = py
+        .detach(|| reaction_from_rxn_block(rxnblock, &params))
+        .py()?;
+    Ok(PyChemicalReaction::new(rxn))
+}
+
+/// construct a string in MDL rxn format for a ChemicalReaction
+#[pyfunction]
+#[pyo3(name = "ReactionToRxnBlock", signature = (reaction, separateAgents = false, forceV3000 = false))]
+#[allow(non_snake_case)]
+fn py_reaction_to_rxn_block(
+    reaction: &Bound<'_, PyChemicalReaction>,
+    separateAgents: bool,
+    forceV3000: bool,
+) -> PyResult<String> {
+    reaction_to_rxn_block(&reaction.borrow().rxn, separateAgents, forceV3000).py()
+}
+
+/// construct a string in MDL v3000 rxn format for a ChemicalReaction
+#[pyfunction]
+#[pyo3(name = "ReactionToV3KRxnBlock", signature = (reaction, separateAgents = false))]
+#[allow(non_snake_case)]
+fn py_reaction_to_v3k_rxn_block(
+    reaction: &Bound<'_, PyChemicalReaction>,
+    separateAgents: bool,
+) -> PyResult<String> {
+    reaction_to_v3k_rxn_block(&reaction.borrow().rxn, separateAgents).py()
+}
+
+/// construct a ChemicalReaction from an molecule if the RXN role property of the molecule is set
+#[pyfunction]
+#[pyo3(name = "ReactionFromMolecule")]
+fn py_reaction_from_molecule(mol: &Bound<'_, PyMol>) -> PyResult<PyChemicalReaction> {
+    Ok(PyChemicalReaction::new(
+        reaction_from_rxn_mol(&mol.borrow().mol).py()?,
+    ))
 }
 
 /// tests if a molecule can be classified as an agent depending on the ratio of mapped atoms and a give threshold
@@ -672,6 +759,11 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_reaction_to_smarts, m)?)?;
     m.add_function(wrap_pyfunction!(py_reaction_to_smiles, m)?)?;
     m.add_function(wrap_pyfunction!(py_reaction_to_molecule, m)?)?;
+    m.add_function(wrap_pyfunction!(py_reaction_from_molecule, m)?)?;
+    m.add_function(wrap_pyfunction!(py_reaction_from_rxn_file, m)?)?;
+    m.add_function(wrap_pyfunction!(py_reaction_from_rxn_block, m)?)?;
+    m.add_function(wrap_pyfunction!(py_reaction_to_rxn_block, m)?)?;
+    m.add_function(wrap_pyfunction!(py_reaction_to_v3k_rxn_block, m)?)?;
     m.add_function(wrap_pyfunction!(py_is_agent, m)?)?;
     m.add_function(wrap_pyfunction!(py_has_atom_mapping, m)?)?;
     m.add_function(wrap_pyfunction!(py_has_reaction_substruct_match, m)?)?;

@@ -3,9 +3,14 @@
 use rdoxide::graphmol::chem_reactions::daylight::{
     ReactionSmartsParserParams, reaction_from_smarts, reaction_from_smiles,
 };
+use rdoxide::graphmol::chem_reactions::mdl::{
+    reaction_from_rxn_block, reaction_from_rxn_mol, reaction_to_rxn_block, reaction_to_rxn_mol,
+    reaction_to_v3k_rxn_block,
+};
 use rdoxide::graphmol::chem_reactions::runner::run_reactants;
 use rdoxide::graphmol::chem_reactions::writer::{reaction_to_smarts, reaction_to_smiles};
 use rdoxide::graphmol::chem_reactions::{ChemicalReaction, get_reacting_atoms};
+use rdoxide::graphmol::file_parsers::MolFileParserParams;
 use rdoxide::graphmol::romol::ROMol;
 use rdoxide::graphmol::smiles_parse::write::{SmilesWriteParams, mol_to_smiles};
 use rdoxide::graphmol::smiles_parse::{SmilesParserParams, mol_from_smiles};
@@ -125,4 +130,59 @@ fn reacting_atoms() {
         get_reacting_atoms(&rxn, false).unwrap(),
         [vec![0, 2], vec![0]]
     );
+}
+
+fn round_trip_smarts(rxn: &ChemicalReaction) -> String {
+    reaction_to_smarts(rxn, &SmilesWriteParams::default()).unwrap()
+}
+
+#[test]
+fn rxn_blocks_round_trip() {
+    let rxn = reaction("[C:1](=[O:2])O.[N:3]>[Pd]>[C:1](=[O:2])[N:3]");
+    let expected = "[#6:1](=[#8:2])[#8].[#7:3]>[Pd]>[#6:1](=[#8:2])[#7:3]";
+    let params = MolFileParserParams {
+        sanitize: false,
+        remove_hs: false,
+        ..MolFileParserParams::default()
+    };
+    for block in [
+        reaction_to_rxn_block(&rxn, true, false).unwrap(),
+        reaction_to_rxn_block(&rxn, false, false).unwrap(),
+        reaction_to_v3k_rxn_block(&rxn, true).unwrap(),
+    ] {
+        let back = reaction_from_rxn_block(&block, &params).unwrap();
+        assert!(!back.implicit_properties_flag());
+        // agents sit with the reactants unless written separately
+        if block.contains("BEGIN AGENT") || block.starts_with("$RXN\n\n      RDKit\n\n  2  1  1") {
+            assert_eq!(round_trip_smarts(&back), expected);
+        } else {
+            assert_eq!(back.num_reactant_templates(), 3);
+        }
+    }
+}
+
+#[test]
+fn malformed_rxn_blocks_are_rejected() {
+    let params = MolFileParserParams::default();
+    for block in ["", "$RXN\n", "x", "$RXN\n\n  RDKit\n\n  1  1\n"] {
+        assert!(
+            reaction_from_rxn_block(block, &params).is_err(),
+            "{block:?}"
+        );
+    }
+}
+
+#[test]
+fn rxn_mol_round_trip() {
+    let rxn = reaction("[C:1](=[O:2])O.[N:3]>[Pd]>[C:1](=[O:2])[N:3]");
+    let back = reaction_from_rxn_mol(&reaction_to_rxn_mol(&rxn).unwrap()).unwrap();
+    assert_eq!(
+        (
+            back.num_reactant_templates(),
+            back.num_agent_templates(),
+            back.num_product_templates()
+        ),
+        (2, 1, 1)
+    );
+    assert_eq!(round_trip_smarts(&back), round_trip_smarts(&rxn));
 }

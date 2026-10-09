@@ -10,6 +10,7 @@
 //! boundary).
 
 pub mod daylight;
+pub mod mdl;
 pub mod runner;
 pub mod utils;
 pub mod writer;
@@ -109,6 +110,10 @@ impl ChemicalReaction {
             .iter_mut()
             .chain(self.agents.iter_mut())
             .chain(self.products.iter_mut())
+    }
+    /// The reactant and product templates (no agents), mutably.
+    pub fn reactants_and_products_mut(&mut self) -> impl Iterator<Item = &mut ROMol> {
+        self.reactants.iter_mut().chain(self.products.iter_mut())
     }
     pub fn num_reactant_templates(&self) -> usize {
         self.reactants.len()

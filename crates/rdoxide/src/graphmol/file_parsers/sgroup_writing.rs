@@ -620,7 +620,7 @@ fn create_zbo_groups(mol: &mut RWMol) -> Result<()> {
 }
 
 /// `moveAdditionalPropertiesToSGroups`
-pub(super) fn move_additional_properties_to_sgroups(mol: &mut RWMol) -> Result<()> {
+pub(crate) fn move_additional_properties_to_sgroups(mol: &mut RWMol) -> Result<()> {
     if mol
         .atoms()
         .iter()
