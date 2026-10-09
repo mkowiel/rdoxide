@@ -64,7 +64,12 @@ fn params(sanitize: bool, remove_hs: bool, strict_parsing: bool) -> MolFileParse
 ///
 ///   Properties in the SD file are used to set properties on each molecule.
 ///   The properties are accessible using the mol.GetProp(propName) method.
-#[pyclass(name = "SDMolSupplier", module = "rdkit.Chem.rdmolfiles", unsendable)]
+#[pyclass(
+    name = "SDMolSupplier",
+    module = "rdkit.Chem.rdmolfiles",
+    subclass,
+    unsendable
+)]
 pub struct PySDMolSupplier {
     inner: SDMolSupplier,
 }

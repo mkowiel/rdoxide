@@ -278,3 +278,43 @@ to = "tests/data/molfiles/first_200.tpsa.csv"
 [[copy]]
 from = "Code/GraphMol/FileParsers/test_data/sdErrors1.sdf"
 to = "tests/data/molfiles/sdErrors1.sdf"
+
+[[copy]]
+from = "rdkit/Chem/ReducedGraphs.py"
+to = "python/rdkit/Chem/ReducedGraphs.py"
+
+[[copy]]
+from = "rdkit/Chem/Randomize.py"
+to = "python/rdkit/Chem/Randomize.py"
+
+[[copy]]
+from = "rdkit/Chem/SaltRemover.py"
+to = "python/rdkit/Chem/SaltRemover.py"
+
+[[copy]]
+from = "rdkit/Chem/PropertyMol.py"
+to = "python/rdkit/Chem/PropertyMol.py"
+
+[[copy]]
+from = "rdkit/Chem/FragmentMatcher.py"
+to = "python/rdkit/Chem/FragmentMatcher.py"
+
+[[copy]]
+from = "rdkit/Chem/FunctionalGroups.py"
+to = "python/rdkit/Chem/FunctionalGroups.py"
+
+[[copy]]
+from = "rdkit/Chem/TorsionFingerprints.py"
+to = "python/rdkit/Chem/TorsionFingerprints.py"
+
+[[copy]]
+from = "rdkit/Chem/SATIS.py"
+to = "python/rdkit/Chem/SATIS.py"
+
+[[copy]]
+from = "rdkit/Chem/RegistrationHash.py"
+to = "python/rdkit/Chem/RegistrationHash.py"
+
+[[copy]]
+from = "rdkit/Chem/FastSDMolSupplier.py"
+to = "python/rdkit/Chem/FastSDMolSupplier.py"
