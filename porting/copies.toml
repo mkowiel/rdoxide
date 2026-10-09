@@ -222,3 +222,43 @@ to = "python/rdkit/DataManip/__init__.py"
 [[copy]]
 from = "rdkit/DataManip/Metric/__init__.py"
 to = "python/rdkit/DataManip/Metric/__init__.py"
+
+[[copy]]
+from = "rdkit/Chem/AtomPairs/__init__.py"
+to = "python/rdkit/Chem/AtomPairs/__init__.py"
+
+[[copy]]
+from = "rdkit/Chem/AtomPairs/Pairs.py"
+to = "python/rdkit/Chem/AtomPairs/Pairs.py"
+
+[[copy]]
+from = "rdkit/Chem/AtomPairs/Torsions.py"
+to = "python/rdkit/Chem/AtomPairs/Torsions.py"
+
+[[copy]]
+from = "rdkit/Chem/AtomPairs/Utils.py"
+to = "python/rdkit/Chem/AtomPairs/Utils.py"
+
+[[copy]]
+from = "rdkit/Chem/AtomPairs/Sheridan.py"
+to = "python/rdkit/Chem/AtomPairs/Sheridan.py"
+
+[[copy]]
+from = "rdkit/Chem/Scaffolds/__init__.py"
+to = "python/rdkit/Chem/Scaffolds/__init__.py"
+
+[[copy]]
+from = "rdkit/Chem/Scaffolds/MurckoScaffold.py"
+to = "python/rdkit/Chem/Scaffolds/MurckoScaffold.py"
+
+[[copy]]
+from = "rdkit/Chem/Fingerprints/__init__.py"
+to = "python/rdkit/Chem/Fingerprints/__init__.py"
+
+[[copy]]
+from = "rdkit/Chem/Fingerprints/FingerprintMols.py"
+to = "python/rdkit/Chem/Fingerprints/FingerprintMols.py"
+
+[[copy]]
+from = "rdkit/Chem/Fingerprints/SimilarityScreener.py"
+to = "python/rdkit/Chem/Fingerprints/SimilarityScreener.py"

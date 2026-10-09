@@ -9,7 +9,9 @@ use rdoxide::graphmol::descriptors::crippen::{
     CRIPPEN_VERSION, calc_crippen_descriptors, get_crippen_atom_contribs,
 };
 use rdoxide::graphmol::descriptors::lipinski::{self as lip, NumRotatableBondsOptions};
-use rdoxide::graphmol::fingerprints::atom_pair::{CODE_SIZE, get_atom_code, get_atom_pair_code};
+use rdoxide::graphmol::fingerprints::atom_pair::{
+    self, CODE_SIZE, get_atom_code, get_atom_pair_code,
+};
 use rdoxide::graphmol::fingerprints::legacy::{self, BitInfoMap, MorganKind, MorganResult};
 use rdoxide::graphmol::fingerprints::morgan::{
     get_connectivity_invariants, get_feature_invariants,
@@ -821,7 +823,70 @@ const LIPINSKI_VERSIONS: &[(&str, &str)] = &[
     ),
 ];
 
+/// The constants of the atom-pair codes (`AtomPairsParameters`), read by
+/// `rdkit.Chem.AtomPairs.Utils` to decode atom codes.
+#[pyclass(
+    name = "AtomPairsParameters",
+    module = "rdkit.Chem.rdMolDescriptors",
+    dict
+)]
+#[derive(Debug)]
+struct PyAtomPairsParameters;
+
+#[pymethods]
+impl PyAtomPairsParameters {
+    #[new]
+    fn new() -> Self {
+        PyAtomPairsParameters
+    }
+    #[classattr]
+    fn version() -> &'static str {
+        atom_pair::ATOM_PAIRS_VERSION
+    }
+    #[classattr]
+    #[allow(non_snake_case)]
+    fn numTypeBits() -> u32 {
+        atom_pair::NUM_TYPE_BITS
+    }
+    #[classattr]
+    #[allow(non_snake_case)]
+    fn numPiBits() -> u32 {
+        atom_pair::NUM_PI_BITS
+    }
+    #[classattr]
+    #[allow(non_snake_case)]
+    fn numBranchBits() -> u32 {
+        atom_pair::NUM_BRANCH_BITS
+    }
+    #[classattr]
+    #[allow(non_snake_case)]
+    fn numChiralBits() -> u32 {
+        atom_pair::NUM_CHIRAL_BITS
+    }
+    #[classattr]
+    #[allow(non_snake_case)]
+    fn codeSize() -> u32 {
+        atom_pair::CODE_SIZE
+    }
+    #[classattr]
+    #[allow(non_snake_case)]
+    fn atomTypes(py: Python<'_>) -> PyResult<Py<PyAny>> {
+        crate::vects::PyVectJ::new_py(py, atom_pair::ATOM_NUMBER_TYPES.to_vec())
+    }
+    #[classattr]
+    #[allow(non_snake_case)]
+    fn numPathBits() -> u32 {
+        atom_pair::NUM_PATH_BITS
+    }
+    #[classattr]
+    #[allow(non_snake_case)]
+    fn numAtomPairFingerprintBits() -> u32 {
+        atom_pair::NUM_ATOM_PAIR_FINGERPRINT_BITS
+    }
+}
+
 pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<PyAtomPairsParameters>()?;
     m.add(
         "__doc__",
         "Module containing functions to compute molecular descriptors",
