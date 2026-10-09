@@ -83,3 +83,63 @@ fn leader_gives_the_same_picks_on_any_number_of_threads() {
         );
     }
 }
+
+mod hierarchical {
+    use rdoxide::ml::cluster::murtagh::{Linkage, cluster_points, hierarchical_cluster};
+    use rdoxide::sim_div_pickers::hierarchical;
+
+    const LINE: [f64; 7] = [0.0, 1.0, 3.0, 7.0, 8.0, 15.0, 16.5];
+
+    fn packed() -> Vec<f64> {
+        (0..LINE.len())
+            .flat_map(|i| (0..i).map(move |j| (LINE[i] - LINE[j]).abs()))
+            .collect()
+    }
+
+    #[test]
+    fn clusters_and_representatives() {
+        let d = packed();
+        for method in [Linkage::Ward, Linkage::Slink, Linkage::Upgma] {
+            let clusters = hierarchical::cluster(&d, 7, 3, method).unwrap();
+            assert_eq!(
+                clusters,
+                [vec![0, 1, 2], vec![3, 4], vec![5, 6]],
+                "{method:?}"
+            );
+        }
+        assert_eq!(
+            hierarchical::pick(&d, 7, 3, Linkage::Ward).unwrap(),
+            [1, 3, 5]
+        );
+        assert_eq!(
+            hierarchical::pick(&d, 7, 3, Linkage::Slink).unwrap(),
+            [0, 3, 5]
+        );
+    }
+
+    #[test]
+    fn argument_errors() {
+        let d = packed();
+        assert!(hierarchical::cluster(&d, 7, 8, Linkage::Ward).is_err());
+        assert!(hierarchical::cluster(&d, 7, 0, Linkage::Ward).is_err());
+        assert!(hierarchical::cluster(&d[..5], 7, 3, Linkage::Ward).is_err());
+    }
+
+    #[test]
+    fn point_clustering_matches_the_reference() {
+        let x = [0.0, 0.0, 1.0, 0.0, 0.0, 2.0, 5.0, 5.0, 6.0, 5.0];
+        let h = cluster_points(&x, 5, 2, Linkage::Slink, 1).unwrap();
+        assert_eq!((h.ia, h.ib), (vec![1, 4, 1, 1, 0], vec![2, 5, 3, 4, 0]));
+        assert_eq!(h.crit, [1.0, 1.0, 4.0, 34.0, 0.0]);
+    }
+
+    #[test]
+    fn the_clustering_overwrites_the_matrix_like_upstream() {
+        let mut d = [1.0, 4.0, 3.0, 9.0, 8.0, 2.0, 7.0, 6.0, 5.0, 10.0];
+        let h = hierarchical_cluster(5, Linkage::Ward, &mut d).unwrap();
+        assert_eq!(h.ia, [1, 3, 1, 1, 0]);
+        assert_eq!(h.ib, [2, 4, 5, 3, 0]);
+        assert_eq!(d[0], 0.5);
+        assert_eq!(d[1], 5.333333333333333);
+    }
+}

@@ -190,3 +190,27 @@ to = "python/rdkit/SimDivFilters/__init__.py"
 [[copy]]
 from = "rdkit/SimDivFilters/SimilarityPickers.py"
 to = "python/rdkit/SimDivFilters/SimilarityPickers.py"
+
+[[copy]]
+from = "rdkit/ML/Cluster/__init__.py"
+to = "python/rdkit/ML/Cluster/__init__.py"
+
+[[copy]]
+from = "rdkit/ML/Cluster/Murtagh.py"
+to = "python/rdkit/ML/Cluster/Murtagh.py"
+
+[[copy]]
+from = "rdkit/ML/Cluster/Clusters.py"
+to = "python/rdkit/ML/Cluster/Clusters.py"
+
+[[copy]]
+from = "rdkit/ML/Cluster/ClusterUtils.py"
+to = "python/rdkit/ML/Cluster/ClusterUtils.py"
+
+[[copy]]
+from = "rdkit/ML/Cluster/Butina.py"
+to = "python/rdkit/ML/Cluster/Butina.py"
+
+[[copy]]
+from = "rdkit/TestRunner.py"
+to = "python/rdkit/TestRunner.py"

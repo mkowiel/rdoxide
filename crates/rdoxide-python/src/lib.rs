@@ -27,6 +27,7 @@ mod pyconv;
 mod rdbase;
 mod rdchem;
 mod rdchem_atom_funcs;
+mod rdclustering;
 mod rddepictor;
 mod rdfingerprintgenerator;
 mod rdinfotheory;
@@ -136,6 +137,12 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
         "rdPartialCharges",
         "rdkit.Chem.rdPartialCharges",
         rdpartialcharges::init,
+    )?;
+    add_submodule(
+        m,
+        "Clustering",
+        "rdkit.ML.Cluster.Clustering",
+        rdclustering::init,
     )?;
     add_submodule(
         m,
