@@ -1,20 +1,23 @@
 //! `SDWriter` (upstream `Wrap/SDWriter.cpp`): writes to a named file,
 //! stdout (`"-"`) or a Python file-like object.
 
-use std::io::Write;
-
-use pyo3::exceptions::{PyIOError, PyRuntimeError};
 use pyo3::prelude::*;
 use rdoxide::graphmol::file_parsers::sd_writer::mol_to_sd_text;
 
 use crate::errors::IntoPyResult;
 use crate::mol::PyMol;
+use crate::writer_sink::{Check, Site, WriterSink, close_sink, no_stream};
 
-enum Sink {
-    File(std::io::BufWriter<std::fs::File>),
-    Stdout,
-    Py(Py<PyAny>),
-}
+const WRITE: Site = Site {
+    check: Check::Precondition,
+    file: "Code/GraphMol/FileParsers/SDWriter.cpp",
+    line: 171,
+};
+const FLUSH: Site = Site {
+    check: Check::Precondition,
+    file: "Code/GraphMol/FileParsers/MolWriters.h",
+    line: 169,
+};
 
 /// A class for writing molecules to SD files.
 ///
@@ -43,29 +46,11 @@ enum Sink {
 ///        >>> writer.SetProps(['prop1','prop2'])
 #[pyclass(name = "SDWriter", module = "rdkit.Chem.rdmolfiles", unsendable)]
 pub struct PySDWriter {
-    sink: Option<Sink>,
+    sink: Option<WriterSink>,
     props: Vec<String>,
     molid: u32,
     kekulize: bool,
     force_v3000: bool,
-}
-
-fn no_stream() -> PyErr {
-    PyRuntimeError::new_err("Pre-condition Violation\n\tno output stream")
-}
-
-impl PySDWriter {
-    fn emit(&mut self, py: Python<'_>, text: &str) -> PyResult<()> {
-        match self.sink.as_mut().ok_or_else(no_stream)? {
-            Sink::File(f) => f
-                .write_all(text.as_bytes())
-                .map_err(|e| PyIOError::new_err(e.to_string())),
-            Sink::Stdout => std::io::stdout()
-                .write_all(text.as_bytes())
-                .map_err(|e| PyIOError::new_err(e.to_string())),
-            Sink::Py(o) => o.call_method1(py, "write", (text,)).map(|_| ()),
-        }
-    }
 }
 
 #[pymethods]
@@ -77,18 +62,7 @@ impl PySDWriter {
     #[new]
     #[allow(non_snake_case)]
     fn new(fileName: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let sink = if let Ok(name) = fileName.extract::<String>() {
-            if name == "-" {
-                Sink::Stdout
-            } else {
-                let f = std::fs::File::create(&name).map_err(|_| {
-                    PyIOError::new_err(format!("File error: Bad output file {name}"))
-                })?;
-                Sink::File(std::io::BufWriter::new(f))
-            }
-        } else {
-            Sink::Py(fileName.clone().unbind())
-        };
+        let sink = WriterSink::open(fileName)?;
         Ok(PySDWriter {
             sink: Some(sink),
             props: Vec::new(),
@@ -140,7 +114,7 @@ impl PySDWriter {
     #[allow(non_snake_case)]
     fn write(&mut self, py: Python<'_>, mol: PyRef<'_, PyMol>, confId: i32) -> PyResult<()> {
         if self.sink.is_none() {
-            return Err(no_stream());
+            return Err(no_stream(WRITE));
         }
         let text = mol_to_sd_text(
             &mol.mol,
@@ -151,36 +125,25 @@ impl PySDWriter {
             Some(&self.props),
         )
         .py()?;
-        self.emit(py, &text)?;
+        self.sink
+            .as_mut()
+            .ok_or_else(|| no_stream(WRITE))?
+            .write(py, &text)?;
         self.molid += 1;
         Ok(())
     }
 
     /// Flushes the output file (forces the disk file to be updated).
     fn flush(&mut self, py: Python<'_>) -> PyResult<()> {
-        match self.sink.as_mut().ok_or_else(no_stream)? {
-            Sink::File(f) => {
-                let _ = f.flush();
-            }
-            Sink::Stdout => {
-                let _ = std::io::stdout().flush();
-            }
-            Sink::Py(o) => {
-                if o.bind(py).hasattr("flush")? {
-                    o.call_method0(py, "flush")?;
-                }
-            }
-        }
-        Ok(())
+        self.sink
+            .as_mut()
+            .ok_or_else(|| no_stream(FLUSH))?
+            .flush(py)
     }
 
     /// Flushes the output file and closes it. The Writer cannot be used after this.
     fn close(&mut self, py: Python<'_>) -> PyResult<()> {
-        if self.sink.is_some() {
-            self.flush(py)?;
-        }
-        self.sink = None;
-        Ok(())
+        close_sink(py, &mut self.sink)
     }
 
     /// Returns the number of molecules written so far.
@@ -225,14 +188,6 @@ impl PySDWriter {
         molid: i32,
     ) -> PyResult<String> {
         mol_to_sd_text(&mol.mol, confId, kekulize, force_v3000, molid, None).py()
-    }
-}
-
-impl Drop for PySDWriter {
-    fn drop(&mut self) {
-        if let Some(Sink::File(f)) = self.sink.as_mut() {
-            let _ = f.flush();
-        }
     }
 }
 

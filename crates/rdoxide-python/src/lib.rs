@@ -40,6 +40,7 @@ mod rdmolfiles_sdsupplier;
 mod rdmolfiles_sdwriter;
 mod rdmolfiles_smarts;
 mod rdmolfiles_smisupplier;
+mod rdmolfiles_smiwriter;
 mod rdmolfiles_write;
 mod rdmolops;
 mod rdmolops_fingerprints;
@@ -52,6 +53,7 @@ mod ringinfo;
 mod stereo_group;
 mod substruct;
 mod vects;
+mod writer_sink;
 
 /// Create a submodule named `full_name` (e.g. `rdkit.Chem.rdchem`) and attach
 /// it to `parent` under `attr`.
