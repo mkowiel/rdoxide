@@ -87,7 +87,11 @@ impl PyBond {
         }
     }
 
-    fn with_mol_mut<R>(&self, py: Python<'_>, f: impl FnOnce(&mut ROMol, u32) -> R) -> PyResult<R> {
+    pub(crate) fn with_mol_mut<R>(
+        &self,
+        py: Python<'_>,
+        f: impl FnOnce(&mut ROMol, u32) -> R,
+    ) -> PyResult<R> {
         match &self.handle {
             BondHandle::Owned(_) => Err(no_owner()),
             BondHandle::InMol { mol, idx } => {

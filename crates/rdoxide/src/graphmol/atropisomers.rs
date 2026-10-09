@@ -380,7 +380,7 @@ pub fn detect_atropisomer_chirality(
 
 // ------------------------------------------------------------------ wedging
 
-use crate::graphmol::file_parsers::mol_file_writer::{WedgeBonds, WedgeInfo};
+use crate::graphmol::wedge_bonds::{WedgeBonds, WedgeInfo};
 
 /// `getBondDirForAtropisomerNoConf`
 fn bond_dir_no_conf(stereo: BondStereo, which_end: usize, which_bond: usize) -> BondDir {

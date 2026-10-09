@@ -99,6 +99,12 @@ impl RDKitError {
         Self::check_at("Pre-condition Violation", message, expr, file, line)
     }
 
+    /// A failed `TEST_ASSERT(expr)` of the C++ sources at `file:line` (the
+    /// last line of the statement); logged like upstream.
+    pub fn test_assert_at(expr: &str, file: &str, line: u32) -> Self {
+        Self::check_at("Test Assert", "Expression Failed: ", expr, file, line)
+    }
+
     fn check_at(
         kind: &'static str,
         message: impl fmt::Display,

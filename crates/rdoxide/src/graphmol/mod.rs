@@ -32,6 +32,7 @@ pub mod smiles_parse;
 pub mod stereo_group;
 pub mod subgraphs;
 pub mod substruct;
+pub mod wedge_bonds;
 
 pub use atom::{Atom, ChiralType, HybridizationType, ValenceType};
 pub use bond::{Bond, BondDir, BondStereo, BondType};

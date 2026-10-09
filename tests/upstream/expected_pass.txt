@@ -177,6 +177,7 @@ rdkit/Chem/UnitTestChemv2.py::TestCase::test2
 rdkit/Chem/UnitTestChemv2.py::TestCase::test3
 rdkit/Chem/UnitTestChemv2.py::TestCase::test4Pkl2
 rdkit/Chem/UnitTestChemv2.py::TestCase::test5Data
+rdkit/Chem/UnitTestChemv2.py::TestCase::testIssue399
 rdkit/Chem/UnitTestCrippen.py::TestCase::testDetails
 rdkit/Chem/UnitTestCrippen.py::TestCase::testDetails2
 rdkit/Chem/UnitTestCrippen.py::TestCase::testIssue1749494

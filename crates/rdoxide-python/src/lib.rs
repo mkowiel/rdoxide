@@ -58,6 +58,7 @@ mod rdmolops_stereo_misc;
 mod rdmolops_structure;
 mod rdmolops_subgraphs;
 mod rdmolops_transforms;
+mod rdmolops_wedging;
 mod rdmolops_zip;
 mod rdmoltransforms;
 mod rdpartialcharges;
