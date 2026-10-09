@@ -1,5 +1,6 @@
 //! Extraction of sub-molecules (`copyMolSubset`): copies selected atoms and
-//! bonds together with their conformer coordinates and the stereo groups that
+//! bonds together with their conformer coordinates and the substance and
+//! stereo groups that
 //! touch the selection.
 //!
 //! Ported from RDKit `Code/GraphMol/Subset.cpp` (2026.09.1).
@@ -7,7 +8,6 @@
 //! Copyright (C) 2025 Hussein Faara, Brian Kelley and other RDKit Contributors.
 //! Licensed under the BSD 3-Clause license (see LICENSES/RDKit-BSD-3-Clause.txt).
 //!
-//! SubstanceGroups are not ported yet, so none are copied.
 
 use std::collections::BTreeMap;
 
@@ -17,6 +17,7 @@ use super::mol_ops::{sanitize_flags::SANITIZE_ALL, sanitize_mol};
 use super::query_ops::{query_atom_from_atom, query_bond_from_bond};
 use super::romol::{ROMol, RWMol};
 use super::stereo_group::StereoGroup;
+use super::substance_group::add_substance_group;
 use crate::rdgeneral::RDProps;
 use crate::rdgeneral::dict::COMPUTED_PROP_NAME;
 use crate::{RDKitError, Result};
@@ -178,6 +179,41 @@ fn copy_selected_atoms_and_bonds(
     Ok(())
 }
 
+/// Substance groups survive when everything they refer to was selected.
+fn copy_selected_substance_groups(
+    extracted: &mut RWMol,
+    mol: &ROMol,
+    info: &SubsetInfo,
+) -> Result<()> {
+    let all_selected =
+        |members: &[u32], selected: &[bool]| members.iter().all(|&m| selected[m as usize]);
+    let map = |members: &[u32], mapping: &BTreeMap<u32, u32>| -> Result<Vec<u32>> {
+        members
+            .iter()
+            .map(|m| {
+                mapping
+                    .get(m)
+                    .copied()
+                    .ok_or_else(|| RDKitError::invariant("unmapped SubstanceGroup member"))
+            })
+            .collect()
+    };
+    for group in mol.substance_groups() {
+        if !(all_selected(group.atoms(), &info.selected_atoms)
+            && all_selected(group.bonds(), &info.selected_bonds)
+            && all_selected(group.parent_atoms(), &info.selected_atoms))
+        {
+            continue;
+        }
+        let mut copy = group.clone();
+        copy.set_atoms(extracted, map(group.atoms(), &info.atom_mapping)?)?;
+        copy.set_parent_atoms(extracted, map(group.parent_atoms(), &info.atom_mapping)?)?;
+        copy.set_bonds(extracted, map(group.bonds(), &info.bond_mapping)?)?;
+        add_substance_group(extracted, copy);
+    }
+    Ok(())
+}
+
 /// Stereo groups survive when they touch the selection; their members that
 /// were not selected are dropped.
 fn copy_selected_stereo_groups(
@@ -238,6 +274,7 @@ fn copy_computed_props(src: &ROMol, dst: &mut RWMol) {
 fn copy_selection(mol: &ROMol, info: &mut SubsetInfo, options: &SubsetOptions) -> Result<RWMol> {
     let mut extracted = RWMol::new();
     copy_selected_atoms_and_bonds(&mut extracted, mol, info, options)?;
+    copy_selected_substance_groups(&mut extracted, mol, info)?;
     copy_selected_stereo_groups(&mut extracted, mol, info)?;
     if options.copy_coordinates {
         copy_coords(&mut extracted, mol, info)?;

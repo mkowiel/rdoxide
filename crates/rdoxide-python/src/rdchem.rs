@@ -378,6 +378,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
         crate::stereo_group::create_stereo_group,
         m
     )?)?;
+    crate::substance_group::add(m)?;
     m.add_function(wrap_pyfunction!(tossit, m)?)?;
     Ok(())
 }

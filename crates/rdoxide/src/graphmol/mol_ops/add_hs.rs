@@ -5,8 +5,6 @@
 //! Copyright (C) 2003-2025 Greg Landrum and other RDKit contributors.
 //! Licensed under the BSD 3-Clause license (see LICENSES/RDKit-BSD-3-Clause.txt).
 //!
-//! SubstanceGroups are not ported yet; the SGroup-related checks are no-ops
-//! until they are (a molecule without SGroups behaves identically).
 
 use std::collections::BTreeMap;
 
@@ -16,6 +14,7 @@ use crate::graphmol::bond::{BondDir, BondStereo, BondType};
 use crate::graphmol::chirality::nontetrahedral::has_non_tetrahedral_stereo;
 use crate::graphmol::periodic_table::PeriodicTable;
 use crate::graphmol::romol::RWMol;
+use crate::graphmol::substance_group::SGroupBondType;
 use crate::rdgeneral::RDProps;
 use crate::rdgeneral::common_properties as cp;
 use crate::{RDKitError, Result};
@@ -226,10 +225,65 @@ fn mol_remove_h(mol: &mut RWMol, idx: u32, update_explicit_count: bool) -> Resul
         } else {
             adjust_stereo_atoms_if_required(mol, idx, heavy)?;
         }
-        // TODO(SubstanceGroups): sg.removeBondWithIdx(bond)
+        // remove the bond from any SGroups that might include it
+        for sg in mol.substance_groups_mut() {
+            sg.remove_bond_with_idx(bond);
+        }
     }
-    // TODO(SubstanceGroups): remove the atom from SGroups / attach points
+    // Remove the atom from any SGroups that might include it, so that they
+    // don't get removed along with it. SAP leaving atoms may be Hs.
+    for sg in mol.substance_groups_mut() {
+        sg.remove_atom_with_idx(idx);
+        sg.remove_parent_atom_with_idx(idx);
+        for sap in sg.attach_points_mut() {
+            if sap.lv_idx == idx as i32 {
+                sap.lv_idx = -1;
+            }
+        }
+    }
     mol.remove_atom_ext(idx, false)
+}
+
+/// Is the H atom one of the "caps" of a substance group (technically not
+/// part of the group, but it defines its boundaries), one of its attach
+/// points (this would be weird; leaving atoms don't count) or an end of a
+/// CState bond?
+fn is_group_boundary_atom(mol: &RWMol, atom: u32) -> Result<bool> {
+    let in_bond = |bond_idx: u32| {
+        let bond = mol.bond(bond_idx);
+        bond.begin_atom_idx() == atom || bond.end_atom_idx() == atom
+    };
+    for sg in mol.substance_groups() {
+        for &bond_idx in sg.bonds() {
+            if sg.bond_type(mol, bond_idx)? == SGroupBondType::XBond && in_bond(bond_idx) {
+                return Ok(true);
+            }
+        }
+        if sg.attach_points().iter().any(|sap| sap.a_idx == atom) {
+            return Ok(true);
+        }
+        if sg.cstates().iter().any(|cs| in_bond(cs.bond_idx)) {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+/// Hs in groups that contain nothing else are kept, so that no group becomes
+/// empty (`filter_sgroup_emptying_hydrogens`).
+fn filter_sgroup_emptying_hydrogens(mol: &RWMol, to_remove: &mut [bool]) {
+    for sg in mol.substance_groups() {
+        let (atoms, parent_atoms) = (sg.atoms(), sg.parent_atoms());
+        if atoms.is_empty() && parent_atoms.is_empty() {
+            continue; // such groups were empty already
+        }
+        let all_removed = |members: &[u32]| members.iter().all(|&m| to_remove[m as usize]);
+        if all_removed(atoms) && all_removed(parent_atoms) {
+            for &a in atoms.iter().chain(parent_atoms) {
+                to_remove[a as usize] = false;
+            }
+        }
+    }
 }
 
 /// anonymous-namespace `shouldRemoveH`
@@ -260,7 +314,19 @@ fn should_remove_h(mol: &RWMol, atom: u32, ps: &RemoveHsParameters) -> Result<bo
     if !ps.remove_mapped && a.atom_map_num() != 0 {
         return Ok(false);
     }
-    // TODO(SubstanceGroups): removeInSGroups checks
+    if ps.remove_in_sgroups {
+        // Hs with a special role in a group stay: those that cap it (they
+        // define its boundary), are attach points or define a CState.
+        if is_group_boundary_atom(mol, atom)? {
+            return Ok(false);
+        }
+    } else if mol
+        .substance_groups()
+        .iter()
+        .any(|sg| sg.includes_atom(atom))
+    {
+        return Ok(false);
+    }
     if !ps.remove_hydrides && a.formal_charge() == -1 {
         return Ok(false);
     }
@@ -373,7 +439,9 @@ pub fn remove_hs(mol: &mut RWMol, ps: &RemoveHsParameters, sanitize: bool) -> Re
             to_remove[i as usize] = true;
         }
     }
-    // TODO(SubstanceGroups): filter_sgroup_emptying_hydrogens
+    if ps.remove_in_sgroups {
+        filter_sgroup_emptying_hydrogens(mol, &mut to_remove);
+    }
     for idx in (0..n).rev() {
         if to_remove[idx as usize] {
             mol_remove_h(mol, idx, ps.update_explicit_count)?;

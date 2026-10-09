@@ -126,6 +126,12 @@
 [module."rdoxide::graphmol::mol_ops::query_hs".sources]
 "Code/GraphMol/AddHs.cpp" = "ac653bc04e5c317b9803d986fcdef668fb17759e"
 
+[module."rdoxide::graphmol::substance_group".sources]
+"Code/GraphMol/SubstanceGroup.cpp" = "9100b668091378e117383421759bbd820c8530e5"
+
+[module."rdoxide_python::substance_group".sources]
+"Code/GraphMol/Wrap/SubstanceGroup.cpp" = "bbe27150bb8c5f19f9ddac2908b8ee8509793870"
+
 [module."rdoxide::graphmol::adjust_query".sources]
 "Code/GraphMol/AdjustQuery.cpp" = "1dfe502cfc05eccd5839e7fe88218c15e24aca94"
 

@@ -68,6 +68,7 @@ mod rdpartialcharges;
 mod rdqueries;
 mod ringinfo;
 mod stereo_group;
+mod substance_group;
 mod substruct;
 mod vects;
 mod writer_sink;

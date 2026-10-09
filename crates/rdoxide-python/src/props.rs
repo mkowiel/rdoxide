@@ -215,16 +215,20 @@ pub fn set_prop(d: &mut Dict, key: &str, val: RDValue, computed: bool) -> PyResu
 ///
 /// `computed`: whether setters take a `computed` argument (Mol, Conformer).
 /// `$priv`, `$comp`: defaults of `GetPropsAsDict(includePrivate, includeComputed)`.
+/// `has_prop`: the type `HasProp` returns (`i32` for most classes, `bool` where upstream does).
 macro_rules! impl_props {
     ($ty:ty, computed = $computed:tt, dict_defaults = ($priv:expr, $comp:expr)) => {
+        $crate::props::impl_props!($ty, computed = $computed, dict_defaults = ($priv, $comp), has_prop = i32);
+    };
+    ($ty:ty, computed = $computed:tt, dict_defaults = ($priv:expr, $comp:expr), has_prop = $has:ty) => {
         $crate::props::impl_props!(@setters $ty, $computed);
 
         #[pyo3::pymethods]
         impl $ty {
             /// Queries a molecule to see if a particular property has been assigned.
             #[pyo3(name = "HasProp")]
-            fn py_has_prop(&self, py: pyo3::Python<'_>, key: &str) -> pyo3::PyResult<i32> {
-                self.with_dict(py, |d| i32::from(d.has_val(key)))
+            fn py_has_prop(&self, py: pyo3::Python<'_>, key: &str) -> pyo3::PyResult<$has> {
+                self.with_dict(py, |d| <$has>::from(d.has_val(key)))
             }
 
             /// Removes a particular property (does nothing if not already set).

@@ -1300,7 +1300,6 @@ fn pickle_body(mol: &ROMol, w: &mut W, flags: u32, wide: bool) -> Result<()> {
             }
         }
     }
-    // TODO(SubstanceGroups): BEGINSGROUP
     if !mol.stereo_groups().is_empty() {
         w.u8(BEGINSTEREOGROUP);
         let mut groups = mol.stereo_groups().to_vec();
@@ -1427,6 +1426,12 @@ fn pickle_body(mol: &ROMol, w: &mut W, flags: u32, wide: bool) -> Result<()> {
 
 /// `MolPickler::pickleMol(mol, res, propertyFlags)`
 pub fn pickle_mol(mol: &ROMol, flags: u32) -> Result<Vec<u8>> {
+    if !mol.substance_groups().is_empty() {
+        // TODO(SubstanceGroups): BEGINSGROUP; refuse instead of dropping them
+        return Err(pickle_error(
+            "rdoxide: pickles with SubstanceGroups are not supported yet",
+        ));
+    }
     let mut w = W::default();
     w.i32(ENDIAN_ID);
     w.i32(VERSION as i32);

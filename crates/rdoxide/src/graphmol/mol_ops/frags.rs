@@ -5,7 +5,6 @@
 //! Copyright (C) 2001-2025 Greg Landrum and other RDKit contributors.
 //! Licensed under the BSD 3-Clause license (see LICENSES/RDKit-BSD-3-Clause.txt).
 //!
-//! SubstanceGroups are not ported yet; their checks are no-ops.
 
 use super::{sanitize_flags::SANITIZE_ALL, sanitize_mol};
 use crate::graphmol::atom::ChiralType;
@@ -84,7 +83,14 @@ pub fn get_mol_frags_as_mols(
                         }
                     }
                 }
-                // TODO(SubstanceGroups)
+                if mol.substance_groups().iter().any(|sg| {
+                    sg.atoms()
+                        .iter()
+                        .chain(sg.parent_atoms())
+                        .any(|&a| in_frag(a))
+                }) {
+                    return true;
+                }
                 for sg in mol.stereo_groups() {
                     if sg.atoms().iter().any(|&a| in_frag(a)) {
                         return true;

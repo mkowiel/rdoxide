@@ -18,6 +18,10 @@ use super::bond::{Bond, BondStereo, BondType};
 use super::conformer::Conformer;
 use super::ring_info::RingInfo;
 use super::stereo_group::{self, StereoGroup, StereoGroupType};
+use super::substance_group::{
+    SubstanceGroup, insert_substance_groups, remove_substance_groups_referencing_atom,
+    remove_substance_groups_referencing_bond,
+};
 use crate::geometry::Point3D;
 use crate::rdgeneral::common_properties as cp;
 use crate::rdgeneral::{Dict, RDProps, RDValue};
@@ -39,6 +43,7 @@ pub struct ROMol {
     pub(crate) conformers: Vec<Conformer>,
     pub(crate) props: Dict,
     pub(crate) stereo_groups: Vec<StereoGroup>,
+    pub(crate) sgroups: Vec<SubstanceGroup>,
     pub(crate) atom_bookmarks: BTreeMap<i32, Vec<u32>>,
     pub(crate) bond_bookmarks: BTreeMap<i32, Vec<u32>>,
     pub(crate) del_atoms: Option<Vec<bool>>,
@@ -81,6 +86,7 @@ impl ROMol {
                 .filter(|c| conf_id < 0 || c.id as i32 == conf_id)
                 .cloned()
                 .collect();
+            m.sgroups = other.sgroups.clone();
             m.props = other.props.clone();
             m.atom_bookmarks = other.atom_bookmarks.clone();
             m.bond_bookmarks = other.bond_bookmarks.clone();
@@ -412,7 +418,7 @@ impl ROMol {
         self.clear_bond_bookmarks_for(idx);
         self.clear_stereo_referencing_bond(idx);
         self.ring_info.reset(true);
-        // TODO(stage 2b): removeSubstanceGroupsReferencingBond
+        remove_substance_groups_referencing_bond(self, idx)?;
         stereo_group::remove_bond_from_groups(idx, &mut self.stereo_groups);
         self.erase_bond(idx);
         Ok(())
@@ -506,7 +512,7 @@ impl ROMol {
                 bond.stereo_atoms.clear();
             }
         }
-        // TODO(stage 2b): removeSubstanceGroupsReferencingAtom
+        remove_substance_groups_referencing_atom(self, idx)?;
         stereo_group::remove_atom_from_groups(idx, &mut self.stereo_groups);
         if clear_props {
             self.clear_computed_props(true);
@@ -586,7 +592,9 @@ impl ROMol {
             new.update_props(&old_props, true);
         }
         self.bonds[idx as usize] = new;
-        let _ = keep_sgroups; // TODO(stage 2b): removeSubstanceGroupsReferencingBond
+        if !keep_sgroups {
+            remove_substance_groups_referencing_bond(self, idx)?;
+        }
         Ok(())
     }
 
@@ -646,8 +654,7 @@ impl ROMol {
             }
         }
         self.insert_stereo_groups(other, orig_atoms, orig_bonds)?;
-        // TODO(stage 2b): insertSubstanceGroups
-        Ok(())
+        insert_substance_groups(self, other, orig_atoms, orig_bonds)
     }
 
     fn insert_stereo_groups(
@@ -732,6 +739,7 @@ impl ROMol {
             let idx = i as u32;
             self.clear_bond_bookmarks_for(idx);
             self.clear_stereo_referencing_bond(idx);
+            remove_substance_groups_referencing_bond(self, idx)?;
             stereo_group::remove_bond_from_groups(idx, &mut self.stereo_groups);
             self.erase_bond(idx);
         }
@@ -751,6 +759,7 @@ impl ROMol {
             }
             self.clear_atom_bookmarks_for(idx);
             self.fix_bond_end_pts(idx);
+            remove_substance_groups_referencing_atom(self, idx)?;
             stereo_group::remove_atom_from_groups(idx, &mut self.stereo_groups);
             alive[i] = false;
             // stereo atoms referring to the deleted atom are dropped below
@@ -962,6 +971,17 @@ impl ROMol {
     }
     pub fn ring_info_mut(&mut self) -> &mut RingInfo {
         &mut self.ring_info
+    }
+
+    /// `getSubstanceGroups(mol)`
+    pub fn substance_groups(&self) -> &[SubstanceGroup] {
+        &self.sgroups
+    }
+
+    /// `getSubstanceGroups(mol)` for modification; the groups must keep
+    /// referring to existing atoms and bonds.
+    pub fn substance_groups_mut(&mut self) -> &mut Vec<SubstanceGroup> {
+        &mut self.sgroups
     }
 
     pub fn stereo_groups(&self) -> &[StereoGroup] {
