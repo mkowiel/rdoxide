@@ -1,15 +1,19 @@
-//! `CalcAUTOCORR3D`, `CalcRDF` and `CalcMORSE` of `rdkit.Chem.rdMolDescriptors`
-//! (upstream `Descriptors/AUTOCORR3D.cpp`, `RDF.cpp`, `MORSE.cpp` and their
+//! `CalcAUTOCORR3D`, `CalcRDF`, `CalcMORSE` and `CalcCoulombMat` of `rdkit.Chem.rdMolDescriptors`
+//! (upstream `Descriptors/AUTOCORR3D.cpp`, `RDF.cpp`, `MORSE.cpp`,
+//! `CoulombMat.cpp` and their
 //! wrappers in `Wrap/rdMolDescriptors.cpp`).
 
 use pyo3::prelude::*;
+use pyo3::types::PyTuple;
 use rdoxide::graphmol::descriptors::autocorr3d::{AUTOCORR3D_VERSION, autocorr3d};
+use rdoxide::graphmol::descriptors::coulomb_mat::{COULOMB_MAT_VERSION, coulomb_mat};
 use rdoxide::graphmol::descriptors::morse::{MORSE_VERSION, morse};
 use rdoxide::graphmol::descriptors::rdf::{RDF_VERSION, rdf};
 
 use crate::errors::IntoPyResult;
 use crate::mol::PyMol;
 use crate::rdmoldescriptors_3d::require_conformer;
+use crate::vects::PyVectD;
 
 /// Returns 3D Autocorrelation descriptors vector
 #[pyfunction]
@@ -60,10 +64,32 @@ fn calc_morse(
     py.detach(|| morse(core, confId, CustomAtomProperty)).py()
 }
 
+/// Returns severals Coulomb randomized matrices
+#[pyfunction]
+#[pyo3(name = "CalcCoulombMat", signature = (mol, confId = -1))]
+#[allow(non_snake_case)]
+fn calc_coulomb_mat<'py>(
+    py: Python<'py>,
+    mol: &Bound<'py, PyMol>,
+    confId: i32,
+) -> PyResult<Bound<'py, PyTuple>> {
+    let m = mol.borrow();
+    let core = &m.mol;
+    require_conformer(core, "Code/GraphMol/Descriptors/CoulombMat.cpp", 40)?;
+    let rows = py.detach(|| coulomb_mat(core, confId)).py()?;
+    let rows = rows
+        .into_iter()
+        .map(|r| PyVectD::new_py(py, r))
+        .collect::<PyResult<Vec<_>>>()?;
+    PyTuple::new(py, rows)
+}
+
 pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("_CalcAUTOCORR3D_version", AUTOCORR3D_VERSION)?;
     m.add("_CalcRDF_version", RDF_VERSION)?;
     m.add("_CalcMORSE_version", MORSE_VERSION)?;
+    m.add("_CalcCoulombMat_version", COULOMB_MAT_VERSION)?;
+    m.add_function(wrap_pyfunction!(calc_coulomb_mat, m)?)?;
     m.add_function(wrap_pyfunction!(calc_autocorr3d, m)?)?;
     m.add_function(wrap_pyfunction!(calc_rdf, m)?)?;
     m.add_function(wrap_pyfunction!(calc_morse, m)?)

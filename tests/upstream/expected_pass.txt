@@ -93,6 +93,8 @@ Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testRootedTorsio
 Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testSpiroAndBridgeheads
 Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testTopologicalTorsions
 Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testTorsionValues
+Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testUSR
+Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testUSRCAT
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testAdditionalOutput
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testAtomPairGenerator
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testCountBounds

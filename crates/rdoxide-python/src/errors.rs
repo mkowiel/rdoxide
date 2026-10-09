@@ -1,8 +1,11 @@
 //! Translation of rdoxide errors into the Python exceptions RDKit raises
 //! (see upstream `Code/RDBoost/Wrap/RDBase.cpp` exception translators).
 
-use pyo3::exceptions::{PyIOError, PyIndexError, PyKeyError, PyRuntimeError, PyValueError};
+use pyo3::exceptions::{
+    PyIOError, PyIndexError, PyKeyError, PyRuntimeError, PyTypeError, PyValueError,
+};
 use pyo3::prelude::*;
+use pyo3::types::PyList;
 use rdoxide::RDKitError;
 
 pub fn to_py(err: RDKitError) -> PyErr {
@@ -62,5 +65,31 @@ pub fn check_failed(site: Site, message: &str) -> PyErr {
         "{}\tRDKIT: {}\n\tBOOST: \n",
         body.replace('\n', "\n\t").trim_end_matches('\t'),
         rdoxide::rdgeneral::RDKIT_VERSION
+    ))
+}
+
+fn type_name(obj: &Bound<'_, PyAny>) -> String {
+    obj.get_type()
+        .name()
+        .map_or_else(|_| "?".into(), |n| n.to_string())
+}
+
+/// `python::extract<python::list>(obj)` of the Boost wrappers: the list, or
+/// the `TypeError` Boost raises for other objects.
+pub fn expect_list<'a, 'py>(obj: &'a Bound<'py, PyAny>) -> PyResult<&'a Bound<'py, PyList>> {
+    obj.cast::<PyList>().map_err(|_| {
+        PyTypeError::new_err(format!(
+            "Expecting an object of type list; got an object of type {} instead",
+            type_name(obj)
+        ))
+    })
+}
+
+/// The `TypeError` Boost raises when no converter produces the C++ type
+/// `cpp_type` from `obj`.
+pub fn no_converter(cpp_type: &str, obj: &Bound<'_, PyAny>) -> PyErr {
+    PyTypeError::new_err(format!(
+        "No registered converter was able to produce a C++ rvalue of type {cpp_type} from this Python object of type {}",
+        type_name(obj)
     ))
 }

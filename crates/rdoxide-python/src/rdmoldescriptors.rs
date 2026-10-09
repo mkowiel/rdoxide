@@ -862,6 +862,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     crate::rdmoldescriptors_bcut::init(m)?;
     crate::rdmoldescriptors_autocorr::init(m)?;
     crate::rdmoldescriptors_profiles::init(m)?;
+    crate::rdmoldescriptors_usr::init(m)?;
     crate::rdmoldescriptors_3d::init(m)?;
     crate::rdmoldescriptors_property::init(m)?;
     m.add_function(wrap_pyfunction!(calc_fraction_csp3, m)?)?;
