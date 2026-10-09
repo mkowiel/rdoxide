@@ -301,6 +301,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     crate::rdmolops_stereo_groups::add(m)?;
     crate::rdmolops_adjust_query::add(m)?;
     crate::rdmolops_stereo_misc::add(m)?;
+    crate::rdchem_stereo_info::add_ops(m)?;
     crate::rdmolops_structure::add(m)?;
     crate::rdmolops_subset::add(m)?;
     crate::rdmolops_fragments::add(m)?;

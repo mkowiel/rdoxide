@@ -780,3 +780,7 @@
 
 [module."rdoxide_python::rdmolhash".sources]
 "Code/GraphMol/MolHash/Wrap/rdMolHash.cpp" = "e73c98c535bdc473a44aa58cdd97c3e9b2da9d2c"
+
+[module."rdoxide::graphmol::chirality::find_stereo".sources]
+"Code/GraphMol/FindStereo.cpp" = "a3ad1280f33a06430df7d566a825dc80e589cbb9"
+"Code/GraphMol/Chirality.h" = "00f628293afe048e44e86c120e86acc3a6e9d280"

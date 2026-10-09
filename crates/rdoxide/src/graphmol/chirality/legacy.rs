@@ -780,7 +780,7 @@ fn entry_idx(e: i32) -> usize {
 }
 
 /// `Chirality::findChiralAtomSpecialCases`
-fn find_chiral_atom_special_cases(
+pub(crate) fn find_chiral_atom_special_cases(
     mol: &mut ROMol,
     possible: &mut [bool],
     atom_ranks: &[u32],

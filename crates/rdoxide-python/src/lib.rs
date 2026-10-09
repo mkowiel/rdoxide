@@ -27,6 +27,7 @@ mod pyconv;
 mod rdbase;
 mod rdchem;
 mod rdchem_atom_funcs;
+mod rdchem_stereo_info;
 mod rdclustering;
 mod rddepictor;
 mod rdfingerprintgenerator;
