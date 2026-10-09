@@ -31,6 +31,7 @@ mod rdchem_atom_funcs;
 mod rdchem_stereo_info;
 mod rdclustering;
 mod rddepictor;
+mod rddeterminebonds;
 mod rdenumeratestereoisomers;
 mod rdfingerprintgenerator;
 mod rdinfotheory;
@@ -58,6 +59,7 @@ mod rdmolfiles_smarts;
 mod rdmolfiles_smisupplier;
 mod rdmolfiles_smiwriter;
 mod rdmolfiles_write;
+mod rdmolfiles_xyz;
 mod rdmolhash;
 mod rdmolops;
 mod rdmolops_adjust_query;
@@ -156,6 +158,12 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
     )?;
     add_submodule(m, "rdMolHash", "rdkit.Chem.rdMolHash", rdmolhash::init)?;
     add_submodule(m, "rdMMPA", "rdkit.Chem.rdMMPA", rdmmpa::init)?;
+    add_submodule(
+        m,
+        "rdDetermineBonds",
+        "rdkit.Chem.rdDetermineBonds",
+        rddeterminebonds::init,
+    )?;
     add_submodule(
         m,
         "rdAbbreviations",

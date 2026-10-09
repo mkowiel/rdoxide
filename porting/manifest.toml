@@ -815,3 +815,18 @@
 
 [module."rdoxide_python::rdabbreviations".sources]
 "Code/GraphMol/Abbreviations/Wrap/rdAbbreviations.cpp" = "66b036defaa16415e5ecd1f16bf1692f07e42a74"
+
+[module."rdoxide::graphmol::file_parsers::xyz".sources]
+"Code/GraphMol/FileParsers/XYZFileParser.cpp" = "01575a0d892d508372539bf1030cb754e10c8ecf"
+"Code/GraphMol/FileParsers/XYZFileWriter.cpp" = "d1ffa49b1e8c8f008db2e52bfa91cc3e1238619a"
+
+[module."rdoxide::graphmol::file_parsers::proximity_bonds".sources]
+"Code/GraphMol/FileParsers/ProximityBonds.cpp" = "d7bb8ec690dab4cb975dc13da658b08a5fa684e4"
+"Code/GraphMol/FileParsers/ProximityBonds.h" = "52f094916a52eb0d0da350332b5b04f19036c422"
+
+[module."rdoxide::graphmol::determine_bonds".sources]
+"Code/GraphMol/DetermineBonds/DetermineBonds.cpp" = "901bebedefddadd379a44bf7af9f9f36f2844e5c"
+"Code/GraphMol/DetermineBonds/DetermineBonds.h" = "d2f3472f65a0b46d1c083896738ad777477b744d"
+
+[module."rdoxide_python::rddeterminebonds".sources]
+"Code/GraphMol/DetermineBonds/Wrap/rdDetermineBonds.cpp" = "199188b06ca0bd23210fd75923360c495f16fc6e"

@@ -122,6 +122,10 @@ Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testTopologicalT
 Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testTorsionValues
 Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testUSR
 Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testUSRCAT
+Code/GraphMol/DetermineBonds/Wrap/testDetermineBonds.py::TestCase::testCtDConnectivity
+Code/GraphMol/DetermineBonds/Wrap/testDetermineBonds.py::TestCase::testMaxIterations
+Code/GraphMol/DetermineBonds/Wrap/testDetermineBonds.py::TestCase::testVdWBonds
+Code/GraphMol/DetermineBonds/Wrap/testDetermineBonds.py::TestCase::testVdWConnectivity
 Code/GraphMol/EnumerateStereoisomers/Wrap/testEnumerateStereoisomers.py::TestCase::testEnumerateStereoisomersBasic
 Code/GraphMol/EnumerateStereoisomers/Wrap/testEnumerateStereoisomers.py::TestCase::testEnumerateStereoisomersWithCrazyNumberOfCenters
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testAdditionalOutput
