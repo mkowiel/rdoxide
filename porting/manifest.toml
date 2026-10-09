@@ -750,3 +750,10 @@
 [module."rdoxide_python::rdmolfiles_mtsupplier".sources]
 "Code/GraphMol/Wrap/MultithreadedSDMolSupplier.cpp" = "a6eb239467e17b3a6f6bf77ae3a1da09d44771b0"
 "Code/GraphMol/Wrap/MultithreadedSmilesMolSupplier.cpp" = "c8938cb8420129a872dd9f4cc2c5b3e2ff34c75a"
+
+[module."rdoxide::graphmol::reduced_graphs".sources]
+"Code/GraphMol/ReducedGraphs/ReducedGraphs.cpp" = "d6d09d0fd648d703f2893b0078ee8faf3424f10f"
+"Code/GraphMol/ReducedGraphs/ReducedGraphs.h" = "91cb4b938555ced1c3d02393b8df16637f26433c"
+
+[module."rdoxide_python::rdreducedgraphs".sources]
+"Code/GraphMol/ReducedGraphs/Wrap/rdReducedGraphs.cpp" = "ff0064f49fbfbab14e57ceecf9e32885df10de99"

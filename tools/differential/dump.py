@@ -325,6 +325,29 @@ def patternfp_record(smi):
     return rec or None
 
 
+def erg_record(smi):
+    """Reduced graph and ErG fingerprints of a molecule."""
+    from rdkit import RDLogger
+    from rdkit.Chem import rdReducedGraphs as rg
+    RDLogger.DisableLog("rdApp.*")
+    m = Chem.MolFromSmiles(smi)
+    if m is None:
+        return None
+    mrg = rg.GenerateMolExtendedReducedGraph(m)
+    mrg.UpdatePropertyCache(False)
+    rec = {
+        "smiles": Chem.MolToSmiles(mrg),
+        # (sorted: the order of the ring centroids follows the order of the rings,
+        # which differs between RDKit releases)
+        "types": sorted(list(a.GetPropsAsDict().get("_ErGAtomTypes", ())) for a in mrg.GetAtoms()),
+        "fp": [round(float(x), 9) for x in rg.GetErGFingerprint(m)],
+        "fp-nofuzz": [round(float(x), 9) for x in rg.GetErGFingerprint(m, fuzzIncrement=0)],
+        "fp-short": [round(float(x), 9) for x in rg.GetErGFingerprint(m, minPath=2, maxPath=8)],
+        "fp-graph": [round(float(x), 9) for x in rg.GenerateErGFingerprintForReducedGraph(mrg)],
+    }
+    return rec
+
+
 LAYERED_VARIANTS = (
     {},
     {"layerFlags": 0x07},
@@ -818,6 +841,8 @@ def dump(mode, smi):
     if mode == "addhs3d":
         m = Chem.MolFromMolBlock(smi)
         return None if m is None else addhs_records(m)
+    if mode == "erg":
+        return erg_record(smi)
     if mode == "layeredfp":
         return layeredfp_record(smi)
     if mode == "patternfp":
