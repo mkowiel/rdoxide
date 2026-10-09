@@ -3,12 +3,12 @@
 //!
 //! Template accessors (`GetReactantTemplate`, `GetReactants`, ...) return
 //! copies where upstream returns references into the reaction. The MDL/Marvin/
-//! CDXML/PNG readers and writers, pickling, fingerprints, reaction depiction,
-//! preprocessing and sanitization are not provided yet.
+//! CDXML/PNG readers and writers, fingerprints, reaction depiction and
+//! enumeration are not provided yet.
 
-use pyo3::exceptions::{PyNotImplementedError, PyValueError};
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use pyo3::types::{PyBool, PyDict, PyList, PyTuple};
+use pyo3::types::{PyBool, PyBytes, PyDict, PyList, PyTuple};
 use rdoxide::graphmol::chem_reactions::daylight::{
     ReactionSmartsParserParams, reaction_from_smarts, reaction_from_smiles,
 };
@@ -16,15 +16,28 @@ use rdoxide::graphmol::chem_reactions::mdl::{
     reaction_from_rxn_block, reaction_from_rxn_file, reaction_from_rxn_mol, reaction_to_rxn_block,
     reaction_to_rxn_mol, reaction_to_v3k_rxn_block,
 };
+use rdoxide::graphmol::chem_reactions::pickler::{
+    pickle_reaction, pickle_reaction_default, reaction_from_pickle,
+};
+use rdoxide::graphmol::chem_reactions::preprocess::{
+    DEFAULT_PROP_NAME, ReactantLabels, add_recursive_queries_to_reaction, preprocess_reaction,
+};
+use rdoxide::graphmol::chem_reactions::sanitize::{
+    chem_draw_rxn_adjust_params, default_rxn_adjust_params, flags as sf,
+    match_only_at_rgroups_adjust_params, sanitize_rxn, sanitize_rxn_as_mols,
+};
 use rdoxide::graphmol::chem_reactions::writer::{reaction_to_smarts, reaction_to_smiles};
 use rdoxide::graphmol::chem_reactions::{self as cr, ChemicalReaction, runner};
 use rdoxide::graphmol::file_parsers::MolFileParserParams;
+use rdoxide::graphmol::functional_group_hierarchy::flattened_functional_group_hierarchy;
 use rdoxide::graphmol::romol::ROMol;
 use rdoxide::graphmol::smiles_parse::write::SmilesWriteParams;
 
+use crate::enums::{add_enum_exported, to_py as enum_to_py};
 use crate::errors::IntoPyResult;
 use crate::mol::PyMol;
 use crate::rdmolfiles_write::PySmilesWriteParams;
+use crate::rdmolops_adjust_query::PyAdjustQueryParameters;
 use crate::substruct::PySubstructMatchParameters;
 
 /// A class for storing and applying chemical reactions.
@@ -45,6 +58,7 @@ use crate::substruct::PySubstructMatchParameters;
 #[pyclass(
     name = "ChemicalReaction",
     module = "rdkit.Chem.rdChemReactions",
+    dict,
     skip_from_py_object
 )]
 pub struct PyChemicalReaction {
@@ -52,11 +66,102 @@ pub struct PyChemicalReaction {
     /// The object handed out by `GetSubstructParams`; it stays live, so edits
     /// to it must reach `rxn` before the reaction is used.
     params: Option<Py<PySubstructMatchParameters>>,
+    /// Template molecules handed out to Python. Upstream returns references
+    /// into the reaction, so edits to them (and changes the reaction makes
+    /// to the templates) have to show up on both sides: [`Self::pull`] copies
+    /// the Python-side state in before the reaction is used, [`Self::push`]
+    /// copies the templates back out after it may have changed them.
+    shared: Vec<SharedTemplate>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Role {
+    Reactant,
+    Product,
+    Agent,
+}
+
+struct SharedTemplate {
+    role: Role,
+    idx: usize,
+    mol: Py<PyMol>,
 }
 
 impl PyChemicalReaction {
     fn new(rxn: ChemicalReaction) -> Self {
-        PyChemicalReaction { rxn, params: None }
+        PyChemicalReaction {
+            rxn,
+            params: None,
+            shared: Vec::new(),
+        }
+    }
+
+    fn templates_mut(&mut self, role: Role) -> &mut Vec<ROMol> {
+        match role {
+            Role::Reactant => self.rxn.reactants_mut(),
+            Role::Product => self.rxn.products_mut(),
+            Role::Agent => self.rxn.agents_mut(),
+        }
+    }
+
+    /// The Python object for template `idx` (the same object every time).
+    fn shared_template(&mut self, py: Python<'_>, role: Role, idx: usize) -> PyResult<Py<PyMol>> {
+        if let Some(s) = self.shared.iter().find(|s| s.role == role && s.idx == idx) {
+            return Ok(s.mol.clone_ref(py));
+        }
+        let mol = Py::new(
+            py,
+            PyMol {
+                mol: self.templates_mut(role)[idx].clone(),
+            },
+        )?;
+        self.shared.push(SharedTemplate {
+            role,
+            idx,
+            mol: mol.clone_ref(py),
+        });
+        Ok(mol)
+    }
+
+    /// All templates of a kind as a tuple of the shared molecules.
+    fn shared_templates(&mut self, py: Python<'_>, role: Role) -> PyResult<Py<PyTuple>> {
+        self.sync_params(py);
+        let n = self.templates_mut(role).len();
+        let mols = (0..n)
+            .map(|i| self.shared_template(py, role, i))
+            .collect::<PyResult<Vec<_>>>()?;
+        Ok(PyTuple::new(py, mols)?.unbind())
+    }
+
+    /// Copies edits made through the handed-out templates into the reaction.
+    fn pull_templates(&mut self, py: Python<'_>) {
+        let shared = std::mem::take(&mut self.shared);
+        for s in &shared {
+            if let (Ok(m), Some(slot)) = (
+                s.mol.bind(py).try_borrow(),
+                self.templates_mut(s.role).get_mut(s.idx),
+            ) {
+                *slot = m.mol.clone();
+            }
+        }
+        self.shared = shared;
+    }
+
+    /// Copies the reaction's templates into the handed-out molecules.
+    fn push(&mut self, py: Python<'_>) {
+        let shared = std::mem::take(&mut self.shared);
+        for s in &shared {
+            let template = self.templates_mut(s.role).get(s.idx).cloned();
+            if let (Some(t), Ok(mut m)) = (template, s.mol.bind(py).try_borrow_mut()) {
+                m.mol = t;
+            }
+        }
+        self.shared = shared;
+    }
+
+    /// The templates were restructured: handed-out molecules are detached.
+    fn detach_templates(&mut self) {
+        self.shared.clear();
     }
 
     pub fn with_dict<R>(
@@ -75,11 +180,13 @@ impl PyChemicalReaction {
         Ok(f(rdoxide::rdgeneral::RDProps::dict_mut(&mut self.rxn)))
     }
 
-    /// Copies the parameters edited through `GetSubstructParams` into the reaction.
+    /// Brings the reaction up to date with Python-side edits: the parameters
+    /// from `GetSubstructParams` and the handed-out templates.
     fn sync_params(&mut self, py: Python<'_>) {
         if let Some(p) = &self.params {
             *self.rxn.substruct_params_mut() = p.borrow(py).base_params();
         }
+        self.pull_templates(py);
     }
 
     /// Syncs the parameters and initializes the reaction if that has not happened yet.
@@ -87,8 +194,16 @@ impl PyChemicalReaction {
         self.sync_params(py);
         if !self.rxn.is_initialized() {
             self.rxn.init_reactant_matchers(false);
+            self.push(py);
         }
     }
+}
+
+/// Borrows the reaction after bringing it up to date with Python-side edits.
+fn synced<'py>(reaction: &Bound<'py, PyChemicalReaction>) -> PyRefMut<'py, PyChemicalReaction> {
+    let mut guard = reaction.borrow_mut();
+    guard.sync_params(reaction.py());
+    guard
 }
 
 fn template_index(which: u32, n: usize) -> PyResult<usize> {
@@ -116,14 +231,6 @@ fn products_to_py(py: Python<'_>, sets: Vec<Vec<ROMol>>) -> PyResult<Py<PyTuple>
     Ok(PyTuple::new(py, tuples)?.unbind())
 }
 
-fn mols_to_py(py: Python<'_>, mols: &[ROMol]) -> PyResult<Py<PyTuple>> {
-    let items = mols
-        .iter()
-        .map(|mol| Py::new(py, PyMol { mol: mol.clone() }))
-        .collect::<PyResult<Vec<_>>>()?;
-    Ok(PyTuple::new(py, items)?.unbind())
-}
-
 /// Moves the removed templates into the `targetList` Python list.
 fn extend_list(py: Python<'_>, target: &Bound<'_, PyAny>, mols: Vec<ROMol>) -> PyResult<()> {
     let list = target.cast::<PyList>()?;
@@ -142,14 +249,73 @@ impl PyChemicalReaction {
         match other {
             None => Ok(PyChemicalReaction::new(ChemicalReaction::new())),
             Some(o) => {
-                if let Ok(r) = o.extract::<PyRef<'_, PyChemicalReaction>>() {
-                    return Ok(PyChemicalReaction::new(r.rxn.clone()));
+                if let Ok(r) = o.cast::<PyChemicalReaction>() {
+                    return Ok(PyChemicalReaction::new(synced(r).rxn.clone()));
                 }
-                Err(PyNotImplementedError::new_err(
-                    "constructing a ChemicalReaction from a binary string is not supported yet",
-                ))
+                let bytes: Vec<u8> = match o.cast::<PyBytes>() {
+                    Ok(b) => b.as_bytes().to_vec(),
+                    Err(_) => o.extract::<String>()?.into_bytes(),
+                };
+                Ok(PyChemicalReaction::new(reaction_from_pickle(&bytes).py()?))
             }
         }
+    }
+
+    /// Returns a binary string representation of the reaction.
+    ///
+    /// Alternatively: ToBinary(propertyFlags) to choose which properties are included.
+    #[pyo3(name = "ToBinary", signature = (propertyFlags = None))]
+    #[allow(non_snake_case)]
+    fn binary<'py>(
+        &mut self,
+        py: Python<'py>,
+        propertyFlags: Option<u32>,
+    ) -> PyResult<Bound<'py, PyBytes>> {
+        self.sync_params(py);
+        let rxn = &self.rxn;
+        let bytes = py
+            .detach(|| match propertyFlags {
+                Some(flags) => pickle_reaction(rxn, flags),
+                None => pickle_reaction_default(rxn),
+            })
+            .py()?;
+        Ok(PyBytes::new(py, &bytes))
+    }
+
+    /// `rdkit_pickle_suite`: `(type(self), (self.ToBinary(),), (self.__dict__,))`
+    fn __reduce__<'py>(slf: &Bound<'py, Self>) -> PyResult<Bound<'py, PyTuple>> {
+        let py = slf.py();
+        PyTuple::new(
+            py,
+            [
+                slf.get_type().into_any(),
+                PyTuple::new(py, [slf.call_method0("ToBinary")?])?.into_any(),
+                PyTuple::new(py, [slf.getattr("__dict__")?])?.into_any(),
+            ],
+        )
+    }
+
+    fn __getstate__<'py>(slf: &Bound<'py, Self>) -> PyResult<Bound<'py, PyTuple>> {
+        PyTuple::new(slf.py(), [slf.getattr("__dict__")?])
+    }
+
+    fn __setstate__(slf: &Bound<'_, Self>, state: &Bound<'_, PyAny>) -> PyResult<()> {
+        let bad = || {
+            PyValueError::new_err(format!(
+                "expected 1-item tuple in call to __setstate__; got {state}"
+            ))
+        };
+        let state = state.cast::<PyTuple>().map_err(|_| bad())?;
+        if state.len() != 1 {
+            return Err(bad());
+        }
+        slf.getattr("__dict__")?
+            .call_method1("update", (state.get_item(0)?,))?;
+        Ok(())
+    }
+
+    fn __getinitargs__<'py>(slf: &Bound<'py, Self>) -> PyResult<Bound<'py, PyTuple>> {
+        PyTuple::new(slf.py(), [slf.call_method0("ToBinary")?])
     }
 
     /// returns the number of reactants this reaction expects
@@ -172,19 +338,22 @@ impl PyChemicalReaction {
 
     /// adds a reactant (a Molecule) to the reaction
     #[pyo3(name = "AddReactantTemplate")]
-    fn add_reactant_template(&mut self, mol: &Bound<'_, PyMol>) -> usize {
+    fn add_reactant_template(&mut self, py: Python<'_>, mol: &Bound<'_, PyMol>) -> usize {
+        self.sync_params(py);
         self.rxn.add_reactant_template(mol.borrow().mol.clone())
     }
 
     /// adds a product (a Molecule)
     #[pyo3(name = "AddProductTemplate")]
-    fn add_product_template(&mut self, mol: &Bound<'_, PyMol>) -> usize {
+    fn add_product_template(&mut self, py: Python<'_>, mol: &Bound<'_, PyMol>) -> usize {
+        self.sync_params(py);
         self.rxn.add_product_template(mol.borrow().mol.clone())
     }
 
     /// adds a agent (a Molecule)
     #[pyo3(name = "AddAgentTemplate")]
-    fn add_agent_template(&mut self, mol: &Bound<'_, PyMol>) -> usize {
+    fn add_agent_template(&mut self, py: Python<'_>, mol: &Bound<'_, PyMol>) -> usize {
+        self.sync_params(py);
         self.rxn.add_agent_template(mol.borrow().mol.clone())
     }
 
@@ -197,8 +366,10 @@ impl PyChemicalReaction {
         moveToAgentTemplates: bool,
         targetList: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<()> {
+        self.sync_params(py);
         let mut removed = Vec::new();
         let target = targetList.filter(|t| !t.is_none()).map(|_| &mut removed);
+        self.detach_templates();
         self.rxn.remove_unmapped_reactant_templates(
             thresholdUnmappedAtoms,
             moveToAgentTemplates,
@@ -216,8 +387,10 @@ impl PyChemicalReaction {
         moveToAgentTemplates: bool,
         targetList: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<()> {
+        self.sync_params(py);
         let mut removed = Vec::new();
         let target = targetList.filter(|t| !t.is_none()).map(|_| &mut removed);
+        self.detach_templates();
         self.rxn.remove_unmapped_product_templates(
             thresholdUnmappedAtoms,
             moveToAgentTemplates,
@@ -233,8 +406,10 @@ impl PyChemicalReaction {
         py: Python<'_>,
         targetList: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<()> {
+        self.sync_params(py);
         let mut removed = Vec::new();
         let target = targetList.filter(|t| !t.is_none()).map(|_| &mut removed);
+        self.detach_templates();
         self.rxn.remove_agent_templates(target);
         targetList.map_or(Ok(()), |t| extend_list(py, t, removed))
     }
@@ -305,6 +480,7 @@ impl PyChemicalReaction {
     fn initialize(&mut self, py: Python<'_>, silent: bool) {
         self.sync_params(py);
         self.rxn.init_reactant_matchers(silent);
+        self.push(py);
     }
 
     /// checks if the reaction is ready for use
@@ -315,36 +491,35 @@ impl PyChemicalReaction {
 
     /// checks the reaction for potential problems, returns (numWarnings,numErrors)
     #[pyo3(name = "Validate", signature = (silent = false))]
-    fn validate(&mut self, silent: bool) -> (u32, u32) {
+    fn validate(&mut self, py: Python<'_>, silent: bool) -> (u32, u32) {
+        self.sync_params(py);
         let (_, warnings, errors) = self.rxn.validate(silent);
+        self.push(py);
         (warnings, errors)
     }
 
     /// returns one of our product templates
     #[pyo3(name = "GetProductTemplate")]
-    fn product_template(&self, which: u32) -> PyResult<PyMol> {
+    fn product_template(&mut self, py: Python<'_>, which: u32) -> PyResult<Py<PyMol>> {
+        self.sync_params(py);
         let i = template_index(which, self.rxn.num_product_templates())?;
-        Ok(PyMol {
-            mol: self.rxn.products()[i].clone(),
-        })
+        self.shared_template(py, Role::Product, i)
     }
 
     /// returns one of our reactant templates
     #[pyo3(name = "GetReactantTemplate")]
-    fn reactant_template(&self, which: u32) -> PyResult<PyMol> {
+    fn reactant_template(&mut self, py: Python<'_>, which: u32) -> PyResult<Py<PyMol>> {
+        self.sync_params(py);
         let i = template_index(which, self.rxn.num_reactant_templates())?;
-        Ok(PyMol {
-            mol: self.rxn.reactants()[i].clone(),
-        })
+        self.shared_template(py, Role::Reactant, i)
     }
 
     /// returns one of our agent templates
     #[pyo3(name = "GetAgentTemplate")]
-    fn agent_template(&self, which: u32) -> PyResult<PyMol> {
+    fn agent_template(&mut self, py: Python<'_>, which: u32) -> PyResult<Py<PyMol>> {
+        self.sync_params(py);
         let i = template_index(which, self.rxn.num_agent_templates())?;
-        Ok(PyMol {
-            mol: self.rxn.agents()[i].clone(),
-        })
+        self.shared_template(py, Role::Agent, i)
     }
 
     /// EXPERT USER: indicates that the reaction can have implicit properties
@@ -393,7 +568,8 @@ impl PyChemicalReaction {
 
     /// returns a sequence of sequences with the atoms that change in the reaction
     #[pyo3(name = "GetReactingAtoms", signature = (mappedAtomsOnly = false))]
-    fn reacting_atoms(&self, py: Python<'_>, mappedAtomsOnly: bool) -> PyResult<Py<PyTuple>> {
+    fn reacting_atoms(&mut self, py: Python<'_>, mappedAtomsOnly: bool) -> PyResult<Py<PyTuple>> {
+        self.sync_params(py);
         let atoms = cr::get_reacting_atoms(&self.rxn, mappedAtomsOnly).py()?;
         let rows = atoms
             .into_iter()
@@ -404,33 +580,53 @@ impl PyChemicalReaction {
 
     /// get the reactant templates
     #[pyo3(name = "GetReactants")]
-    fn reactants(&self, py: Python<'_>) -> PyResult<Py<PyTuple>> {
-        mols_to_py(py, self.rxn.reactants())
+    fn reactants(&mut self, py: Python<'_>) -> PyResult<Py<PyTuple>> {
+        self.shared_templates(py, Role::Reactant)
     }
 
     /// get the product templates
     #[pyo3(name = "GetProducts")]
-    fn products(&self, py: Python<'_>) -> PyResult<Py<PyTuple>> {
-        mols_to_py(py, self.rxn.products())
+    fn products(&mut self, py: Python<'_>) -> PyResult<Py<PyTuple>> {
+        self.shared_templates(py, Role::Product)
     }
 
     /// get the agent templates
     #[pyo3(name = "GetAgents")]
-    fn agents(&self, py: Python<'_>) -> PyResult<Py<PyTuple>> {
-        mols_to_py(py, self.rxn.agents())
+    fn agents(&mut self, py: Python<'_>) -> PyResult<Py<PyTuple>> {
+        self.shared_templates(py, Role::Agent)
     }
 
     /// get the parameter object controlling the substructure matching
     #[pyo3(name = "GetSubstructParams")]
     fn substruct_params(&mut self, py: Python<'_>) -> PyResult<Py<PySubstructMatchParameters>> {
         if self.params.is_none() {
-            self.params = Some(Py::new(py, PySubstructMatchParameters::new_default())?);
+            self.params = Some(Py::new(
+                py,
+                PySubstructMatchParameters::from_core(self.rxn.substruct_params()),
+            )?);
         }
         Ok(self
             .params
             .as_ref()
             .map(|p| p.clone_ref(py))
             .expect("set above"))
+    }
+
+    /// adds recursive queries and returns reactant labels
+    #[pyo3(name = "AddRecursiveQueriesToReaction", signature = (queries = None, propName = DEFAULT_PROP_NAME, getLabels = false))]
+    #[allow(non_snake_case)]
+    fn add_recursive_queries(
+        &mut self,
+        py: Python<'_>,
+        queries: Option<&Bound<'_, PyDict>>,
+        propName: &str,
+        getLabels: bool,
+    ) -> PyResult<Option<Py<PyTuple>>> {
+        let queries = query_map(queries)?;
+        self.sync_params(py);
+        let labels = add_recursive_queries_to_reaction(&mut self.rxn, &queries, propName).py()?;
+        self.push(py);
+        getLabels.then(|| labels_to_py(py, labels)).transpose()
     }
 
     /// Removes all computed properties from the reaction.
@@ -547,7 +743,7 @@ fn py_reaction_to_smarts(
     params: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<String> {
     let params = write_params(params, false, false)?;
-    reaction_to_smarts(&reaction.borrow().rxn, &params).py()
+    reaction_to_smarts(&synced(reaction).rxn, &params).py()
 }
 
 /// construct a reaction SMILES string for a ChemicalReaction
@@ -558,7 +754,7 @@ fn py_reaction_to_smiles(
     params: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<String> {
     let params = write_params(params, true, true)?;
-    reaction_to_smiles(&reaction.borrow().rxn, &params).py()
+    reaction_to_smiles(&synced(reaction).rxn, &params).py()
 }
 
 /// construct a molecule for a ChemicalReaction with RXN role property set
@@ -566,7 +762,7 @@ fn py_reaction_to_smiles(
 #[pyo3(name = "ReactionToMolecule")]
 fn py_reaction_to_molecule(reaction: &Bound<'_, PyChemicalReaction>) -> PyResult<PyMol> {
     Ok(PyMol {
-        mol: reaction_to_rxn_mol(&reaction.borrow().rxn).py()?,
+        mol: reaction_to_rxn_mol(&synced(reaction).rxn).py()?,
     })
 }
 
@@ -624,7 +820,7 @@ fn py_reaction_to_rxn_block(
     separateAgents: bool,
     forceV3000: bool,
 ) -> PyResult<String> {
-    reaction_to_rxn_block(&reaction.borrow().rxn, separateAgents, forceV3000).py()
+    reaction_to_rxn_block(&synced(reaction).rxn, separateAgents, forceV3000).py()
 }
 
 /// construct a string in MDL v3000 rxn format for a ChemicalReaction
@@ -635,7 +831,7 @@ fn py_reaction_to_v3k_rxn_block(
     reaction: &Bound<'_, PyChemicalReaction>,
     separateAgents: bool,
 ) -> PyResult<String> {
-    reaction_to_v3k_rxn_block(&reaction.borrow().rxn, separateAgents).py()
+    reaction_to_v3k_rxn_block(&synced(reaction).rxn, separateAgents).py()
 }
 
 /// construct a ChemicalReaction from an molecule if the RXN role property of the molecule is set
@@ -659,7 +855,7 @@ fn py_is_agent(molecule: &Bound<'_, PyMol>, agentThreshold: f64) -> bool {
 #[pyfunction]
 #[pyo3(name = "HasReactionAtomMapping")]
 fn py_has_atom_mapping(rxn: &Bound<'_, PyChemicalReaction>) -> bool {
-    cr::has_reaction_atom_mapping(&rxn.borrow().rxn)
+    cr::has_reaction_atom_mapping(&synced(rxn).rxn)
 }
 
 /// tests if the queryReaction is a substructure of a reaction
@@ -671,11 +867,9 @@ fn py_has_reaction_substruct_match(
     queryReaction: &Bound<'_, PyChemicalReaction>,
     includeAgents: bool,
 ) -> PyResult<bool> {
-    let py = reaction.py();
-    reaction.borrow_mut().sync_params(py);
     cr::has_reaction_substruct_match(
-        &reaction.borrow().rxn,
-        &queryReaction.borrow().rxn,
+        &synced(reaction).rxn,
+        &synced(queryReaction).rxn,
         includeAgents,
     )
     .py()
@@ -691,9 +885,7 @@ macro_rules! template_match_fn {
             reaction: &Bound<'_, PyChemicalReaction>,
             queryReaction: &Bound<'_, PyChemicalReaction>,
         ) -> PyResult<bool> {
-            let py = reaction.py();
-            reaction.borrow_mut().sync_params(py);
-            $core(&reaction.borrow().rxn, &queryReaction.borrow().rxn).py()
+                    $core(&synced(reaction).rxn, &synced(queryReaction).rxn).py()
         }
     };
 }
@@ -723,7 +915,10 @@ template_match_fn!(
 #[pyfunction]
 #[pyo3(name = "UpdateProductsStereochemistry")]
 fn py_update_products_stereochem(reaction: &Bound<'_, PyChemicalReaction>) -> PyResult<()> {
-    cr::update_products_stereochem(&mut reaction.borrow_mut().rxn).py()
+    let mut guard = synced(reaction);
+    let result = cr::update_products_stereochem(&mut guard.rxn).py();
+    guard.push(reaction.py());
+    result
 }
 
 /// reduce the product of a reaction to the side chains added by the reaction.
@@ -745,7 +940,171 @@ fn py_reduce_product_to_side_chains(
 #[pyfunction]
 #[pyo3(name = "RemoveMappingNumbersFromReactions")]
 fn py_remove_mapping_numbers(reaction: &Bound<'_, PyChemicalReaction>) {
-    cr::remove_mapping_numbers_from_reactions(&mut reaction.borrow_mut().rxn);
+    let mut guard = synced(reaction);
+    cr::remove_mapping_numbers_from_reactions(&mut guard.rxn);
+    guard.push(reaction.py());
+}
+
+fn query_map(
+    dict: Option<&Bound<'_, PyDict>>,
+) -> PyResult<std::collections::BTreeMap<String, ROMol>> {
+    dict.map_or_else(
+        || Ok(Default::default()),
+        |d| {
+            d.iter()
+                .map(|(k, v)| Ok((k.extract()?, mol_ref(&v)?.mol.clone())))
+                .collect()
+        },
+    )
+}
+
+fn labels_to_py(py: Python<'_>, labels: ReactantLabels) -> PyResult<Py<PyTuple>> {
+    let per_template = labels
+        .into_iter()
+        .map(|template| {
+            let pairs = template
+                .into_iter()
+                .map(|(idx, name)| {
+                    PyTuple::new(
+                        py,
+                        [
+                            idx.into_pyobject(py)?.into_any(),
+                            name.into_pyobject(py)?.into_any(),
+                        ],
+                    )
+                })
+                .collect::<PyResult<Vec<_>>>()?;
+            PyTuple::new(py, pairs)
+        })
+        .collect::<PyResult<Vec<_>>>()?;
+    Ok(PyTuple::new(py, per_template)?.unbind())
+}
+
+#[doc = include_str!("docs/preprocess_reaction.txt")]
+#[allow(clippy::doc_lazy_continuation, clippy::doc_overindented_list_items)]
+#[pyfunction]
+#[pyo3(name = "PreprocessReaction", signature = (reaction, queries = None, propName = DEFAULT_PROP_NAME))]
+#[allow(non_snake_case)]
+fn py_preprocess_reaction(
+    py: Python<'_>,
+    reaction: &Bound<'_, PyChemicalReaction>,
+    queries: Option<&Bound<'_, PyDict>>,
+    propName: &str,
+) -> PyResult<Py<PyTuple>> {
+    let mut queries = query_map(queries)?;
+    if queries.is_empty() {
+        queries = flattened_functional_group_hierarchy(true).clone();
+    }
+    let mut guard = synced(reaction);
+    let n_reactants = guard.rxn.num_reactant_templates();
+    let n_products = guard.rxn.num_product_templates();
+    let (_, mut warnings, mut errors) = guard.rxn.validate(false);
+    let mut labels = Vec::new();
+    if errors == 0 {
+        let result = preprocess_reaction(&mut guard.rxn, &queries, propName).py()?;
+        (warnings, errors, labels) = (
+            result.num_warnings,
+            result.num_errors,
+            result.reactant_labels,
+        );
+    }
+    guard.push(py);
+    PyTuple::new(
+        py,
+        [
+            warnings.into_pyobject(py)?.into_any(),
+            errors.into_pyobject(py)?.into_any(),
+            n_reactants.into_pyobject(py)?.into_any(),
+            n_products.into_pyobject(py)?.into_any(),
+            labels_to_py(py, labels)?.into_bound(py).into_any(),
+        ],
+    )
+    .map(Bound::unbind)
+}
+
+/// Returns the default adjustment parameters for reactant templates
+#[pyfunction]
+#[pyo3(name = "GetDefaultAdjustParams")]
+fn py_default_adjust_params() -> PyAdjustQueryParameters {
+    PyAdjustQueryParameters {
+        params: default_rxn_adjust_params(),
+    }
+}
+
+/// (deprecated, see MatchOnlyAtRgroupsAdjustParams)
+///     Returns the chemdraw style adjustment parameters for reactant templates
+#[pyfunction]
+#[pyo3(name = "GetChemDrawRxnAdjustParams")]
+fn py_chem_draw_adjust_params() -> PyAdjustQueryParameters {
+    PyAdjustQueryParameters {
+        params: chem_draw_rxn_adjust_params(),
+    }
+}
+
+/// Only match at the specified rgroup locations in the reactant templates
+#[pyfunction]
+#[pyo3(name = "MatchOnlyAtRgroupsAdjustParams")]
+fn py_match_only_at_rgroups_adjust_params() -> PyAdjustQueryParameters {
+    PyAdjustQueryParameters {
+        params: match_only_at_rgroups_adjust_params(),
+    }
+}
+
+/// Does some sanitization of the reactant and product templates of a reaction.
+///
+///     - The reaction is modified in place.
+///     - If sanitization fails, an exception will be thrown unless catchErrors is set
+///
+///   ARGUMENTS:
+///
+///     - rxn: the reaction to be modified
+///     - sanitizeOps: (optional) reaction sanitization operations to be carried out
+///       these should be constructed by or'ing together the
+///       operations in rdkit.Chem.rdChemReactions.SanitizeFlags
+///     - optional adjustment parameters for changing the meaning of the substructure
+///       matching done in the templates.  The default is
+///       rdkit.Chem.rdChemReactions.DefaultRxnAdjustParams which aromatizes
+///       kekule structures if possible.
+///     - catchErrors: (optional) if provided, instead of raising an exception
+///       when sanitization fails (the default behavior), the
+///       first operation that failed (as defined in rdkit.Chem.rdChemReactions.SanitizeFlags)
+///       is returned. Zero is returned on success.
+///
+///   The operations carried out by default are:
+///     1) fixRGroups(): sets R group labels on mapped dummy atoms when possible
+///     2) fixAtomMaps(): attempts to set atom maps on unmapped R groups
+///     3) adjustTemplate(): calls adjustQueryProperties() on all reactant templates
+///     4) fixHs(): merges explicit Hs in the reactant templates that don't map to heavy atoms
+#[pyfunction]
+#[pyo3(name = "SanitizeRxn", signature = (rxn, sanitizeOps = sf::SANITIZE_ALL, params = None, catchErrors = false))]
+#[allow(non_snake_case)]
+fn py_sanitize_rxn(
+    py: Python<'_>,
+    rxn: &Bound<'_, PyChemicalReaction>,
+    sanitizeOps: u32,
+    params: Option<&Bound<'_, PyAdjustQueryParameters>>,
+    catchErrors: bool,
+) -> PyResult<Py<PyAny>> {
+    let params = params.map_or_else(default_rxn_adjust_params, |p| p.borrow().params.clone());
+    let mut guard = synced(rxn);
+    let result = sanitize_rxn(&mut guard.rxn, sanitizeOps, &params);
+    guard.push(py);
+    match result {
+        Ok(()) => enum_to_py(py, "SanitizeFlags", i64::from(sf::SANITIZE_NONE)),
+        Err((op, _)) if catchErrors => enum_to_py(py, "SanitizeFlags", i64::from(op)),
+        Err((_, e)) => Err(crate::errors::to_py(e)),
+    }
+}
+
+/// Does the usual molecular sanitization on each reactant, agent, and product of the reaction
+#[pyfunction]
+#[pyo3(name = "SanitizeRxnAsMols", signature = (rxn, sanitizeOps = 0xFFF_FFFF))]
+#[allow(non_snake_case)]
+fn py_sanitize_rxn_as_mols(rxn: &Bound<'_, PyChemicalReaction>, sanitizeOps: u32) -> PyResult<()> {
+    let mut guard = synced(rxn);
+    let result = sanitize_rxn_as_mols(&mut guard.rxn, sanitizeOps).py();
+    guard.push(rxn.py());
+    result
 }
 
 pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -754,6 +1113,31 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
         "Module containing classes and functions for working with chemical reactions.",
     )?;
     m.add_class::<PyChemicalReaction>()?;
+    add_enum_exported(
+        m,
+        "SanitizeFlags",
+        &[
+            ("SANITIZE_NONE", i64::from(sf::SANITIZE_NONE)),
+            ("SANITIZE_ATOM_MAPS", i64::from(sf::SANITIZE_ATOM_MAPS)),
+            (
+                "SANITIZE_RGROUP_NAMES",
+                i64::from(sf::SANITIZE_RGROUP_NAMES),
+            ),
+            (
+                "SANITIZE_ADJUST_REACTANTS",
+                i64::from(sf::SANITIZE_ADJUST_REACTANTS),
+            ),
+            ("SANITIZE_MERGEHS", i64::from(sf::SANITIZE_MERGEHS)),
+            ("SANITIZE_ALL", i64::from(sf::SANITIZE_ALL)),
+        ],
+        None,
+    )?;
+    m.add_function(wrap_pyfunction!(py_preprocess_reaction, m)?)?;
+    m.add_function(wrap_pyfunction!(py_default_adjust_params, m)?)?;
+    m.add_function(wrap_pyfunction!(py_chem_draw_adjust_params, m)?)?;
+    m.add_function(wrap_pyfunction!(py_match_only_at_rgroups_adjust_params, m)?)?;
+    m.add_function(wrap_pyfunction!(py_sanitize_rxn, m)?)?;
+    m.add_function(wrap_pyfunction!(py_sanitize_rxn_as_mols, m)?)?;
     m.add_function(wrap_pyfunction!(py_reaction_from_smarts, m)?)?;
     m.add_function(wrap_pyfunction!(py_reaction_from_smiles, m)?)?;
     m.add_function(wrap_pyfunction!(py_reaction_to_smarts, m)?)?;

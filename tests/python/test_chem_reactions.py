@@ -191,3 +191,84 @@ def test_reaction_molecule_round_trip():
   assert (back.GetNumReactantTemplates(), back.GetNumAgentTemplates(),
           back.GetNumProductTemplates()) == (2, 1, 1)
   assert rdChemReactions.ReactionToSmarts(back) == rdChemReactions.ReactionToSmarts(rxn)
+
+
+def _bromide_reaction():
+  rxn = rdChemReactions.ReactionFromSmarts("[C:1][Br].[N:2]>>[C:1][N:2]")
+  rxn.Initialize()
+  return rxn
+
+
+def test_preprocess_reaction_with_default_groups():
+  rxn = _bromide_reaction()
+  r1 = rxn.GetReactantTemplate(0)
+  r1.GetAtomWithIdx(1).SetProp("molFileValue", "Halogen.Aromatic")
+  assert r1.HasSubstructMatch(r1)
+  assert Chem.MolFromSmiles("CBr").HasSubstructMatch(r1)
+  warnings, errors, n_reactants, n_products, labels = rdChemReactions.PreprocessReaction(rxn)
+  assert (warnings, errors, n_reactants, n_products) == (0, 0, 2, 1)
+  assert labels == (((1, "halogen.aromatic"), ), ())
+  # the handed-out template sees the new query, as upstream's reference does
+  assert not Chem.MolFromSmiles("CBr").HasSubstructMatch(r1)
+  assert not Chem.MolFromSmiles("c1ccccc1Br").HasSubstructMatch(r1)
+
+
+def test_preprocess_reaction_unknown_group():
+  rxn = _bromide_reaction()
+  rxn.GetReactantTemplate(0).GetAtomWithIdx(1).SetProp("molFileValue", "boromicacid")
+  with pytest.raises(KeyError, match="boromicacid"):
+    rdChemReactions.PreprocessReaction(rxn)
+
+
+def test_add_recursive_queries_to_reaction():
+  rxn = _bromide_reaction()
+  rxn.GetReactantTemplate(0).GetAtomWithIdx(1).SetProp("query", "ar")
+  queries = {"ar": Chem.MolFromSmarts("[Br]-a")}
+  assert rxn.AddRecursiveQueriesToReaction(queries, "query") is None
+  q = rxn.GetReactantTemplate(0)
+  assert Chem.MolFromSmiles("c1ccccc1Br").HasSubstructMatch(Chem.MolFromSmarts("[Br]-a"))
+  assert not Chem.MolFromSmiles("CBr").HasSubstructMatch(q)
+  rxn = _bromide_reaction()
+  rxn.GetReactantTemplate(0).GetAtomWithIdx(1).SetProp("query", "ar")
+  labels = rxn.AddRecursiveQueriesToReaction(queries, "query", True)
+  assert labels == (((1, "ar"), ), ())
+
+
+def test_sanitize_flags_and_rxn_params():
+  assert rdChemReactions.SANITIZE_NONE == 0
+  assert int(rdChemReactions.SanitizeFlags.SANITIZE_MERGEHS) == 8
+  assert not rdChemReactions.GetDefaultAdjustParams().adjustDegree
+  assert rdChemReactions.MatchOnlyAtRgroupsAdjustParams().adjustDegree
+
+
+def test_sanitize_rxn():
+  rxn = rdChemReactions.ReactionFromRxnBlock(
+    rdChemReactions.ReactionToRxnBlock(rdChemReactions.ReactionFromSmarts(AMIDE)))
+  assert int(rdChemReactions.SanitizeRxn(rxn, catchErrors=True)) == 0
+  rdChemReactions.SanitizeRxnAsMols(rxn, Chem.SanitizeFlags.SANITIZE_NONE)
+
+
+def test_pickle_round_trip():
+  import pickle
+  rxn = rdChemReactions.ReactionFromSmarts(SMARTS_WITH_AGENT)
+  rxn.Initialize()
+  rxn.GetSubstructParams().useChirality = True
+  copy = pickle.loads(pickle.dumps(rxn))
+  assert rdChemReactions.ReactionToSmarts(copy) == rdChemReactions.ReactionToSmarts(rxn)
+  assert copy.IsInitialized() and copy._getImplicitPropertiesFlag()
+  assert copy.GetSubstructParams().useChirality
+  assert (copy.GetNumReactantTemplates(), copy.GetNumAgentTemplates(),
+          copy.GetNumProductTemplates()) == (2, 1, 1)
+  from_binary = rdChemReactions.ChemicalReaction(rxn.ToBinary())
+  assert rdChemReactions.ReactionToSmarts(from_binary) == rdChemReactions.ReactionToSmarts(rxn)
+  ps = copy.RunReactants((Chem.MolFromSmiles("CC(=O)O"), Chem.MolFromSmiles("NC")))
+  assert smiles_sets(ps) == [("CNC(C)=O", )]
+
+
+def test_handed_out_templates_are_live():
+  rxn = rdChemReactions.ReactionFromSmarts("[C:1][O:2]>>[C:1][N:2]")
+  template = rxn.GetReactantTemplate(0)
+  template.GetAtomWithIdx(0).SetProp("edited", "yes")
+  rxn.Initialize()
+  assert rxn.GetReactantTemplate(0).GetAtomWithIdx(0).GetProp("edited") == "yes"
+  assert rxn.GetReactants()[0].GetAtomWithIdx(0).GetProp("edited") == "yes"

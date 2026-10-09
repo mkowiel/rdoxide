@@ -11,6 +11,7 @@
 
 pub mod mol_fragmenter;
 pub mod mol_zip;
+pub mod recursive_queries;
 pub mod replace_core;
 
 use std::collections::{BTreeMap, BTreeSet};

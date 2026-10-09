@@ -84,28 +84,7 @@ pub struct PySubstructMatchParameters {
 impl PySubstructMatchParameters {
     #[new]
     fn py_new() -> Self {
-        let d = SubstructMatchParameters::default();
-        PySubstructMatchParameters {
-            useChirality: d.use_chirality,
-            useEnhancedStereo: d.use_enhanced_stereo,
-            aromaticMatchesConjugated: d.aromatic_matches_conjugated,
-            aromaticMatchesSingleOrDouble: d.aromatic_matches_single_or_double,
-            useGenericMatchers: d.use_generic_matchers,
-            useQueryQueryMatches: d.use_query_query_matches,
-            recursionPossible: d.recursion_possible,
-            uniquify: d.uniquify,
-            maxMatches: d.max_matches,
-            maxRecursiveMatches: d.max_recursive_matches,
-            numThreads: d.num_threads,
-            bondProperties: d.bond_properties,
-            atomProperties: d.atom_properties,
-            specifiedStereoQueryMatchesUnspecified: d.specified_stereo_query_matches_unspecified,
-            extraAtomCheckOverridesDefaultCheck: d.extra_atom_check_overrides_default,
-            extraBondCheckOverridesDefaultCheck: d.extra_bond_check_overrides_default,
-            extra_atom_check: None,
-            extra_bond_check: None,
-            extra_final_check: None,
-        }
+        Self::from_core(&SubstructMatchParameters::default())
     }
 
     /// allows you to provide a function that will be called
@@ -235,9 +214,29 @@ fn atom_location(atom: &PyAtom) -> PyResult<(&Py<PyMol>, u32)> {
 }
 
 impl PySubstructMatchParameters {
-    /// The default parameters.
-    pub(crate) fn new_default() -> Self {
-        Self::py_new()
+    /// The Python object for the given core parameters (callbacks unset).
+    pub(crate) fn from_core(d: &SubstructMatchParameters) -> Self {
+        PySubstructMatchParameters {
+            useChirality: d.use_chirality,
+            useEnhancedStereo: d.use_enhanced_stereo,
+            aromaticMatchesConjugated: d.aromatic_matches_conjugated,
+            aromaticMatchesSingleOrDouble: d.aromatic_matches_single_or_double,
+            useGenericMatchers: d.use_generic_matchers,
+            useQueryQueryMatches: d.use_query_query_matches,
+            recursionPossible: d.recursion_possible,
+            uniquify: d.uniquify,
+            maxMatches: d.max_matches,
+            maxRecursiveMatches: d.max_recursive_matches,
+            numThreads: d.num_threads,
+            bondProperties: d.bond_properties.clone(),
+            atomProperties: d.atom_properties.clone(),
+            specifiedStereoQueryMatchesUnspecified: d.specified_stereo_query_matches_unspecified,
+            extraAtomCheckOverridesDefaultCheck: d.extra_atom_check_overrides_default,
+            extraBondCheckOverridesDefaultCheck: d.extra_bond_check_overrides_default,
+            extra_atom_check: None,
+            extra_bond_check: None,
+            extra_final_check: None,
+        }
     }
 
     /// The core parameters for matching `query` against `mol`; the Python

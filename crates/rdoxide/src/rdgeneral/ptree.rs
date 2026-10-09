@@ -82,6 +82,13 @@ impl PTree {
             .unwrap_or(default)
     }
 
+    /// `pt.get<int>(key, default)`: unparsable values give the default.
+    pub fn get_i32(&self, key: &str, default: i32) -> i32 {
+        self.get_str(key)
+            .and_then(|v| v.trim().parse().ok())
+            .unwrap_or(default)
+    }
+
     /// `write_json(stream, pt, false)` (without the trailing newline).
     pub fn to_json(&self) -> String {
         let mut out = String::new();

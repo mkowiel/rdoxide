@@ -926,3 +926,22 @@
 [module."rdoxide::graphmol::chem_reactions::mdl".sources]
 "Code/GraphMol/ChemReactions/MDLParser.cpp" = "8975fcc62d017855d670f68e03c9cd31759be9ee"
 "Code/GraphMol/ChemReactions/MoleculeParser.cpp" = "48ce1743db7c069b656fe74b7834904683298439"
+
+[module."rdoxide::graphmol::chem_reactions::pickler".sources]
+"Code/GraphMol/ChemReactions/ReactionPickler.h" = "45930332d9a4dfdf1ba8b8dbcda0a85e22dd3770"
+"Code/GraphMol/ChemReactions/ReactionPickler.cpp" = "b0917df74935f2e3fb936ec541bf77c350357948"
+
+[module."rdoxide::graphmol::chem_reactions::sanitize".sources]
+"Code/GraphMol/ChemReactions/SanitizeRxn.h" = "5eb5674bca4bd309a83debbdd754004a2eda7736"
+"Code/GraphMol/ChemReactions/SanitizeRxn.cpp" = "70d9d1c1db4f65a0d97d235106fc97a63fd2e33b"
+
+[module."rdoxide::graphmol::chem_reactions::preprocess".sources]
+"Code/GraphMol/ChemReactions/PreprocessRxn.h" = "d3cdca5ef7af3716634f9acfd2a14bd279926e89"
+"Code/GraphMol/ChemReactions/PreprocessRxn.cpp" = "75edcfd3bbcd547301ace4e6a0b5d794003aa739"
+
+[module."rdoxide::graphmol::chem_transforms::recursive_queries".sources]
+"Code/GraphMol/ChemTransforms/ChemTransforms.cpp" = "6171788687c941a6d9f36aa79e397aa0475681f0"
+
+[module."rdoxide::graphmol::functional_group_hierarchy".sources]
+"Code/GraphMol/FilterCatalog/FunctionalGroupHierarchy.h" = "9157d1bb6ba6644c014ef601f013a67bb9282760"
+"Code/GraphMol/FilterCatalog/FunctionalGroupHierarchy.cpp" = "6b64ee67f1d382505a5db21ac4f9e92131951b8b"

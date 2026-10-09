@@ -40,7 +40,7 @@ const WHICH_FLAGS: [(&str, i64); 7] = [
 )]
 #[derive(Clone, Default)]
 pub struct PyAdjustQueryParameters {
-    params: AdjustQueryParameters,
+    pub(crate) params: AdjustQueryParameters,
 }
 
 /// A read/write attribute of the parameters, as `def_readwrite` makes it.
