@@ -310,6 +310,21 @@ def rdkitfp_record(smi):
     return res
 
 
+def patternfp_record(smi):
+    """PatternFingerprint of the SMILES-parsed and the SMARTS-parsed molecule."""
+    from rdkit import RDLogger
+    RDLogger.DisableLog("rdApp.*")
+    rec = {}
+    for kind, mol in (("smiles", Chem.MolFromSmiles(smi)), ("smarts", Chem.MolFromSmarts(smi))):
+        if mol is None:
+            continue
+        rec[kind] = {
+            f"{size}{'t' if taut else ''}": list(Chem.PatternFingerprint(mol, size, tautomerFingerprints=taut).GetOnBits())
+            for size, taut in ((2048, False), (2048, True), (512, False))
+        }
+    return rec or None
+
+
 def rdkfingerprint_record(smi):
     """Legacy Chem.RDKFingerprint / UnfoldedRDKFingerprintCountBased."""
     m = Chem.MolFromSmiles(smi)
@@ -770,6 +785,8 @@ def dump(mode, smi):
     if mode == "addhs3d":
         m = Chem.MolFromMolBlock(smi)
         return None if m is None else addhs_records(m)
+    if mode == "patternfp":
+        return patternfp_record(smi)
     if mode == "maccs":
         from rdkit.Chem import MACCSkeys
         m = Chem.MolFromSmiles(smi)

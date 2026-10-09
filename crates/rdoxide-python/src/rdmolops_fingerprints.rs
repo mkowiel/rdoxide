@@ -1,10 +1,17 @@
 //! Legacy path fingerprints of `rdkit.Chem.rdmolops` (`RDKFingerprint`,
-//! `UnfoldedRDKFingerprintCountBased`; upstream `GraphMol/Wrap/MolOps.cpp`).
+//! `UnfoldedRDKFingerprintCountBased`, `PatternFingerprint`; upstream
+//! `GraphMol/Wrap/MolOps.cpp`).
 
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
+use rdoxide::datastructs::BitVect;
+use rdoxide::error::RDKitError;
 use rdoxide::graphmol::fingerprints::legacy::{
     PathFpOutput, rdk_fingerprint_mol, unfolded_rdk_fingerprint_mol,
+};
+use rdoxide::graphmol::fingerprints::pattern::{
+    PATTERN_FINGERPRINT_MOL_VERSION, pattern_fingerprint_mol,
 };
 
 use crate::datastructs::PyExplicitBitVect;
@@ -136,8 +143,45 @@ fn unfolded_rdk_fingerprint(
     Ok(PyULongSIV::wrap(fp))
 }
 
+/// A fingerprint using SMARTS patterns
+///
+/// NOTE: This function is experimental. The API or results may change from
+///   release to release.
+#[pyfunction]
+#[pyo3(name = "PatternFingerprint", signature = (mol, fpSize = 2048, atomCounts = None, setOnlyBits = None, tautomerFingerprints = false))]
+#[allow(non_snake_case)]
+fn pattern_fingerprint(
+    mol: PyRef<'_, PyMol>,
+    fpSize: u32,
+    atomCounts: Option<&Bound<'_, PyAny>>,
+    setOnlyBits: Option<PyRef<'_, PyExplicitBitVect>>,
+    tautomerFingerprints: bool,
+) -> PyResult<PyExplicitBitVect> {
+    // upstream validates both arguments but neither changes the result
+    if let Some(counts) = atomCounts.filter(|c| c.is_truthy().unwrap_or(false)) {
+        if (counts.len()? as u32) < mol.mol.num_atoms() {
+            return Err(PyValueError::new_err(
+                "atomCounts shorter than the number of atoms",
+            ));
+        }
+        for item in counts.try_iter()? {
+            item?.extract::<u32>()?;
+        }
+    }
+    if setOnlyBits.is_some_and(|b| b.bv.num_bits() != fpSize) {
+        return Err(RDKitError::precondition("bad setOnlyBits size")).py();
+    }
+    let bv = pattern_fingerprint_mol(&mol.mol, fpSize, tautomerFingerprints).py()?;
+    Ok(PyExplicitBitVect::wrap(bv))
+}
+
 pub fn add(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(rdk_fingerprint, m)?)?;
+    m.add_function(wrap_pyfunction!(pattern_fingerprint, m)?)?;
+    m.add(
+        "_PatternFingerprint_version",
+        PATTERN_FINGERPRINT_MOL_VERSION,
+    )?;
     m.add_function(wrap_pyfunction!(unfolded_rdk_fingerprint, m)?)?;
     Ok(())
 }
