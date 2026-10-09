@@ -290,6 +290,7 @@ rdkit/DataStructs/UnitTestBitEnsemble.py::TestCase::test3
 rdkit/DataStructs/UnitTestFlatMatrix.py::TestCase::testGetElementFromFlatMatrix
 rdkit/DataStructs/UnitTestFlatMatrix.py::TestCase::testGetNFromFlatMatrix
 rdkit/DataStructs/UnitTestcBitVect.py::ExplicitTestCase::testAllBitSim
+rdkit/DataStructs/UnitTestcBitVect.py::ExplicitTestCase::testFingerprints
 rdkit/DataStructs/UnitTestcBitVect.py::ExplicitTestCase::testFold
 rdkit/DataStructs/UnitTestcBitVect.py::ExplicitTestCase::testNumBitsInCommon
 rdkit/DataStructs/UnitTestcBitVect.py::ExplicitTestCase::testOffBitProjSimilarity
@@ -306,6 +307,7 @@ rdkit/DataStructs/UnitTestcBitVect.py::ExplicitTestCase::testSparseIdx
 rdkit/DataStructs/UnitTestcBitVect.py::ExplicitTestCase::testStringOps
 rdkit/DataStructs/UnitTestcBitVect.py::ExplicitTestCase::testTanimotoSim
 rdkit/DataStructs/UnitTestcBitVect.py::SparseBitVectTests::testAllBitSim
+rdkit/DataStructs/UnitTestcBitVect.py::SparseBitVectTests::testFingerprints
 rdkit/DataStructs/UnitTestcBitVect.py::SparseBitVectTests::testFold
 rdkit/DataStructs/UnitTestcBitVect.py::SparseBitVectTests::testNumBitsInCommon
 rdkit/DataStructs/UnitTestcBitVect.py::SparseBitVectTests::testOffBitProjSimilarity

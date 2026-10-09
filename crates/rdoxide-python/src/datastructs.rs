@@ -12,6 +12,7 @@ use rdoxide::datastructs::bit_ops::{
 use rdoxide::datastructs::bit_vect::{base64_encode, bit_vect_from_binary};
 use rdoxide::datastructs::{
     BitVect, ExplicitBitVect, SparseBitVect, convert_to_explicit, from_bit_string,
+    from_daylight_string,
 };
 
 use crate::datastructs_siv as siv;
@@ -676,6 +677,22 @@ fn convert_to_explicit_py(sbv: PyRef<'_, PySparseBitVect>) -> PyExplicitBitVect 
     PyExplicitBitVect::wrap(convert_to_explicit(&sbv.bv))
 }
 
+/// Fill a BitVect using an ASCII (Daylight) encoding of a fingerprint.
+///
+///    **Arguments**
+///      - bv: either a _SparseBitVect_ or an _ExplicitBitVect_
+///      - txt: a string with the Daylight encoding (this is the text that
+///             the Daylight tools put in the FP field of a TDT)
+#[pyfunction]
+#[pyo3(name = "InitFromDaylightString", signature = (sbv, s))]
+fn init_from_daylight_string(sbv: &Bound<'_, PyAny>, s: &str) -> PyResult<()> {
+    if let Ok(mut e) = sbv.extract::<PyRefMut<'_, PyExplicitBitVect>>() {
+        return from_daylight_string(&mut e.bv, s).py();
+    }
+    let mut sp = sbv.extract::<PyRefMut<'_, PySparseBitVect>>()?;
+    from_daylight_string(&mut sp.bv, s).py()
+}
+
 /// Creates an ExplicitBitVect from a bit string (string of 0s and 1s).
 #[pyfunction]
 #[pyo3(name = "CreateFromBitString", signature = (bits))]
@@ -779,6 +796,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
         wrap_pyfunction!(bv_to_fps, m)?,
         wrap_pyfunction!(bv_to_binary, m)?,
         wrap_pyfunction!(convert_to_explicit_py, m)?,
+        wrap_pyfunction!(init_from_daylight_string, m)?,
         wrap_pyfunction!(create_from_bit_string, m)?,
         wrap_pyfunction!(create_from_fps, m)?,
         wrap_pyfunction!(create_from_binary, m)?,
