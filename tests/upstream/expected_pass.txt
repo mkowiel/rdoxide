@@ -82,6 +82,10 @@ Code/GraphMol/Abbreviations/Wrap/testAbbreviations.py::TestCase::testCondenseLin
 Code/GraphMol/Abbreviations/Wrap/testAbbreviations.py::TestCase::testGithub3692
 Code/GraphMol/Abbreviations/Wrap/testAbbreviations.py::TestCase::testLabel
 Code/GraphMol/Abbreviations/Wrap/testAbbreviations.py::TestCase::testParsingAbbrevs
+Code/GraphMol/ChemReactions/Wrap/testSanitize.py::TestCase::test_github_4162
+Code/GraphMol/ChemReactions/Wrap/testSanitize.py::TestCase::test_only_aromatize_if_possible
+Code/GraphMol/ChemReactions/Wrap/testSanitize.py::TestCase::test_sanitize
+Code/GraphMol/ChemReactions/Wrap/testSanitize.py::TestCase::test_unused_rlabel_in_product
 Code/GraphMol/Descriptors/Wrap/test3D.py::TestCase::test1AUTOCORR2D
 Code/GraphMol/Descriptors/Wrap/test3D.py::TestCase::test2AUTOCORR3D
 Code/GraphMol/Descriptors/Wrap/test3D.py::TestCase::test3GETAWAY
@@ -629,6 +633,9 @@ rdkit/Chem/Scaffolds/UnitTestMurckoScaffold.py::TestCase::test_MakeScaffoldGener
 rdkit/Chem/Scaffolds/UnitTestMurckoScaffold.py::TestCase::test_MurckScaffoldSmilesFromSmiles
 rdkit/Chem/Scaffolds/UnitTestMurckoScaffold.py::TestCase::test_MurckoScaffoldSmiles
 rdkit/Chem/Scaffolds/UnitTestMurckoScaffold.py::TestCase::test_ReferenceImplementation
+rdkit/Chem/SimpleEnum/UnitTestEnumerator.py::DocTestCase::runTest
+rdkit/Chem/SimpleEnum/UnitTestEnumerator.py::TestCase::test_EnumerateReactionException
+rdkit/Chem/SimpleEnum/UnitTestEnumerator.py::TestCase::test_UniquifyingEnhancedStereo
 rdkit/Chem/Suppliers/UnitTestSDMolSupplier.py::TestCase::test_SDMolSupplier
 rdkit/Chem/Suppliers/UnitTestSDMolSupplier.py::TestCase::test_SDWriter
 rdkit/Chem/Suppliers/UnitTestSmilesMolSupplier.py::TestCase::test_SmilesReaderBoundaryConditions

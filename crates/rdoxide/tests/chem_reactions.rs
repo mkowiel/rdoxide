@@ -186,3 +186,56 @@ fn rxn_mol_round_trip() {
     );
     assert_eq!(round_trip_smarts(&back), round_trip_smarts(&rxn));
 }
+
+#[test]
+fn pickles_round_trip() {
+    use rdoxide::graphmol::chem_reactions::pickler::{
+        pickle_reaction_default, reaction_from_pickle,
+    };
+    let mut rxn = reaction("[C:1](=[O:2])O.[N:3]>[Pd]>[C:1](=[O:2])[N:3]");
+    rxn.substruct_params_mut().use_chirality = true;
+    let back = reaction_from_pickle(&pickle_reaction_default(&rxn).unwrap()).unwrap();
+    assert_eq!(round_trip_smarts(&back), round_trip_smarts(&rxn));
+    assert!(back.is_initialized() && back.implicit_properties_flag());
+    assert!(back.substruct_params().use_chirality);
+    assert_eq!(back.num_agent_templates(), 1);
+    assert!(reaction_from_pickle(b"not a pickle").is_err());
+}
+
+#[test]
+fn sanitize_maps_rgroup_dummies() {
+    use rdoxide::graphmol::chem_reactions::sanitize::{
+        default_rxn_adjust_params, flags::SANITIZE_ALL, sanitize_rxn,
+    };
+    let mut rxn =
+        reaction_from_smarts("[*:1]C>>[*:1]CC", &ReactionSmartsParserParams::new()).unwrap();
+    sanitize_rxn(&mut rxn, SANITIZE_ALL, &default_rxn_adjust_params()).unwrap();
+    assert_eq!(rxn.num_reactant_templates(), 1);
+}
+
+#[test]
+fn preprocess_adds_functional_group_queries() {
+    use rdoxide::graphmol::chem_reactions::preprocess::preprocess_reaction_with_default_groups;
+    use rdoxide::rdgeneral::{RDProps, common_properties::molFileValue};
+    let mut rxn = reaction_from_smarts(
+        "[C:1]Br.[N:2]>>[C:1][N:2]",
+        &ReactionSmartsParserParams::new(),
+    )
+    .unwrap();
+    rxn.reactants_mut()[0]
+        .atom_mut(1)
+        .dict_mut()
+        .set_val(molFileValue, "Halogen.Aromatic");
+    let result = preprocess_reaction_with_default_groups(&mut rxn, molFileValue).unwrap();
+    assert!(result.valid);
+    assert_eq!(
+        result.reactant_labels,
+        [vec![(1, "halogen.aromatic".to_string())], vec![]]
+    );
+    rxn.reactants_mut()[0]
+        .atom_mut(1)
+        .dict_mut()
+        .set_val(molFileValue, "boromicacid");
+    let err = preprocess_reaction_with_default_groups(&mut rxn, molFileValue).unwrap_err();
+    assert!(matches!(err, rdoxide::RDKitError::Key(k) if k == "boromicacid"));
+}

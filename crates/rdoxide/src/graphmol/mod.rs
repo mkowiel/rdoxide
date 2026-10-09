@@ -20,6 +20,7 @@ pub mod enumerate_stereoisomers;
 pub mod file_parsers;
 pub mod find_rings;
 pub mod fingerprints;
+pub mod functional_group_hierarchy;
 pub mod kekulize;
 pub mod matrices;
 pub mod mmpa;

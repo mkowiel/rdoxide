@@ -2064,6 +2064,30 @@ fn mol_from_pickle_reader(r: &mut R<'_>, flags: u32) -> Result<ROMol> {
     Ok(mol)
 }
 
+/// `streamWriteProps`: the properties selected by `flags` (`PRIVATE_PROPS`,
+/// `COMPUTED_PROPS`), for pickles that embed properties outside a molecule.
+pub(crate) fn pickle_properties(props: &impl RDProps, flags: u32) -> Vec<u8> {
+    let mut w = W::default();
+    write_props(
+        &mut w,
+        props,
+        flags & PRIVATE_PROPS != 0,
+        flags & COMPUTED_PROPS != 0,
+        &[],
+        true,
+    );
+    w.0
+}
+
+/// `streamReadProps`: reads properties written by [`pickle_properties`] from
+/// `data` at `*pos` into `dict` and advances `*pos`.
+pub(crate) fn unpickle_properties(data: &[u8], pos: &mut usize, dict: &mut Dict) -> Result<()> {
+    let mut r = R { data, pos: *pos };
+    read_props(&mut r, dict, true, false)?;
+    *pos = r.pos;
+    Ok(())
+}
+
 /// `MolPickler::molFromPickle(pickle, mol, propertyFlags)`
 pub fn mol_from_pickle(data: &[u8], flags: u32) -> Result<ROMol> {
     let mut r = R { data, pos: 0 };

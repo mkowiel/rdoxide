@@ -24,6 +24,7 @@ use crate::graphmol::queries::{
 use crate::graphmol::romol::ROMol;
 use crate::graphmol::stereo_group::StereoGroupType;
 use crate::rdgeneral::common_properties as cp;
+use crate::rdgeneral::ptree::PTree;
 use crate::rdgeneral::utils::count_swaps_to_interconvert;
 use crate::rdgeneral::{RDProps, RDValue};
 use crate::{RDKitError, Result};
@@ -1102,4 +1103,64 @@ pub fn remove_duplicates(matches: &mut Vec<MatchVect>, n_atoms: u32) {
         }
         seen.insert(v)
     });
+}
+
+impl SubstructMatchParameters {
+    /// `substructMatchParamsToJSON`: the serializable options as JSON (callbacks
+    /// and property lists are not included). Unlike upstream, the text is compact.
+    pub fn to_json(&self) -> String {
+        let mut pt = PTree::new();
+        pt.put("useChirality", self.use_chirality);
+        pt.put("useEnhancedStereo", self.use_enhanced_stereo);
+        pt.put(
+            "aromaticMatchesConjugated",
+            self.aromatic_matches_conjugated,
+        );
+        pt.put("useQueryQueryMatches", self.use_query_query_matches);
+        pt.put("recursionPossible", self.recursion_possible);
+        pt.put("uniquify", self.uniquify);
+        pt.put("maxMatches", self.max_matches);
+        pt.put("maxRecursiveMatches", self.max_recursive_matches);
+        pt.put("numThreads", self.num_threads);
+        pt.put(
+            "specifiedStereoQueryMatchesUnspecified",
+            self.specified_stereo_query_matches_unspecified,
+        );
+        pt.put(
+            "aromaticMatchesSingleOrDouble",
+            self.aromatic_matches_single_or_double,
+        );
+        pt.to_json()
+    }
+
+    /// `updateSubstructMatchParamsFromJSON`: options missing from `json` keep
+    /// their current value; an empty string changes nothing.
+    pub fn update_from_json(&mut self, json: &str) -> crate::Result<()> {
+        if json.is_empty() {
+            return Ok(());
+        }
+        let pt = PTree::from_json(json)?;
+        self.use_chirality = pt.get_bool("useChirality", self.use_chirality);
+        self.use_enhanced_stereo = pt.get_bool("useEnhancedStereo", self.use_enhanced_stereo);
+        self.aromatic_matches_conjugated = pt.get_bool(
+            "aromaticMatchesConjugated",
+            self.aromatic_matches_conjugated,
+        );
+        self.use_query_query_matches =
+            pt.get_bool("useQueryQueryMatches", self.use_query_query_matches);
+        self.recursion_possible = pt.get_bool("recursionPossible", self.recursion_possible);
+        self.uniquify = pt.get_bool("uniquify", self.uniquify);
+        self.max_matches = pt.get_u32("maxMatches", self.max_matches);
+        self.max_recursive_matches = pt.get_u32("maxRecursiveMatches", self.max_recursive_matches);
+        self.num_threads = pt.get_i32("numThreads", self.num_threads);
+        self.specified_stereo_query_matches_unspecified = pt.get_bool(
+            "specifiedStereoQueryMatchesUnspecified",
+            self.specified_stereo_query_matches_unspecified,
+        );
+        self.aromatic_matches_single_or_double = pt.get_bool(
+            "aromaticMatchesSingleOrDouble",
+            self.aromatic_matches_single_or_double,
+        );
+        Ok(())
+    }
 }
