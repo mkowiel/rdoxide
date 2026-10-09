@@ -27,6 +27,11 @@ pub enum RDKitError {
     Conformer(String),
     /// `BadFileException` -> `OSError`
     BadFile(String),
+    /// `ChemicalReactionException` -> `ValueError("ChemicalParserException: …")`
+    ChemicalReaction(String),
+    /// `ChemicalReactionParserException` ->
+    /// `ValueError("ChemicalReactionParserException: …")`
+    ChemicalReactionParser(String),
     /// Sanitization failures (`MolSanitizeException` hierarchy).
     Sanitize(SanitizeError),
 }
@@ -154,7 +159,9 @@ impl fmt::Display for RDKitError {
             | RDKitError::FileParse(m)
             | RDKitError::UnhandledFeature(m)
             | RDKitError::Conformer(m)
-            | RDKitError::BadFile(m) => f.write_str(m),
+            | RDKitError::BadFile(m)
+            | RDKitError::ChemicalReaction(m)
+            | RDKitError::ChemicalReactionParser(m) => f.write_str(m),
             RDKitError::Sanitize(e) => match e {
                 SanitizeError::Generic { message }
                 | SanitizeError::AtomValence { message, .. }

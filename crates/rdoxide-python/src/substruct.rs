@@ -235,6 +235,11 @@ fn atom_location(atom: &PyAtom) -> PyResult<(&Py<PyMol>, u32)> {
 }
 
 impl PySubstructMatchParameters {
+    /// The default parameters.
+    pub(crate) fn new_default() -> Self {
+        Self::py_new()
+    }
+
     /// The core parameters for matching `query` against `mol`; the Python
     /// callbacks see atoms and bonds of those two molecules.
     fn to_core(

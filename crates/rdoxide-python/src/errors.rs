@@ -20,6 +20,12 @@ pub fn to_py(err: RDKitError) -> PyErr {
             PyRuntimeError::new_err(m)
         }
         RDKitError::BadFile(m) => PyIOError::new_err(m),
+        RDKitError::ChemicalReaction(m) => {
+            PyValueError::new_err(format!("ChemicalParserException: {m}"))
+        }
+        RDKitError::ChemicalReactionParser(m) => {
+            PyValueError::new_err(format!("ChemicalReactionParserException: {m}"))
+        }
         RDKitError::Sanitize(e) => crate::rdchem::sanitize_error(&e),
     }
 }

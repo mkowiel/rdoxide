@@ -51,7 +51,7 @@ pub struct PySmilesWriteParams {
 }
 
 impl PySmilesWriteParams {
-    fn to_core(&self) -> SmilesWriteParams {
+    pub(crate) fn to_core(&self) -> SmilesWriteParams {
         SmilesWriteParams {
             do_isomeric_smiles: self.doIsomericSmiles,
             do_kekule: self.doKekule,
