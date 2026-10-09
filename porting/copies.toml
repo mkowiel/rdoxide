@@ -262,3 +262,19 @@ to = "python/rdkit/Chem/Fingerprints/FingerprintMols.py"
 [[copy]]
 from = "rdkit/Chem/Fingerprints/SimilarityScreener.py"
 to = "python/rdkit/Chem/Fingerprints/SimilarityScreener.py"
+
+[[copy]]
+from = "Code/GraphMol/FileParsers/test_data/NCI_aids_few.sdf"
+to = "tests/data/molfiles/NCI_aids_few.sdf"
+
+[[copy]]
+from = "Code/GraphMol/FileParsers/test_data/fewSmi.csv"
+to = "tests/data/molfiles/fewSmi.csv"
+
+[[copy]]
+from = "Code/GraphMol/FileParsers/test_data/first_200.tpsa.csv"
+to = "tests/data/molfiles/first_200.tpsa.csv"
+
+[[copy]]
+from = "Code/GraphMol/FileParsers/test_data/sdErrors1.sdf"
+to = "tests/data/molfiles/sdErrors1.sdf"

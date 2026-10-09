@@ -51,7 +51,11 @@ impl Default for SmilesMolSupplierParams {
 
 /// `boost::tokenizer` with `char_separator(delimiter, "", keep_empty_tokens)`:
 /// a split at every delimiter character that keeps empty fields.
-fn tokenize<'a>(line: &'a str, delimiter: &str) -> Vec<&'a str> {
+pub(super) fn tokenize<'a>(line: &'a str, delimiter: &str) -> Vec<&'a str> {
+    // (an empty input has no tokens at all)
+    if line.is_empty() {
+        return Vec::new();
+    }
     line.split(|c| delimiter.contains(c)).collect()
 }
 
@@ -477,5 +481,22 @@ impl SmilesMolSupplier {
             this.d_len = this.d_molpos.len() as i64;
             this.d_len as usize
         })
+    }
+}
+
+#[cfg(test)]
+mod tokenize_tests {
+    use super::tokenize;
+
+    #[test]
+    fn splits_at_every_delimiter_character_and_keeps_empty_fields() {
+        assert_eq!(tokenize("a,,b,", ","), ["a", "", "b", ""]);
+        assert_eq!(tokenize(",", ","), ["", ""]);
+        assert_eq!(tokenize("a b\tc", " \t"), ["a", "b", "c"]);
+    }
+
+    #[test]
+    fn empty_input_has_no_tokens() {
+        assert!(tokenize("", ",").is_empty());
     }
 }

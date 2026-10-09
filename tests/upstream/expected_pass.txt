@@ -148,6 +148,10 @@ Code/GraphMol/Wrap/testConformer.py::TestCase::test2Issue217
 Code/GraphMol/Wrap/testConformer.py::TestCase::test3Exceptions
 Code/GraphMol/Wrap/testConformer.py::TestCase::test4ConfTuple
 Code/GraphMol/Wrap/testConformer.py::TestCase::test5PositionsArray
+Code/GraphMol/Wrap/testMultithreadedMolSupplier.py::TestCase::testMultiSDMolSupplier
+Code/GraphMol/Wrap/testMultithreadedMolSupplier.py::TestCase::testMultiSDMolSupplierThrow
+Code/GraphMol/Wrap/testMultithreadedMolSupplier.py::TestCase::testMultiSmiMolSupplier
+Code/GraphMol/Wrap/testMultithreadedMolSupplier.py::TestCase::testMultiSmiMolSupplierThrow
 Code/GraphMol/Wrap/testSGroups.py::TestCase::testAttachPoints
 Code/GraphMol/Wrap/testSGroups.py::TestCase::testBasics
 Code/GraphMol/Wrap/testSGroups.py::TestCase::testBasics3000

@@ -738,3 +738,15 @@
 
 [module."rdoxide_python::rdmetricmatrixcalc".sources]
 "Code/DataManip/MetricMatrixCalc/Wrap/rdMetricMatrixCalc.cpp" = "5b06194f4b69f8fd548ea0719edb4724111b4de0"
+
+[module."rdoxide::graphmol::file_parsers::multithreaded_supplier".sources]
+"Code/GraphMol/FileParsers/MultithreadedMolSupplier.cpp" = "fd467ff80ca5cae339805b159902fadf66671bc2"
+"Code/GraphMol/FileParsers/MultithreadedMolSupplier.h" = "43bc3f6fced6d664cdacda92977cbe0be7a9f7db"
+"Code/GraphMol/FileParsers/MultithreadedSDMolSupplier.cpp" = "203b643b95024271c6db284955f5b8f9e769cf11"
+"Code/GraphMol/FileParsers/MultithreadedSDMolSupplier.h" = "bc4afe0ece1be25caf68e497ae48067809564644"
+"Code/GraphMol/FileParsers/MultithreadedSmilesMolSupplier.cpp" = "eba9e89c1a52a13fbcd2f7993123f0ea1627fbdf"
+"Code/GraphMol/FileParsers/MultithreadedSmilesMolSupplier.h" = "b4ab3bbd07cd104348348d2dad622a9216c2e3aa"
+
+[module."rdoxide_python::rdmolfiles_mtsupplier".sources]
+"Code/GraphMol/Wrap/MultithreadedSDMolSupplier.cpp" = "a6eb239467e17b3a6f6bf77ae3a1da09d44771b0"
+"Code/GraphMol/Wrap/MultithreadedSmilesMolSupplier.cpp" = "c8938cb8420129a872dd9f4cc2c5b3e2ff34c75a"
