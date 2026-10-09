@@ -77,7 +77,7 @@ impl PySubstructMatchParameters {
 }
 
 impl PySubstructMatchParameters {
-    fn to_core(&self) -> SubstructMatchParameters {
+    pub(crate) fn to_core(&self) -> SubstructMatchParameters {
         SubstructMatchParameters {
             use_chirality: self.useChirality,
             use_enhanced_stereo: self.useEnhancedStereo,

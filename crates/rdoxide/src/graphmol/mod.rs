@@ -36,6 +36,7 @@ pub mod subgraphs;
 pub mod subset;
 pub mod substance_group;
 pub mod substruct;
+pub mod substruct_library;
 pub mod wedge_bonds;
 
 pub use atom::{Atom, ChiralType, HybridizationType, ValenceType};

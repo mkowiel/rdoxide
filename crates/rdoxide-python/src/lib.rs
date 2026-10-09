@@ -72,6 +72,7 @@ mod rdpartialcharges;
 mod rdqueries;
 mod rdreducedgraphs;
 mod rdsimdivpickers;
+mod rdsubstructlibrary;
 mod ringinfo;
 mod stereo_group;
 mod substance_group;
@@ -140,6 +141,12 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
         "rdReducedGraphs",
         "rdkit.Chem.rdReducedGraphs",
         rdreducedgraphs::init,
+    )?;
+    add_submodule(
+        m,
+        "rdSubstructLibrary",
+        "rdkit.Chem.rdSubstructLibrary",
+        rdsubstructlibrary::init,
     )?;
     add_submodule(
         m,
