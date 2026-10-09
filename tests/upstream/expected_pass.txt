@@ -356,6 +356,8 @@ rdkit/Chem/UnitTestGraphDescriptors_2.py::TestCase::testOrderDepend
 rdkit/Chem/UnitTestGraphDescriptors_2.py::TestCase::testPathCounts
 rdkit/Chem/UnitTestLipinski.py::TestCase::test1
 rdkit/Chem/UnitTestLipinski.py::TestCase::testIssue2183420
+rdkit/Chem/UnitTestMol3D.py::TestCase::testConformerRMS
+rdkit/Chem/UnitTestMol3D.py::TestCase::testConformerRMSMatrix
 rdkit/Chem/UnitTestMol3D.py::TestCase::testDetectBondStereoChemistry
 rdkit/Chem/UnitTestMol3D.py::TestCase::testEnumerateEitherDoubleStereo
 rdkit/Chem/UnitTestMol3D.py::TestCase::testEnumerateStereoisomersBasic
@@ -381,6 +383,7 @@ rdkit/Chem/UnitTestMol3D.py::TestCase::testTorsionFingerprintsColinearBonds
 rdkit/Chem/UnitTestOldBugs.py::TestCase::testBug12a
 rdkit/Chem/UnitTestOldBugs.py::TestCase::testBug12b
 rdkit/Chem/UnitTestOldBugs.py::TestCase::testBug14
+rdkit/Chem/UnitTestOldBugs.py::TestCase::testGithub112
 rdkit/Chem/UnitTestQED.py::DocTestCase::runTest
 rdkit/Chem/UnitTestQED.py::TestCase::testNCI200
 rdkit/Chem/UnitTestQED.py::TestCase::testQED
