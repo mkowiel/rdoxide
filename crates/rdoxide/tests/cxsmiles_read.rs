@@ -141,3 +141,23 @@ fn link_nodes_become_a_property() {
     // more than two neighbors need the outer atoms
     assert!(parse_with("FC1CCC(O)C1 |LN:1:1.3|", true, true).is_none());
 }
+
+#[test]
+fn variable_attachment_points() {
+    let mol = parse("CO*.C1=CC=NC=C1 |m:2:3.5.4|");
+    let bond = mol.bond(mol.bond_idx_between(1, 2).unwrap());
+    assert_eq!(
+        bond.get_prop(cp::_MolFileBondEndPts)
+            .unwrap()
+            .to_rd_string(),
+        "(3 4 6 5)"
+    );
+    assert_eq!(
+        bond.get_prop(cp::_MolFileBondAttach)
+            .unwrap()
+            .to_rd_string(),
+        "ANY"
+    );
+    // the attached atom must have a single bond
+    assert!(parse_with("CC(C)C |m:1:3|", true, true).is_none());
+}
