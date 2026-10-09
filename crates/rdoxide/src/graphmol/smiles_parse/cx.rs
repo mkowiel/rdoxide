@@ -4,9 +4,10 @@
 //! enhanced stereo (stereo groups), wedged and wiggly bonds, cis/trans and
 //! unspecified double bonds, dative/hydrogen/zero-order bonds, and the query
 //! features (unsaturation, ring bond count, substitution count, the special
-//! atom labels). Substance groups, polymer groups, link nodes and variable
-//! attachment points are not ported yet; extensions that use them fail to
-//! parse (the warning names the feature).
+//! atom labels), and substance groups (data `SgD:`, polymer `Sg:` and the
+//! hierarchy `SgH:`). Link nodes and variable attachment points are not
+//! ported yet; extensions that use them fail to parse (the warning names
+//! the feature).
 //!
 //! Ported from RDKit `Code/GraphMol/SmilesParse/CXSmilesOps.cpp` (2026.09.1).
 //!
@@ -27,6 +28,7 @@ use crate::graphmol::queries::{
 use crate::graphmol::query_ops::{atom_expand_query, replace_atom_with_query_atom};
 use crate::graphmol::romol::RWMol;
 use crate::graphmol::stereo_group::{StereoGroup, StereoGroupType};
+use crate::graphmol::substance_group::{SubstanceGroup, add_substance_group};
 use crate::rd_log_warning;
 use crate::rdgeneral::common_properties as cp;
 use crate::rdgeneral::{RDProps, RDValue};
@@ -36,6 +38,31 @@ use crate::rdgeneral::{RDProps, RDValue};
 pub(crate) const ANY_VALUE: u32 = 0xDEADBEEF;
 
 const PSEUDOATOMS_P: [&str; 2] = ["Pol_p", "Mod_p"];
+
+/// `sgroupTypemap`: CXSMILES polymer group codes and their molfile types.
+pub(crate) const SGROUP_TYPEMAP: [(&str, &str); 15] = [
+    ("n", "SRU"),
+    ("mon", "MON"),
+    ("mer", "MER"),
+    ("co", "COP"),
+    ("xl", "CRO"),
+    ("mod", "MOD"),
+    ("mix", "MIX"),
+    ("f", "FOR"),
+    ("any", "ANY"),
+    ("gen", "GEN"),
+    ("c", "COM"),
+    ("grf", "GRA"),
+    ("alt", "COP"),
+    ("ran", "COP"),
+    ("blk", "COP"),
+];
+
+/// Property holding the position of a group in the CXSMILES (`cxsmilesindex`).
+const CXSMILES_INDEX: &str = "_cxsmilesindex";
+const HEAD_CROSSINGS: &str = "_headCrossings";
+const TAIL_CROSSINGS: &str = "_tailCrossings";
+const LABELS_PROCESSED: &str = "_cxsmilesLabelsProcessed";
 
 /// `SmilesParseOps::detail::_needsDetectBondStereo`
 pub(crate) const NEEDS_DETECT_BOND_STEREO: &str = "_needsDetectBondStereo";
@@ -767,6 +794,242 @@ impl CxParser<'_> {
         self.mol.set_stereo_groups(groups).is_ok()
     }
 
+    /// `read_int_list(first, last, res, sep)`: never fails.
+    fn read_int_list(&mut self, sep: u8) -> Vec<u32> {
+        let mut res = Vec::new();
+        loop {
+            let start = self.first;
+            while self.first <= self.last() && self.ch().is_ascii_digit() {
+                self.first += 1;
+            }
+            if self.first > start {
+                let digits = std::str::from_utf8(&self.text[start..self.first]).unwrap_or("0");
+                res.push(digits.parse().unwrap_or(0));
+            }
+            if self.at_end() || self.ch() != sep {
+                break;
+            }
+            self.first += 1;
+        }
+        res
+    }
+
+    /// `parse_data_sgroup_attr`: one `:`-terminated attribute of a data group.
+    fn parse_data_sgroup_attr(
+        &mut self,
+        sgroup: &mut SubstanceGroup,
+        keep: bool,
+        field: &str,
+        is_array: bool,
+    ) -> bool {
+        if self.at_end() {
+            return false;
+        }
+        if self.ch() != b'|' {
+            let Some(data) = self.read_text_to(b":") else {
+                return false;
+            };
+            self.first += 1;
+            if !data.is_empty() && keep {
+                let value = if is_array {
+                    RDValue::VecString(vec![data])
+                } else {
+                    RDValue::String(data)
+                };
+                sgroup.dict_mut().set_val(field, value);
+            }
+        }
+        true
+    }
+
+    /// `|SgD:atoms:field:data:queryop:unit:tag:(coords)|`
+    fn parse_data_sgroup(&mut self, n_sgroups: u32) -> bool {
+        if !self.text[self.first..].starts_with(b"SgD:") {
+            return false;
+        }
+        self.first += 4;
+        let atoms = self.read_int_list(b',');
+        let mut sgroup = SubstanceGroup::new("DAT");
+        sgroup.dict_mut().set_val(CXSMILES_INDEX, n_sgroups);
+        let mut keep = false;
+        for idx in atoms {
+            if self.valid_atom(idx) {
+                keep = true;
+                if sgroup.add_atom_with_idx(self.mol, idx).is_err() {
+                    return false;
+                }
+            }
+        }
+        self.first += 1;
+        if !self.parse_data_sgroup_attr(&mut sgroup, keep, "FIELDNAME", false) {
+            return false;
+        }
+        if keep {
+            sgroup
+                .dict_mut()
+                .set_val("FIELDDISP", "    0.0000    0.0000    DR    ALL  0       0");
+        }
+        for (field, is_array) in [
+            ("DATAFIELDS", true),
+            ("QUERYOP", false),
+            ("FIELDINFO", false),
+            ("FIELDTAG", false),
+        ] {
+            if !self.parse_data_sgroup_attr(&mut sgroup, keep, field, is_array) {
+                return false;
+            }
+        }
+        if !self.at_end() && self.ch() == b'(' {
+            let Some(coords) = self.read_text_to(b")") else {
+                return false;
+            };
+            self.first += 1;
+            if keep {
+                sgroup.dict_mut().set_val("COORDS", coords);
+            }
+        }
+        if keep {
+            // the label processing can destroy sgroup info, so do it now
+            process_cx_smiles_labels(self.mol);
+            let index = self.mol.substance_groups().len() as u32 + 1;
+            sgroup.dict_mut().set_val("index", index);
+            add_substance_group(self.mol, sgroup);
+        }
+        true
+    }
+
+    /// `|SgH:parent:child.child,parent:child|`
+    fn parse_sgroup_hierarchy(&mut self) -> bool {
+        if !self.text[self.first..].starts_with(b"SgH:") {
+            return false;
+        }
+        self.first += 4;
+        let find = |mol: &RWMol, id: u32| {
+            mol.substance_groups()
+                .iter()
+                .position(|sg| sg.get_prop(CXSMILES_INDEX).and_then(RDValue::as_uint) == Some(id))
+        };
+        loop {
+            let Some(mut parent_id) = self.read_int() else {
+                return false;
+            };
+            let parent = find(self.mol, parent_id);
+            if let Some(p) = parent
+                && let Some(index) = self.mol.substance_groups()[p]
+                    .get_prop("index")
+                    .and_then(RDValue::as_uint)
+            {
+                parent_id = index;
+            }
+            if self.first > self.last() || self.ch() != b':' {
+                return false;
+            }
+            self.first += 1;
+            let children = self.read_int_list(b'.');
+            if parent.is_some() {
+                for child in children {
+                    if child as usize >= self.mol.substance_groups().len() {
+                        // "child id references non-existent SGroup"
+                        return false;
+                    }
+                    if let Some(c) = find(self.mol, child) {
+                        self.mol.substance_groups_mut()[c]
+                            .dict_mut()
+                            .set_val("PARENT", parent_id);
+                    }
+                }
+            }
+            if self.first <= self.last() && self.ch() == b',' {
+                self.first += 1;
+            } else {
+                return true;
+            }
+        }
+    }
+
+    /// `|Sg:type:atoms:subscript:superscript:head crossings:tail crossings:|`;
+    /// empty trailing fields may be missing.
+    fn parse_polymer_sgroup(&mut self, n_sgroups: u32) -> bool {
+        if !self.text[self.first..].starts_with(b"Sg:") {
+            return false;
+        }
+        self.first += 3;
+        let Some(type_code) = self.read_text_to(b":") else {
+            return false;
+        };
+        self.first += 1;
+        let Some((_, sgroup_type)) = SGROUP_TYPEMAP.iter().find(|(code, _)| *code == type_code)
+        else {
+            return false;
+        };
+        let mut sgroup = SubstanceGroup::new(sgroup_type);
+        sgroup.dict_mut().set_val(CXSMILES_INDEX, n_sgroups);
+        match type_code.as_str() {
+            "alt" => sgroup.dict_mut().set_val("SUBTYPE", "ALT"),
+            "ran" => sgroup.dict_mut().set_val("SUBTYPE", "RAN"),
+            "blk" => sgroup.dict_mut().set_val("SUBTYPE", "BLO"),
+            _ => {}
+        }
+        let mut keep = false;
+        for idx in self.read_int_list(b',') {
+            if self.valid_atom(idx) {
+                if sgroup.add_atom_with_idx(self.mol, idx).is_err() {
+                    return false;
+                }
+                keep = true;
+            }
+        }
+        if self.first <= self.last() && self.ch() == b':' {
+            self.first += 1;
+            let Some(subscript) = self.read_text_to(b":|") else {
+                return false;
+            };
+            if keep && !subscript.is_empty() {
+                sgroup.dict_mut().set_val("LABEL", subscript);
+            }
+            if self.first <= self.last() && self.ch() == b':' {
+                self.first += 1;
+                let Some(superscript) = self.read_text_to(b":|,") else {
+                    return false;
+                };
+                if keep && !superscript.is_empty() {
+                    sgroup.dict_mut().set_val("CONNECT", superscript);
+                }
+                if self.first <= self.last() && self.ch() == b':' {
+                    self.first += 1;
+                    let mut head = self.read_int_list(b',');
+                    if keep && !head.is_empty() {
+                        keep = head.iter().all(|&b| self.valid_atom(b));
+                        head.retain(|&b| self.valid_atom(b));
+                        let _ =
+                            sgroup.set_prop(HEAD_CROSSINGS, RDValue::VecUnsignedInt(head), true);
+                    }
+                    let mut tail = Vec::new();
+                    if self.first <= self.last() && self.ch() == b':' {
+                        self.first += 1;
+                        tail = self.read_int_list(b',');
+                    }
+                    if keep && !tail.is_empty() {
+                        keep = tail.iter().all(|&b| self.valid_atom(b));
+                        tail.retain(|&b| self.valid_atom(b));
+                        let _ =
+                            sgroup.set_prop(TAIL_CROSSINGS, RDValue::VecUnsignedInt(tail), true);
+                    }
+                }
+            }
+        }
+        if keep {
+            process_cx_smiles_labels(self.mol);
+            if finalize_polymer_sgroup(self.mol, &mut sgroup).is_err() {
+                return false;
+            }
+            let index = self.mol.substance_groups().len() as u32 + 1;
+            sgroup.dict_mut().set_val("index", index);
+            add_substance_group(self.mol, sgroup);
+        }
+        true
+    }
+
     /// An extension that this port does not handle yet.
     fn unsupported(&self, what: &str) -> bool {
         rd_log_warning!("CXSMILES {what} are not supported by rdoxide yet");
@@ -779,6 +1042,7 @@ impl CxParser<'_> {
         }
         self.first += 1;
         let mut conf_index = 0;
+        let mut n_sgroups = 0;
         while self.first < self.last() && self.ch() != b'|' {
             let length = self.last() - self.first;
             let ok = match self.ch() {
@@ -812,8 +1076,22 @@ impl CxParser<'_> {
                 b'L' if self.first + 1 < self.last() && self.ch_at(1) == b'N' => {
                     self.unsupported("link nodes")
                 }
+                b'S' if self.first + 2 < self.last()
+                    && self.ch_at(1) == b'g'
+                    && self.ch_at(2) == b'D' =>
+                {
+                    n_sgroups += 1;
+                    self.parse_data_sgroup(n_sgroups - 1)
+                }
+                b'S' if self.first + 2 < self.last()
+                    && self.ch_at(1) == b'g'
+                    && self.ch_at(2) == b'H' =>
+                {
+                    self.parse_sgroup_hierarchy()
+                }
                 b'S' if self.first + 1 < self.last() && self.ch_at(1) == b'g' => {
-                    self.unsupported("substance groups")
+                    n_sgroups += 1;
+                    self.parse_polymer_sgroup(n_sgroups - 1)
                 }
                 b'u' => self.parse_unsaturation(),
                 b's' => self.parse_substitution(),
@@ -844,6 +1122,106 @@ impl CxParser<'_> {
     }
 }
 
+/// `setupUnmarkedPolymerSGroup`: no information about the bonds in and out of
+/// the group is present, so they are found from the first and last atom.
+fn setup_unmarked_polymer_sgroup(
+    mol: &RWMol,
+    sgroup: &SubstanceGroup,
+    head: &mut Vec<u32>,
+    tail: &mut Vec<u32>,
+) -> Result<(), ()> {
+    let atoms = sgroup.atoms();
+    let (Some(&first), Some(&last)) = (atoms.first(), atoms.last()) else {
+        return Err(()); // "no atoms in polymer sgroup"
+    };
+    for nbr in mol.atom_neighbors(first).collect::<Vec<_>>() {
+        if atoms.contains(&nbr) {
+            continue;
+        }
+        let bond = mol.bond_idx_between(first, nbr).ok_or(())?;
+        // usually a head crossing; with a single atom in the group and a head
+        // crossing already known, the bond may be a tail crossing
+        if atoms.len() > 1 || head.is_empty() {
+            head.push(bond);
+        } else if atoms.len() == 1 {
+            if tail.is_empty() {
+                tail.push(bond);
+            } else {
+                rd_log_warning!(
+                    " single atom polymer Sgroup has more than two bonds to external atoms. Ignoring all bonds after the first two."
+                );
+            }
+        }
+    }
+    if atoms.len() > 1 {
+        for nbr in mol.atom_neighbors(last).collect::<Vec<_>>() {
+            if !atoms.contains(&nbr) {
+                tail.push(mol.bond_idx_between(last, nbr).ok_or(())?);
+            }
+        }
+    }
+    Ok(())
+}
+
+/// `finalizePolymerSGroup`: sets up the connectivity and crossing bonds.
+fn finalize_polymer_sgroup(mol: &RWMol, sgroup: &mut SubstanceGroup) -> Result<(), ()> {
+    let mut flipped = false;
+    let mut connect = sgroup
+        .get_prop("CONNECT")
+        .map_or_else(|| "EU".to_string(), RDValue::to_rd_string);
+    if connect.contains(",f") {
+        flipped = true;
+        connect = connect.replace(",f", "");
+    }
+    connect = match connect.as_str() {
+        "hh" => "HH".into(),
+        "ht" => "HT".into(),
+        "eu" => "EU".into(),
+        other => {
+            rd_log_warning!("unrecognized CXSMILES CONNECT value: '{other}'. Assuming 'eu'");
+            "EU".into()
+        }
+    };
+    sgroup.dict_mut().set_val("CONNECT", connect);
+
+    let take = |sgroup: &mut SubstanceGroup, key: &str| match sgroup.get_prop(key) {
+        Some(RDValue::VecUnsignedInt(v)) => {
+            let v = v.clone();
+            sgroup.clear_prop(key);
+            v
+        }
+        _ => Vec::new(),
+    };
+    let mut head = take(sgroup, HEAD_CROSSINGS);
+    let mut tail = take(sgroup, TAIL_CROSSINGS);
+    if head.is_empty() && tail.is_empty() {
+        setup_unmarked_polymer_sgroup(mol, sgroup, &mut head, &mut tail)?;
+    }
+    if head.is_empty() && tail.is_empty() {
+        return Ok(()); // we tried
+    }
+    for &b in head.iter().chain(&tail) {
+        sgroup.add_bond_with_idx(mol, b).map_err(|_| ())?;
+    }
+    let mut xbcorr = Vec::new();
+    for i in 0..head.len().min(tail.len()) {
+        let tail_idx = if flipped {
+            tail[tail.len() - i - 1]
+        } else {
+            tail[i]
+        };
+        xbcorr.push(head[i]);
+        xbcorr.push(tail_idx);
+    }
+    sgroup
+        .dict_mut()
+        .set_val("XBHEAD", RDValue::VecUnsignedInt(head));
+    sgroup
+        .dict_mut()
+        .set_val("XBCORR", RDValue::VecUnsignedInt(xbcorr));
+    Ok(())
+}
+
 /// `SmilesParseOps::parseCXExtensions`: applies the extension block at the
 /// start of `text` to `mol`. `pos` ends up after the block (or wherever the
 /// parser stopped on failure).
@@ -870,6 +1248,7 @@ pub fn parse_cx_extensions(
         return Err(CxParseError);
     }
     process_cx_smiles_labels(mol);
+    mol.clear_prop(LABELS_PROCESSED);
     Ok(())
 }
 
@@ -885,6 +1264,9 @@ fn add_query(mol: &mut RWMol, idx: u32, query: crate::graphmol::queries::AtomQue
 
 /// `processCXSmilesLabels`: the special atom labels become queries.
 fn process_cx_smiles_labels(mol: &mut RWMol) {
+    if mol.has_prop(LABELS_PROCESSED) {
+        return;
+    }
     for idx in 0..mol.num_atoms() {
         let label = mol
             .atom(idx)
@@ -923,4 +1305,5 @@ fn process_cx_smiles_labels(mol: &mut RWMol) {
             }
         }
     }
+    let _ = mol.set_prop(LABELS_PROCESSED, 1i32, true);
 }

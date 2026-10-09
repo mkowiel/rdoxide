@@ -6,6 +6,7 @@
 
 use std::collections::BTreeMap;
 
+use super::cx::SGROUP_TYPEMAP;
 use super::write::{SmilesWriteParams, mol_to_smiles_detail};
 use crate::graphmol::atropisomers::{
     get_atropisomer_atoms_and_bonds, wedge_bonds_from_atropisomers,
@@ -66,25 +67,6 @@ const ATTACHMENT_POINT_LABEL_PREFIX: &str = "_AP";
 const SGROUP_ALLOWED: &str = "><\"!@#$%()[]./\\?-+*^_~= ";
 const ATOM_PROP_ALLOWED: &str = "><\"!@#$%()[]./\\?-+*^_~= ";
 const LABEL_ALLOWED: &str = "><\"!@#%()[]./\\?-+*^_~=,: ";
-
-/// `sgroupTypemap` (CXSMILES code -> molfile type)
-const SGROUP_TYPEMAP: [(&str, &str); 15] = [
-    ("n", "SRU"),
-    ("mon", "MON"),
-    ("mer", "MER"),
-    ("co", "COP"),
-    ("xl", "CRO"),
-    ("mod", "MOD"),
-    ("mix", "MIX"),
-    ("f", "FOR"),
-    ("any", "ANY"),
-    ("gen", "GEN"),
-    ("c", "COM"),
-    ("grf", "GRA"),
-    ("alt", "COP"),
-    ("ran", "COP"),
-    ("blk", "COP"),
-];
 
 /// `quote_string`: characters that are not alphanumeric or allowed are
 /// written as `&#code;`.

@@ -42,3 +42,15 @@ def test_bool_overload_and_empty():
     m = Chem.MolFromSmiles("C[C@H](F)Cl")
     assert Chem.MolToCXSmiles(m, isomericSmiles=False) == "CC(F)Cl"
     assert Chem.MolToCXSmiles(Chem.Mol()) == ""
+
+
+@pytest.mark.parametrize("cx", [
+    "*CCO* |$star_e;;;;star_e$,Sg:n:1,2,3::eu:::|",
+    "*C* |$star_e;;star_e$,Sg:n:1::ht:::|",
+    "*CC |$star_e;;$,SgD:0:querydata:val::::|",
+    "*CC(*)C(*)N* |$star_e;;;star_e;;star_e;;star_e$,Sg:n:6,1,2,4::hh:6,0:2,4:|",
+])
+def test_substance_groups_round_trip(cx):
+    m = Chem.MolFromSmiles(cx)
+    assert m is not None
+    assert Chem.MolToCXSmiles(m) == cx

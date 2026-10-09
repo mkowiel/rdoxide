@@ -95,3 +95,31 @@ fn names_and_failures() {
     assert!(!mol.has_prop(cp::_Name));
     assert!(parse_with("CC |o:0,0| name", true, true).is_none());
 }
+
+#[test]
+fn polymer_and_data_substance_groups() {
+    let mol = parse("*-CCO-* |$star_e;;;;star_e$,Sg:n:1,2,3::eu|");
+    let sgs = mol.substance_groups();
+    assert_eq!(sgs.len(), 1);
+    assert_eq!(sgs[0].get_prop("TYPE").unwrap().to_rd_string(), "SRU");
+    assert_eq!(sgs[0].atoms(), [1, 2, 3]);
+    // the bonds out of the group were found from its end atoms
+    assert_eq!(sgs[0].bonds().len(), 2);
+    assert_eq!(sgs[0].get_prop("CONNECT").unwrap().to_rd_string(), "EU");
+
+    let mol = parse("*CC |$star_e;;$,SgD:0:querydata:val::::|");
+    let sg = &mol.substance_groups()[0];
+    assert_eq!(sg.get_prop("TYPE").unwrap().to_rd_string(), "DAT");
+    assert_eq!(
+        sg.get_prop("FIELDNAME").unwrap().to_rd_string(),
+        "querydata"
+    );
+    assert_eq!(sg.get_prop("index").unwrap().as_uint(), Some(1));
+
+    // a parent/child pair
+    let mol = parse("*CC* |$star_e;;;star_e$,Sg:n:1::ht,Sg:n:2::ht,SgH:0:1|");
+    assert_eq!(mol.substance_groups().len(), 2);
+    assert!(mol.substance_groups()[1].has_prop("PARENT"));
+    // groups with unknown types do not parse
+    assert!(parse_with("CC |Sg:zzz:0|", true, true).is_none());
+}
