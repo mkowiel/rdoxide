@@ -58,6 +58,9 @@ def test_substance_groups_round_trip(cx):
 
 def test_link_nodes_round_trip():
     # the outer atoms are written when the atom has more than two neighbors
-    m = Chem.MolFromSmiles("OC1CCC(F)C1 |LN:4:1.3.3.6|")
-    assert m.GetProp("molFileLinkNodes") == "1 3 2 5 4 5 7" or m.HasProp("molFileLinkNodes")
-    assert "LN:" in Chem.MolToCXSmiles(m)
+    cx = "OC1CCC(F)C1 |LN:4:1.3.3.6|"
+    m = Chem.MolFromSmiles(cx)
+    assert m.GetProp("_molLinkNodes") == "1 3 2 5 4 5 7"
+    assert Chem.MolToCXSmiles(m) == cx
+    m = Chem.MolFromSmiles("OC1CCCC1 |LN:4:1.3|")
+    assert m.GetProp("_molLinkNodes") == "1 3 2 5 4 5 6"
