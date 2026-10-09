@@ -2,6 +2,7 @@
 //! `NontetrahedralStereo.cpp`.
 
 pub mod bond_dirs;
+pub mod find_stereo;
 pub mod from_coords;
 pub mod legacy;
 pub mod nontetrahedral;

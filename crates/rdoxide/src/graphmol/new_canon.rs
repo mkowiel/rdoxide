@@ -381,10 +381,22 @@ fn get_chiral_rank(mol: &ROMol, atoms: &[CanonAtom], i: usize) -> u32 {
     0
 }
 
+/// `Canon::AtomCompareCode`: a complete atom comparison key used after the
+/// current symmetry class. Ordered by atom map, degree, primary, secondary.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord)]
+pub struct AtomCompareCode {
+    pub atom_map_number: i32,
+    pub degree: u32,
+    pub primary: u64,
+    pub secondary: u64,
+}
+
 /// `Canon::AtomCompareFunctor`
 pub struct AtomCompareFunctor<'a> {
     mol: &'a ROMol,
     atoms_in_play: Option<&'a [bool]>,
+    /// optional complete atom comparison keys, replacing `basecomp`
+    pub compare_codes: Option<&'a [AtomCompareCode]>,
     pub use_nbrs: bool,
     pub use_isotopes: bool,
     pub use_chirality: bool,
@@ -406,6 +418,7 @@ impl<'a> AtomCompareFunctor<'a> {
         AtomCompareFunctor {
             mol,
             atoms_in_play,
+            compare_codes: None,
             use_nbrs: false,
             use_isotopes: true,
             use_chirality: true,
@@ -555,7 +568,21 @@ impl Comparer for AtomCompareFunctor<'_> {
                 return 0;
             }
         }
-        let v = self.basecomp(atoms, i, j);
+        let v = match self.compare_codes {
+            Some(_) if atoms[i].index != atoms[j].index => {
+                if atoms[i].index < atoms[j].index {
+                    -1
+                } else {
+                    1
+                }
+            }
+            Some(codes) => match codes[i].cmp(&codes[j]) {
+                std::cmp::Ordering::Less => -1,
+                std::cmp::Ordering::Equal => 0,
+                std::cmp::Ordering::Greater => 1,
+            },
+            None => self.basecomp(atoms, i, j),
+        };
         if v != 0 {
             return v;
         }
@@ -1313,6 +1340,8 @@ pub struct FragmentRankOptions<'a> {
     pub include_atom_maps: bool,
     pub include_chiral_presence: bool,
     pub include_ring_stereo: bool,
+    /// complete atom comparison keys (see [`AtomCompareCode`])
+    pub compare_codes: Option<&'a [AtomCompareCode]>,
 }
 
 impl Default for FragmentRankOptions<'_> {
@@ -1326,6 +1355,7 @@ impl Default for FragmentRankOptions<'_> {
             include_atom_maps: true,
             include_chiral_presence: false,
             include_ring_stereo: true,
+            compare_codes: None,
         }
     }
 }
@@ -1394,6 +1424,7 @@ pub fn rank_fragment_atoms(
         ftor.use_atom_maps = opts.include_atom_maps;
         ftor.use_chirality_rings = opts.include_chirality;
         ftor.use_chiral_presence = opts.include_chiral_presence;
+        ftor.compare_codes = opts.compare_codes;
         let order = rank_with_functor(
             &mut ftor,
             m,

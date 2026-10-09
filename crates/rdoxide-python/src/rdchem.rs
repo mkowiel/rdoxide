@@ -285,6 +285,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     crate::substruct::init(m)?;
     m.add_function(wrap_pyfunction!(get_periodic_table, m)?)?;
 
+    crate::rdchem_stereo_info::add_chem(m)?;
     use crate::enums::{add_enum, add_enum_exported};
     use crate::enums_impl::*;
     add_enum(

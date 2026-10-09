@@ -789,6 +789,7 @@ pub fn mol_fragment_to_smiles(
                 include_atom_maps: !params.ignore_atom_map_numbers,
                 include_chiral_presence: false,
                 include_ring_stereo: true,
+                compare_codes: None,
             },
         )?
     } else {

@@ -318,3 +318,7 @@ to = "python/rdkit/Chem/RegistrationHash.py"
 [[copy]]
 from = "rdkit/Chem/FastSDMolSupplier.py"
 to = "python/rdkit/Chem/FastSDMolSupplier.py"
+
+[[copy]]
+from = "rdkit/Chem/EnumerateStereoisomers.py"
+to = "python/rdkit/Chem/EnumerateStereoisomers.py"
