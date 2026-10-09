@@ -1,13 +1,15 @@
 //! MDL Mol block reader (`MolFromMolBlock`, `MolFromMolDataStream`).
 //!
 //! Ported from RDKit `Code/GraphMol/FileParsers/MolFileParser.cpp`
-//! (2026.09.1). The V2000 CTAB is ported; V3000 blocks, SGroups and a few
-//! rarely used property lines (ZBO/ZCH/HYD/MRV/APO/LIN) are reported as
-//! parse errors until they are ported.
+//! (2026.09.1). V2000 CTABs (SGroups included, see `sgroup_parsing`) and
+//! V3000 blocks are ported; a few rarely used property lines
+//! (ZBO/ZCH/HYD/MRV/APO/LIN) are reported as parse errors until they are
+//! ported.
 //!
 //! Copyright (C) 2002-2025 Greg Landrum and other RDKit contributors.
 //! Licensed under the BSD 3-Clause license (see LICENSES/RDKit-BSD-3-Clause.txt).
 
+use super::sgroup_parsing::{V2000SGroups, is_sgroup_line, process_sgroups};
 use super::utils::{
     LineStream, is_bad_cast, lexical_cast_int, lossy, strip_spaces_and_cast_unsigned, substr,
     substr_from, to_double_field, to_int, to_unsigned,
@@ -41,7 +43,7 @@ use crate::graphmol::query_ops::{
 use crate::graphmol::romol::RWMol;
 use crate::rdgeneral::common_properties as cp;
 use crate::rdgeneral::{RDProps, RDValue};
-use crate::{RDKitError, Result, rd_log_warning};
+use crate::{RDKitError, Result, rd_log_error, rd_log_warning};
 
 /// `v2::FileParsers::MolFileParserParams`
 #[derive(Debug, Clone, PartialEq)]
@@ -920,6 +922,7 @@ fn parse_mol_block_properties(
         parse_old_atom_list(mol, &temp, *line)?;
     }
 
+    let mut sgroups = V2000SGroups::default();
     let mut first_charge_line = true;
     let line_beg = |t: &[u8]| t[..t.len().min(6)].to_vec();
     let mut lb = line_beg(&temp);
@@ -972,10 +975,7 @@ fn parse_mol_block_properties(
                         "Unsupported SGroup subtype 'M  CRS' on line {l}"
                     )));
                 }
-                b"M  STY" | b"M  SST" | b"M  SLB" | b"M  SCN" | b"M  SDS" | b"M  SAL"
-                | b"M  SBL" | b"M  SPA" | b"M  SMT" | b"M  SDI" | b"M  SBV" | b"M  SDT"
-                | b"M  SDD" | b"M  SCD" | b"M  SED" | b"M  SPL" | b"M  SNC" | b"M  SAP"
-                | b"M  SCL" | b"M  SBT" => return Err(not_ported("SGroup data", l)),
+                b if is_sgroup_line(b) => sgroups.parse_line(mol, &temp, l, strict)?,
                 b"M  ZBO" | b"M  ZCH" | b"M  HYD" | b"M  MRV" | b"M  APO" | b"M  LIN" => {
                     return Err(not_ported(&lossy(&lb), l));
                 }
@@ -986,7 +986,11 @@ fn parse_mol_block_properties(
         temp = s.get_line();
         lb = line_beg(&temp);
     }
-    Ok(first(&temp) == b'M' && starts(&temp, b"M  END"))
+    let complete = first(&temp) == b'M' && starts(&temp, b"M  END");
+    if complete {
+        sgroups.finish(mol, strict)?;
+    }
+    Ok(complete)
 }
 
 /// `calculate3dFlag`
@@ -1133,7 +1137,7 @@ fn process_mol_props(mol: &mut RWMol) -> Result<()> {
         }
         mol.atom_mut(aidx).props.clear_val(cp::molTotValence);
     }
-    Ok(())
+    process_sgroups(mol)
 }
 
 /// `FileParserUtils::finishMolProcessing`
@@ -1273,40 +1277,66 @@ pub fn mol_from_mol_data_stream(
     }
     res.props.set_val(cp::_MolFileChiralFlag, chiral_flag);
 
-    let file_complete = if ctab_version == 2000 {
-        parse_v2000_ctab(
-            s,
-            line,
-            &mut res,
-            &mut chirality_possible,
-            n_atoms,
-            n_bonds,
-            params.strict_parsing,
-        )?
-    } else {
-        if n_atoms != 0 || n_bonds != 0 {
-            let msg = format!(
-                "V3000 mol blocks should have 0s in the initial counts line. (line: {line})"
-            );
-            if params.strict_parsing {
-                return Err(fpe(msg));
-            }
-            rd_log_warning!("{msg}");
-        }
-        let (expect_mend, expect_macro_atoms) = if params.parsing_scsr_mol {
-            (false, true)
+    let parsed = (|| -> Result<bool> {
+        if ctab_version == 2000 {
+            parse_v2000_ctab(
+                s,
+                line,
+                &mut res,
+                &mut chirality_possible,
+                n_atoms,
+                n_bonds,
+                params.strict_parsing,
+            )
         } else {
-            (true, false)
-        };
-        super::mol_file_v3000::parse_v3000_ctab(
-            s,
-            line,
-            &mut res,
-            &mut chirality_possible,
-            params.strict_parsing,
-            expect_mend,
-            expect_macro_atoms,
-        )?
+            if n_atoms != 0 || n_bonds != 0 {
+                let msg = format!(
+                    "V3000 mol blocks should have 0s in the initial counts line. (line: {line})"
+                );
+                if params.strict_parsing {
+                    return Err(fpe(msg));
+                }
+                rd_log_warning!("{msg}");
+            }
+            let (expect_mend, expect_macro_atoms) = if params.parsing_scsr_mol {
+                (false, true)
+            } else {
+                (true, false)
+            };
+            super::mol_file_v3000::parse_v3000_ctab(
+                s,
+                line,
+                &mut res,
+                &mut chirality_possible,
+                params.strict_parsing,
+                expect_mend,
+                expect_macro_atoms,
+            )
+        }
+    })();
+    let file_complete = match parsed {
+        Ok(complete) => complete,
+        Err(RDKitError::UnhandledFeature(msg)) => {
+            // an unsupported feature: skip the rest of the molecule
+            rd_log_error!(" Unhandled CTAB feature: '{msg}'. Molecule skipped.");
+            let mut temp = if s.eof() { Vec::new() } else { s.get_line() };
+            *line += 1;
+            while !s.eof()
+                && !s.fail()
+                && !temp.starts_with(b"M  END")
+                && !temp.starts_with(b"$$$$")
+            {
+                temp = s.get_line();
+                *line += 1;
+            }
+            if s.eof() && !temp.starts_with(b"M  END") && !temp.starts_with(b"$$$$") {
+                return Err(fpe(format!(
+                    "Problems encountered parsing Mol data, M  END missing around line {line}"
+                )));
+            }
+            return Ok(None);
+        }
+        Err(e) => return Err(e),
     };
     if !file_complete {
         return Err(fpe(format!(

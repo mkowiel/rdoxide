@@ -132,6 +132,10 @@
 [module."rdoxide_python::substance_group".sources]
 "Code/GraphMol/Wrap/SubstanceGroup.cpp" = "bbe27150bb8c5f19f9ddac2908b8ee8509793870"
 
+[module."rdoxide::graphmol::file_parsers::sgroup_parsing".sources]
+"Code/GraphMol/FileParsers/MolSGroupParsing.cpp" = "87f8e9942f4d0dca37d9c06ab7da59a1aa2b2402"
+"Code/GraphMol/FileParsers/MolSGroupParsing.h" = "86caffe14aa21d4b29b217712ad3f0b6004176fd"
+
 [module."rdoxide::graphmol::adjust_query".sources]
 "Code/GraphMol/AdjustQuery.cpp" = "1dfe502cfc05eccd5839e7fe88218c15e24aca94"
 

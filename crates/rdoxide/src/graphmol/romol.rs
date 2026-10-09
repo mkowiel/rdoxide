@@ -884,6 +884,13 @@ impl ROMol {
             .and_then(|l| l.first().copied())
             .ok_or_else(|| RDKitError::precondition("bond bookmark not found"))
     }
+    /// `getUniqueBondWithBookmark`: the first bond with the bookmark.
+    pub fn get_unique_bond_with_bookmark(&self, mark: i32) -> Result<u32> {
+        self.bond_bookmarks
+            .get(&mark)
+            .and_then(|l| l.first().copied())
+            .ok_or_else(|| RDKitError::precondition("bookmark not found"))
+    }
     pub fn get_all_bonds_with_bookmark(&self, mark: i32) -> Result<&[u32]> {
         self.bond_bookmarks
             .get(&mark)

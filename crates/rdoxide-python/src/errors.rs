@@ -16,7 +16,9 @@ pub fn to_py(err: RDKitError) -> PyErr {
         RDKitError::Conformer(_) => PyValueError::new_err("Bad Conformer Id"),
         RDKitError::Key(m) => PyKeyError::new_err(m),
         RDKitError::Index(m) => PyIndexError::new_err(m),
-        RDKitError::Runtime(m) | RDKitError::FileParse(m) => PyRuntimeError::new_err(m),
+        RDKitError::Runtime(m) | RDKitError::FileParse(m) | RDKitError::UnhandledFeature(m) => {
+            PyRuntimeError::new_err(m)
+        }
         RDKitError::BadFile(m) => PyIOError::new_err(m),
         RDKitError::Sanitize(e) => crate::rdchem::sanitize_error(&e),
     }

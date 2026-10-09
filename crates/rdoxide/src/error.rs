@@ -20,6 +20,9 @@ pub enum RDKitError {
     /// `FileParseException` -> `RuntimeError` (most Python readers catch it
     /// and return `None`).
     FileParse(String),
+    /// `MolFileUnhandledFeatureException`: a CTAB feature that is not
+    /// supported; the mol file readers skip the molecule instead of failing.
+    UnhandledFeature(String),
     /// `ConformerException` -> `ValueError("Bad Conformer Id")`
     Conformer(String),
     /// `BadFileException` -> `OSError`
@@ -149,6 +152,7 @@ impl fmt::Display for RDKitError {
             | RDKitError::Index(m)
             | RDKitError::Runtime(m)
             | RDKitError::FileParse(m)
+            | RDKitError::UnhandledFeature(m)
             | RDKitError::Conformer(m)
             | RDKitError::BadFile(m) => f.write_str(m),
             RDKitError::Sanitize(e) => match e {
