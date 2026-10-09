@@ -1,12 +1,14 @@
 //! Molecule hashes (upstream `GraphMol/MolHash`, the NextMove "nmmolhash"
 //! functions): canonical SMILES of progressively abstracted molecules.
 //!
-//! CXSMILES output (`useCxSmiles`) is not ported yet and is rejected.
+//! With `use_cx_smiles` the hashes are CXSMILES: the extension block follows
+//! the SMILES (except for its coordinates and the fields in
+//! `cx_flags_to_skip`).
 
 mod formula;
 mod tautomer_v2;
 
-use crate::error::{RDKitError, Result};
+use crate::error::Result;
 use crate::graphmol::bond::{Bond, BondStereo, BondType};
 use crate::graphmol::chirality::legacy::assign_stereochemistry;
 use crate::graphmol::find_rings::fast_find_rings;
@@ -14,7 +16,8 @@ use crate::graphmol::mol_ops::add_hs::{RemoveHsParameters, remove_hs};
 use crate::graphmol::mol_ops::assign_radicals;
 use crate::graphmol::mol_ops::frags::{get_mol_frags_as_mols, get_mol_frags_mapping};
 use crate::graphmol::romol::{ROMol, RWMol};
-use crate::graphmol::smiles_parse::write::{SmilesWriteParams, mol_to_smiles};
+use crate::graphmol::smiles_parse::cx_write::{cx_fields, get_cx_extensions};
+use crate::graphmol::smiles_parse::write::{SmilesWriteParams, mol_to_smiles_detail};
 use crate::graphmol::{Atom, ChiralType};
 
 /// Atoms or bonds with this property set (any value) are left out of the
@@ -54,15 +57,44 @@ pub mod strip_type {
     pub const HYDROGEN: u32 = 16;
 }
 
-/// Writes the canonical SMILES of `mol`; `all_explicit` is what the v2
-/// tautomer hash needs.
-fn smiles(mol: &mut RWMol, all_explicit: bool) -> Result<String> {
+/// Whether the hash is a CXSMILES and which of its fields to leave out
+/// (`useCXSmiles`, `cxFlagsToSkip`).
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Cx {
+    enabled: bool,
+    skip: u32,
+}
+
+/// Writes the canonical SMILES of `mol` (`convertToSmilesWithCXFlags`);
+/// `all_explicit` is what the v2 tautomer hash needs.
+fn smiles(mol: &mut RWMol, all_explicit: bool, cx: Cx) -> Result<String> {
     let params = SmilesWriteParams {
         all_bonds_explicit: all_explicit,
         all_hs_explicit: all_explicit,
         ..Default::default()
     };
-    mol_to_smiles(mol, &params)
+    let skip_stereo_groups = cx.skip & cx_fields::ENHANCEDSTEREO != 0;
+    mol_to_smiles_detail(mol, &params, cx.enabled, !skip_stereo_groups)
+}
+
+/// `addCXExtensions`: appends the extension block, without coordinates and
+/// the skipped fields (`additional_skips` come on top).
+fn add_cx_extensions(
+    mol: &mut RWMol,
+    result: &mut String,
+    cx: Cx,
+    additional_skips: u32,
+) -> Result<()> {
+    if !cx.enabled {
+        return Ok(());
+    }
+    let skip = cx.skip | additional_skips | cx_fields::COORDS;
+    let ext = get_cx_extensions(mol, cx_fields::ALL ^ skip)?;
+    if !ext.is_empty() {
+        *result += " ";
+        *result += &ext;
+    }
+    Ok(())
 }
 
 /// Radicals and stereochemistry after the structure was abstracted: stereo
@@ -133,7 +165,7 @@ fn normalize_h_count(mol: &mut RWMol, idx: u32) {
 }
 
 /// `AnonymousGraph`: the element graph (`elem`) or the bare skeleton.
-fn anonymous_graph(mol: &mut RWMol, elem: bool) -> Result<String> {
+fn anonymous_graph(mol: &mut RWMol, elem: bool, cx: Cx) -> Result<String> {
     for idx in 0..mol.num_atoms() {
         let atom = mol.atom_mut(idx);
         atom.set_is_aromatic(false);
@@ -153,11 +185,13 @@ fn anonymous_graph(mol: &mut RWMol, elem: bool) -> Result<String> {
         bond.set_is_aromatic(false);
     }
     clean_up(mol)?;
-    smiles(mol, false)
+    let mut result = smiles(mol, false, cx)?;
+    add_cx_extensions(mol, &mut result, cx, cx_fields::RADICALS)?;
+    Ok(result)
 }
 
 /// `MesomerHash` (`netq`) and the redox-pair hash.
-fn mesomer_hash(mol: &mut RWMol, netq: bool) -> Result<String> {
+fn mesomer_hash(mol: &mut RWMol, netq: bool, cx: Cx) -> Result<String> {
     let mut charge = 0;
     for idx in 0..mol.num_atoms() {
         let atom = mol.atom_mut(idx);
@@ -169,15 +203,16 @@ fn mesomer_hash(mol: &mut RWMol, netq: bool) -> Result<String> {
         mol.bond_mut(idx).set_bond_type(BondType::Single);
     }
     clean_up(mol)?;
-    let mut result = smiles(mol, false)?;
+    let mut result = smiles(mol, false, cx)?;
     if netq {
         result += &format!("_{charge}");
     }
+    add_cx_extensions(mol, &mut result, cx, cx_fields::RADICALS)?;
     Ok(result)
 }
 
 /// `TautomerHash` (`proto`: the protomer hash).
-fn tautomer_hash(mol: &mut RWMol, proto: bool) -> Result<String> {
+fn tautomer_hash(mol: &mut RWMol, proto: bool, cx: Cx) -> Result<String> {
     let (mut hcount, mut charge) = (0i32, 0i32);
     for idx in 0..mol.num_atoms() {
         let hs = mol.total_num_hs(idx, false)?;
@@ -203,12 +238,13 @@ fn tautomer_hash(mol: &mut RWMol, proto: bool) -> Result<String> {
         }
     }
     clean_up(mol)?;
-    let mut result = smiles(mol, false)?;
+    let mut result = smiles(mol, false, cx)?;
     result += &if proto {
         format!("_{}", hcount - charge)
     } else {
         format!("_{hcount}_{charge}")
     };
+    add_cx_extensions(mol, &mut result, cx, cx_fields::RADICALS)?;
     Ok(result)
 }
 
@@ -249,7 +285,7 @@ fn is_in_scaffold(mol: &ROMol, idx: u32) -> bool {
 }
 
 /// `ExtendedMurckoScaffold`: the scaffold plus dummies for its substituents.
-fn extended_murcko(mol: &mut RWMol) -> Result<String> {
+fn extended_murcko(mol: &mut RWMol, cx: Cx) -> Result<String> {
     ensure_rings(mol)?;
     let in_scaffold: Vec<bool> = (0..mol.num_atoms())
         .map(|i| is_in_scaffold(mol, i))
@@ -272,11 +308,13 @@ fn extended_murcko(mol: &mut RWMol) -> Result<String> {
     }
     remove_atoms(mol, &deletion)?;
     clean_up(mol)?;
-    smiles(mol, false)
+    let mut result = smiles(mol, false, cx)?;
+    add_cx_extensions(mol, &mut result, cx, cx_fields::RADICALS)?;
+    Ok(result)
 }
 
 /// `MurckoScaffoldHash`: ring systems and their linkers.
-fn murcko_scaffold(mol: &mut RWMol) -> Result<String> {
+fn murcko_scaffold(mol: &mut RWMol, cx: Cx) -> Result<String> {
     loop {
         let mut deletion = Vec::new();
         for idx in 0..mol.num_atoms() {
@@ -300,7 +338,9 @@ fn murcko_scaffold(mol: &mut RWMol) -> Result<String> {
         }
     }
     clean_up(mol)?;
-    smiles(mol, false)
+    let mut result = smiles(mol, false, cx)?;
+    add_cx_extensions(mol, &mut result, cx, cx_fields::RADICALS)?;
+    Ok(result)
 }
 
 fn net_charge(mol: &ROMol) -> String {
@@ -391,7 +431,7 @@ fn cap_end(mol: &mut RWMol, atom: u32, asterisk: bool) -> Result<()> {
 }
 
 /// `RegioisomerHash`: the molecule broken into ring and chain fragments.
-fn regioisomer(mol: &mut RWMol) -> Result<String> {
+fn regioisomer(mol: &mut RWMol, cx: Cx) -> Result<String> {
     // decisions are made on a copy, so bonds can be removed from `mol`
     let mut copy = mol.clone();
     ensure_rings(&mut copy)?;
@@ -410,7 +450,9 @@ fn regioisomer(mol: &mut RWMol) -> Result<String> {
         cap_end(mol, end, split & 2 != 0)?;
     }
     assign_stereochemistry(mol, true, true, false)?;
-    smiles(mol, false)
+    let mut result = smiles(mol, false, cx)?;
+    add_cx_extensions(mol, &mut result, cx, 0)?;
+    Ok(result)
 }
 
 /// `ArthorSubOrderHash`: a fixed-width hex summary of the composition.
@@ -478,26 +520,29 @@ pub fn mol_hash(
     mol: &mut RWMol,
     func: HashFunction,
     use_cx_smiles: bool,
-    _cx_flags_to_skip: u32,
+    cx_flags_to_skip: u32,
 ) -> Result<String> {
-    if use_cx_smiles {
-        return Err(RDKitError::Runtime(
-            "CXSMILES output is not supported by MolHash yet".into(),
-        ));
-    }
+    let cx = Cx {
+        enabled: use_cx_smiles,
+        skip: cx_flags_to_skip,
+    };
     sanitize_hydrogens(mol)?;
     match func {
-        HashFunction::AnonymousGraph => anonymous_graph(mol, false),
-        HashFunction::ElementGraph => anonymous_graph(mol, true),
-        HashFunction::CanonicalSmiles => smiles(mol, false),
-        HashFunction::MurckoScaffold => murcko_scaffold(mol),
-        HashFunction::ExtendedMurcko => extended_murcko(mol),
-        HashFunction::Mesomer => mesomer_hash(mol, true),
-        HashFunction::RedoxPair => mesomer_hash(mol, false),
-        HashFunction::HetAtomTautomer => tautomer_hash(mol, false),
-        HashFunction::HetAtomTautomerv2 => tautomer_v2::tautomer_hash_v2(mol, false),
-        HashFunction::HetAtomProtomer => tautomer_hash(mol, true),
-        HashFunction::HetAtomProtomerv2 => tautomer_v2::tautomer_hash_v2(mol, true),
+        HashFunction::AnonymousGraph => anonymous_graph(mol, false, cx),
+        HashFunction::ElementGraph => anonymous_graph(mol, true, cx),
+        HashFunction::CanonicalSmiles => {
+            let mut result = smiles(mol, false, cx)?;
+            add_cx_extensions(mol, &mut result, cx, 0)?;
+            Ok(result)
+        }
+        HashFunction::MurckoScaffold => murcko_scaffold(mol, cx),
+        HashFunction::ExtendedMurcko => extended_murcko(mol, cx),
+        HashFunction::Mesomer => mesomer_hash(mol, true, cx),
+        HashFunction::RedoxPair => mesomer_hash(mol, false, cx),
+        HashFunction::HetAtomTautomer => tautomer_hash(mol, false, cx),
+        HashFunction::HetAtomTautomerv2 => tautomer_v2::tautomer_hash_v2(mol, false, cx),
+        HashFunction::HetAtomProtomer => tautomer_hash(mol, true, cx),
+        HashFunction::HetAtomProtomerv2 => tautomer_v2::tautomer_hash_v2(mol, true, cx),
         HashFunction::MolFormula => formula::molecular_formula(mol),
         HashFunction::AtomBondCounts => Ok(format!("{},{}", mol.num_atoms(), mol.num_bonds())),
         HashFunction::NetCharge => Ok(net_charge(mol)),
@@ -505,7 +550,7 @@ pub fn mol_hash(
         HashFunction::SmallWorldIndexBRL => Ok(small_world(mol, true)),
         HashFunction::DegreeVector => Ok(degree_vector(mol)),
         HashFunction::ArthorSubstructureOrder => arthor_sub_order(mol),
-        HashFunction::Regioisomer => regioisomer(mol),
+        HashFunction::Regioisomer => regioisomer(mol, cx),
     }
 }
 

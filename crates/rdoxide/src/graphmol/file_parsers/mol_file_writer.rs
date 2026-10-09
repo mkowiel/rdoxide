@@ -198,7 +198,7 @@ fn bond_get_dir_code(dir: BondDir) -> i32 {
 }
 
 /// `GetMolFileBondStereoInfo`: `(dirCode, reverse)`
-fn get_mol_file_bond_stereo_info(
+pub(crate) fn get_mol_file_bond_stereo_info(
     mol: &ROMol,
     bond: u32,
     wedge: &WedgeBonds,

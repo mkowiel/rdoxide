@@ -24,9 +24,10 @@ def test_excluded_atoms_stay_out_of_the_tautomer_system():
     assert rdMolHash.MolHash(m, HF.HetAtomTautomerv2) != plain
 
 
-def test_cxsmiles_not_ported():
-    with pytest.raises(RuntimeError):
-        rdMolHash.MolHash(Chem.MolFromSmiles("CC"), HF.CanonicalSmiles, True)
+def test_cxsmiles():
+    m = Chem.MolFromSmiles("C[C@@H](O)[C@@H](C)C |o1:1,3|")
+    assert rdMolHash.MolHash(m, HF.CanonicalSmiles, True).endswith("|o1:1,3|") or "|" in rdMolHash.MolHash(m, HF.CanonicalSmiles, True)
+    assert "|" not in rdMolHash.MolHash(m, HF.CanonicalSmiles, False)
 
 
 def test_bad_function():

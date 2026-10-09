@@ -4,6 +4,7 @@
 //! Licensed under the BSD 3-Clause license (see LICENSES/RDKit-BSD-3-Clause.txt).
 
 pub mod cx;
+pub mod cx_write;
 pub mod lexer;
 pub mod ops;
 pub mod parser;
