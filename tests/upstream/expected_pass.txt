@@ -115,6 +115,8 @@ Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testTopologicalT
 Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testTorsionValues
 Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testUSR
 Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testUSRCAT
+Code/GraphMol/EnumerateStereoisomers/Wrap/testEnumerateStereoisomers.py::TestCase::testEnumerateStereoisomersBasic
+Code/GraphMol/EnumerateStereoisomers/Wrap/testEnumerateStereoisomers.py::TestCase::testEnumerateStereoisomersWithCrazyNumberOfCenters
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testAdditionalOutput
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testAtomPairGenerator
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testBulk

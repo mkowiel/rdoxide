@@ -30,6 +30,7 @@ mod rdchem_atom_funcs;
 mod rdchem_stereo_info;
 mod rdclustering;
 mod rddepictor;
+mod rdenumeratestereoisomers;
 mod rdfingerprintgenerator;
 mod rdinfotheory;
 mod rdmetricmatrixcalc;
@@ -151,6 +152,12 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
         rdsubstructlibrary::init,
     )?;
     add_submodule(m, "rdMolHash", "rdkit.Chem.rdMolHash", rdmolhash::init)?;
+    add_submodule(
+        m,
+        "rdEnumerateStereoisomers",
+        "rdkit.Chem.rdEnumerateStereoisomers",
+        rdenumeratestereoisomers::init,
+    )?;
     add_submodule(
         m,
         "rdPartialCharges",
