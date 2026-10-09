@@ -182,3 +182,11 @@ to = "python/rdkit/Chem/Descriptors3D.py"
 [[copy]]
 from = "Data/FragmentDescriptors.csv"
 to = "python/rdkit/share/RDKit/Data/FragmentDescriptors.csv"
+
+[[copy]]
+from = "rdkit/SimDivFilters/__init__.py"
+to = "python/rdkit/SimDivFilters/__init__.py"
+
+[[copy]]
+from = "rdkit/SimDivFilters/SimilarityPickers.py"
+to = "python/rdkit/SimDivFilters/SimilarityPickers.py"

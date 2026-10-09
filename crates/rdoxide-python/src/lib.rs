@@ -67,6 +67,7 @@ mod rdmolops_zip;
 mod rdmoltransforms;
 mod rdpartialcharges;
 mod rdqueries;
+mod rdsimdivpickers;
 mod ringinfo;
 mod stereo_group;
 mod substance_group;
@@ -135,6 +136,12 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
         "rdPartialCharges",
         "rdkit.Chem.rdPartialCharges",
         rdpartialcharges::init,
+    )?;
+    add_submodule(
+        m,
+        "rdSimDivPickers",
+        "rdkit.SimDivFilters.rdSimDivPickers",
+        rdsimdivpickers::init,
     )?;
     add_submodule(
         m,
