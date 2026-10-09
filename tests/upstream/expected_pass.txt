@@ -157,6 +157,15 @@ Code/GraphMol/MMPA/Wrap/testMMPA.py::TestCase::test6
 Code/GraphMol/MMPA/Wrap/testMMPA.py::TestCase::test7
 Code/GraphMol/MMPA/Wrap/testMMPA.py::TestCase::test8
 Code/GraphMol/MMPA/Wrap/testMMPA.py::TestCase::test9
+Code/GraphMol/MolChemicalFeatures/Wrap/testChemicalFeatures.py::TestCase::testAtomMatch
+Code/GraphMol/MolChemicalFeatures/Wrap/testChemicalFeatures.py::TestCase::testBasic
+Code/GraphMol/MolChemicalFeatures/Wrap/testChemicalFeatures.py::TestCase::testGithub2530
+Code/GraphMol/MolChemicalFeatures/Wrap/testChemicalFeatures.py::TestCase::testGithub2603
+Code/GraphMol/MolChemicalFeatures/Wrap/testChemicalFeatures.py::TestCase::testIncludeOnly
+Code/GraphMol/MolChemicalFeatures/Wrap/testChemicalFeatures.py::TestCase::testIssue231
+Code/GraphMol/MolChemicalFeatures/Wrap/testChemicalFeatures.py::TestCase::testParseErrorHandling
+Code/GraphMol/MolChemicalFeatures/Wrap/testChemicalFeatures.py::TestCase::testStringParse
+Code/GraphMol/MolChemicalFeatures/Wrap/testChemicalFeatures.py::TestCase::testStringParse2
 Code/GraphMol/MolHash/Wrap/testMolHash.py::TestCase::test1
 Code/GraphMol/MolHash/Wrap/testMolHash.py::TestCase::testCxSmiles
 Code/GraphMol/MolHash/Wrap/testMolHash.py::TestCase::testProtomerV2
@@ -247,6 +256,10 @@ rdkit/Chem/EState/UnitTestFingerprints.py::TestCase::test_exampleCode
 rdkit/Chem/EState/UnitTestTypes.py::TestCase::test1_simpleMolecules
 rdkit/Chem/EState/UnitTestTypes.py::TestCase::test2_complexMolecules
 rdkit/Chem/EState/UnitTestVSA.py::TestCase::test1
+rdkit/Chem/Features/UnitTestFeatDirUtilsRD.py::TestCase::test1_GetDonor2FeatVects
+rdkit/Chem/Features/UnitTestFeatDirUtilsRD.py::TestCase::test2_1_GetDonor2FeatVects
+rdkit/Chem/Features/UnitTestFeatDirUtilsRD.py::TestCase::test2_2_GetDonor2FeatVects
+rdkit/Chem/Features/UnitTestFeatDirUtilsRD.py::TestCase::test3_GetDonor2FeatVects
 rdkit/Chem/Fingerprints/UnitTestFingerprints.py::TestCase::test1
 rdkit/Chem/Fingerprints/UnitTestFingerprints.py::TestCase::test2
 rdkit/Chem/Fingerprints/UnitTestFingerprints.py::TestCase::test3

@@ -873,3 +873,30 @@
 
 [module."rdoxide_python::rdmolalign".sources]
 "Code/GraphMol/MolAlign/Wrap/rdMolAlign.cpp" = "56d0ef958c935c02ce7a9db1e6a0497edbe62045"
+
+[module."rdoxide::chemical_features".sources]
+"Code/ChemicalFeatures/FreeChemicalFeature.cpp" = "5bc1f7b6442bba17bd73eb7be0b69a36b396887c"
+"Code/ChemicalFeatures/FreeChemicalFeature.h" = "5612652f9610bc769abdb5c1cbb5822ff29c1118"
+"Code/ChemicalFeatures/ChemicalFeature.h" = "a4f8e31eb64d1f3cd4ba347d95f389027ba1e345"
+
+[module."rdoxide::graphmol::mol_chemical_features".sources]
+"Code/GraphMol/MolChemicalFeatures/MolChemicalFeature.cpp" = "0e8498914ebd8ad4442c00a7800529e3c931c3c7"
+"Code/GraphMol/MolChemicalFeatures/MolChemicalFeature.h" = "f6743001eaca2096b84e00c6f95533045bd21e91"
+"Code/GraphMol/MolChemicalFeatures/MolChemicalFeatureDef.cpp" = "0b6509154877988ecae78fdf9ff3e4beda91b999"
+"Code/GraphMol/MolChemicalFeatures/MolChemicalFeatureDef.h" = "41a95eea48091df354edd2da6997d24995c33363"
+"Code/GraphMol/MolChemicalFeatures/MolChemicalFeatureFactory.cpp" = "19ef1e476c38c6d3a1aa1b904ee1ba54c52309ba"
+"Code/GraphMol/MolChemicalFeatures/MolChemicalFeatureFactory.h" = "7bd719e6773f9093707e0dc4eb6066f80d000e57"
+
+[module."rdoxide::graphmol::mol_chemical_features::parser".sources]
+"Code/GraphMol/MolChemicalFeatures/FeatureParser.cpp" = "0c3aa6908fca47bc0432f9e56dae832940ddaabd"
+"Code/GraphMol/MolChemicalFeatures/FeatureParser.h" = "479b9a0ed29889563bafe570e8793e4d36c9bc8f"
+
+[module."rdoxide_python::rdchemicalfeatures".sources]
+"Code/ChemicalFeatures/Wrap/FreeChemicalFeature.cpp" = "2f4123a498e9014f53a81a10a929a62dba06b896"
+"Code/ChemicalFeatures/Wrap/rdChemicalFeatures.cpp" = "1d1cffab00ca9726a656050ce885e887211993af"
+
+[module."rdoxide_python::rdmolchemicalfeatures".sources]
+"Code/GraphMol/MolChemicalFeatures/Wrap/MolChemicalFeature.cpp" = "697be8201b71926df8397912735061b7bc22f3f9"
+"Code/GraphMol/MolChemicalFeatures/Wrap/MolChemicalFeatureFactory.cpp" = "208cdf68243e2a56873060cf814d67ac840b5350"
+"Code/GraphMol/MolChemicalFeatures/Wrap/ChemicalFeatureUtils.cpp" = "bf7ee81af8f932408f746f1c4963ecfc9c351dc2"
+"Code/GraphMol/MolChemicalFeatures/Wrap/rdMolChemicalFeatures.cpp" = "28ff3415cb39e896d3b882b14ecdf54a389b43d5"
