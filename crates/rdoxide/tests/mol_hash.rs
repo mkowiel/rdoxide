@@ -59,8 +59,19 @@ fn formula_charges_and_empty_molecules() {
 }
 
 #[test]
-fn cxsmiles_is_rejected() {
-    assert!(mol_hash(&mut mol("CC"), HashFunction::CanonicalSmiles, true, 0).is_err());
+fn cxsmiles_hashes() {
+    let m = mol(
+        "C[C@@H](O)[C@@H](C)[C@@H](C)C[C@H](C1=CN=CN1)C1=CNC=N1 |o1:8,5,&1:1,3,r,c:11,18,t:9,15|",
+    );
+    let hash = |skip| mol_hash(&mut m.clone(), HashFunction::HetAtomTautomer, true, skip).unwrap();
+    assert_eq!(
+        hash(0),
+        "C[C@H](CC([C]1[CH][N][CH][N]1)[C]1[CH][N][CH][N]1)[C@@H](C)[C@H](C)[O]_3_0 |o1:1,&1:14,16|"
+    );
+    // without the enhanced stereo block
+    assert!(
+        !hash(rdoxide::graphmol::smiles_parse::cx_write::cx_fields::ENHANCEDSTEREO).contains('|')
+    );
 }
 
 #[test]

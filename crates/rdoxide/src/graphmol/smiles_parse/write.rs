@@ -408,9 +408,22 @@ fn fragment_smiles_construct(
     Ok(res)
 }
 
-/// `SmilesWrite::detail::MolToSmiles(mol, params, doingCXSmiles=false)`.
-/// Sets `_smilesAtomOutputOrder` / `_smilesBondOutputOrder` on `mol`.
+/// `MolToSmiles(mol, params)`: sets `_smilesAtomOutputOrder` /
+/// `_smilesBondOutputOrder` on `mol`.
 pub fn mol_to_smiles(mol: &mut ROMol, params: &SmilesWriteParams) -> Result<String> {
+    mol_to_smiles_detail(mol, params, false, true)
+}
+
+/// `SmilesWrite::detail::MolToSmiles`. When writing CXSMILES
+/// (`doing_cx_smiles`) the features that live in the extension (stereo
+/// groups if `include_stereo_groups`, wiggly and unspecified double bonds,
+/// dative and hydrogen bonds) are kept out of the SMILES proper.
+pub(crate) fn mol_to_smiles_detail(
+    mol: &mut ROMol,
+    params: &SmilesWriteParams,
+    doing_cx_smiles: bool,
+    include_stereo_groups: bool,
+) -> Result<String> {
     if mol.num_atoms() == 0 {
         return Ok(String::new());
     }
@@ -464,22 +477,36 @@ pub fn mol_to_smiles(mol: &mut ROMol, params: &SmilesWriteParams) -> Result<Stri
                 assign_stereochemistry(tmol, params.clean_stereo, false, false)?;
             }
         }
-        tmol.set_stereo_groups(Vec::new())?;
-        for bi in 0..tmol.num_bonds() {
-            let b = tmol.bond_mut(bi);
-            if matches!(b.bond_dir(), BondDir::Unknown | BondDir::EitherDouble) {
-                b.set_bond_dir(BondDir::None);
-            }
-            if b.stereo() == BondStereo::StereoAny {
-                b.set_stereo(BondStereo::StereoNone)?;
+        if !doing_cx_smiles || !include_stereo_groups {
+            // otherwise they would be used in the canonicalization
+            tmol.set_stereo_groups(Vec::new())?;
+        }
+        if !doing_cx_smiles {
+            for bi in 0..tmol.num_bonds() {
+                let b = tmol.bond_mut(bi);
+                if matches!(b.bond_dir(), BondDir::Unknown | BondDir::EitherDouble) {
+                    b.set_bond_dir(BondDir::None);
+                }
+                if b.stereo() == BondStereo::StereoAny {
+                    b.set_stereo(BondStereo::StereoNone)?;
+                }
             }
         }
-        if !params.include_dative_bonds {
+        if doing_cx_smiles || !params.include_dative_bonds {
+            // the extension has the coordinate bonds
             for bi in 0..tmol.num_bonds() {
                 if tmol.bond(bi).bond_type() == BondType::Dative {
                     tmol.bond_mut(bi).set_bond_type(BondType::Single);
                     let begin = tmol.bond(bi).begin_atom_idx();
                     tmol.calc_explicit_valence(begin, false)?;
+                }
+            }
+        }
+        if doing_cx_smiles {
+            // hydrogen bonds are single bonds here and listed in the extension
+            for bi in 0..tmol.num_bonds() {
+                if tmol.bond(bi).bond_type() == BondType::Hydrogen {
+                    tmol.bond_mut(bi).set_bond_type(BondType::Single);
                 }
             }
         }

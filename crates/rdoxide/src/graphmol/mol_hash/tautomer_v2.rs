@@ -5,12 +5,15 @@
 use std::collections::VecDeque;
 use std::sync::OnceLock;
 
-use super::{EXCLUDE_FROM_TAUTOMERISM_PROP, clean_up, ensure_rings, in_ring, smiles};
+use super::{
+    Cx, EXCLUDE_FROM_TAUTOMERISM_PROP, add_cx_extensions, clean_up, ensure_rings, in_ring, smiles,
+};
 use crate::error::Result;
 use crate::graphmol::ChiralType;
 use crate::graphmol::atom::HybridizationType;
 use crate::graphmol::bond::{Bond, BondStereo, BondType};
 use crate::graphmol::romol::{ROMol, RWMol};
+use crate::graphmol::smiles_parse::cx_write::cx_fields;
 use crate::graphmol::smiles_parse::smarts::{SmartsParserParams, mol_from_smarts};
 use crate::graphmol::substruct::{SubstructMatchParameters, substruct_match};
 use crate::rdgeneral::RDProps;
@@ -397,7 +400,7 @@ impl<'a> Systems<'a> {
 }
 
 /// `TautomerHashv2` (`proto`: the protomer hash)
-pub(super) fn tautomer_hash_v2(mol: &mut RWMol, proto: bool) -> Result<String> {
+pub(super) fn tautomer_hash_v2(mol: &mut RWMol, proto: bool, cx: Cx) -> Result<String> {
     ensure_rings(mol)?;
     let nb = mol.num_bonds() as usize;
     let (mut to_modify, atoms_to_modify) = {
@@ -449,11 +452,12 @@ pub(super) fn tautomer_hash_v2(mol: &mut RWMol, proto: bool) -> Result<String> {
     if mol.num_bonds() > 0 || mol.num_atoms() > 0 {
         clean_up(mol)?;
     }
-    let mut result = smiles(mol, true)?;
+    let mut result = smiles(mol, true, cx)?;
     result += &if proto {
         format!("_{}", hcount as i32 - charge)
     } else {
         format!("_{hcount}_{charge}")
     };
+    add_cx_extensions(mol, &mut result, cx, cx_fields::RADICALS)?;
     Ok(result)
 }

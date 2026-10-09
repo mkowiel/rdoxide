@@ -325,6 +325,27 @@ def patternfp_record(smi):
     return rec or None
 
 
+def cx_record(m):
+    """CXSMILES of a molecule with several field selections."""
+    if m is None:
+        return None
+    from rdkit.Chem import rdmolfiles
+    F = rdmolfiles.CXSmilesFields
+    res = {}
+    for key, flags in (("all", F.CX_ALL), ("nocoords", F.CX_ALL_BUT_COORDS), ("none", F.CX_NONE),
+                       ("stereo", F.CX_ENHANCEDSTEREO | F.CX_BOND_CFG), ("props", F.CX_ATOM_PROPS | F.CX_ATOM_LABELS)):
+        p = Chem.SmilesWriteParams()
+        try:
+            res[key] = Chem.MolToCXSmiles(m, p, int(flags))
+        except Exception as e:  # noqa: BLE001
+            res[key] = type(e).__name__
+    try:
+        res["nonisomeric"] = Chem.MolToCXSmiles(m, isomericSmiles=False)
+    except Exception as e:  # noqa: BLE001
+        res["nonisomeric"] = type(e).__name__
+    return res
+
+
 def molhash_record(smi):
     """Every MolHash function of a molecule (the CXSMILES variants are not ported)."""
     from rdkit.Chem import rdMolHash
@@ -1125,6 +1146,28 @@ def main():
     if mode == "sdf":
         for rec in sdf_records(path):
             print(json.dumps(rec, default=list))
+        return
+    if mode == "cxsmiles":
+        for line in open(path):
+            line = line.strip()
+            if not line or line.lower().startswith("smiles"):
+                continue
+            try:
+                res = cx_record(Chem.MolFromSmiles(line))
+            except Exception as e:  # noqa: BLE001
+                res = {"exception": type(e).__name__}
+            print(json.dumps([line, res], default=list))
+        return
+    if mode == "cxmolblock":
+        txt = open(path, encoding="utf-8").read()
+        for i, blk in enumerate(txt.split("$$$$\n")):
+            if not blk.strip():
+                continue
+            try:
+                res = cx_record(Chem.MolFromMolBlock(blk))
+            except Exception as e:  # noqa: BLE001
+                res = {"exception": type(e).__name__}
+            print(json.dumps([f"#{i} {blk.splitlines()[0][:40] if blk else ''}", res], default=list))
         return
     if mode in ("molblock", "molwrite", "addhs3d"):
         txt = open(path, encoding="utf-8").read()

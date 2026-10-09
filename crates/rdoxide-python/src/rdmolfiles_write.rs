@@ -4,10 +4,14 @@
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
+use rdoxide::graphmol::smiles_parse::cx_write::{
+    RestoreBondDirOption, cx_fields, mol_to_cx_smiles,
+};
 use rdoxide::graphmol::smiles_parse::write::{
     SmilesWriteParams, mol_fragment_to_smiles, mol_to_random_smiles_vect, mol_to_smiles,
 };
 
+use crate::enums::add_enum;
 use crate::errors::IntoPyResult;
 use crate::mol::PyMol;
 
@@ -191,6 +195,79 @@ fn py_mol_to_smiles(
         ..SmilesWriteParams::default()
     };
     run_mol_to_smiles(py, &mol, params)
+}
+
+/// Returns the CXSMILES string for a molecule
+///   ARGUMENTS:
+///
+///     - mol: the molecule
+///     - isomericSmiles: (optional) include information about stereochemistry in
+///       the SMILES.  Defaults to true.
+///     - kekuleSmiles: (optional) use the Kekule form (no aromatic bonds) in
+///       the SMILES.  Defaults to false.
+///     - rootedAtAtom: (optional) if non-negative, this forces the SMILES
+///       to start at a particular atom. Defaults to -1.
+///     - canonical: (optional) if false no attempt will be made to canonicalize
+///       the molecule. Defaults to true.
+///     - allBondsExplicit: (optional) if true, all bond orders will be explicitly indicated
+///       in the output SMILES. Defaults to false.
+///     - allHsExplicit: (optional) if true, all H counts will be explicitly indicated
+///       in the output SMILES. Defaults to false.
+///     - doRandom: (optional) if true, randomizes the traversal of the molecule graph,
+///       so we can generate random smiles. Defaults to false.  If true, overrides
+///       canonical setting.
+///
+///   RETURNS:
+///
+///     a string
+///
+/// Alternatively: MolToCXSmiles(mol, params, flags=CXSmilesFields.CX_ALL,
+/// restoreBondDirs=RestoreBondDirOption.RestoreBondDirOptionClear)
+#[pyfunction]
+#[pyo3(name = "MolToCXSmiles", signature = (*args, **kwargs))]
+fn py_mol_to_cx_smiles(
+    py: Python<'_>,
+    args: &Bound<'_, PyTuple>,
+    kwargs: Option<&Bound<'_, PyDict>>,
+) -> PyResult<String> {
+    let a = Args {
+        name: "MolToCXSmiles",
+        args,
+        kwargs,
+    };
+    let mol = a
+        .get(0, "mol")?
+        .ok_or_else(|| PyTypeError::new_err("MolToCXSmiles() missing required argument 'mol'"))?;
+    let mol = mol.cast::<PyMol>()?.borrow().mol.clone();
+    let (params, flags, restore) = match a.get(1, "params")? {
+        Some(p) if p.cast::<PySmilesWriteParams>().is_ok() => {
+            let params = p.cast::<PySmilesWriteParams>()?.borrow().to_core();
+            let flags = a
+                .get(2, "flags")?
+                .map_or(Ok(cx_fields::ALL), |v| v.extract::<u32>())?;
+            let restore = match a.get(3, "restoreBondDirs")? {
+                Some(v) if v.extract::<i64>()? == 0 => RestoreBondDirOption::True,
+                _ => RestoreBondDirOption::Clear,
+            };
+            (params, flags, restore)
+        }
+        _ => (
+            SmilesWriteParams {
+                do_isomeric_smiles: a.flag(1, "isomericSmiles", true)?,
+                do_kekule: a.flag(2, "kekuleSmiles", false)?,
+                rooted_at_atom: a.int(3, "rootedAtAtom", -1)?,
+                canonical: a.flag(4, "canonical", true)?,
+                all_bonds_explicit: a.flag(5, "allBondsExplicit", false)?,
+                all_hs_explicit: a.flag(6, "allHsExplicit", false)?,
+                do_random: a.flag(7, "doRandom", false)?,
+                ..SmilesWriteParams::default()
+            },
+            cx_fields::ALL,
+            RestoreBondDirOption::Clear,
+        ),
+    };
+    py.detach(|| mol_to_cx_smiles(&mol, &params, flags, restore))
+        .py()
 }
 
 /// `pythonObjectToVect<int>(obj, maxV)`
@@ -439,6 +516,46 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_mol_fragment_to_smarts, m)?)?;
     m.add_class::<PySmilesWriteParams>()?;
     m.add_function(wrap_pyfunction!(py_mol_to_smiles, m)?)?;
+    m.add_function(wrap_pyfunction!(py_mol_to_cx_smiles, m)?)?;
+    add_enum(
+        m,
+        "CXSmilesFields",
+        &[
+            ("CX_NONE", i64::from(cx_fields::NONE)),
+            ("CX_ATOM_LABELS", i64::from(cx_fields::ATOM_LABELS)),
+            ("CX_MOLFILE_VALUES", i64::from(cx_fields::MOLFILE_VALUES)),
+            ("CX_COORDS", i64::from(cx_fields::COORDS)),
+            ("CX_RADICALS", i64::from(cx_fields::RADICALS)),
+            ("CX_ATOM_PROPS", i64::from(cx_fields::ATOM_PROPS)),
+            ("CX_LINKNODES", i64::from(cx_fields::LINKNODES)),
+            ("CX_ENHANCEDSTEREO", i64::from(cx_fields::ENHANCEDSTEREO)),
+            ("CX_SGROUPS", i64::from(cx_fields::SGROUPS)),
+            ("CX_POLYMER", i64::from(cx_fields::POLYMER)),
+            ("CX_BOND_CFG", i64::from(cx_fields::BOND_CFG)),
+            (
+                "CX_BOND_ATROPISOMER",
+                i64::from(cx_fields::BOND_ATROPISOMER),
+            ),
+            (
+                "CX_COORDINATE_BONDS",
+                i64::from(cx_fields::COORDINATE_BONDS),
+            ),
+            ("CX_HYDROGEN_BONDS", i64::from(cx_fields::HYDROGEN_BONDS)),
+            ("CX_ZERO_BONDS", i64::from(cx_fields::ZERO_BONDS)),
+            ("CX_ALL", i64::from(cx_fields::ALL)),
+            ("CX_ALL_BUT_COORDS", i64::from(cx_fields::ALL_BUT_COORDS)),
+        ],
+        None,
+    )?;
+    add_enum(
+        m,
+        "RestoreBondDirOption",
+        &[
+            ("RestoreBondDirOptionClear", 1),
+            ("RestoreBondDirOptionTrue", 0),
+        ],
+        None,
+    )?;
     m.add_function(wrap_pyfunction!(py_mol_fragment_to_smiles, m)?)?;
     m.add_function(wrap_pyfunction!(py_mol_to_random_smiles_vect, m)?)?;
     Ok(())

@@ -768,6 +768,9 @@
 "Code/GraphMol/SubstructLibrary/Wrap/SubstructLibraryWrap.cpp" = "ca6a9b9123ea1efdf4d347060031763383965245"
 "Code/GraphMol/SubstructLibrary/Wrap/rdSubstructLibrary.cpp" = "e852d8f6dba0c62e6831933d0a765b3c7e0d9321"
 
+[module."rdoxide::graphmol::smiles_parse::cx_write".sources]
+"Code/GraphMol/SmilesParse/CXSmilesOps.cpp" = "000c3236922e74f224235f67e421a71186792530"
+
 [module."rdoxide::graphmol::mol_hash".sources]
 "Code/GraphMol/MolHash/hashfunctions.cpp" = "5be6991ca3764e624889169e7f2821f6b8159520"
 "Code/GraphMol/MolHash/normalize.cpp" = "2d35e6dbc28caa9e4e1a0e1a0a8612b6001e3f79"

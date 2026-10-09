@@ -21,7 +21,7 @@ use crate::graphmol::stereo_group::StereoGroup;
 const REALLY_SMALL_BOND_LEN: f64 = 0.0000001;
 
 /// `(atom, neighbor bonds)` for one end of a candidate bond.
-type AtropAtomAndBondVec = (u32, Vec<u32>);
+pub(crate) type AtropAtomAndBondVec = (u32, Vec<u32>);
 
 fn is_atrop(s: BondStereo) -> bool {
     matches!(s, BondStereo::StereoAtropCW | BondStereo::StereoAtropCCW)
@@ -42,7 +42,10 @@ fn other(mol: &ROMol, bond: u32, atom: u32) -> u32 {
 }
 
 /// `getAtropisomerAtomsAndBonds`
-fn get_atropisomer_atoms_and_bonds(mol: &ROMol, bond: u32) -> Option<[AtropAtomAndBondVec; 2]> {
+pub(crate) fn get_atropisomer_atoms_and_bonds(
+    mol: &ROMol,
+    bond: u32,
+) -> Option<[AtropAtomAndBondVec; 2]> {
     let b = mol.bond(bond);
     let mut res = [
         (b.begin_atom_idx(), Vec::new()),
