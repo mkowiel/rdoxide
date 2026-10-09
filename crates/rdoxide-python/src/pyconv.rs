@@ -52,3 +52,29 @@ pub fn python_object_to_vect(
     }
     Ok(Some(res))
 }
+
+/// A NumPy `float64` array holding `values`, built from raw bytes so that
+/// large results do not pass through Python lists.
+pub fn float64_array<'py>(py: Python<'py>, values: &[f64]) -> PyResult<Bound<'py, PyAny>> {
+    let bytes: Vec<u8> = values.iter().flat_map(|v| v.to_ne_bytes()).collect();
+    // a bytearray gives a writable array without another copy
+    let buffer = pyo3::types::PyByteArray::new(py, &bytes);
+    let np = py.import("numpy")?;
+    np.call_method1("frombuffer", (buffer, np.getattr("float64")?))
+}
+
+/// The values of `array` converted to `float64`, in C order, and its shape.
+pub fn float64_values(
+    py: Python<'_>,
+    array: &Bound<'_, PyAny>,
+) -> PyResult<(Vec<f64>, Vec<usize>)> {
+    let np = py.import("numpy")?;
+    let contiguous = np.call_method1("ascontiguousarray", (array, "float64"))?;
+    let shape: Vec<usize> = contiguous.getattr("shape")?.extract()?;
+    let bytes: Vec<u8> = contiguous.call_method0("tobytes")?.extract()?;
+    let values = bytes
+        .chunks_exact(8)
+        .map(|c| f64::from_ne_bytes([c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7]]))
+        .collect();
+    Ok((values, shape))
+}

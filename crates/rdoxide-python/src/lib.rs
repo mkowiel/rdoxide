@@ -31,6 +31,7 @@ mod rdclustering;
 mod rddepictor;
 mod rdfingerprintgenerator;
 mod rdinfotheory;
+mod rdmetricmatrixcalc;
 mod rdmoldescriptors;
 mod rdmoldescriptors_3d;
 mod rdmoldescriptors_autocorr;
@@ -137,6 +138,12 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
         "rdPartialCharges",
         "rdkit.Chem.rdPartialCharges",
         rdpartialcharges::init,
+    )?;
+    add_submodule(
+        m,
+        "rdMetricMatrixCalc",
+        "rdkit.DataManip.Metric.rdMetricMatrixCalc",
+        rdmetricmatrixcalc::init,
     )?;
     add_submodule(
         m,

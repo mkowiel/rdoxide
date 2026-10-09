@@ -731,3 +731,10 @@
 
 [module."rdoxide_python::rdclustering".sources]
 "Code/ML/Cluster/Murtagh/Clustering.cpp" = "ff8dea78c72f21ee83e43f8428b2c44cd5be5dce"
+
+[module."rdoxide::data_manip::metric_matrix".sources]
+"Code/DataManip/MetricMatrixCalc/MetricFuncs.h" = "b4220af2970097d0fa0dcd5f1d0aa389bdfb93e0"
+"Code/DataManip/MetricMatrixCalc/MetricMatrixCalc.h" = "1413ee12d5d4d4ad9c78960c987aa3cb961b5530"
+
+[module."rdoxide_python::rdmetricmatrixcalc".sources]
+"Code/DataManip/MetricMatrixCalc/Wrap/rdMetricMatrixCalc.cpp" = "5b06194f4b69f8fd548ea0719edb4724111b4de0"
