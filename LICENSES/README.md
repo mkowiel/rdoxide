@@ -6,6 +6,7 @@
 | `RingDecomposerLib-BSD-3-Clause.txt` | Code translated from RingDecomposerLib v1.1.3_rdkit (University of Hamburg, ZBH; Andresen, Flachsenberg, Rarey), used by RDKit for ring families / SSSR: `crates/rdoxide/src/external/ring_decomposer_lib/`. |
 | `LLVM-Apache-2.0-with-LLVM-exception.txt` | `crates/rdoxide/src/rdgeneral/cxx_sort.rs`, a translation of libc++'s `std::sort` (LLVM Project), used to reproduce the element order of RDKit's unstable sorts. |
 | `RDKit-ChemReactions-Novartis-BSD-3-Clause.txt` | Code translated from `Code/GraphMol/ChemReactions` (Novartis). Source: `Code/GraphMol/ChemReactions/license.txt`. |
+| `RDKit-Descriptors3D-Godin-BSD-3-Clause.txt` | Code translated from the descriptor files by Guillaume Godin (Institute of Cancer Research): `AUTOCORR2D/3D`, `MolData3Ddescriptors`, `Data3Ddescriptors` (and later `WHIM`, `RDF`, `MORSE`, `GETAWAY`, ...): `crates/rdoxide/src/graphmol/descriptors/data_3d.rs`, `autocorr2d.rs`. Source: the file headers in `Code/GraphMol/Descriptors/`. |
 
 When porting a component that carries its own license (anything under
 upstream `External/`, fonts in `Data/Fonts`, ...), copy its license file here,

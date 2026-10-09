@@ -167,7 +167,11 @@ rdkit/Chem/UnitTestCrippen.py::TestCase::testLogP
 rdkit/Chem/UnitTestCrippen.py::TestCase::testRepeat
 rdkit/Chem/UnitTestDescriptors.py::DocTestCase::runTest
 rdkit/Chem/UnitTestDescriptors.py::TestCase::testGetMolDescriptors
+rdkit/Chem/UnitTestDescriptors.py::TestCase::testMQN
+rdkit/Chem/UnitTestDescriptors.py::TestCase::testMQNDetails
 rdkit/Chem/UnitTestDescriptors.py::TestCase::testMolFormula
+rdkit/Chem/UnitTestDescriptors.py::TestCase::testVectorDescriptors
+rdkit/Chem/UnitTestDescriptors.py::TestCase::testVectorDescriptorsInDescList
 rdkit/Chem/UnitTestDescriptors.py::TestCase::test_FpDensityMorgan
 rdkit/Chem/UnitTestDescriptors.py::TestCase::test_issue_4567
 rdkit/Chem/UnitTestFragmentDescriptors.py::TestCase::test1

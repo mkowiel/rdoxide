@@ -860,6 +860,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     crate::rdmoldescriptors_molsurf::init(m)?;
     crate::rdmoldescriptors_connectivity::init(m)?;
     crate::rdmoldescriptors_bcut::init(m)?;
+    crate::rdmoldescriptors_autocorr::init(m)?;
     crate::rdmoldescriptors_property::init(m)?;
     m.add_function(wrap_pyfunction!(calc_fraction_csp3, m)?)?;
     m.add_function(wrap_pyfunction!(calc_num_heterocycles, m)?)?;

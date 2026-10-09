@@ -523,3 +523,21 @@
 [module."rdoxide_python::rdmolfiles_fwdsdsupplier".sources]
 "Code/GraphMol/Wrap/ForwardSDMolSupplier.cpp" = "b2e57f1324ec65c3bf77ac51c7e83417db2adfd6"
 "Code/GraphMol/Wrap/MolSupplier.h" = "a931d5f55aafe8de95c48c9e44fffd2ba0e88d15"
+
+[module."rdoxide::graphmol::descriptors::mqn".sources]
+"Code/GraphMol/Descriptors/MQN.cpp" = "64855a48ede8da8eae3accfbaeb9a1a2b2a99f59"
+
+[module."rdoxide::graphmol::descriptors::data_3d".sources]
+"Code/GraphMol/Descriptors/Data3Ddescriptors.cpp" = "64dee982b1549c380dcacb70a9825916af80bd47"
+"Code/GraphMol/Descriptors/Data3Ddescriptors.h" = "5ecd00508cb86d80f75f20fc3864c9115a729cb1"
+
+[module."rdoxide::graphmol::descriptors::mol_data_3d".sources]
+"Code/GraphMol/Descriptors/MolData3Ddescriptors.cpp" = "829459bca28bc2bb395bafdc33b6b9ce16da64e3"
+"Code/GraphMol/Descriptors/MolData3Ddescriptors.h" = "ae2ff9d7be477def0dc0e9f51bdbfbc549a4c64d"
+
+[module."rdoxide::graphmol::descriptors::autocorr2d".sources]
+"Code/GraphMol/Descriptors/AUTOCORR2D.cpp" = "62021cfeb0b12052dab381f0629a9bc6f4f3dc80"
+"Code/GraphMol/Descriptors/AUTOCORR2D.h" = "c8a6816646c7340bdc5e9bc081ad8a4739482152"
+
+[module."rdoxide_python::rdmoldescriptors_autocorr".sources]
+"Code/GraphMol/Descriptors/Wrap/rdMolDescriptors.cpp" = "4d3c2e1d6315579af9f3bf02b1564224fe48b82e"
