@@ -248,3 +248,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-09 — Stage 13h: SubstanceGroup pickling. Next: CXSMILES SGroup sections, M  MRV/APO/LIN lines, FPBReader, SPS, GenericGroups.
 * 2026-10-09 — Stage 13i: M  APO/LIN/MRV lines. Next: CXSMILES SGroup sections and writing, FPBReader, SPS, GenericGroups.
 * 2026-10-09 — Stage 14a: pure-Python `rdkit.Chem` modules copied verbatim (ReducedGraphs, Randomize, SaltRemover, PropertyMol, FragmentMatcher, FunctionalGroups, TorsionFingerprints, SATIS, RegistrationHash, FastSDMolSupplier); ratchet 460/632.
+* 2026-10-09 — Stage 14b: Chem.CanonicalizeEnhancedStereo (unlocks upstream RegistrationHash tests).
