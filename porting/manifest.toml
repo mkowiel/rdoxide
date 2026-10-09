@@ -900,3 +900,25 @@
 "Code/GraphMol/MolChemicalFeatures/Wrap/MolChemicalFeatureFactory.cpp" = "208cdf68243e2a56873060cf814d67ac840b5350"
 "Code/GraphMol/MolChemicalFeatures/Wrap/ChemicalFeatureUtils.cpp" = "bf7ee81af8f932408f746f1c4963ecfc9c351dc2"
 "Code/GraphMol/MolChemicalFeatures/Wrap/rdMolChemicalFeatures.cpp" = "28ff3415cb39e896d3b882b14ecdf54a389b43d5"
+
+[module."rdoxide::graphmol::chem_reactions".sources]
+"Code/GraphMol/ChemReactions/Reaction.h" = "1768832c6ed1447a4a3a5d8d69d1eb3488fd254e"
+"Code/GraphMol/ChemReactions/Reaction.cpp" = "6021dbb2db0a252008c64b9899b559c7629e6a59"
+
+[module."rdoxide::graphmol::chem_reactions::utils".sources]
+"Code/GraphMol/ChemReactions/ReactionUtils.h" = "702820bf97e581a3c702e46cb53ff4dd7d737d36"
+"Code/GraphMol/ChemReactions/ReactionUtils.cpp" = "57380d5c26a143bb2120eebefd38066b6d172685"
+
+[module."rdoxide::graphmol::chem_reactions::runner".sources]
+"Code/GraphMol/ChemReactions/ReactionRunner.h" = "8eba57c5c7e0807a360df5dc774a423adfea2129"
+"Code/GraphMol/ChemReactions/ReactionRunner.cpp" = "055b67c638bb46bb5c5246597110a335c1788efb"
+
+[module."rdoxide::graphmol::chem_reactions::daylight".sources]
+"Code/GraphMol/ChemReactions/ReactionParser.h" = "9af217731fcf7040fe5ba113f252bf7db0bf080e"
+"Code/GraphMol/ChemReactions/DaylightParser.cpp" = "099878f6ec8a2015408ac8fe79d39ac84e9e2d64"
+
+[module."rdoxide::graphmol::chem_reactions::writer".sources]
+"Code/GraphMol/ChemReactions/ReactionWriter.cpp" = "ce1e099b0f0b927a736a89269e7f673ec1bbd67a"
+
+[module."rdoxide_python::rdchemreactions".sources]
+"Code/GraphMol/ChemReactions/Wrap/rdChemReactions.cpp" = "a2bba60a070f26399204cd2867735fb15cc58a10"

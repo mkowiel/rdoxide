@@ -12,7 +12,7 @@ use std::f64::consts::PI;
 use super::legacy::should_detect_double_bond_stereo;
 use crate::geometry::Point3D;
 use crate::geometry::point::compute_dihedral_angle;
-use crate::graphmol::bond::{BondDir, BondStereo, BondType};
+use crate::graphmol::bond::{Bond, BondDir, BondStereo, BondType};
 use crate::graphmol::find_rings::{SymmetrizeSSSRAlgorithm, symmetrize_sssr};
 use crate::graphmol::romol::ROMol;
 use crate::rdgeneral::common_properties as cp;
@@ -428,12 +428,71 @@ pub fn set_double_bond_neighbor_directions(mol: &mut ROMol, conf: Option<usize>)
     Ok(())
 }
 
-/// `Chirality::getNeighboringDirectedBond`
-fn neighboring_directed_bond(mol: &ROMol, atom: u32) -> Option<u32> {
+/// `Chirality::hasStereoBondDir`
+pub fn has_stereo_bond_dir(bond: &Bond) -> bool {
+    is_dir(bond.bond_dir())
+}
+
+/// `Chirality::getNeighboringDirectedBond`: the first non-double bond of
+/// `atom` that carries a stereo direction.
+pub fn neighboring_directed_bond(mol: &ROMol, atom: u32) -> Option<u32> {
     mol.atom_bond_indices(atom).find(|&b| {
         let bd = mol.bond(b);
         bd.bond_type() != BondType::Double && is_dir(bd.bond_dir())
     })
+}
+
+/// `findHighestCIPNeighbor`: the neighbor of `atom` (other than `skip`) with
+/// the highest `_CIPRank`; `None` if a rank is missing or the best is tied.
+fn highest_cip_neighbor(mol: &ROMol, atom: u32, skip: u32) -> Option<u32> {
+    let mut best_rank = 0;
+    let mut best: Option<u32> = None;
+    for nbr in mol.atom_neighbors(atom).filter(|&n| n != skip) {
+        let cip = mol
+            .atom(nbr)
+            .get_prop(cp::_CIPRank)
+            .and_then(RDValue::as_uint)?;
+        if cip > best_rank || best.is_none() {
+            best_rank = cip;
+            best = Some(nbr);
+        } else if cip == best_rank {
+            crate::rd_log_warning!(
+                "Warning: duplicate CIP ranks found in findHighestCIPNeighbor()"
+            );
+            best = None;
+        }
+    }
+    best
+}
+
+/// `Chirality::findStereoAtoms`: the stereo atoms of a double bond with
+/// defined stereo, taken from the bond or derived from E/Z labels and CIP
+/// ranks (empty when they cannot be determined).
+pub fn find_stereo_atoms(mol: &ROMol, bond_idx: u32) -> Result<Vec<i32>> {
+    let bond = mol.bond(bond_idx);
+    if bond.bond_type() != BondType::Double {
+        return Err(RDKitError::precondition("not double bond"));
+    }
+    if bond.stereo() <= BondStereo::StereoAny {
+        return Err(RDKitError::precondition("no defined stereo"));
+    }
+    if !bond.stereo_atoms().is_empty() {
+        return Ok(bond.stereo_atoms().to_vec());
+    }
+    if matches!(bond.stereo(), BondStereo::StereoE | BondStereo::StereoZ) {
+        let (begin, end) = (bond.begin_atom_idx(), bond.end_atom_idx());
+        return Ok(
+            match (
+                highest_cip_neighbor(mol, begin, end),
+                highest_cip_neighbor(mol, end, begin),
+            ) {
+                (Some(a), Some(b)) => vec![a as i32, b as i32],
+                _ => Vec::new(),
+            },
+        );
+    }
+    crate::rd_log_warning!("Unable to assign stereo atoms for bond {}", bond_idx);
+    Ok(Vec::new())
 }
 
 /// `MolOps::setBondStereoFromDirections`
