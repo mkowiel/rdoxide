@@ -11,6 +11,7 @@ use rdoxide::graphmol::romol::ROMol;
 
 use crate::errors::IntoPyResult;
 use crate::mol::PyMol;
+use crate::pyconv::python_object_to_vect;
 
 /// Parameters controlling which Hs are removed.
 #[pyclass(
@@ -382,23 +383,7 @@ fn py_add_hs(args: &Bound<'_, PyTuple>, kwargs: Option<&Bound<'_, PyDict>>) -> P
         )
     };
     // pythonObjectToVect(onlyOnAtoms, nAtoms): falsy -> all atoms
-    let only = match only_on {
-        Some(o) if o.is_truthy()? => {
-            let n = mol.mol.num_atoms();
-            let mut v = Vec::new();
-            for x in o.try_iter()? {
-                let x: u32 = x?.extract()?;
-                if x >= n {
-                    return Err(pyo3::exceptions::PyValueError::new_err(
-                        "list element larger than allowed value",
-                    ));
-                }
-                v.push(x);
-            }
-            Some(v)
-        }
-        _ => None,
-    };
+    let only = python_object_to_vect(only_on.as_ref(), Some(mol.mol.num_atoms()))?;
     let mut res: ROMol = mol.mol.clone();
     add_hs(&mut res, &params, only.as_deref()).py()?;
     Ok(PyMol { mol: res })

@@ -1,7 +1,6 @@
 //! Legacy path fingerprints of `rdkit.Chem.rdmolops` (`RDKFingerprint`,
 //! `UnfoldedRDKFingerprintCountBased`; upstream `GraphMol/Wrap/MolOps.cpp`).
 
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 use rdoxide::graphmol::fingerprints::legacy::{
@@ -12,27 +11,7 @@ use crate::datastructs::PyExplicitBitVect;
 use crate::datastructs_siv::PyULongSIV;
 use crate::errors::IntoPyResult;
 use crate::mol::PyMol;
-
-/// `pythonObjectToVect`: `None` for falsy objects (None, 0, empty sequences).
-fn opt_vect(o: Option<&Bound<'_, PyAny>>, max_v: Option<u32>) -> PyResult<Option<Vec<u32>>> {
-    let Some(o) = o else { return Ok(None) };
-    if !o.is_truthy()? {
-        return Ok(None);
-    }
-    let mut v = Vec::new();
-    for x in o.try_iter()? {
-        let x: u32 = x?.extract()?;
-        if let Some(m) = max_v
-            && x >= m
-        {
-            return Err(PyValueError::new_err(
-                "list element larger than allowed value",
-            ));
-        }
-        v.push(x);
-    }
-    Ok(Some(v))
-}
+use crate::pyconv::python_object_to_vect;
 
 fn requested(o: Option<&Bound<'_, PyAny>>) -> bool {
     o.is_some_and(|o| !o.is_none())
@@ -91,8 +70,8 @@ fn rdk_fingerprint(
     bitInfo: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PyExplicitBitVect> {
     let n = mol.mol.num_atoms();
-    let invs = opt_vect(atomInvariants, None)?;
-    let from = opt_vect(fromAtoms, Some(n))?;
+    let invs = python_object_to_vect(atomInvariants, None)?;
+    let from = python_object_to_vect(fromAtoms, Some(n))?;
     let mut out = PathFpOutput {
         atom_bits: requested(atomBits).then(Vec::new),
         bit_info: requested(bitInfo).then(Default::default),
@@ -135,8 +114,8 @@ fn unfolded_rdk_fingerprint(
     bitInfo: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PyULongSIV> {
     let n = mol.mol.num_atoms();
-    let invs = opt_vect(atomInvariants, None)?;
-    let from = opt_vect(fromAtoms, Some(n))?;
+    let invs = python_object_to_vect(atomInvariants, None)?;
+    let from = python_object_to_vect(fromAtoms, Some(n))?;
     let mut out = PathFpOutput {
         atom_bits: requested(atomBits).then(Vec::new),
         bit_info: requested(bitInfo).then(Default::default),

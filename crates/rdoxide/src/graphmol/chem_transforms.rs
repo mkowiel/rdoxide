@@ -1,6 +1,6 @@
 //! Substructure-based molecule transforms (upstream
 //! `GraphMol/ChemTransforms/ChemTransforms.cpp`): currently
-//! `deleteSubstructs`.
+//! `deleteSubstructs` and `combineMols`.
 //!
 //! Ported from RDKit 2026.09.1.
 //!
@@ -9,11 +9,12 @@
 
 use std::collections::BTreeSet;
 
-use crate::Result;
+use crate::geometry::Point3D;
 use crate::graphmol::conformer::Conformer;
 use crate::graphmol::mol_ops::frags::get_mol_frags_atoms;
 use crate::graphmol::romol::{ROMol, RWMol};
 use crate::graphmol::substruct::{SubstructMatchParameters, substruct_match};
+use crate::{Result, rd_log_warning};
 
 /// `details::updateSubMolConfs`: rebuilds the conformers of `res` from those
 /// of `mol`, leaving out the removed atoms.
@@ -93,5 +94,34 @@ pub fn delete_substructs(
     res.clear_computed_props(true);
     // update our properties, but allow unhappiness:
     res.update_property_cache(false)?;
+    Ok(res)
+}
+
+/// `combineMols(mol1, mol2, offset)`: the atoms of both molecules in one
+/// molecule. The coordinates of `mol2` are shifted by `offset` in every
+/// conformer that both molecules have.
+pub fn combine_mols(mol1: &ROMol, mol2: &ROMol, offset: Point3D) -> Result<RWMol> {
+    let mut res = mol1.clone();
+    let n_atoms1 = res.num_atoms();
+    res.insert_mol(mol2)?;
+
+    if mol1.num_conformers() > 0 && mol2.num_conformers() > 0 {
+        if mol1.num_conformers() != mol2.num_conformers() {
+            rd_log_warning!("combineMols: molecules have unequal numbers of conformers");
+        }
+        for conf1 in res.conformers_mut() {
+            match mol2.conformer(conf1.id() as i32) {
+                Ok(conf2) => {
+                    for (i, &p) in conf2.positions().iter().enumerate() {
+                        conf1.set_atom_pos(i as u32 + n_atoms1, p + offset)?;
+                    }
+                }
+                Err(_) => {
+                    rd_log_warning!("combineMols: conformer id {} not found in mol2", conf1.id())
+                }
+            }
+        }
+    }
+    res.clear_computed_props(true);
     Ok(res)
 }

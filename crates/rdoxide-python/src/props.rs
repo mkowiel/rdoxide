@@ -133,7 +133,7 @@ pub fn rdvalue_to_py(
             }
             s.into_pyobject(py)?.into_any().unbind()
         }
-        RDValue::VecInt(x) => x.clone().into_pyobject(py)?.into_any().unbind(),
+        RDValue::VecInt(x) => crate::vects::PyVectI::new_py(py, x.clone())?,
         RDValue::VecUnsignedInt(x) => x.clone().into_pyobject(py)?.into_any().unbind(),
         RDValue::VecDouble(x) => x.clone().into_pyobject(py)?.into_any().unbind(),
         RDValue::VecFloat(x) => x.clone().into_pyobject(py)?.into_any().unbind(),

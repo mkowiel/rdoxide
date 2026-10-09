@@ -5,6 +5,7 @@ use pyo3::exceptions::{
     PyIOError, PyIndexError, PyKeyError, PyRuntimeError, PyTypeError, PyValueError,
 };
 use pyo3::prelude::*;
+use pyo3::sync::PyOnceLock;
 use pyo3::types::PyList;
 use rdoxide::RDKitError;
 
@@ -92,4 +93,43 @@ pub fn no_converter(cpp_type: &str, obj: &Bound<'_, PyAny>) -> PyErr {
         "No registered converter was able to produce a C++ rvalue of type {cpp_type} from this Python object of type {}",
         type_name(obj)
     ))
+}
+
+/// `Boost.Python.ArgumentError`, a `TypeError` subclass.
+fn argument_error_type(py: Python<'_>) -> PyResult<&Bound<'_, pyo3::types::PyType>> {
+    static TYPE: PyOnceLock<Py<pyo3::types::PyType>> = PyOnceLock::new();
+    TYPE.get_or_try_init(py, || {
+        PyErr::new_type(
+            py,
+            c"Boost.Python.ArgumentError",
+            None,
+            Some(&py.get_type::<PyTypeError>()),
+            None,
+        )
+    })
+    .map(|t| t.bind(py))
+}
+
+/// The `Boost.Python.ArgumentError` raised when no overload of `func`
+/// matches the call. `got` is the Python-side signature (`Mol, Mol, tuple`),
+/// `expected` the C++ one.
+pub fn argument_error(py: Python<'_>, func: &str, got: &[String], expected: &str) -> PyErr {
+    let msg = format!(
+        "Python argument types in\n    None.{func}({})\ndid not match C++ signature:\n    {expected}",
+        got.join(", ")
+    );
+    match argument_error_type(py) {
+        Ok(t) => PyErr::from_type(t.clone(), msg),
+        Err(e) => e,
+    }
+}
+
+/// Name of the Python type of `obj` as Boost prints it in signatures.
+pub fn boost_type_name(obj: &Bound<'_, PyAny>) -> String {
+    let n = type_name(obj);
+    if obj.is_instance_of::<pyo3::types::PyString>() {
+        "str".into()
+    } else {
+        n
+    }
 }

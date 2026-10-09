@@ -21,28 +21,10 @@ use crate::datastructs_siv::{PyIntSIV, PyLongSIV, PyUIntSIV};
 use crate::enums::add_enum_exported;
 use crate::errors::IntoPyResult;
 use crate::mol::PyMol;
+use crate::pyconv::python_object_to_vect;
 
 fn deprecation_warning(msg: &str) {
     rdoxide::rd_log_warning!("DEPRECATION WARNING: {msg}");
-}
-
-/// `pythonObjectToVect(obj, maxV)`: `None` for falsy objects.
-fn opt_vect(o: Option<&Bound<'_, PyAny>>, max_v: u32) -> PyResult<Option<Vec<u32>>> {
-    let Some(o) = o else { return Ok(None) };
-    if !o.is_truthy()? {
-        return Ok(None);
-    }
-    let mut v = Vec::new();
-    for x in o.try_iter()? {
-        let x: u32 = x?.extract()?;
-        if x >= max_v {
-            return Err(PyValueError::new_err(
-                "list element larger than allowed value",
-            ));
-        }
-        v.push(x);
-    }
-    Ok(Some(v))
 }
 
 /// The Morgan helpers' handling of `invariants` / `useFeatures`.
@@ -112,8 +94,8 @@ fn morgan_helper(
     let invs = morgan_invariants(mol, invariants, use_features)?;
     let froms = match kind {
         // GetMorganFingerprintAsBitVect range-checks fromAtoms
-        MorganKind::BitVect(_) => opt_vect(from_atoms, mol.mol.num_atoms())?,
-        _ => opt_vect(from_atoms, u32::MAX)?,
+        MorganKind::BitVect(_) => python_object_to_vect(from_atoms, Some(mol.mol.num_atoms()))?,
+        _ => python_object_to_vect(from_atoms, None)?,
     };
     let bit_info = requested(bit_info);
     if let Some(b) = bit_info {
@@ -315,9 +297,9 @@ fn ap_args(
 ) -> PyResult<ApArgs> {
     let n = mol.mol.num_atoms();
     Ok(ApArgs {
-        from: opt_vect(from, n)?,
-        ignore: opt_vect(ignore, n)?,
-        invs: opt_vect(invs, 1 << CODE_SIZE)?,
+        from: python_object_to_vect(from, Some(n))?,
+        ignore: python_object_to_vect(ignore, Some(n))?,
+        invs: python_object_to_vect(invs, Some(1 << CODE_SIZE))?,
     })
 }
 

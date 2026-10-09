@@ -597,3 +597,10 @@
 [module."rdoxide::graphmol::descriptors::getaway".sources]
 "Code/GraphMol/Descriptors/GETAWAY.cpp" = "7617e4ca8c40ce311bb44dfe43fce8ab8f8b7e17"
 "Code/GraphMol/Descriptors/GETAWAY.h" = "3c0601b195b8a39eb51258ad90e1ea1af8286052"
+
+[module."rdoxide::graphmol::mol_ops::structure".sources]
+"Code/GraphMol/Renumber.cpp" = "e87ef8680a8dd133a959cb3214cec0297b42f073"
+"Code/GraphMol/MolOps.h" = "c5a0698d6bf73d26329ac02a32ac4b694ca2d10f"
+
+[module."rdoxide_python::rdmolops_structure".sources]
+"Code/GraphMol/Wrap/MolOps.cpp" = "2dc7ae10c4ce7523938a4db10e31215cfe2162db"

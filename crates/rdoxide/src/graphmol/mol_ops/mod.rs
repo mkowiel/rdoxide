@@ -39,9 +39,11 @@ use sanitize_flags::*;
 
 pub mod add_hs;
 pub mod frags;
+pub mod structure;
 use crate::rdgeneral::RDProps;
 pub use add_hs::{RemoveHsParameters, remove_hs};
 pub use frags::{get_mol_frags_as_mols, get_mol_frags_atoms, get_mol_frags_mapping};
+pub use structure::{get_formal_charge, remove_stereochemistry, renumber_atoms};
 
 /// `QueryOps::isMetal` for plain atoms (Marvin's "M" pseudo-element).
 pub fn is_metal(atomic_num: u32) -> bool {
