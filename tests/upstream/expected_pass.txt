@@ -63,6 +63,7 @@ Code/Geometry/Wrap/testGeometry.py::TestCase::testPointPickles
 Code/Geometry/Wrap/testGeometry.py::TestCase::testSymmetry
 Code/GraphMol/Descriptors/Wrap/test3D.py::TestCase::test1AUTOCORR2D
 Code/GraphMol/Descriptors/Wrap/test3D.py::TestCase::test2AUTOCORR3D
+Code/GraphMol/Descriptors/Wrap/test3D.py::TestCase::test3GETAWAY
 Code/GraphMol/Descriptors/Wrap/test3D.py::TestCase::test4MORSE
 Code/GraphMol/Descriptors/Wrap/test3D.py::TestCase::test5RDF
 Code/GraphMol/Descriptors/Wrap/test3D.py::TestCase::test6WHIM

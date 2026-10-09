@@ -8,6 +8,7 @@ pub mod coulomb_mat;
 pub mod crippen;
 pub mod data_3d;
 pub mod eem;
+pub mod getaway;
 pub mod lipinski;
 pub mod mol_data_3d;
 pub mod mol_surf;

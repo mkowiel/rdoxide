@@ -593,3 +593,7 @@
 [module."rdoxide::graphmol::descriptors::whim".sources]
 "Code/GraphMol/Descriptors/WHIM.cpp" = "0cd80d3e38db2c01b76a71bd93f6632fab4e0f45"
 "Code/GraphMol/Descriptors/WHIM.h" = "50766aa1bafbd15ad562b3ceaf2f1eb796dab341"
+
+[module."rdoxide::graphmol::descriptors::getaway".sources]
+"Code/GraphMol/Descriptors/GETAWAY.cpp" = "7617e4ca8c40ce311bb44dfe43fce8ab8f8b7e17"
+"Code/GraphMol/Descriptors/GETAWAY.h" = "3c0601b195b8a39eb51258ad90e1ea1af8286052"

@@ -43,7 +43,8 @@ LICENSES/RDKit-PBF-InstituteOfCancerResearch-BSD-3-Clause.txt  RDKit PBF descrip
 LICENSES/RDKit-Descriptors3D-Godin-BSD-3-Clause.txt       RDKit AUTOCORR/WHIM/RDF/... descriptors
                                                          (Guillaume Godin, Institute of Cancer Research)
 LICENSES/Eigen-MPL-2.0.txt                                Eigen (numerics/eigen_3x3.rs symmetric eigensolver,
-                                                         numerics/full_piv_lu.rs, numerics/jacobi_svd.rs),
+                                                         numerics/full_piv_lu.rs, numerics/jacobi_svd.rs,
+                                                         numerics/dense.rs),
                                                          Copyright (C) Gael Guennebaud, Benoit Jacob, Jitse Niesen
 LICENSES/RingDecomposerLib-BSD-3-Clause.txt              RingDecomposerLib (ring families, SSSR),
                                                          Copyright (c) 2016 University of Hamburg,

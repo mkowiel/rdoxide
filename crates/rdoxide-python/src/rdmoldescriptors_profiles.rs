@@ -1,6 +1,6 @@
-//! `CalcAUTOCORR3D`, `CalcRDF`, `CalcMORSE`, `CalcCoulombMat` and `CalcEEMcharges` and `CalcWHIM` of `rdkit.Chem.rdMolDescriptors`
+//! `CalcAUTOCORR3D`, `CalcRDF`, `CalcMORSE`, `CalcCoulombMat` and `CalcEEMcharges`, `CalcWHIM` and `CalcGETAWAY` of `rdkit.Chem.rdMolDescriptors`
 //! (upstream `Descriptors/AUTOCORR3D.cpp`, `RDF.cpp`, `MORSE.cpp`,
-//! `CoulombMat.cpp`, `EEM.cpp`, `WHIM.cpp` and their
+//! `CoulombMat.cpp`, `EEM.cpp`, `WHIM.cpp`, `GETAWAY.cpp` and their
 //! wrappers in `Wrap/rdMolDescriptors.cpp`).
 
 use pyo3::prelude::*;
@@ -8,6 +8,7 @@ use pyo3::types::PyTuple;
 use rdoxide::graphmol::descriptors::autocorr3d::{AUTOCORR3D_VERSION, autocorr3d};
 use rdoxide::graphmol::descriptors::coulomb_mat::{COULOMB_MAT_VERSION, coulomb_mat};
 use rdoxide::graphmol::descriptors::eem::{EEM_VERSION, eem};
+use rdoxide::graphmol::descriptors::getaway::{GETAWAY_VERSION, getaway};
 use rdoxide::graphmol::descriptors::morse::{MORSE_VERSION, morse};
 use rdoxide::graphmol::descriptors::rdf::{RDF_VERSION, rdf};
 use rdoxide::graphmol::descriptors::whim::{WHIM_VERSION, whim};
@@ -115,6 +116,25 @@ fn calc_whim(
         .py()
 }
 
+/// Returns the GETAWAY descriptors vector
+#[pyfunction]
+#[pyo3(name = "CalcGETAWAY", signature = (mol, confId = -1, precision = 2.0, CustomAtomProperty = ""))]
+#[allow(non_snake_case)]
+fn calc_getaway(
+    py: Python<'_>,
+    mol: &Bound<'_, PyMol>,
+    confId: i32,
+    precision: f64,
+    CustomAtomProperty: &str,
+) -> PyResult<Vec<f64>> {
+    let mut m = mol.borrow_mut();
+    let core = &mut m.mol;
+    require_conformer(core, "Code/GraphMol/Descriptors/GETAWAY.cpp", 1136)?;
+    // the C++ wrapper converts the double to an unsigned int
+    py.detach(|| getaway(core, confId, precision as u32, CustomAtomProperty))
+        .py()
+}
+
 pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("_CalcAUTOCORR3D_version", AUTOCORR3D_VERSION)?;
     m.add("_CalcRDF_version", RDF_VERSION)?;
@@ -125,6 +145,8 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(calc_eem_charges, m)?)?;
     m.add("_CalcWHIM_version", WHIM_VERSION)?;
     m.add_function(wrap_pyfunction!(calc_whim, m)?)?;
+    m.add("_CalcGETAWAY_version", GETAWAY_VERSION)?;
+    m.add_function(wrap_pyfunction!(calc_getaway, m)?)?;
     m.add_function(wrap_pyfunction!(calc_autocorr3d, m)?)?;
     m.add_function(wrap_pyfunction!(calc_rdf, m)?)?;
     m.add_function(wrap_pyfunction!(calc_morse, m)?)

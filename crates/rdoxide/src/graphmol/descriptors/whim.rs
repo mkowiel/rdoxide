@@ -18,7 +18,8 @@
 use super::mol_data_3d as weights;
 use crate::geometry::Point3D;
 use crate::graphmol::romol::ROMol;
-use crate::numerics::jacobi_svd::jacobi_svd_3x3;
+use crate::numerics::dense::{Matrix, SMALL_PRODUCT, dot, in_packet, packet_sum};
+use crate::numerics::jacobi_svd::jacobi_svd;
 use crate::rdgeneral::fp::fmuladd;
 use crate::{RDKitError, Result};
 
@@ -35,79 +36,6 @@ const CUSTOM_SELECTION: [usize; 17] = [0, 1, 2, 6, 7, 14, 15, 16, 10, 11, 12, 3,
 
 fn roundn(x: f64) -> f64 {
     (x * 1000.0).round() / 1000.0
-}
-
-/// Eigen evaluates products of matrices with `rows + cols + depth` below this
-/// bound coefficient by coefficient (`EIGEN_GEMM_TO_COEFFBASED_THRESHOLD`).
-const SMALL_PRODUCT: usize = 20;
-
-/// Doubles per SIMD register of the reference build (NEON).
-const PACKET: usize = 2;
-
-/// Dot product of two vectors the way Eigen sums the products: `fused` for
-/// the multiply-add chains of its vectorized kernels, otherwise a plain sum of
-/// separately rounded products.
-fn dot(a: impl Iterator<Item = f64>, b: impl Iterator<Item = f64>, fused: bool) -> f64 {
-    let mut pairs = a.zip(b);
-    let Some((x, y)) = pairs.next() else {
-        return 0.0;
-    };
-    pairs.fold(x * y, |acc, (x, y)| {
-        if fused {
-            fmuladd(x, y, acc)
-        } else {
-            acc + x * y
-        }
-    })
-}
-
-/// Whether row `row` of a column of `rows` entries starting `offset` elements
-/// after a register boundary is computed by Eigen's vectorized path: the rows
-/// between the first aligned element and the last full register.
-fn in_packet(row: usize, rows: usize, offset: usize) -> bool {
-    let start = offset % PACKET;
-    let end = start + (rows - start.min(rows)) / PACKET * PACKET;
-    row >= start && row < end
-}
-
-/// `sum()` of a contiguous vector whose first element is `offset` elements
-/// past a register boundary (Eigen's vectorized reduction: two interleaved
-/// register accumulators, the lanes added at the end, then the unaligned head
-/// and tail one by one).
-fn packet_sum(v: &[f64], offset: usize) -> f64 {
-    let start = (offset % PACKET).min(v.len());
-    let size = v.len() - start;
-    let aligned = size / PACKET * PACKET;
-    if aligned == 0 {
-        return v.iter().skip(1).fold(v[0], |acc, x| acc + x);
-    }
-    let end = start + aligned;
-    let end2 = start + size / (2 * PACKET) * (2 * PACKET);
-    let load = |i: usize| [v[i], v[i + 1]];
-    let mut r0 = load(start);
-    if aligned > PACKET {
-        let mut r1 = load(start + PACKET);
-        let mut i = start + 2 * PACKET;
-        while i < end2 {
-            let (a, b) = (load(i), load(i + PACKET));
-            r0 = [r0[0] + a[0], r0[1] + a[1]];
-            r1 = [r1[0] + b[0], r1[1] + b[1]];
-            i += 2 * PACKET;
-        }
-        r0 = [r0[0] + r1[0], r0[1] + r1[1]];
-        if end > end2 {
-            let a = load(end2);
-            r0 = [r0[0] + a[0], r0[1] + a[1]];
-        }
-    }
-    let mut res = r0[0] + r0[1];
-    for x in &v[..start] {
-        res += x;
-    }
-    for x in &v[end..] {
-        res += x;
-    }
-    res
 }
 
 /// Centered coordinates, as `x[atom][axis]`.
@@ -153,15 +81,19 @@ fn whim_values(weight: &[f64], points: &[Point3D], th: f64) -> [f64; NUM_INTERME
             *c = dot(weighted, (0..n).map(|k| x[k][l]), fused) / total_weight;
         }
     }
-    let svd = jacobi_svd_3x3(&cov);
-    let sv = svd.singular_values;
+    let svd = jacobi_svd(&Matrix::from_fn(3, 3, |r, c| cov[r][c]), false);
+    let sv = [
+        svd.singular_values[0],
+        svd.singular_values[1],
+        svd.singular_values[2],
+    ];
     let scores_small = n + 3 + 3 < SMALL_PRODUCT;
     let mut scores = vec![[0.0; 3]; n];
     for (atom, xi) in x.iter().enumerate() {
         for c in 0..3 {
             // the n x 3 result is stored column-major: column c starts c * n elements in
             let fused = !scores_small || in_packet(atom, n, c * n);
-            scores[atom][c] = dot(xi.iter().copied(), (0..3).map(|k| svd.v[k][c]), fused);
+            scores[atom][c] = dot(xi.iter().copied(), (0..3).map(|k| svd.v.get(k, c)), fused);
         }
     }
 
