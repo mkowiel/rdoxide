@@ -12,6 +12,7 @@ publish = false
 [lib]
 name = "_rdoxide"
 crate-type = ["cdylib", "rlib"]
+doctest = false
 
 [dependencies]
 rdoxide.workspace = true

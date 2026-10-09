@@ -5,6 +5,7 @@ pub mod atom_pair;
 pub mod legacy;
 pub mod maccs;
 pub mod morgan;
+pub mod pattern;
 pub mod rdkit_fp;
 pub mod torsion;
 
