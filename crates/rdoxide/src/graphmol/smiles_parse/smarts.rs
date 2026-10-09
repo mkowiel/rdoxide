@@ -1545,8 +1545,7 @@ pub fn mol_from_smarts(smarts: &str, params: &SmartsParserParams) -> crate::Resu
         &mut name,
     )?;
     if params.merge_hs {
-        // TODO(stage 4c): MolOps::mergeQueryHs
-        return Err(crate::RDKitError::invariant("mergeHs is not ported yet"));
+        crate::graphmol::mol_ops::query_hs::merge_query_hs(&mut res, false, false)?;
     }
     crate::graphmol::chirality::bond_dirs::set_bond_stereo_from_directions(&mut res)?;
     if !params.skip_cleanup {

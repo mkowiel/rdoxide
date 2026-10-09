@@ -123,6 +123,9 @@
 [module."python::rdkit.Geometry.__init__".sources]
 "rdkit/Geometry/__init__.py" = "ce2a8f5aae4528ae84fd9797869a16395a612e46"
 
+[module."rdoxide::graphmol::mol_ops::query_hs".sources]
+"Code/GraphMol/AddHs.cpp" = "ac653bc04e5c317b9803d986fcdef668fb17759e"
+
 [module."rdoxide::graphmol::smiles_parse::cx".sources]
 "Code/GraphMol/SmilesParse/CXSmilesOps.cpp" = "000c3236922e74f224235f67e421a71186792530"
 
