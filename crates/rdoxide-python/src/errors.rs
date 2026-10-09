@@ -125,8 +125,19 @@ fn argument_error_type(py: Python<'_>) -> PyResult<&Bound<'_, pyo3::types::PyTyp
 /// matches the call. `got` is the Python-side signature (`Mol, Mol, tuple`),
 /// `expected` the C++ one.
 pub fn argument_error(py: Python<'_>, func: &str, got: &[String], expected: &str) -> PyErr {
+    argument_error_in(py, "None", func, got, expected)
+}
+
+/// [`argument_error`] for a method; `scope` is the Python class name.
+pub fn argument_error_in(
+    py: Python<'_>,
+    scope: &str,
+    func: &str,
+    got: &[String],
+    expected: &str,
+) -> PyErr {
     let msg = format!(
-        "Python argument types in\n    None.{func}({})\ndid not match C++ signature:\n    {expected}",
+        "Python argument types in\n    {scope}.{func}({})\ndid not match C++ signature:\n    {expected}",
         got.join(", ")
     );
     match argument_error_type(py) {

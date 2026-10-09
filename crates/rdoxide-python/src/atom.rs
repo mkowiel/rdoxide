@@ -4,6 +4,8 @@ use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyTuple;
 use rdoxide::graphmol::atom as core_atom;
+use rdoxide::graphmol::queries::{AtomQuery, CompositeQueryType};
+use rdoxide::graphmol::query_ops::atom_expand_query;
 use rdoxide::graphmol::{Atom, ROMol, ValenceType};
 use rdoxide::rdgeneral::Dict;
 
@@ -44,14 +46,46 @@ fn no_owner() -> PyErr {
     ))
 }
 
+/// The class to store QueryAtoms.
+/// These cannot currently be constructed directly from Python
+#[pyclass(name = "QueryAtom", module = "rdkit.Chem.rdchem", extends = PyAtom)]
+pub struct PyQueryAtom;
+
 impl PyAtom {
+    /// The Python object for an atom: a `QueryAtom` when the atom carries a
+    /// query (upstream returns the most derived class), else an `Atom`.
+    pub fn from_handle(py: Python<'_>, handle: AtomHandle) -> PyResult<Py<PyAtom>> {
+        let is_query = match &handle {
+            AtomHandle::Owned(a) => a.has_query(),
+            // the molecule may be borrowed mutably by the caller; the plain
+            // class is the safe answer then
+            AtomHandle::InMol { mol, idx } => mol.bind(py).try_borrow().is_ok_and(|m| {
+                m.mol
+                    .atoms()
+                    .get(*idx as usize)
+                    .is_some_and(Atom::has_query)
+            }),
+        };
+        let init = PyClassInitializer::from(PyAtom { handle });
+        if is_query {
+            let obj = Py::new(py, init.add_subclass(PyQueryAtom))?;
+            Ok(obj
+                .into_bound(py)
+                .into_any()
+                .cast_into::<PyAtom>()?
+                .unbind())
+        } else {
+            Py::new(py, init)
+        }
+    }
+
     pub fn in_mol(py: Python<'_>, mol: Py<PyMol>, idx: u32) -> PyResult<Py<PyAtom>> {
-        Py::new(
-            py,
-            PyAtom {
-                handle: AtomHandle::InMol { mol, idx },
-            },
-        )
+        Self::from_handle(py, AtomHandle::InMol { mol, idx })
+    }
+
+    /// A free-standing atom.
+    pub fn owned(py: Python<'_>, atom: Atom) -> PyResult<Py<PyAtom>> {
+        Self::from_handle(py, AtomHandle::Owned(atom))
     }
 
     /// Run `f` on the owning molecule and this atom's index (error for
@@ -177,10 +211,8 @@ impl PyAtom {
     }
 
     /// Create a copy of the atom
-    fn __copy__(&self, py: Python<'_>) -> PyResult<PyAtom> {
-        Ok(PyAtom {
-            handle: AtomHandle::Owned(self.snapshot(py)?.copy_detached()),
-        })
+    fn __copy__(&self, py: Python<'_>) -> PyResult<Py<PyAtom>> {
+        Self::owned(py, self.snapshot(py)?.copy_detached())
     }
 
     /// Returns the atomic number.
@@ -493,8 +525,19 @@ impl PyAtom {
     ///     - other: the other Atom to which to compare
     #[pyo3(name = "Match")]
     fn py_match(&self, py: Python<'_>, what: PyRef<'_, PyAtom>) -> PyResult<bool> {
-        let other = what.snapshot(py)?;
-        self.with(py, |a| a.matches(&other))
+        let Some(query) = self.with(py, |a| a.query().cloned())? else {
+            let other = what.snapshot(py)?;
+            return self.with(py, |a| a.matches(&other));
+        };
+        // a query atom evaluates its query on the other atom in its context
+        match &what.handle {
+            AtomHandle::InMol { .. } => what.with_owner(|mol, idx| query.matches(mol, idx).py()),
+            AtomHandle::Owned(atom) => {
+                let mut single = ROMol::new();
+                single.add_atom(atom.copy_detached(), false);
+                query.matches(&single, 0).py()
+            }
+        }
     }
 
     /// Returns whether or not the atom is in a ring of a particular size.
@@ -580,5 +623,91 @@ impl PyAtom {
         }
         self.with_mol_mut(py, |m, _| crate::perception::find_sssr_if_needed(m))?
             .py()
+    }
+}
+
+pub(crate) fn expand_how(how: Option<&Bound<'_, PyAny>>) -> PyResult<CompositeQueryType> {
+    let how = how.map_or(Ok(0), |h| h.extract::<i64>())?;
+    match how {
+        0 => Ok(CompositeQueryType::And),
+        1 => Ok(CompositeQueryType::Or),
+        2 => Ok(CompositeQueryType::XOr),
+        _ => Err(PyValueError::new_err("bad CompositeQueryType")),
+    }
+}
+
+/// The query of `other`, if it has one; `other` must be a `QueryAtom`.
+fn other_query(
+    slf: &Bound<'_, PyQueryAtom>,
+    other: &Bound<'_, PyAny>,
+    method: &str,
+    extra: &[Bound<'_, PyAny>],
+) -> PyResult<Option<AtomQuery>> {
+    let py = slf.py();
+    let Ok(other) = other.cast::<PyQueryAtom>() else {
+        let mut got = vec![
+            "QueryAtom".to_string(),
+            crate::errors::boost_type_name(other),
+        ];
+        got.extend(extra.iter().map(crate::errors::boost_type_name));
+        let expected = if method == "ExpandQuery" {
+            "ExpandQuery(RDKit::QueryAtom* self, RDKit::QueryAtom const* other, Queries::CompositeQueryType how=rdkit.Chem.rdchem.CompositeQueryType.COMPOSITE_AND, bool maintainOrder=True)"
+        } else {
+            "SetQuery(RDKit::QueryAtom* self, RDKit::QueryAtom const* other)"
+        };
+        return Err(crate::errors::argument_error_in(
+            py,
+            "QueryAtom",
+            method,
+            &got,
+            expected,
+        ));
+    };
+    let other: PyRef<'_, PyAtom> = other.as_super().borrow();
+    other.with(py, |a| a.query().cloned())
+}
+
+#[pymethods]
+impl PyQueryAtom {
+    #[new]
+    #[pyo3(signature = (*_args, **_kwargs))]
+    fn py_new(
+        _args: &Bound<'_, pyo3::types::PyTuple>,
+        _kwargs: Option<&Bound<'_, pyo3::types::PyDict>>,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        Err(PyRuntimeError::new_err(
+            "This class cannot be instantiated from Python",
+        ))
+    }
+
+    /// combines the query from other with ours
+    #[pyo3(name = "ExpandQuery", signature = (other, how = None, maintainOrder = true))]
+    #[allow(non_snake_case)]
+    fn expand_query(
+        slf: &Bound<'_, Self>,
+        other: &Bound<'_, PyAny>,
+        how: Option<&Bound<'_, PyAny>>,
+        maintainOrder: bool,
+    ) -> PyResult<()> {
+        let py = slf.py();
+        let extra: Vec<Bound<'_, PyAny>> = how.into_iter().cloned().collect();
+        let how = expand_how(how)?;
+        if let Some(query) = other_query(slf, other, "ExpandQuery", &extra)? {
+            let mut this: PyRefMut<'_, PyAtom> = slf.as_super().borrow_mut();
+            this.with_mut(py, |a| atom_expand_query(a, query, how, maintainOrder))?
+                .py()?;
+        }
+        Ok(())
+    }
+
+    /// Replace our query with a copy of the other query
+    #[pyo3(name = "SetQuery", signature = (other))]
+    fn set_query(slf: &Bound<'_, Self>, other: &Bound<'_, PyAny>) -> PyResult<()> {
+        let py = slf.py();
+        if let Some(query) = other_query(slf, other, "SetQuery", &[])? {
+            let mut this: PyRefMut<'_, PyAtom> = slf.as_super().borrow_mut();
+            this.with_mut(py, |a| a.set_query(Some(query)))?;
+        }
+        Ok(())
     }
 }

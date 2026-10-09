@@ -14,10 +14,10 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
-use crate::graphmol::atom::ChiralType;
+use crate::graphmol::atom::{Atom, ChiralType};
 use crate::graphmol::bond::{BondStereo, BondType};
 use crate::graphmol::queries::{
-    AtomQuery, BondQuery, QueryKind, RecursionSets, atom_queries_match,
+    AtomQuery, BondQuery, QueryKind, RecursionSets, atom_queries_match, has_recursive_query,
 };
 use crate::graphmol::romol::ROMol;
 use crate::graphmol::stereo_group::StereoGroupType;
@@ -852,6 +852,29 @@ fn recursive_matcher(
         }
     }
     Ok(matches)
+}
+
+/// The atoms of `mol` that match the query atom `qa`, which is what
+/// iterating a `QueryAtomIterator` (`Mol.GetAtomsMatchingQuery`) yields.
+/// Recursive queries are evaluated against `mol` first.
+pub fn atoms_matching_query(mol: &ROMol, qa: &Atom) -> Result<Vec<u32>> {
+    let Some(query) = qa.query() else {
+        return Ok((0..mol.num_atoms())
+            .filter(|&i| qa.matches(mol.atom(i)))
+            .collect());
+    };
+    let mut rec = RecursionSets::new();
+    if has_recursive_query(Some(query)) {
+        let ps = SubstructMatchParameters::default();
+        match_subqueries(mol, query, &ps, &mut BTreeMap::new(), &mut rec)?;
+    }
+    let mut matching = Vec::new();
+    for idx in 0..mol.num_atoms() {
+        if query.matches_with(mol, idx, Some(&rec))? {
+            matching.push(idx);
+        }
+    }
+    Ok(matching)
 }
 
 fn run_vf2(

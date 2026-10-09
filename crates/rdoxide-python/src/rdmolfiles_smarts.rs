@@ -10,8 +10,8 @@ use rdoxide::graphmol::smiles_parse::smarts::{
     SmartsParserParams, atom_from_smarts, bond_from_smarts, mol_from_smarts,
 };
 
-use crate::atom::{AtomHandle, PyAtom};
-use crate::bond::{BondHandle, PyBond};
+use crate::atom::PyAtom;
+use crate::bond::PyBond;
 use crate::mol::PyMol;
 
 /// Parameters controlling SMARTS Parsing
@@ -158,20 +158,20 @@ fn py_mol_from_smarts(
 #[pyfunction]
 #[pyo3(name = "AtomFromSmarts")]
 #[allow(non_snake_case)]
-fn py_atom_from_smarts(SMARTS: &str) -> Option<PyAtom> {
-    atom_from_smarts(SMARTS).map(|a| PyAtom {
-        handle: AtomHandle::Owned(a),
-    })
+fn py_atom_from_smarts(py: Python<'_>, SMARTS: &str) -> PyResult<Option<Py<PyAtom>>> {
+    atom_from_smarts(SMARTS)
+        .map(|a| PyAtom::owned(py, a))
+        .transpose()
 }
 
 /// Construct a bond from a SMARTS string
 #[pyfunction]
 #[pyo3(name = "BondFromSmarts")]
 #[allow(non_snake_case)]
-fn py_bond_from_smarts(SMILES: &str) -> Option<PyBond> {
-    bond_from_smarts(SMILES).map(|b| PyBond {
-        handle: BondHandle::Owned(b),
-    })
+fn py_bond_from_smarts(py: Python<'_>, SMILES: &str) -> PyResult<Option<Py<PyBond>>> {
+    bond_from_smarts(SMILES)
+        .map(|b| PyBond::owned(py, b))
+        .transpose()
 }
 
 pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {

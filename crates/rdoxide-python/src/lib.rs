@@ -64,6 +64,7 @@ mod rdmolops_wedging;
 mod rdmolops_zip;
 mod rdmoltransforms;
 mod rdpartialcharges;
+mod rdqueries;
 mod ringinfo;
 mod stereo_group;
 mod substruct;
@@ -101,6 +102,7 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
     add_submodule(m, "rdmolfiles", "rdkit.Chem.rdmolfiles", rdmolfiles::init)?;
     add_submodule(m, "rdmolops", "rdkit.Chem.rdmolops", rdmolops::init)?;
     add_submodule(m, "rdDepictor", "rdkit.Chem.rdDepictor", rddepictor::init)?;
+    add_submodule(m, "rdqueries", "rdkit.Chem.rdqueries", rdqueries::init)?;
     add_submodule(
         m,
         "rdMolTransforms",

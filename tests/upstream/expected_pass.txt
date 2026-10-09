@@ -141,6 +141,7 @@ Code/GraphMol/Wrap/test_lazy_numpy.py::TestLazyNumpy::test_conformer_positions_l
 Code/GraphMol/Wrap/test_lazy_numpy.py::TestLazyNumpy::test_datastructs_convert_loads_numpy
 Code/GraphMol/Wrap/test_lazy_numpy.py::TestLazyNumpy::test_numpy_loads_on_demand
 Code/GraphMol/Wrap/test_subset.py::TestCase::test_subset
+Code/GraphMol/Wrap/test_substruct.py::TestCase::test_recursiveatoms
 rdkit/Chem/EState/UnitTestEState.py::TestCase::test_GetPrincipleQuantumNumber
 rdkit/Chem/EState/UnitTestEState.py::TestCase::test_aromatics
 rdkit/Chem/EState/UnitTestEState.py::TestCase::test_cacheEstate

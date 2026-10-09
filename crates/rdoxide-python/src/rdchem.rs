@@ -362,8 +362,10 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("KekulizeException", py.get_type::<KekulizeException>())?;
 
     m.add_class::<crate::atom::PyAtom>()?;
+    m.add_class::<crate::atom::PyQueryAtom>()?;
     crate::rdchem_atom_funcs::add(m)?;
     m.add_class::<crate::bond::PyBond>()?;
+    m.add_class::<crate::bond::PyQueryBond>()?;
     m.add_class::<crate::conformer::PyConformer>()?;
     m.add_class::<crate::mol::PyMol>()?;
     m.add_class::<crate::mol::PyRWMol>()?;

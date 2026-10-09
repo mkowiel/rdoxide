@@ -4,6 +4,7 @@
 use pyo3::exceptions::{PyIndexError, PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyTuple;
+use rdoxide::graphmol::substruct::atoms_matching_query;
 use rdoxide::graphmol::{Atom, Bond, BondType, ROMol};
 use rdoxide::rdgeneral::{Dict, RDProps};
 
@@ -276,6 +277,41 @@ impl PyMol {
             indices: Some(idx),
             pos: 0,
         }
+    }
+
+    /// Returns a read-only sequence containing all of the atoms in a molecule that match the query atom. Atom query options are defined in the rdkit.Chem.rdqueries module.
+    #[pyo3(name = "GetAtomsMatchingQuery", signature = (qa))]
+    fn get_atoms_matching_query(slf: &Bound<'_, Self>, qa: &Bound<'_, PyAny>) -> PyResult<AtomSeq> {
+        let py = slf.py();
+        let query_atom = if qa.is_none() {
+            return Err(crate::errors::check_failed(
+                crate::errors::Site {
+                    check: crate::errors::Check::Precondition,
+                    file: "Code/GraphMol/AtomIterators.cpp",
+                    line: 390,
+                    expr: "what",
+                },
+                "bad query atom",
+            ));
+        } else if let Ok(atom) = qa.cast::<crate::atom::PyQueryAtom>() {
+            atom.as_super().borrow().snapshot(py)?
+        } else {
+            return Err(crate::errors::argument_error_in(
+                py,
+                "Mol",
+                "GetAtomsMatchingQuery",
+                &["Mol".to_string(), crate::errors::boost_type_name(qa)],
+                "GetAtomsMatchingQuery(boost::shared_ptr<RDKit::ROMol> self, RDKit::QueryAtom* qa)",
+            ));
+        };
+        let m = slf.borrow();
+        let indices = atoms_matching_query(&m.mol, &query_atom).py()?;
+        Ok(AtomSeq {
+            mol: slf.clone().unbind(),
+            len_at_start: m.mol.num_atoms(),
+            indices: Some(indices),
+            pos: 0,
+        })
     }
 
     /// Returns the number of conformations on the molecule

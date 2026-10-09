@@ -2,7 +2,9 @@
 
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
-use rdoxide::graphmol::{Bond, ROMol};
+use rdoxide::graphmol::queries::BondQuery;
+use rdoxide::graphmol::query_ops::bond_expand_query;
+use rdoxide::graphmol::{Atom, Bond, ROMol};
 use rdoxide::rdgeneral::Dict;
 
 use crate::atom::{AtomHandle, PyAtom};
@@ -13,8 +15,7 @@ use crate::props::impl_props;
 
 #[derive(Debug)]
 pub enum BondHandle {
-    /// Bonds cannot be created from Python, but query bonds (stage 4) can.
-    #[allow(dead_code)]
+    /// Bonds cannot be created from Python, but query bonds can.
     Owned(Bond),
     InMol {
         mol: Py<PyMol>,
@@ -41,14 +42,44 @@ fn no_owner() -> PyErr {
     ))
 }
 
+/// The class to store QueryBonds.
+/// These cannot currently be constructed directly from Python
+#[pyclass(name = "QueryBond", module = "rdkit.Chem.rdchem", extends = PyBond)]
+pub struct PyQueryBond;
+
 impl PyBond {
+    /// The Python object for a bond: a `QueryBond` when the bond carries a
+    /// query, else a `Bond` (see `PyAtom::from_handle`).
+    pub fn from_handle(py: Python<'_>, handle: BondHandle) -> PyResult<Py<PyBond>> {
+        let is_query = match &handle {
+            BondHandle::Owned(b) => b.has_query(),
+            BondHandle::InMol { mol, idx } => mol.bind(py).try_borrow().is_ok_and(|m| {
+                m.mol
+                    .bonds()
+                    .get(*idx as usize)
+                    .is_some_and(Bond::has_query)
+            }),
+        };
+        let init = PyClassInitializer::from(PyBond { handle });
+        if is_query {
+            let obj = Py::new(py, init.add_subclass(PyQueryBond))?;
+            Ok(obj
+                .into_bound(py)
+                .into_any()
+                .cast_into::<PyBond>()?
+                .unbind())
+        } else {
+            Py::new(py, init)
+        }
+    }
+
     pub fn in_mol(py: Python<'_>, mol: Py<PyMol>, idx: u32) -> PyResult<Py<PyBond>> {
-        Py::new(
-            py,
-            PyBond {
-                handle: BondHandle::InMol { mol, idx },
-            },
-        )
+        Self::from_handle(py, BondHandle::InMol { mol, idx })
+    }
+
+    /// A free-standing bond.
+    pub fn owned(py: Python<'_>, bond: Bond) -> PyResult<Py<PyBond>> {
+        Self::from_handle(py, BondHandle::Owned(bond))
     }
 
     pub fn with<R>(&self, py: Python<'_>, f: impl FnOnce(&Bond) -> R) -> PyResult<R> {
@@ -313,8 +344,27 @@ impl PyBond {
     ///     - other: the other Bond to which to compare
     #[pyo3(name = "Match")]
     fn py_match(&self, py: Python<'_>, what: PyRef<'_, PyBond>) -> PyResult<bool> {
-        let other = what.snapshot(py)?;
-        self.with(py, |b| b.matches(&other))
+        let Some(query) = self.with(py, |b| b.query().cloned())? else {
+            let other = what.snapshot(py)?;
+            return self.with(py, |b| b.matches(&other));
+        };
+        // a query bond evaluates its query on the other bond in its context
+        match &what.handle {
+            BondHandle::InMol { mol, idx } => {
+                let m = mol.bind(py).borrow();
+                query.matches(&m.mol, *idx).py()
+            }
+            BondHandle::Owned(bond) => {
+                let mut single = ROMol::new();
+                single.add_atom(Atom::new(0), false);
+                single.add_atom(Atom::new(0), false);
+                let mut copy = bond.clone();
+                copy.set_begin_atom_idx_unchecked(0);
+                copy.set_end_atom_idx_unchecked(1);
+                let idx = single.add_bond_object(copy).py()?;
+                query.matches(&single, idx).py()
+            }
+        }
     }
 
     /// Returns whether or not the bond is in a ring of a particular size.
@@ -395,5 +445,80 @@ impl PyBond {
         }
         self.with_mol_mut(py, |m, _| crate::perception::find_sssr_if_needed(m))?
             .py()
+    }
+}
+
+fn other_query(
+    slf: &Bound<'_, PyQueryBond>,
+    other: &Bound<'_, PyAny>,
+    method: &str,
+    extra: &[Bound<'_, PyAny>],
+) -> PyResult<Option<BondQuery>> {
+    let py = slf.py();
+    let Ok(other) = other.cast::<PyQueryBond>() else {
+        let mut got = vec![
+            "QueryBond".to_string(),
+            crate::errors::boost_type_name(other),
+        ];
+        got.extend(extra.iter().map(crate::errors::boost_type_name));
+        let expected = if method == "ExpandQuery" {
+            "ExpandQuery(RDKit::QueryBond* self, RDKit::QueryBond const* other, Queries::CompositeQueryType how=rdkit.Chem.rdchem.CompositeQueryType.COMPOSITE_AND, bool maintainOrder=True)"
+        } else {
+            "SetQuery(RDKit::QueryBond* self, RDKit::QueryBond const* other)"
+        };
+        return Err(crate::errors::argument_error_in(
+            py,
+            "QueryBond",
+            method,
+            &got,
+            expected,
+        ));
+    };
+    let other: PyRef<'_, PyBond> = other.as_super().borrow();
+    other.with(py, |a| a.query().cloned())
+}
+
+#[pymethods]
+impl PyQueryBond {
+    #[new]
+    #[pyo3(signature = (*_args, **_kwargs))]
+    fn py_new(
+        _args: &Bound<'_, pyo3::types::PyTuple>,
+        _kwargs: Option<&Bound<'_, pyo3::types::PyDict>>,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        Err(PyRuntimeError::new_err(
+            "This class cannot be instantiated from Python",
+        ))
+    }
+
+    /// combines the query from other with ours
+    #[pyo3(name = "ExpandQuery", signature = (other, how = None, maintainOrder = true))]
+    #[allow(non_snake_case)]
+    fn expand_query(
+        slf: &Bound<'_, Self>,
+        other: &Bound<'_, PyAny>,
+        how: Option<&Bound<'_, PyAny>>,
+        maintainOrder: bool,
+    ) -> PyResult<()> {
+        let py = slf.py();
+        let extra: Vec<Bound<'_, PyAny>> = how.into_iter().cloned().collect();
+        let how = crate::atom::expand_how(how)?;
+        if let Some(query) = other_query(slf, other, "ExpandQuery", &extra)? {
+            let mut this: PyRefMut<'_, PyBond> = slf.as_super().borrow_mut();
+            this.with_mut(py, |b| bond_expand_query(b, query, how, maintainOrder))?
+                .py()?;
+        }
+        Ok(())
+    }
+
+    /// Replace our query with a copy of the other query
+    #[pyo3(name = "SetQuery", signature = (other))]
+    fn set_query(slf: &Bound<'_, Self>, other: &Bound<'_, PyAny>) -> PyResult<()> {
+        let py = slf.py();
+        if let Some(query) = other_query(slf, other, "SetQuery", &[])? {
+            let mut this: PyRefMut<'_, PyBond> = slf.as_super().borrow_mut();
+            this.with_mut(py, |b| b.set_query(Some(query)))?;
+        }
+        Ok(())
     }
 }
