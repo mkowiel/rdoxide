@@ -86,6 +86,7 @@ Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testRDKitFPGenerato
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testRDKitFPGeneratorAndFromAtoms
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testTopologicalTorsionGenerator
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testTopologicalTorsionShortestPaths
+Code/GraphMol/PartialCharges/Wrap/testPartialCharges.py::TestCase::test0HalgrenSet
 Code/GraphMol/PartialCharges/Wrap/testPartialCharges.py::TestCase::test1PPDataset
 Code/GraphMol/PartialCharges/Wrap/testPartialCharges.py::TestCase::test2Params
 Code/GraphMol/PartialCharges/Wrap/testPartialCharges.py::TestCase::test3Params
@@ -118,6 +119,9 @@ rdkit/Chem/EState/UnitTestTypes.py::TestCase::test2_complexMolecules
 rdkit/Chem/EState/UnitTestVSA.py::TestCase::test1
 rdkit/Chem/Suppliers/UnitTestSDMolSupplier.py::TestCase::test_SDMolSupplier
 rdkit/Chem/Suppliers/UnitTestSDMolSupplier.py::TestCase::test_SDWriter
+rdkit/Chem/Suppliers/UnitTestSmilesMolSupplier.py::TestCase::test_SmilesReaderBoundaryConditions
+rdkit/Chem/Suppliers/UnitTestSmilesMolSupplier.py::TestCase::test_SmilesReaderIndex
+rdkit/Chem/Suppliers/UnitTestSmilesMolSupplier.py::TestCase::test_SmilesReaderIterator
 rdkit/Chem/UnitTestChem.py::TestCase::testMultiConfMolFromSDF
 rdkit/Chem/UnitTestChem.py::TestCase::testPkl
 rdkit/Chem/UnitTestChem.py::TestCase::testPkl1
@@ -214,6 +218,8 @@ rdkit/Chem/UnitTestSmiles.py::TestCase::testRings2
 rdkit/Chem/UnitTestSmiles.py::TestCase::testStereoParsingIsConsistent
 rdkit/Chem/UnitTestSpacialScore.py::TestCase::testVersion
 rdkit/Chem/UnitTestSuppliers.py::TestCase::test1SDSupplier
+rdkit/Chem/UnitTestSuppliers.py::TestCase::test2SmilesSupplier
+rdkit/Chem/UnitTestSuppliers.py::TestCase::test3SmilesSupplier
 rdkit/Chem/UnitTestSurf.py::TestCase::testHsAndTPSA
 rdkit/Chem/UnitTestSurf.py::TestCase::testTPSAShort
 rdkit/Chem/UnitTestSurf.py::TestCase_descriptorRegression::testTPSALong

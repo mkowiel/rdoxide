@@ -15,7 +15,7 @@ use crate::rdgeneral::{RDProps, RDValue};
 use crate::{RDKitError, Result, rd_log_error, rd_log_warning};
 
 /// `FileParserUtils::strip` with the default " \t\r\n"
-fn strip(s: &[u8]) -> &[u8] {
+pub(crate) fn strip(s: &[u8]) -> &[u8] {
     let ws = |c: &u8| matches!(c, b' ' | b'\t' | b'\r' | b'\n');
     let start = s.iter().position(|c| !ws(c)).unwrap_or(s.len());
     let end = s.iter().rposition(|c| !ws(c)).map_or(start, |e| e + 1);
