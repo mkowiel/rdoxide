@@ -922,3 +922,7 @@
 
 [module."rdoxide_python::rdchemreactions".sources]
 "Code/GraphMol/ChemReactions/Wrap/rdChemReactions.cpp" = "a2bba60a070f26399204cd2867735fb15cc58a10"
+
+[module."rdoxide::graphmol::chem_reactions::mdl".sources]
+"Code/GraphMol/ChemReactions/MDLParser.cpp" = "8975fcc62d017855d670f68e03c9cd31759be9ee"
+"Code/GraphMol/ChemReactions/MoleculeParser.cpp" = "48ce1743db7c069b656fe74b7834904683298439"
