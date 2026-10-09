@@ -6,11 +6,14 @@
 //! CDXML/PNG readers and writers, fingerprints, reaction depiction and
 //! enumeration are not provided yet.
 
-use pyo3::exceptions::PyValueError;
+use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyBytes, PyDict, PyList, PyTuple};
 use rdoxide::graphmol::chem_reactions::daylight::{
     ReactionSmartsParserParams, reaction_from_smarts, reaction_from_smiles,
+};
+use rdoxide::graphmol::chem_reactions::fingerprints::{
+    FingerprintType, ReactionFingerprintParams, difference_fingerprint, structural_fingerprint,
 };
 use rdoxide::graphmol::chem_reactions::mdl::{
     reaction_from_rxn_block, reaction_from_rxn_file, reaction_from_rxn_mol, reaction_to_rxn_block,
@@ -36,7 +39,9 @@ use rdoxide::graphmol::romol::ROMol;
 use rdoxide::graphmol::smiles_parse::cx_write::cx_fields;
 use rdoxide::graphmol::smiles_parse::write::SmilesWriteParams;
 
-use crate::enums::{add_enum_exported, to_py as enum_to_py};
+use crate::datastructs::PyExplicitBitVect;
+use crate::datastructs_siv::PyUIntSIV;
+use crate::enums::{add_enum, add_enum_exported, to_py as enum_to_py};
 use crate::errors::IntoPyResult;
 use crate::mol::PyMol;
 use crate::rdmolfiles_write::PySmilesWriteParams;
@@ -790,6 +795,156 @@ fn py_reaction_to_cx_smiles(
         .py()
 }
 
+const FINGERPRINT_TYPE: &str = "FingerprintType";
+
+fn fingerprint_type_members() -> [(&'static str, i64); 5] {
+    [
+        ("AtomPairFP", FingerprintType::AtomPair as i64),
+        (
+            "TopologicalTorsion",
+            FingerprintType::TopologicalTorsion as i64,
+        ),
+        ("MorganFP", FingerprintType::Morgan as i64),
+        ("RDKitFP", FingerprintType::RDKit as i64),
+        ("PatternFP", FingerprintType::Pattern as i64),
+    ]
+}
+
+/// A class for storing parameters to manipulate the calculation of
+/// fingerprints of chemical reactions.
+#[pyclass(
+    name = "ReactionFingerprintParams",
+    module = "rdkit.Chem.rdChemReactions",
+    from_py_object
+)]
+#[derive(Clone, Default)]
+struct PyReactionFingerprintParams {
+    params: ReactionFingerprintParams,
+}
+
+#[pymethods]
+impl PyReactionFingerprintParams {
+    /// Constructor: no arguments, or (includeAgents, bitRatioAgents,
+    /// nonAgentWeight, agentWeight, fpSize, fpType)
+    #[new]
+    #[pyo3(signature = (*args))]
+    fn new(args: &Bound<'_, PyTuple>) -> PyResult<Self> {
+        match args.len() {
+            0 => Ok(Self::default()),
+            6 => {
+                let fp_type: i64 = args.get_item(5)?.extract()?;
+                Ok(PyReactionFingerprintParams {
+                    params: ReactionFingerprintParams {
+                        include_agents: args.get_item(0)?.extract()?,
+                        bit_ratio_agents: args.get_item(1)?.extract()?,
+                        non_agent_weight: args.get_item(2)?.extract()?,
+                        agent_weight: args.get_item(3)?.extract()?,
+                        fp_size: args.get_item(4)?.extract()?,
+                        fp_type: fingerprint_type(fp_type)?,
+                    },
+                })
+            }
+            _ => Err(PyTypeError::new_err(
+                "ReactionFingerprintParams() takes no arguments or (includeAgents, \
+                 bitRatioAgents, nonAgentWeight, agentWeight, fpSize, fpType)",
+            )),
+        }
+    }
+
+    #[getter(fpSize)]
+    fn fp_size(&self) -> u32 {
+        self.params.fp_size
+    }
+    #[setter(fpSize)]
+    fn set_fp_size(&mut self, v: u32) {
+        self.params.fp_size = v;
+    }
+    #[getter(fpType)]
+    fn fp_type(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        enum_to_py(py, FINGERPRINT_TYPE, self.params.fp_type as i64)
+    }
+    #[setter(fpType)]
+    fn set_fp_type(&mut self, v: i64) -> PyResult<()> {
+        self.params.fp_type = fingerprint_type(v)?;
+        Ok(())
+    }
+    #[getter(bitRatioAgents)]
+    fn bit_ratio_agents(&self) -> f64 {
+        self.params.bit_ratio_agents
+    }
+    #[setter(bitRatioAgents)]
+    fn set_bit_ratio_agents(&mut self, v: f64) {
+        self.params.bit_ratio_agents = v;
+    }
+    #[getter(nonAgentWeight)]
+    fn non_agent_weight(&self) -> u32 {
+        self.params.non_agent_weight
+    }
+    #[setter(nonAgentWeight)]
+    fn set_non_agent_weight(&mut self, v: u32) {
+        self.params.non_agent_weight = v;
+    }
+    #[getter(agentWeight)]
+    fn agent_weight(&self) -> i32 {
+        self.params.agent_weight
+    }
+    #[setter(agentWeight)]
+    fn set_agent_weight(&mut self, v: i32) {
+        self.params.agent_weight = v;
+    }
+    #[getter(includeAgents)]
+    fn include_agents(&self) -> bool {
+        self.params.include_agents
+    }
+    #[setter(includeAgents)]
+    fn set_include_agents(&mut self, v: bool) {
+        self.params.include_agents = v;
+    }
+}
+
+fn fingerprint_type(v: i64) -> PyResult<FingerprintType> {
+    i32::try_from(v)
+        .ok()
+        .and_then(FingerprintType::from_i32)
+        .ok_or_else(|| PyValueError::new_err("invalid FingerprintType"))
+}
+
+/// construct a difference fingerprint for a ChemicalReaction by subtracting
+/// the reactant fingerprint from the product fingerprint
+#[pyfunction]
+#[pyo3(name = "CreateDifferenceFingerprintForReaction", signature = (reaction, ReactionFingerPrintParams = None))]
+#[allow(non_snake_case)]
+fn py_create_difference_fingerprint(
+    py: Python<'_>,
+    reaction: &Bound<'_, PyChemicalReaction>,
+    ReactionFingerPrintParams: Option<PyReactionFingerprintParams>,
+) -> PyResult<PyUIntSIV> {
+    let params = ReactionFingerPrintParams
+        .map_or_else(ReactionFingerprintParams::default_difference, |p| p.params);
+    let rxn = synced(reaction).rxn.clone();
+    py.detach(|| difference_fingerprint(&rxn, &params))
+        .py()
+        .map(PyUIntSIV::wrap)
+}
+
+/// construct a structural fingerprint for a ChemicalReaction by
+/// concatenating the reactant fingerprint and the product fingerprint
+#[pyfunction]
+#[pyo3(name = "CreateStructuralFingerprintForReaction", signature = (reaction, ReactionFingerPrintParams = None))]
+#[allow(non_snake_case)]
+fn py_create_structural_fingerprint(
+    py: Python<'_>,
+    reaction: &Bound<'_, PyChemicalReaction>,
+    ReactionFingerPrintParams: Option<PyReactionFingerprintParams>,
+) -> PyResult<PyExplicitBitVect> {
+    let params = ReactionFingerPrintParams
+        .map_or_else(ReactionFingerprintParams::default_structural, |p| p.params);
+    let rxn = synced(reaction).rxn.clone();
+    py.detach(|| structural_fingerprint(&rxn, &params))
+        .py()
+        .map(PyExplicitBitVect::wrap)
+}
+
 /// construct a molecule for a ChemicalReaction with RXN role property set
 #[pyfunction]
 #[pyo3(name = "ReactionToMolecule")]
@@ -1146,6 +1301,10 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
         "Module containing classes and functions for working with chemical reactions.",
     )?;
     m.add_class::<PyChemicalReaction>()?;
+    add_enum(m, FINGERPRINT_TYPE, &fingerprint_type_members(), None)?;
+    m.add_class::<PyReactionFingerprintParams>()?;
+    m.add_function(wrap_pyfunction!(py_create_difference_fingerprint, m)?)?;
+    m.add_function(wrap_pyfunction!(py_create_structural_fingerprint, m)?)?;
     add_enum_exported(
         m,
         "SanitizeFlags",

@@ -917,6 +917,10 @@
 "Code/GraphMol/ChemReactions/ReactionParser.h" = "9af217731fcf7040fe5ba113f252bf7db0bf080e"
 "Code/GraphMol/ChemReactions/DaylightParser.cpp" = "099878f6ec8a2015408ac8fe79d39ac84e9e2d64"
 
+[module."rdoxide::graphmol::chem_reactions::fingerprints".sources]
+"Code/GraphMol/ChemReactions/ReactionFingerprints.h" = "a1fbeaf81f35fcf61f55f616259b3e35ea3867d1"
+"Code/GraphMol/ChemReactions/ReactionFingerprints.cpp" = "6c7ff3cdba8b7efd1a38223648e033920b32369b"
+
 [module."rdoxide::graphmol::chem_reactions::writer".sources]
 "Code/GraphMol/ChemReactions/ReactionWriter.cpp" = "ce1e099b0f0b927a736a89269e7f673ec1bbd67a"
 
