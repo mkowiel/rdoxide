@@ -30,6 +30,7 @@ mod rdbase;
 mod rdchem;
 mod rdchem_atom_funcs;
 mod rdchem_stereo_info;
+mod rdchemicalfeatures;
 mod rdclustering;
 mod rddepictor;
 mod rddeterminebonds;
@@ -40,6 +41,7 @@ mod rdmetricmatrixcalc;
 mod rdmhfpfingerprint;
 mod rdmmpa;
 mod rdmolalign;
+mod rdmolchemicalfeatures;
 mod rdmoldescriptors;
 mod rdmoldescriptors_3d;
 mod rdmoldescriptors_autocorr;
@@ -126,6 +128,18 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
     add_submodule(m, "rdDepictor", "rdkit.Chem.rdDepictor", rddepictor::init)?;
     add_submodule(m, "rdqueries", "rdkit.Chem.rdqueries", rdqueries::init)?;
     add_submodule(m, "rdMolAlign", "rdkit.Chem.rdMolAlign", rdmolalign::init)?;
+    add_submodule(
+        m,
+        "rdChemicalFeatures",
+        "rdkit.Chem.rdChemicalFeatures",
+        rdchemicalfeatures::init,
+    )?;
+    add_submodule(
+        m,
+        "rdMolChemicalFeatures",
+        "rdkit.Chem.rdMolChemicalFeatures",
+        rdmolchemicalfeatures::init,
+    )?;
     add_submodule(
         m,
         "rdMolTransforms",
