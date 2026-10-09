@@ -50,6 +50,7 @@ mod rdmolfiles_smiwriter;
 mod rdmolfiles_write;
 mod rdmolops;
 mod rdmolops_fingerprints;
+mod rdmolops_fragments;
 mod rdmolops_hs;
 mod rdmolops_matrices;
 mod rdmolops_structure;

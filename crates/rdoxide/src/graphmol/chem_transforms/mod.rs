@@ -1,13 +1,15 @@
 //! Substructure-based molecule transforms (upstream
 //! `GraphMol/ChemTransforms/ChemTransforms.cpp`): `deleteSubstructs`,
 //! `replaceSubstructs`, `replaceSidechains`, `MurckoDecompose` and
-//! `combineMols`; `replaceCore` lives in [`replace_core`].
+//! `combineMols`; `replaceCore` lives in [`replace_core`] and the bond
+//! fragmentation (`MolFragmenter.cpp`) in [`mol_fragmenter`].
 //!
 //! Ported from RDKit 2026.09.1.
 //!
 //! Copyright (C) 2006-2025 Greg Landrum and other RDKit contributors.
 //! Licensed under the BSD 3-Clause license (see LICENSES/RDKit-BSD-3-Clause.txt).
 
+pub mod mol_fragmenter;
 pub mod replace_core;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -25,6 +27,10 @@ use crate::rdgeneral::common_properties as cp;
 use crate::rdgeneral::{RDProps, RDValue};
 use crate::{RDKitError, Result, rd_log_warning};
 
+pub use mol_fragmenter::{
+    FragmenterBondType, fragment_on_bond_patterns, fragment_on_bonds, fragment_on_brics_bonds,
+    fragment_on_some_bonds,
+};
 pub use replace_core::{replace_core, replace_core_with_match};
 
 /// `details::updateSubMolConfs`: rebuilds the conformers of `res` from those
