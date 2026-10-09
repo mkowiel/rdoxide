@@ -784,3 +784,12 @@
 [module."rdoxide::graphmol::chirality::find_stereo".sources]
 "Code/GraphMol/FindStereo.cpp" = "a3ad1280f33a06430df7d566a825dc80e589cbb9"
 "Code/GraphMol/Chirality.h" = "00f628293afe048e44e86c120e86acc3a6e9d280"
+
+[module."rdoxide::graphmol::enumerate_stereoisomers".sources]
+"Code/GraphMol/EnumerateStereoisomers/EnumerateStereoisomers.cpp" = "14333233323d63bf0a8cf3ee6d724948949a647e"
+"Code/GraphMol/EnumerateStereoisomers/EnumerateStereoisomers.h" = "731919e7ab883e2ba2d44ebd932b20a4d34a260a"
+"Code/GraphMol/EnumerateStereoisomers/Flippers.cpp" = "ae35a7005243ccb5151008970d4bd5c3aeb7289d"
+"Code/GraphMol/EnumerateStereoisomers/Flippers.h" = "00cfe6a8d48d6caa94c4386e88bfe4dca7c52d43"
+
+[module."rdoxide_python::rdenumeratestereoisomers".sources]
+"Code/GraphMol/EnumerateStereoisomers/Wrap/rdEnumerateStereoisomers.cpp" = "ac981759a35782681eb18c27ed32e71f4bf2c9c9"

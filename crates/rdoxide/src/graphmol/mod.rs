@@ -13,6 +13,7 @@ pub mod conjug_hybrid;
 pub mod debug;
 pub mod depictor;
 pub mod descriptors;
+pub mod enumerate_stereoisomers;
 pub mod file_parsers;
 pub mod find_rings;
 pub mod fingerprints;
