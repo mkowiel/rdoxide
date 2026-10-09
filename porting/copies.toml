@@ -214,3 +214,11 @@ to = "python/rdkit/ML/Cluster/Butina.py"
 [[copy]]
 from = "rdkit/TestRunner.py"
 to = "python/rdkit/TestRunner.py"
+
+[[copy]]
+from = "rdkit/DataManip/__init__.py"
+to = "python/rdkit/DataManip/__init__.py"
+
+[[copy]]
+from = "rdkit/DataManip/Metric/__init__.py"
+to = "python/rdkit/DataManip/Metric/__init__.py"

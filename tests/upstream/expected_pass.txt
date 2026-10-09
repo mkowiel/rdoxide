@@ -1,5 +1,10 @@
 # Upstream RDKit Python tests known to pass on rdoxide (ratchet).
 # Maintained by tools/run_upstream_tests.py --update
+Code/DataManip/MetricMatrixCalc/Wrap/testMatricCalc.py::TestCase::test0DistsArray
+Code/DataManip/MetricMatrixCalc/Wrap/testMatricCalc.py::TestCase::test2DistListList
+Code/DataManip/MetricMatrixCalc/Wrap/testMatricCalc.py::TestCase::test3Compare
+Code/DataManip/MetricMatrixCalc/Wrap/testMatricCalc.py::TestCase::test4ebv
+Code/DataManip/MetricMatrixCalc/Wrap/testMatricCalc.py::TestCase::test5sbv
 Code/DataStructs/Wrap/testBV.py::TestCase::test01BVWithAllOnes
 Code/DataStructs/Wrap/testBV.py::TestCase::test0FromList
 Code/DataStructs/Wrap/testBV.py::TestCase::test10BulkOps2
@@ -164,6 +169,17 @@ Code/GraphMol/Wrap/test_lazy_numpy.py::TestLazyNumpy::test_datastructs_convert_l
 Code/GraphMol/Wrap/test_lazy_numpy.py::TestLazyNumpy::test_numpy_loads_on_demand
 Code/GraphMol/Wrap/test_subset.py::TestCase::test_subset
 Code/GraphMol/Wrap/test_substruct.py::TestCase::test_recursiveatoms
+Code/SimDivPickers/Wrap/testPickers.py::TestCase::test0MaxMin
+Code/SimDivPickers/Wrap/testPickers.py::TestCase::test1HierarchPick
+Code/SimDivPickers/Wrap/testPickers.py::TestCase::testBitVectorLeader1
+Code/SimDivPickers/Wrap/testPickers.py::TestCase::testBitVectorMaxMin
+Code/SimDivPickers/Wrap/testPickers.py::TestCase::testBitVectorMaxMin2
+Code/SimDivPickers/Wrap/testPickers.py::TestCase::testBitVectorMaxMin3
+Code/SimDivPickers/Wrap/testPickers.py::TestCase::testBitVectorMaxMin4
+Code/SimDivPickers/Wrap/testPickers.py::TestCase::testInts
+Code/SimDivPickers/Wrap/testPickers.py::TestCase::testIssue208
+Code/SimDivPickers/Wrap/testPickers.py::TestCase::testLazyLeader
+Code/SimDivPickers/Wrap/testPickers.py::TestCase::testNonUniqueCrash
 rdkit/Chem/EState/UnitTestEState.py::TestCase::test_GetPrincipleQuantumNumber
 rdkit/Chem/EState/UnitTestEState.py::TestCase::test_aromatics
 rdkit/Chem/EState/UnitTestEState.py::TestCase::test_cacheEstate
