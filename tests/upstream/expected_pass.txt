@@ -134,6 +134,9 @@ Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testRDKitFPGenerato
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testRDKitFPGeneratorAndFromAtoms
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testTopologicalTorsionGenerator
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testTopologicalTorsionShortestPaths
+Code/GraphMol/Fingerprints/Wrap/testMHFP.py::TestCase::testBulkFunctions
+Code/GraphMol/Fingerprints/Wrap/testMHFP.py::TestCase::testMHFPDistance
+Code/GraphMol/Fingerprints/Wrap/testMHFP.py::TestCase::testMHFPFingerprint
 Code/GraphMol/MMPA/Wrap/testMMPA.py::TestCase::test1
 Code/GraphMol/MMPA/Wrap/testMMPA.py::TestCase::test2
 Code/GraphMol/MMPA/Wrap/testMMPA.py::TestCase::test3

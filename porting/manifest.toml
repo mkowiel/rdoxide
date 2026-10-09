@@ -800,3 +800,10 @@
 
 [module."rdoxide_python::rdmmpa".sources]
 "Code/GraphMol/MMPA/Wrap/rdMMPA.cpp" = "3039cee9ff8fb71ffae461defa7f207e817ce473"
+
+[module."rdoxide::graphmol::fingerprints::mhfp".sources]
+"Code/GraphMol/Fingerprints/MHFP.cpp" = "bace09aeeef3a8008716631c7f4d430e128a034f"
+"Code/GraphMol/Fingerprints/MHFP.h" = "a5044ddd344dfc1c1738a33c2938aa08d56c4bae"
+
+[module."rdoxide_python::rdmhfpfingerprint".sources]
+"Code/GraphMol/Fingerprints/Wrap/MHFPWrapper.cpp" = "9c003b9de63e7c8cb9eff68c433abe294897b90b"
