@@ -3,8 +3,7 @@
 //!
 //! Ported from RDKit `Code/GraphMol/MolPickler.{h,cpp}` and
 //! `Code/RDGeneral/StreamOps.h` (2026.09.1). Pickles written by RDKit can be
-//! read here and vice versa. Not ported yet: SubstanceGroups, monomer info,
-//! the version-1 format and custom (ExplicitBitVect) property handlers.
+//! read here and vice versa. Not ported yet: monomer info, the version-1 format and custom (ExplicitBitVect) property handlers.
 //!
 //! Copyright (C) 2001-2025 Greg Landrum and other RDKit contributors.
 //! Licensed under the BSD 3-Clause license (see LICENSES/RDKit-BSD-3-Clause.txt).
@@ -23,6 +22,7 @@ use crate::graphmol::queries::{
 use crate::graphmol::ring_info::FindRingType;
 use crate::graphmol::romol::ROMol;
 use crate::graphmol::stereo_group::{StereoGroup, StereoGroupType, assign_stereo_group_ids};
+use crate::graphmol::substance_group::{SubstanceGroup, add_substance_group};
 use crate::rdgeneral::common_properties as cp;
 use crate::rdgeneral::{Dict, RDProps, RDValue};
 use crate::{RDKitError, Result};
@@ -1300,6 +1300,13 @@ fn pickle_body(mol: &ROMol, w: &mut W, flags: u32, wide: bool) -> Result<()> {
             }
         }
     }
+    if !mol.substance_groups().is_empty() {
+        w.u8(BEGINSGROUP);
+        w.i32(mol.substance_groups().len() as i32);
+        for sg in mol.substance_groups() {
+            pickle_substance_group(w, sg, wide);
+        }
+    }
     if !mol.stereo_groups().is_empty() {
         w.u8(BEGINSTEREOGROUP);
         let mut groups = mol.stereo_groups().to_vec();
@@ -1426,12 +1433,6 @@ fn pickle_body(mol: &ROMol, w: &mut W, flags: u32, wide: bool) -> Result<()> {
 
 /// `MolPickler::pickleMol(mol, res, propertyFlags)`
 pub fn pickle_mol(mol: &ROMol, flags: u32) -> Result<Vec<u8>> {
-    if !mol.substance_groups().is_empty() {
-        // TODO(SubstanceGroups): BEGINSGROUP; refuse instead of dropping them
-        return Err(pickle_error(
-            "rdoxide: pickles with SubstanceGroups are not supported yet",
-        ));
-    }
     let mut w = W::default();
     w.i32(ENDIAN_ID);
     w.i32(VERSION as i32);
@@ -1497,10 +1498,12 @@ fn depickle_body(
         }
     }
     if tag == BEGINSGROUP {
-        // TODO(SubstanceGroups)
-        return Err(pickle_error(
-            "rdoxide: pickles with SubstanceGroups are not supported yet",
-        ));
+        let n = r.i32()?;
+        for _ in 0..n.max(0) {
+            let sgroup = substance_group_from_pickle(r, &mol, version, wide)?;
+            add_substance_group(&mut mol, sgroup);
+        }
+        tag = r.tag(version)?;
     }
     if tag == BEGINSTEREOGROUP {
         read_stereo_groups(r, &mut mol, version, wide)?;
@@ -1681,6 +1684,98 @@ fn read_rings(
 }
 
 /// `_depickleStereo`
+/// `MolPickler::_pickleSubstanceGroup<T>`
+fn pickle_substance_group(w: &mut W, sgroup: &SubstanceGroup, wide: bool) {
+    write_props(w, sgroup, false, false, &[], false);
+    for indices in [sgroup.atoms(), sgroup.parent_atoms(), sgroup.bonds()] {
+        w.t(wide, indices.len() as i64);
+        for &i in indices {
+            w.t(wide, i as i64);
+        }
+    }
+    w.t(wide, sgroup.brackets().len() as i64);
+    for bracket in sgroup.brackets() {
+        for pt in bracket {
+            write_point_f32(w, pt);
+        }
+    }
+    // the vector of a CSTATE only exists for SUP groups
+    let is_sup = is_sup_group(sgroup);
+    w.t(wide, sgroup.cstates().len() as i64);
+    for cstate in sgroup.cstates() {
+        w.t(wide, cstate.bond_idx as i64);
+        if is_sup {
+            write_point_f32(w, &cstate.vector);
+        }
+    }
+    w.t(wide, sgroup.attach_points().len() as i64);
+    for ap in sgroup.attach_points() {
+        w.t(wide, ap.a_idx as i64);
+        w.i32(ap.lv_idx);
+        w.str(&ap.id);
+    }
+}
+
+fn is_sup_group(sgroup: &SubstanceGroup) -> bool {
+    matches!(sgroup.get_prop("TYPE"), Some(RDValue::String(t)) if t == "SUP")
+}
+
+fn write_point_f32(w: &mut W, pt: &Point3D) {
+    w.f32(pt.x as f32);
+    w.f32(pt.y as f32);
+    w.f32(pt.z as f32);
+}
+
+fn read_point_f32(r: &mut R<'_>) -> Result<Point3D> {
+    let x = r.f32()? as f64;
+    let y = r.f32()? as f64;
+    let z = r.f32()? as f64;
+    Ok(Point3D::new(x, y, z))
+}
+
+/// `MolPickler::_getSubstanceGroupFromPickle<T>`
+fn substance_group_from_pickle(
+    r: &mut R<'_>,
+    mol: &ROMol,
+    version: i32,
+    wide: bool,
+) -> Result<SubstanceGroup> {
+    // the TYPE property is overridden by the pickled properties
+    let mut sgroup = SubstanceGroup::new("");
+    read_props(r, sgroup.dict_mut(), version < 14000, true)?;
+
+    for _ in 0..r.t(wide)? {
+        sgroup.add_atom_with_idx(mol, r.t(wide)? as u32)?;
+    }
+    for _ in 0..r.t(wide)? {
+        sgroup.add_parent_atom_with_idx(mol, r.t(wide)? as u32)?;
+    }
+    for _ in 0..r.t(wide)? {
+        sgroup.add_bond_with_idx(mol, r.t(wide)? as u32)?;
+    }
+    for _ in 0..r.t(wide)? {
+        let bracket = [read_point_f32(r)?, read_point_f32(r)?, read_point_f32(r)?];
+        sgroup.add_bracket(bracket);
+    }
+    let is_sup = is_sup_group(&sgroup);
+    for _ in 0..r.t(wide)? {
+        let bond = r.t(wide)? as u32;
+        let vector = if is_sup {
+            read_point_f32(r)?
+        } else {
+            Point3D::default()
+        };
+        sgroup.add_cstate(mol, bond, vector)?;
+    }
+    for _ in 0..r.t(wide)? {
+        let a_idx = r.t(wide)? as u32;
+        let lv_idx = r.i32()?;
+        let id = r.str()?;
+        sgroup.add_attach_point(a_idx, lv_idx, &id);
+    }
+    Ok(sgroup)
+}
+
 fn read_stereo_groups(r: &mut R<'_>, mol: &mut ROMol, version: i32, wide: bool) -> Result<()> {
     let n = r.t(wide)? as u32;
     if n == 0 {

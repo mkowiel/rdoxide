@@ -143,3 +143,22 @@ fn group_properties_and_type_checks() {
     add_substance_group(&mut mol, group);
     assert!(!checks::is_substance_group_id_free(&mol, 3));
 }
+
+#[test]
+fn groups_survive_a_pickle_round_trip() {
+    use rdoxide::graphmol::pickle::{flags, mol_from_pickle, pickle_mol};
+
+    let mut mol = sru_mol("CCOCC");
+    mol.substance_groups_mut()[0].add_bracket([
+        Point3D::new(0.0, 0.0, 0.0),
+        Point3D::new(1.0, 1.0, 0.0),
+        Point3D::new(0.0, 0.0, 0.0),
+    ]);
+    mol.substance_groups_mut()[0].add_attach_point(1, -1, "");
+    let bytes = pickle_mol(&mol, flags::ALL_PROPS).unwrap();
+    let copy = mol_from_pickle(&bytes, flags::ALL_PROPS).unwrap();
+    assert_eq!(summary(&copy), summary(&mol));
+    assert_eq!(copy.substance_groups()[0].brackets().len(), 1);
+    assert_eq!(copy.substance_groups()[0].attach_points().len(), 1);
+    assert_eq!(pickle_mol(&copy, flags::ALL_PROPS).unwrap(), bytes);
+}
