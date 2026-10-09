@@ -9,6 +9,8 @@ use crate::graphmol::romol::ROMol;
 use crate::rdgeneral::RDProps;
 use crate::rdgeneral::common_properties as cp;
 
+/// `atomPairsVersion`
+pub const ATOM_PAIRS_VERSION: &str = "1.1.0";
 pub const NUM_TYPE_BITS: u32 = 4;
 pub const ATOM_NUMBER_TYPES: [u32; 16] = [5, 6, 7, 8, 9, 14, 15, 16, 17, 33, 34, 35, 51, 52, 53, 0];
 pub const NUM_PI_BITS: u32 = 2;
