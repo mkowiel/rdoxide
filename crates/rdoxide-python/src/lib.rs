@@ -70,6 +70,7 @@ mod rdmolops_zip;
 mod rdmoltransforms;
 mod rdpartialcharges;
 mod rdqueries;
+mod rdreducedgraphs;
 mod rdsimdivpickers;
 mod ringinfo;
 mod stereo_group;
@@ -133,6 +134,12 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
         "rdInfoTheory",
         "rdkit.ML.InfoTheory.rdInfoTheory",
         rdinfotheory::init,
+    )?;
+    add_submodule(
+        m,
+        "rdReducedGraphs",
+        "rdkit.Chem.rdReducedGraphs",
+        rdreducedgraphs::init,
     )?;
     add_submodule(
         m,

@@ -142,6 +142,11 @@ Code/GraphMol/PartialCharges/Wrap/testPartialCharges.py::TestCase::test3Params
 Code/GraphMol/PartialCharges/Wrap/testPartialCharges.py::TestCase::testGithub2480
 Code/GraphMol/PartialCharges/Wrap/testPartialCharges.py::TestCase::testGithubIssue20
 Code/GraphMol/PartialCharges/Wrap/testPartialCharges.py::TestCase::testGithubIssue577
+Code/GraphMol/ReducedGraphs/Wrap/testReducedGraphs.py::TestCase::test1
+Code/GraphMol/ReducedGraphs/Wrap/testReducedGraphs.py::TestCase::test2
+Code/GraphMol/ReducedGraphs/Wrap/testReducedGraphs.py::TestCase::test3
+Code/GraphMol/ReducedGraphs/Wrap/testReducedGraphs.py::TestCase::test4
+Code/GraphMol/ReducedGraphs/Wrap/testReducedGraphs.py::TestCase::testCanRetrieveProp
 Code/GraphMol/Wrap/testConformer.py::TestCase::test0AddHds
 Code/GraphMol/Wrap/testConformer.py::TestCase::test0Conformers
 Code/GraphMol/Wrap/testConformer.py::TestCase::test2Issue217
