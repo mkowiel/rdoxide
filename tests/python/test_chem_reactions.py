@@ -302,3 +302,36 @@ def test_cxsmiles_reaction_second_template():
   rxn = rdChemReactions.ReactionFromSmiles("CC.CO>>CCO |$;;;a;;;b$|")
   assert rxn.GetReactantTemplate(1).GetAtomWithIdx(1).GetProp("atomLabel") == "a"
   assert rxn.GetProductTemplate(0).GetAtomWithIdx(2).GetProp("atomLabel") == "b"
+
+
+def test_reaction_fingerprint_params():
+  params = rdChemReactions.ReactionFingerprintParams()
+  assert (params.fpSize, params.includeAgents, params.nonAgentWeight) == (2048, False, 10)
+  params.fpSize = 512
+  assert params.fpSize == 512
+  params = rdChemReactions.ReactionFingerprintParams(True, 0.3, 5, 2, 1024,
+                                                     rdChemReactions.FingerprintType.MorganFP)
+  assert params.fpType == rdChemReactions.FingerprintType.MorganFP
+  assert params.bitRatioAgents == 0.3
+
+
+def test_difference_fingerprint():
+  # expectations from RDKit 2026.03.6
+  rxn = rdChemReactions.ReactionFromSmarts("[C:1](=[O:2])O.[N:3]>>[C:1](=[O:2])[N:3]")
+  fp = rdChemReactions.CreateDifferenceFingerprintForReaction(rxn)
+  assert sorted(fp.GetNonzeroElements().items()) == [(367, 10), (399, -10), (497, 10), (1731, -10)]
+  params = rdChemReactions.ReactionFingerprintParams(
+    False, 0.2, 5, 2, 512, rdChemReactions.FingerprintType.AtomPairFP)
+  fp = rdChemReactions.CreateDifferenceFingerprintForReaction(rxn, params)
+  assert sorted(fp.GetNonzeroElements().items()) == [(195, -1), (367, 1), (399, -1), (497, 1)]
+
+
+def test_structural_fingerprint():
+  rxn = rdChemReactions.ReactionFromSmarts("[C:1](=[O:2])O.[N:3]>>[C:1](=[O:2])[N:3]")
+  fp = rdChemReactions.CreateStructuralFingerprintForReaction(rxn)
+  assert fp.GetNumBits() == 4096
+  assert list(fp.GetOnBits())[:5] == [71, 287, 292, 293, 319]
+  params = rdChemReactions.ReactionFingerprintParams(
+    True, 0.3, 5, 2, 1024, rdChemReactions.FingerprintType.AtomPairFP)
+  fp = rdChemReactions.CreateStructuralFingerprintForReaction(rxn, params)
+  assert list(fp.GetOnBits()) == [8, 120, 280, 446, 638, 706]

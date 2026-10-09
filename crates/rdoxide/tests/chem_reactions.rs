@@ -255,3 +255,25 @@ fn cx_extensions_are_numbered_over_all_templates() {
         reaction_to_cx_smarts(&rxn, &SmilesWriteParams::default(), cx_fields::ALL).unwrap();
     assert_eq!(written, text);
 }
+
+#[test]
+fn reaction_fingerprints_match_reference() {
+    use rdoxide::datastructs::BitVect;
+    use rdoxide::graphmol::chem_reactions::fingerprints::{
+        ReactionFingerprintParams, difference_fingerprint, structural_fingerprint,
+    };
+    // expectations from RDKit 2026.03.6
+    let rxn = reaction_from_smarts(AMIDE, &ReactionSmartsParserParams::new()).unwrap();
+    let diff =
+        difference_fingerprint(&rxn, &ReactionFingerprintParams::default_difference()).unwrap();
+    let elements: Vec<(i128, i32)> = diff
+        .nonzero_elements()
+        .iter()
+        .map(|(&k, &v)| (k, v))
+        .collect();
+    assert_eq!(elements, [(367, 10), (399, -10), (497, 10), (1731, -10)]);
+    let structural =
+        structural_fingerprint(&rxn, &ReactionFingerprintParams::default_structural()).unwrap();
+    assert_eq!(structural.num_bits(), 4096);
+    assert_eq!(structural.on_bits()[..5], [71, 287, 292, 293, 319]);
+}
