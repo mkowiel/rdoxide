@@ -64,3 +64,11 @@ def test_link_nodes_round_trip():
     assert Chem.MolToCXSmiles(m) == cx
     m = Chem.MolFromSmiles("OC1CCCC1 |LN:4:1.3|")
     assert m.GetProp("_molLinkNodes") == "1 3 2 5 4 5 6"
+
+
+def test_fragment_cxsmiles():
+    m = Chem.MolFromSmiles("CC[C@H](F)Cl |o1:2|")
+    frag = Chem.MolFragmentToCXSmiles(m, atomsToUse=[1, 2, 3, 4])
+    assert frag.startswith(Chem.MolFragmentToSmiles(m, atomsToUse=[1, 2, 3, 4]))
+    assert frag.endswith("|o1:2|") or "|" in frag
+    assert Chem.MolFragmentToCXSmiles(Chem.MolFromSmiles("CCO"), atomsToUse=[0, 1]) == "CC"

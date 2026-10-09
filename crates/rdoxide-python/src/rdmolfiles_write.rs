@@ -5,7 +5,7 @@ use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
 use rdoxide::graphmol::smiles_parse::cx_write::{
-    RestoreBondDirOption, cx_fields, mol_to_cx_smiles,
+    RestoreBondDirOption, cx_fields, mol_fragment_to_cx_smiles, mol_to_cx_smiles,
 };
 use rdoxide::graphmol::smiles_parse::write::{
     SmilesWriteParams, mol_fragment_to_smiles, mol_to_random_smiles_vect, mol_to_smiles,
@@ -298,53 +298,18 @@ fn str_vect(obj: Option<Bound<'_, PyAny>>) -> PyResult<Option<Vec<String>>> {
         .map(Some)
 }
 
-/// Returns the canonical SMILES string for a fragment of a molecule
-///   ARGUMENTS:
-///
-///     - mol: the molecule
-///     - atomsToUse : a list of atoms to include in the fragment
-///     - bondsToUse : (optional) a list of bonds to include in the fragment
-///       if not provided, all bonds between the atoms provided
-///       will be included.
-///     - atomSymbols : (optional) a list with the symbols to use for the atoms
-///       in the SMILES. This should have be mol.GetNumAtoms() long.
-///     - bondSymbols : (optional) a list with the symbols to use for the bonds
-///       in the SMILES. This should have be mol.GetNumBonds() long.
-///     - isomericSmiles: (optional) include information about stereochemistry in
-///       the SMILES.  Defaults to true.
-///     - kekuleSmiles: (optional) use the Kekule form (no aromatic bonds) in
-///       the SMILES.  Defaults to false.
-///     - rootedAtAtom: (optional) if non-negative, this forces the SMILES
-///       to start at a particular atom. Defaults to -1.  If not -1, over-rides
-///       setting for canonical.
-///     - canonical: (optional) if false no attempt will be made to canonicalize
-///       the molecule. Defaults to true.
-///     - allBondsExplicit: (optional) if true, all bond orders will be explicitly indicated
-///       in the output SMILES. Defaults to false.
-///     - allHsExplicit: (optional) if true, all H counts will be explicitly indicated
-///       in the output SMILES. Defaults to false.
-///
-///   RETURNS:
-///
-///     a string
-///
-/// Alternatively: MolFragmentToSmiles(mol, params, atomsToUse, bondsToUse=0,
-/// atomSymbols=0, bondSymbols=0) with a SmilesWriteParams object.
-#[pyfunction]
-#[pyo3(name = "MolFragmentToSmiles", signature = (*args, **kwargs))]
-fn py_mol_fragment_to_smiles(
+/// Shared body of `MolFragmentToSmiles` and `MolFragmentToCXSmiles`.
+fn fragment_to_smiles(
     py: Python<'_>,
+    name: &'static str,
+    cx: bool,
     args: &Bound<'_, PyTuple>,
     kwargs: Option<&Bound<'_, PyDict>>,
 ) -> PyResult<String> {
-    let a = Args {
-        name: "MolFragmentToSmiles",
-        args,
-        kwargs,
-    };
-    let mol_obj = a.get(0, "mol")?.ok_or_else(|| {
-        PyTypeError::new_err("MolFragmentToSmiles() missing required argument 'mol'")
-    })?;
+    let a = Args { name, args, kwargs };
+    let mol_obj = a
+        .get(0, "mol")?
+        .ok_or_else(|| PyTypeError::new_err(format!("{name}() missing required argument 'mol'")))?;
     let mol = mol_obj.cast::<PyMol>()?;
     let mut m = mol.borrow_mut();
     let (na, nb) = (m.mol.num_atoms() as usize, m.mol.num_bonds() as usize);
@@ -385,8 +350,13 @@ fn py_mol_fragment_to_smiles(
         ));
     }
     let core = &mut m.mol;
+    let write = if cx {
+        mol_fragment_to_cx_smiles
+    } else {
+        mol_fragment_to_smiles
+    };
     py.detach(|| {
-        mol_fragment_to_smiles(
+        write(
             core,
             &params,
             &atoms,
@@ -396,6 +366,60 @@ fn py_mol_fragment_to_smiles(
         )
     })
     .py()
+}
+
+/// Returns the canonical SMILES string for a fragment of a molecule
+///   ARGUMENTS:
+///
+///     - mol: the molecule
+///     - atomsToUse : a list of atoms to include in the fragment
+///     - bondsToUse : (optional) a list of bonds to include in the fragment
+///       if not provided, all bonds between the atoms provided
+///       will be included.
+///     - atomSymbols : (optional) a list with the symbols to use for the atoms
+///       in the SMILES. This should have be mol.GetNumAtoms() long.
+///     - bondSymbols : (optional) a list with the symbols to use for the bonds
+///       in the SMILES. This should have be mol.GetNumBonds() long.
+///     - isomericSmiles: (optional) include information about stereochemistry in
+///       the SMILES.  Defaults to true.
+///     - kekuleSmiles: (optional) use the Kekule form (no aromatic bonds) in
+///       the SMILES.  Defaults to false.
+///     - rootedAtAtom: (optional) if non-negative, this forces the SMILES
+///       to start at a particular atom. Defaults to -1.  If not -1, over-rides
+///       setting for canonical.
+///     - canonical: (optional) if false no attempt will be made to canonicalize
+///       the molecule. Defaults to true.
+///     - allBondsExplicit: (optional) if true, all bond orders will be explicitly indicated
+///       in the output SMILES. Defaults to false.
+///     - allHsExplicit: (optional) if true, all H counts will be explicitly indicated
+///       in the output SMILES. Defaults to false.
+///
+///   RETURNS:
+///
+///     a string
+///
+/// Alternatively: MolFragmentToSmiles(mol, params, atomsToUse, bondsToUse=0,
+/// atomSymbols=0, bondSymbols=0) with a SmilesWriteParams object.
+#[pyfunction]
+#[pyo3(name = "MolFragmentToSmiles", signature = (*args, **kwargs))]
+fn py_mol_fragment_to_smiles(
+    py: Python<'_>,
+    args: &Bound<'_, PyTuple>,
+    kwargs: Option<&Bound<'_, PyDict>>,
+) -> PyResult<String> {
+    fragment_to_smiles(py, "MolFragmentToSmiles", false, args, kwargs)
+}
+
+/// Returns the CXSMILES string for a fragment of a molecule (same arguments
+/// as MolFragmentToSmiles)
+#[pyfunction]
+#[pyo3(name = "MolFragmentToCXSmiles", signature = (*args, **kwargs))]
+fn py_mol_fragment_to_cx_smiles(
+    py: Python<'_>,
+    args: &Bound<'_, PyTuple>,
+    kwargs: Option<&Bound<'_, PyDict>>,
+) -> PyResult<String> {
+    fragment_to_smiles(py, "MolFragmentToCXSmiles", true, args, kwargs)
 }
 
 /// returns a list of SMILES generated using the randomSmiles algorithm
@@ -557,6 +581,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
         None,
     )?;
     m.add_function(wrap_pyfunction!(py_mol_fragment_to_smiles, m)?)?;
+    m.add_function(wrap_pyfunction!(py_mol_fragment_to_cx_smiles, m)?)?;
     m.add_function(wrap_pyfunction!(py_mol_to_random_smiles_vect, m)?)?;
     Ok(())
 }

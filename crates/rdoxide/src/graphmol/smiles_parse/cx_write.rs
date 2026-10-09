@@ -6,7 +6,7 @@
 use std::collections::BTreeMap;
 
 use super::cx::SGROUP_TYPEMAP;
-use super::write::{SmilesWriteParams, mol_to_smiles_detail};
+use super::write::{SmilesWriteParams, mol_fragment_to_smiles, mol_to_smiles_detail};
 use crate::graphmol::atropisomers::{
     get_atropisomer_atoms_and_bonds, wedge_bonds_from_atropisomers,
 };
@@ -965,6 +965,33 @@ pub fn mol_to_cx_smiles(
         cleanup_stereo_groups(&mut trwmol)?;
     }
     let ext = get_cx_extensions(&mut trwmol, flags)?;
+    if !ext.is_empty() {
+        res += " ";
+        res += &ext;
+    }
+    Ok(res)
+}
+
+/// `MolFragmentToCXSmiles`: the SMILES of a fragment followed by the
+/// extension block of the whole molecule (as upstream, the extensions are
+/// not restricted to the fragment).
+pub fn mol_fragment_to_cx_smiles(
+    mol: &mut ROMol,
+    params: &SmilesWriteParams,
+    atoms_to_use: &[i32],
+    bonds_to_use: Option<&[i32]>,
+    atom_symbols: Option<&[String]>,
+    bond_symbols: Option<&[String]>,
+) -> Result<String> {
+    let mut res = mol_fragment_to_smiles(
+        mol,
+        params,
+        atoms_to_use,
+        bonds_to_use,
+        atom_symbols,
+        bond_symbols,
+    )?;
+    let ext = get_cx_extensions(mol, cx_fields::ALL)?;
     if !ext.is_empty() {
         res += " ";
         res += &ext;
