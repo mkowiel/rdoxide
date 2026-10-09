@@ -417,7 +417,7 @@ fn parse_search_args(
         match take("parameters") {
             Some(p) => p
                 .extract::<PyRef<'_, PySubstructMatchParameters>>()?
-                .to_core(),
+                .base_params(),
             None => return Err(PyTypeError::new_err("missing argument 'parameters'")),
         }
     } else {

@@ -3,11 +3,18 @@
 //! corresponding parts of upstream `Code/GraphMol/Wrap/Mol.cpp` and
 //! `substructmethods.h`.
 
-use pyo3::exceptions::PyTypeError;
+use std::sync::{Arc, Mutex};
+
+use pyo3::exceptions::{PyRuntimeError, PyTypeError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple};
-use rdoxide::graphmol::substruct::{MatchVect, SubstructMatchParameters, substruct_match};
+use rdoxide::graphmol::substruct::{
+    AtomCoordsMatcher, FinalMatchCheck, MatchCheck, MatchVect, SubstructMatchParameters,
+    substruct_match,
+};
 
+use crate::atom::{AtomHandle, PyAtom};
+use crate::bond::{BondHandle, PyBond};
 use crate::errors::IntoPyResult;
 use crate::mol::PyMol;
 
@@ -15,41 +22,62 @@ use crate::mol::PyMol;
 #[pyclass(
     name = "SubstructMatchParameters",
     module = "rdkit.Chem.rdchem",
-    get_all,
-    set_all,
     skip_from_py_object
 )]
 #[derive(Clone)]
 #[allow(non_snake_case)]
 pub struct PySubstructMatchParameters {
     /// Use chirality in determining whether or not atoms/bonds match
+    #[pyo3(get, set)]
     useChirality: bool,
     /// take enhanced stereochemistry into account while doing the match. This only has an effect if useChirality is also True.
+    #[pyo3(get, set)]
     useEnhancedStereo: bool,
     /// aromatic and conjugated bonds match each other
+    #[pyo3(get, set)]
     aromaticMatchesConjugated: bool,
     /// aromatic and single or double bonds match each other
+    #[pyo3(get, set)]
     aromaticMatchesSingleOrDouble: bool,
     /// use generic groups (=homology groups) as a post-filtering step (if any are present in the molecule)
+    #[pyo3(get, set)]
     useGenericMatchers: bool,
     /// Consider query-query matches, not just simple matches
+    #[pyo3(get, set)]
     useQueryQueryMatches: bool,
     /// Allow recursive queries
+    #[pyo3(get, set)]
     recursionPossible: bool,
     /// uniquify (by atom index) match results
+    #[pyo3(get, set)]
     uniquify: bool,
     /// maximum number of matches to return
+    #[pyo3(get, set)]
     maxMatches: u32,
     /// maximum number of recursive matches to find
+    #[pyo3(get, set)]
     maxRecursiveMatches: u32,
     /// number of threads to use when multi-threading is possible.0 selects the number of concurrent threads supported by thehardware. negative values are added to the number of concurrentthreads supported by the hardware.
+    #[pyo3(get, set)]
     numThreads: i32,
     /// bond properties that must be equivalent in order to match.
+    #[pyo3(get, set)]
     bondProperties: Vec<String>,
     /// atom properties that must be equivalent in order to match.
+    #[pyo3(get, set)]
     atomProperties: Vec<String>,
     /// If set, query atoms and bonds with specified stereochemistry will match atoms and bonds with unspecified stereochemistry.
+    #[pyo3(get, set)]
     specifiedStereoQueryMatchesUnspecified: bool,
+    /// if set, only the extraAtomCheck will be used to determine whether or not atoms match
+    #[pyo3(get, set)]
+    extraAtomCheckOverridesDefaultCheck: bool,
+    /// if set, only the extraBondCheck will be used to determine whether or not bonds match
+    #[pyo3(get, set)]
+    extraBondCheckOverridesDefaultCheck: bool,
+    extra_atom_check: Option<Arc<Callback>>,
+    extra_bond_check: Option<Arc<Callback>>,
+    extra_final_check: Option<Arc<Callback>>,
 }
 
 #[pymethods]
@@ -72,12 +100,176 @@ impl PySubstructMatchParameters {
             bondProperties: d.bond_properties,
             atomProperties: d.atom_properties,
             specifiedStereoQueryMatchesUnspecified: d.specified_stereo_query_matches_unspecified,
+            extraAtomCheckOverridesDefaultCheck: d.extra_atom_check_overrides_default,
+            extraBondCheckOverridesDefaultCheck: d.extra_bond_check_overrides_default,
+            extra_atom_check: None,
+            extra_bond_check: None,
+            extra_final_check: None,
+        }
+    }
+
+    /// allows you to provide a function that will be called
+    /// for each atom pair that matches during substructure searching,
+    /// after all other comparisons have passed.
+    /// The function should return true or false indicating whether or not
+    /// that atom-match should be accepted. An AtomCoordsMatcher can be
+    /// given instead of a function.
+    #[pyo3(name = "setExtraAtomCheckFunc", signature = (func))]
+    fn set_extra_atom_check_func(&mut self, func: &Bound<'_, PyAny>) {
+        self.extra_atom_check = Some(Arc::new(Callback::new(func)));
+    }
+
+    /// allows you to provide a function that will be called
+    /// for each bond pair that matches during substructure searching,
+    /// after all other comparisons have passed.
+    /// The function should return true or false indicating whether or not
+    /// that bond-match should be accepted.
+    #[pyo3(name = "setExtraBondCheckFunc", signature = (func))]
+    fn set_extra_bond_check_func(&mut self, func: &Bound<'_, PyAny>) {
+        self.extra_bond_check = Some(Arc::new(Callback::new(func)));
+    }
+
+    /// allows you to provide a function that will be called to validate
+    /// a final match. The function is called with the molecule and the
+    /// list of matched atom indices and should return true or false
+    /// indicating whether or not that match should be accepted.
+    #[pyo3(name = "setExtraFinalCheck", signature = (func))]
+    fn set_extra_final_check(&mut self, func: &Bound<'_, PyAny>) {
+        self.extra_final_check = Some(Arc::new(Callback::new(func)));
+    }
+}
+
+/// A Python object registered as an extra check: a function, or an
+/// `AtomCoordsMatcher` (evaluated without the GIL).
+#[derive(Debug)]
+enum Callback {
+    Function(Py<PyAny>),
+    Coords(Py<PyAtomCoordsMatcher>),
+}
+
+impl Callback {
+    fn new(func: &Bound<'_, PyAny>) -> Self {
+        match func.cast::<PyAtomCoordsMatcher>() {
+            Ok(m) => Callback::Coords(m.clone().unbind()),
+            Err(_) => Callback::Function(func.clone().unbind()),
         }
     }
 }
 
+/// The first error raised by a Python callback; matching stops accepting
+/// pairs once it is set and the error is re-raised after the search.
+type ErrorSlot = Arc<Mutex<Option<PyErr>>>;
+
+/// Calls `f` with the GIL held, remembering the first error and answering
+/// `false` for failed calls.
+fn guarded(errors: &ErrorSlot, f: impl FnOnce(Python<'_>) -> PyResult<bool>) -> bool {
+    Python::attach(|py| match f(py) {
+        Ok(accepted) => accepted,
+        Err(e) => {
+            errors
+                .lock()
+                .unwrap_or_else(|p| p.into_inner())
+                .get_or_insert(e);
+            false
+        }
+    })
+}
+
+/// Allows using atom coordinates as part of substructure matching
+#[pyclass(
+    name = "AtomCoordsMatcher",
+    module = "rdkit.Chem.rdchem",
+    skip_from_py_object
+)]
+#[derive(Debug, Clone)]
+#[allow(non_snake_case)]
+pub struct PyAtomCoordsMatcher {
+    /// reference conformer ID
+    #[pyo3(get, set)]
+    refConfId: i32,
+    /// query conformer ID
+    #[pyo3(get, set)]
+    queryConfId: i32,
+    /// squared distance tolerance
+    #[pyo3(get, set)]
+    tol2: f64,
+}
+
+#[pymethods]
+#[allow(non_snake_case)]
+impl PyAtomCoordsMatcher {
+    /// constructor taking reference and query conformer IDs and a distance tolerance
+    #[new]
+    #[pyo3(signature = (refConfId = -1, queryConfId = -1, tol = 1e-4))]
+    fn py_new(refConfId: i32, queryConfId: i32, tol: f64) -> Self {
+        PyAtomCoordsMatcher {
+            refConfId,
+            queryConfId,
+            tol2: tol * tol,
+        }
+    }
+
+    fn __call__(&self, py: Python<'_>, queryAtom: &PyAtom, targetAtom: &PyAtom) -> PyResult<bool> {
+        let (qm, qi) = atom_location(queryAtom)?;
+        let (tm, ti) = atom_location(targetAtom)?;
+        let (qm, tm) = (qm.borrow(py), tm.borrow(py));
+        Ok(self.core().matches(&qm.mol, qi, &tm.mol, ti))
+    }
+}
+
+impl PyAtomCoordsMatcher {
+    fn core(&self) -> AtomCoordsMatcher {
+        AtomCoordsMatcher {
+            ref_conf_id: self.refConfId,
+            query_conf_id: self.queryConfId,
+            tol2: self.tol2,
+        }
+    }
+}
+
+fn atom_location(atom: &PyAtom) -> PyResult<(&Py<PyMol>, u32)> {
+    match &atom.handle {
+        AtomHandle::InMol { mol, idx } => Ok((mol, *idx)),
+        AtomHandle::Owned(_) => Err(PyRuntimeError::new_err("atom has no owning molecule")),
+    }
+}
+
 impl PySubstructMatchParameters {
-    pub(crate) fn to_core(&self) -> SubstructMatchParameters {
+    /// The core parameters for matching `query` against `mol`; the Python
+    /// callbacks see atoms and bonds of those two molecules.
+    fn to_core(
+        &self,
+        py: Python<'_>,
+        mol: &Bound<'_, PyMol>,
+        query: &Bound<'_, PyMol>,
+        errors: &ErrorSlot,
+    ) -> SubstructMatchParameters {
+        let pair = Pair {
+            mol: mol.clone().unbind(),
+            query: query.clone().unbind(),
+            errors: errors.clone(),
+        };
+        SubstructMatchParameters {
+            extra_atom_check: self
+                .extra_atom_check
+                .as_deref()
+                .map(|cb| pair.pair_check(py, cb, PairKind::Atom)),
+            extra_atom_check_overrides_default: self.extraAtomCheckOverridesDefaultCheck,
+            extra_bond_check: self
+                .extra_bond_check
+                .as_deref()
+                .map(|cb| pair.pair_check(py, cb, PairKind::Bond)),
+            extra_bond_check_overrides_default: self.extraBondCheckOverridesDefaultCheck,
+            extra_final_check: self
+                .extra_final_check
+                .as_deref()
+                .map(|cb| pair.final_check(py, cb)),
+            ..self.base_params()
+        }
+    }
+
+    /// The parameters without Python callbacks.
+    pub(crate) fn base_params(&self) -> SubstructMatchParameters {
         SubstructMatchParameters {
             use_chirality: self.useChirality,
             use_enhanced_stereo: self.useEnhancedStereo,
@@ -93,7 +285,81 @@ impl PySubstructMatchParameters {
             bond_properties: self.bondProperties.clone(),
             atom_properties: self.atomProperties.clone(),
             specified_stereo_query_matches_unspecified: self.specifiedStereoQueryMatchesUnspecified,
+            ..SubstructMatchParameters::default()
         }
+    }
+}
+
+/// The molecules a search runs on, as seen by Python callbacks.
+struct Pair {
+    mol: Py<PyMol>,
+    query: Py<PyMol>,
+    errors: ErrorSlot,
+}
+
+#[derive(Clone, Copy)]
+enum PairKind {
+    Atom,
+    Bond,
+}
+
+impl Pair {
+    /// `extraAtomCheck` / `extraBondCheck`: `func(queryItem, molItem)`.
+    fn pair_check(&self, py: Python<'_>, cb: &Callback, kind: PairKind) -> MatchCheck {
+        let func = match cb {
+            Callback::Function(f) => f.clone_ref(py),
+            Callback::Coords(m) => return m.borrow(py).core().into(),
+        };
+        let (mol, query, errors) = (
+            self.mol.clone_ref(py),
+            self.query.clone_ref(py),
+            self.errors.clone(),
+        );
+        MatchCheck::new(move |_, qi, _, mi| {
+            guarded(&errors, |py| {
+                let item = |owner: &Py<PyMol>, idx: u32| -> PyResult<Py<PyAny>> {
+                    let owner = owner.clone_ref(py);
+                    Ok(match kind {
+                        PairKind::Atom => Py::new(
+                            py,
+                            PyAtom {
+                                handle: AtomHandle::InMol { mol: owner, idx },
+                            },
+                        )?
+                        .into_any(),
+                        PairKind::Bond => Py::new(
+                            py,
+                            PyBond {
+                                handle: BondHandle::InMol { mol: owner, idx },
+                            },
+                        )?
+                        .into_any(),
+                    })
+                };
+                func.bind(py)
+                    .call1((item(&query, qi)?, item(&mol, mi)?))?
+                    .is_truthy()
+            })
+        })
+    }
+
+    /// `extraFinalCheck`: `func(mol, [matched atom indices])`.
+    fn final_check(&self, py: Python<'_>, cb: &Callback) -> FinalMatchCheck {
+        let Callback::Function(func) = cb else {
+            return FinalMatchCheck::new(|_, _| true);
+        };
+        let (func, mol, errors) = (
+            func.clone_ref(py),
+            self.mol.clone_ref(py),
+            self.errors.clone(),
+        );
+        FinalMatchCheck::new(move |_, aids| {
+            guarded(&errors, |py| {
+                func.bind(py)
+                    .call1((mol.clone_ref(py), aids.to_vec()))?
+                    .is_truthy()
+            })
+        })
     }
 }
 
@@ -131,24 +397,41 @@ impl<'py> Args<'_, 'py> {
         })?;
         Ok(q.cast::<PyMol>()?.clone())
     }
-    fn params(&self) -> Option<SubstructMatchParameters> {
-        self.get(1, "params").ok().flatten().and_then(|p| {
-            p.cast::<PySubstructMatchParameters>()
-                .ok()
-                .map(|p| p.borrow().to_core())
-        })
+    fn params(&self) -> Option<Bound<'py, PySubstructMatchParameters>> {
+        self.get(1, "params")
+            .ok()
+            .flatten()
+            .and_then(|p| p.cast_into::<PySubstructMatchParameters>().ok())
     }
+}
+
+/// What a method needs to run a search: either the user's parameters
+/// (possibly with Python callbacks) or plain core parameters.
+enum Params<'py> {
+    User(Bound<'py, PySubstructMatchParameters>),
+    Core(SubstructMatchParameters),
 }
 
 fn run(
     py: Python<'_>,
-    mol: &PyMol,
+    mol: &Bound<'_, PyMol>,
     query: &Bound<'_, PyMol>,
-    ps: &SubstructMatchParameters,
+    params: Params<'_>,
 ) -> PyResult<Vec<MatchVect>> {
-    let q = query.borrow();
-    let (m, q) = (&mol.mol, &q.mol);
-    py.detach(|| substruct_match(m, q, ps)).py()
+    let errors = ErrorSlot::default();
+    let ps = match params {
+        Params::User(p) => p.borrow().to_core(py, mol, query, &errors),
+        Params::Core(ps) => ps,
+    };
+    let result = {
+        let (mol, query) = (mol.borrow(), query.borrow());
+        let (m, q) = (&mol.mol, &query.mol);
+        py.detach(|| substruct_match(m, q, &ps))
+    };
+    if let Some(e) = errors.lock().unwrap_or_else(|p| p.into_inner()).take() {
+        return Err(e);
+    }
+    result.py()
 }
 
 fn match_tuple<'py>(py: Python<'py>, m: &MatchVect) -> PyResult<Bound<'py, PyTuple>> {
@@ -173,11 +456,11 @@ impl PyMol {
     /// Alternatively: HasSubstructMatch(query, params) with SubstructMatchParameters.
     #[pyo3(name = "HasSubstructMatch", signature = (*args, **kwargs))]
     fn has_substruct_match(
-        &self,
-        py: Python<'_>,
+        slf: &Bound<'_, Self>,
         args: &Bound<'_, PyTuple>,
         kwargs: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<bool> {
+        let py = slf.py();
         let a = Args {
             name: "HasSubstructMatch",
             args,
@@ -185,16 +468,16 @@ impl PyMol {
         };
         let query = a.query()?;
         let ps = match a.params() {
-            Some(p) => p,
-            None => SubstructMatchParameters {
+            Some(p) => Params::User(p),
+            None => Params::Core(SubstructMatchParameters {
                 recursion_possible: a.flag(1, "recursionPossible", true)?,
                 use_chirality: a.flag(2, "useChirality", false)?,
                 use_query_query_matches: a.flag(3, "useQueryQueryMatches", false)?,
                 max_matches: 1,
                 ..SubstructMatchParameters::default()
-            },
+            }),
         };
-        Ok(!run(py, self, &query, &ps)?.is_empty())
+        Ok(!run(py, slf, &query, ps)?.is_empty())
     }
 
     /// Returns the indices of the molecule's atoms that match a substructure query.
@@ -217,11 +500,11 @@ impl PyMol {
     /// Alternatively: GetSubstructMatch(query, params) with SubstructMatchParameters.
     #[pyo3(name = "GetSubstructMatch", signature = (*args, **kwargs))]
     fn get_substruct_match<'py>(
-        &self,
-        py: Python<'py>,
+        slf: &Bound<'py, Self>,
         args: &Bound<'py, PyTuple>,
         kwargs: Option<&Bound<'py, PyDict>>,
     ) -> PyResult<Bound<'py, PyTuple>> {
+        let py = slf.py();
         let a = Args {
             name: "GetSubstructMatch",
             args,
@@ -229,15 +512,15 @@ impl PyMol {
         };
         let query = a.query()?;
         let ps = match a.params() {
-            Some(p) => p,
-            None => SubstructMatchParameters {
+            Some(p) => Params::User(p),
+            None => Params::Core(SubstructMatchParameters {
                 use_chirality: a.flag(1, "useChirality", false)?,
                 use_query_query_matches: a.flag(2, "useQueryQueryMatches", false)?,
                 max_matches: 1,
                 ..SubstructMatchParameters::default()
-            },
+            }),
         };
-        let res = run(py, self, &query, &ps)?;
+        let res = run(py, slf, &query, ps)?;
         match res.first() {
             Some(m) => match_tuple(py, m),
             None => Ok(PyTuple::empty(py)),
@@ -271,11 +554,11 @@ impl PyMol {
     /// Alternatively: GetSubstructMatches(query, params) with SubstructMatchParameters.
     #[pyo3(name = "GetSubstructMatches", signature = (*args, **kwargs))]
     fn get_substruct_matches<'py>(
-        &self,
-        py: Python<'py>,
+        slf: &Bound<'py, Self>,
         args: &Bound<'py, PyTuple>,
         kwargs: Option<&Bound<'py, PyDict>>,
     ) -> PyResult<Bound<'py, PyTuple>> {
+        let py = slf.py();
         let a = Args {
             name: "GetSubstructMatches",
             args,
@@ -283,8 +566,8 @@ impl PyMol {
         };
         let query = a.query()?;
         let ps = match a.params() {
-            Some(p) => p,
-            None => SubstructMatchParameters {
+            Some(p) => Params::User(p),
+            None => Params::Core(SubstructMatchParameters {
                 uniquify: a.flag(1, "uniquify", true)?,
                 use_chirality: a.flag(2, "useChirality", false)?,
                 use_query_query_matches: a.flag(3, "useQueryQueryMatches", false)?,
@@ -293,9 +576,9 @@ impl PyMol {
                     None => 1000,
                 },
                 ..SubstructMatchParameters::default()
-            },
+            }),
         };
-        let res = run(py, self, &query, &ps)?;
+        let res = run(py, slf, &query, ps)?;
         let items = res
             .iter()
             .map(|m| match_tuple(py, m))
@@ -306,5 +589,6 @@ impl PyMol {
 
 pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PySubstructMatchParameters>()?;
+    m.add_class::<PyAtomCoordsMatcher>()?;
     Ok(())
 }

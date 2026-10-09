@@ -251,3 +251,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-09 — Stage 14b: Chem.CanonicalizeEnhancedStereo (unlocks upstream RegistrationHash tests).
 * 2026-10-09 — Stage 14c: bulk fingerprint functions (GetFPs/GetCountFPs/GetSparseFPs/GetSparseCountFPs, FPType), multithreaded and order-preserving.
 * 2026-10-09 — Stage 14d: CalcOxidationNumbers (adds LICENSES/linchemin-MIT.txt).
+* 2026-10-09 — Stage 14e: SubstructMatchParameters extra atom/bond/final check callbacks and AtomCoordsMatcher (Python callbacks run under the GIL; SubstructLibrary ignores them).

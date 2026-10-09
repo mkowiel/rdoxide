@@ -13,6 +13,8 @@
 //! search, which is observably equivalent.
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::fmt;
+use std::sync::Arc;
 
 use crate::graphmol::atom::{Atom, ChiralType};
 use crate::graphmol::bond::{BondStereo, BondType};
@@ -30,7 +32,97 @@ use crate::{RDKitError, Result};
 /// atom (`MatchVectType`).
 pub type MatchVect = Vec<(i32, i32)>;
 
-/// `SubstructMatchParameters` (callbacks are not supported yet).
+/// A callback comparing one query atom/bond with one molecule atom/bond:
+/// `(query, query index, molecule, molecule index)` (`extraAtomCheck` /
+/// `extraBondCheck`). It may be called from several threads.
+#[derive(Clone)]
+pub struct MatchCheck(Arc<MatchCheckFn>);
+
+type MatchCheckFn = dyn Fn(&ROMol, u32, &ROMol, u32) -> bool + Send + Sync;
+
+impl MatchCheck {
+    pub fn new(f: impl Fn(&ROMol, u32, &ROMol, u32) -> bool + Send + Sync + 'static) -> Self {
+        MatchCheck(Arc::new(f))
+    }
+
+    fn call(&self, query: &ROMol, qi: u32, mol: &ROMol, mi: u32) -> bool {
+        (self.0)(query, qi, mol, mi)
+    }
+}
+
+/// A callback validating a finished match: `(molecule, matched atom indices
+/// in query atom order)` (`extraFinalCheck`).
+#[derive(Clone)]
+pub struct FinalMatchCheck(Arc<FinalMatchCheckFn>);
+
+type FinalMatchCheckFn = dyn Fn(&ROMol, &[u32]) -> bool + Send + Sync;
+
+impl FinalMatchCheck {
+    pub fn new(f: impl Fn(&ROMol, &[u32]) -> bool + Send + Sync + 'static) -> Self {
+        FinalMatchCheck(Arc::new(f))
+    }
+}
+
+/// `AtomCoordsMatchFunctor`: atoms match when their positions in the
+/// reference (molecule) and query conformers are within a tolerance.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AtomCoordsMatcher {
+    pub ref_conf_id: i32,
+    pub query_conf_id: i32,
+    /// squared distance tolerance
+    pub tol2: f64,
+}
+
+impl AtomCoordsMatcher {
+    pub fn new(ref_conf_id: i32, query_conf_id: i32, tol: f64) -> Self {
+        AtomCoordsMatcher {
+            ref_conf_id,
+            query_conf_id,
+            tol2: tol * tol,
+        }
+    }
+
+    /// Molecules without conformers (or without the requested one) never match.
+    pub fn matches(&self, query: &ROMol, qi: u32, mol: &ROMol, mi: u32) -> bool {
+        if query.num_conformers() == 0 || mol.num_conformers() == 0 {
+            return false;
+        }
+        let pos = |m: &ROMol, conf: i32, idx: u32| m.conformer(conf)?.atom_pos(idx);
+        match (
+            pos(query, self.query_conf_id, qi),
+            pos(mol, self.ref_conf_id, mi),
+        ) {
+            (Ok(q), Ok(t)) => (q - t).length_sq() <= self.tol2,
+            _ => false,
+        }
+    }
+}
+
+impl From<AtomCoordsMatcher> for MatchCheck {
+    fn from(m: AtomCoordsMatcher) -> Self {
+        MatchCheck::new(move |q, qi, mol, mi| m.matches(q, qi, mol, mi))
+    }
+}
+
+macro_rules! callback_traits {
+    ($($t:ty),*) => {$(
+        impl fmt::Debug for $t {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str(stringify!($t))
+            }
+        }
+        /// Callbacks are equal when they are the same closure.
+        impl PartialEq for $t {
+            fn eq(&self, other: &Self) -> bool {
+                Arc::ptr_eq(&self.0, &other.0)
+            }
+        }
+        impl Eq for $t {}
+    )*};
+}
+callback_traits!(MatchCheck, FinalMatchCheck);
+
+/// `SubstructMatchParameters`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SubstructMatchParameters {
     pub use_chirality: bool,
@@ -47,6 +139,16 @@ pub struct SubstructMatchParameters {
     pub max_recursive_matches: u32,
     pub specified_stereo_query_matches_unspecified: bool,
     pub aromatic_matches_single_or_double: bool,
+    /// Called for atom pairs that passed every other comparison.
+    pub extra_atom_check: Option<MatchCheck>,
+    /// Use only `extra_atom_check` to decide whether atoms match.
+    pub extra_atom_check_overrides_default: bool,
+    /// Called for bond pairs that passed every other comparison.
+    pub extra_bond_check: Option<MatchCheck>,
+    /// Use only `extra_bond_check` to decide whether bonds match.
+    pub extra_bond_check_overrides_default: bool,
+    /// Called with each finished match.
+    pub extra_final_check: Option<FinalMatchCheck>,
 }
 
 impl Default for SubstructMatchParameters {
@@ -66,6 +168,11 @@ impl Default for SubstructMatchParameters {
             max_recursive_matches: 1000,
             specified_stereo_query_matches_unspecified: false,
             aromatic_matches_single_or_double: false,
+            extra_atom_check: None,
+            extra_atom_check_overrides_default: false,
+            extra_bond_check: None,
+            extra_bond_check_overrides_default: false,
+            extra_final_check: None,
         }
     }
 }
@@ -432,6 +539,10 @@ impl Ctx<'_> {
     /// `atomCompat`
     fn atom_compat(&self, qi: u32, mi: u32) -> Result<bool> {
         let (qa, ma) = (self.query.atom(qi), self.mol.atom(mi));
+        let extra = self.ps.extra_atom_check.as_ref();
+        if let (true, Some(check)) = (self.ps.extra_atom_check_overrides_default, extra) {
+            return Ok(check.call(self.query, qi, self.mol, mi));
+        }
         let res = if self.ps.use_query_query_matches && qa.has_query() && ma.has_query() {
             match (qa.query(), ma.query()) {
                 (Some(q1), Some(q2)) => atom_queries_match(q1, q2),
@@ -445,6 +556,9 @@ impl Ctx<'_> {
         }
         if !self.ps.atom_properties.is_empty() && !property_compat(qa, ma, &self.ps.atom_properties)
         {
+            return Ok(false);
+        }
+        if extra.is_some_and(|check| !check.call(self.query, qi, self.mol, mi)) {
             return Ok(false);
         }
         Ok(true)
@@ -465,6 +579,10 @@ impl Ctx<'_> {
     /// `bondCompat`
     fn bond_compat(&self, qb: u32, mb: u32) -> Result<bool> {
         let (b1, b2) = (self.query.bond(qb), self.mol.bond(mb));
+        let extra = self.ps.extra_bond_check.as_ref();
+        if let (true, Some(check)) = (self.ps.extra_bond_check_overrides_default, extra) {
+            return Ok(check.call(self.query, qb, self.mol, mb));
+        }
         let conj_sd = |b: &crate::graphmol::bond::Bond| {
             b.is_conjugated() && matches!(b.bond_type(), BondType::Single | BondType::Double)
         };
@@ -519,6 +637,9 @@ impl Ctx<'_> {
         }
         if !self.ps.bond_properties.is_empty() && !property_compat(b1, b2, &self.ps.bond_properties)
         {
+            return Ok(false);
+        }
+        if extra.is_some_and(|check| !check.call(self.query, qb, self.mol, mb)) {
             return Ok(false);
         }
         Ok(true)
@@ -584,6 +705,11 @@ impl<'a> FinalCheck<'a> {
 
     fn check(&mut self, q_c: &[u32], m_c: &[u32]) -> Result<bool> {
         let nq = self.query.num_atoms() as usize;
+        if let Some(FinalMatchCheck(f)) = &self.ps.extra_final_check {
+            if !f(self.mol, &m_c[..nq]) {
+                return Ok(false);
+            }
+        }
         let mut seen_key = Vec::new();
         if self.ps.uniquify {
             seen_key = vec![false; self.mol.num_atoms() as usize];
