@@ -39,6 +39,7 @@ mod rdinfotheory;
 mod rdmetricmatrixcalc;
 mod rdmhfpfingerprint;
 mod rdmmpa;
+mod rdmolalign;
 mod rdmoldescriptors;
 mod rdmoldescriptors_3d;
 mod rdmoldescriptors_autocorr;
@@ -124,6 +125,7 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
     add_submodule(m, "rdmolops", "rdkit.Chem.rdmolops", rdmolops::init)?;
     add_submodule(m, "rdDepictor", "rdkit.Chem.rdDepictor", rddepictor::init)?;
     add_submodule(m, "rdqueries", "rdkit.Chem.rdqueries", rdqueries::init)?;
+    add_submodule(m, "rdMolAlign", "rdkit.Chem.rdMolAlign", rdmolalign::init)?;
     add_submodule(
         m,
         "rdMolTransforms",

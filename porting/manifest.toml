@@ -861,3 +861,15 @@
 
 [module."rdoxide_python::rdmolinterchange".sources]
 "Code/GraphMol/MolInterchange/Wrap/rdMolInterchange.cpp" = "1d36c0b7b8be4cba566b6c90027410cd1df39092"
+
+[module."rdoxide::numerics::alignment".sources]
+"Code/Numerics/Alignment/AlignPoints.cpp" = "adfeac24534d3e334908505615094a90fc2716ec"
+"Code/Numerics/Alignment/AlignPoints.h" = "88a1e1992bfdb757639bc245ea129700eb373b75"
+
+[module."rdoxide::graphmol::mol_align".sources]
+"Code/GraphMol/MolAlign/AlignMolecules.cpp" = "8875caf54ce329bf75e31fac43807e11408ed9dd"
+"Code/GraphMol/MolAlign/AlignMolecules.h" = "987f33a5e105c8fb1153b21a3342e7dae9b1583b"
+"Code/GraphMol/MolAlign/O3AAlignMolecules.cpp" = "61135e8c08a92ea1b317e6ed2e63ecf68779279d"
+
+[module."rdoxide_python::rdmolalign".sources]
+"Code/GraphMol/MolAlign/Wrap/rdMolAlign.cpp" = "56d0ef958c935c02ce7a9db1e6a0497edbe62045"
