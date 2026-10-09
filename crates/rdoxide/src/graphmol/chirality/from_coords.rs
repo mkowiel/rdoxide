@@ -2,7 +2,8 @@
 //! (`MolOps::assignChiralTypesFromBondDirs`,
 //! `Chirality::atomChiralTypeFromBondDirPseudo3D`), 3D geometry
 //! (`MolOps::assignChiralTypesFrom3D`) and double bonds
-//! (`MolOps::detectBondStereochemistry`).
+//! (`MolOps::detectBondStereochemistry`), and molfile atom parities
+//! (`MolOps::assignChiralTypesFromMolParity`).
 //!
 //! Ported from RDKit `Code/GraphMol/Chirality.cpp` (2026.09.1).
 //!
@@ -665,4 +666,47 @@ pub fn assign_stereochemistry_from_3d(
     detect_bond_stereochemistry(mol, conf_id)?;
     assign_chiral_types_from_3d(mol, conf_id, replace_existing_tags)?;
     super::legacy::assign_stereochemistry(mol, replace_existing_tags, true, true)
+}
+
+/// `MolOps::assignChiralTypesFromMolParity`: sets the chiral tags from the
+/// molfile `molParity` atom property (1 = clockwise, 2 = counterclockwise
+/// when the neighbors are numbered by increasing atom index).
+pub fn assign_chiral_types_from_mol_parity(
+    mol: &mut ROMol,
+    replace_existing_tags: bool,
+) -> Result<()> {
+    mol.props.clear_val(cp::_StereochemDone);
+    for idx in 0..mol.num_atoms() {
+        if !replace_existing_tags && mol.atom(idx).chiral_tag() != ChiralType::Unspecified {
+            continue;
+        }
+        let parity = mol
+            .atom(idx)
+            .props
+            .get(cp::molParity)
+            .and_then(RDValue::as_int)
+            .unwrap_or(0);
+        if !(1..=2).contains(&parity) || mol.atom_degree(idx) < 3 {
+            mol.atom_mut(idx).set_chiral_tag(ChiralType::Unspecified);
+            continue;
+        }
+        // parity 1 (CW) and 2 (CCW) become 0 and 1
+        let mut parity = parity - 1;
+        let mut bonds: Vec<u32> = mol.atom_bond_indices(idx).collect();
+        bonds.sort_by_key(|&b| mol.bond(b).other_atom_idx(idx).unwrap_or(u32::MAX));
+        let probe: Vec<i32> = bonds.iter().map(|&b| b as i32).collect();
+        if mol.perturbation_order(idx, &probe)? % 2 == 1 {
+            parity = 1 - parity;
+        }
+        let tag = if parity == 0 {
+            ChiralType::TetrahedralCW
+        } else {
+            ChiralType::TetrahedralCCW
+        };
+        mol.atom_mut(idx).set_chiral_tag(tag);
+        if mol.atom(idx).needs_update_property_cache() {
+            mol.update_atom_property_cache(idx, false)?;
+        }
+    }
+    Ok(())
 }

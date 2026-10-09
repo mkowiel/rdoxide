@@ -5,6 +5,11 @@
 //! agree with Eigen to rounding error but not bit for bit — Eigen's own
 //! results already depend on the SIMD width it was built with.
 
+pub mod dense;
+pub mod eigen_3x3;
+pub mod full_piv_lu;
+pub mod jacobi_svd;
+
 use crate::{RDKitError, Result};
 
 const MAX_QL_ITERATIONS: usize = 60;

@@ -285,7 +285,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     crate::substruct::init(m)?;
     m.add_function(wrap_pyfunction!(get_periodic_table, m)?)?;
 
-    use crate::enums::add_enum;
+    use crate::enums::{add_enum, add_enum_exported};
     use crate::enums_impl::*;
     add_enum(
         m,
@@ -293,13 +293,35 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
         &PyHybridizationType::members(),
         Some("Hybridization type"),
     )?;
-    add_enum(m, "ChiralType", &PyChiralType::members(), None)?;
-    add_enum(m, "ValenceType", &PyValenceType::members(), None)?;
+    add_enum_exported(m, "ChiralType", &PyChiralType::members(), None)?;
+    add_enum_exported(m, "ValenceType", &PyValenceType::members(), None)?;
     add_enum(m, "BondType", &PyBondType::members(), None)?;
     add_enum(m, "BondDir", &PyBondDir::members(), None)?;
     add_enum(m, "BondStereo", &PyBondStereo::members(), None)?;
-    add_enum(m, "StereoGroupType", &PyStereoGroupType::members(), None)?;
-    add_enum(
+    add_enum_exported(m, "StereoGroupType", &PyStereoGroupType::members(), None)?;
+    add_enum_exported(
+        m,
+        "CompositeQueryType",
+        &[
+            ("COMPOSITE_AND", 0),
+            ("COMPOSITE_OR", 1),
+            ("COMPOSITE_XOR", 2),
+        ],
+        None,
+    )?;
+    add_enum_exported(
+        m,
+        "ResonanceFlags",
+        &[
+            ("ALLOW_INCOMPLETE_OCTETS", 1),
+            ("ALLOW_CHARGE_SEPARATION", 2),
+            ("KEKULE_ALL", 4),
+            ("UNCONSTRAINED_CATIONS", 8),
+            ("UNCONSTRAINED_ANIONS", 16),
+        ],
+        None,
+    )?;
+    add_enum_exported(
         m,
         "PropertyPickleOptions",
         &[
@@ -340,7 +362,10 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("KekulizeException", py.get_type::<KekulizeException>())?;
 
     m.add_class::<crate::atom::PyAtom>()?;
+    m.add_class::<crate::atom::PyQueryAtom>()?;
+    crate::rdchem_atom_funcs::add(m)?;
     m.add_class::<crate::bond::PyBond>()?;
+    m.add_class::<crate::bond::PyQueryBond>()?;
     m.add_class::<crate::conformer::PyConformer>()?;
     m.add_class::<crate::mol::PyMol>()?;
     m.add_class::<crate::mol::PyRWMol>()?;
@@ -353,6 +378,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
         crate::stereo_group::create_stereo_group,
         m
     )?)?;
+    crate::substance_group::add(m)?;
     m.add_function(wrap_pyfunction!(tossit, m)?)?;
     Ok(())
 }

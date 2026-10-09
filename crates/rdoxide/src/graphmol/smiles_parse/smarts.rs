@@ -1536,20 +1536,16 @@ pub fn mol_from_smarts(smarts: &str, params: &SmartsParserParams) -> crate::Resu
     let Some(mut res) = to_mol(&label_recursive_patterns(&lsmarts), &lsmarts) else {
         return Ok(None);
     };
-    if !cx_part.is_empty() && params.parse_name {
-        // CXSMILES extensions are ported later (see mol_from_smiles)
-        if !cx_part.starts_with('|') {
-            name = cx_part.clone();
-        } else if let Some(end) = cx_part[1..].find('|') {
-            let rest = cx_part[end + 2..].trim();
-            if !rest.is_empty() {
-                name = rest.to_string();
-            }
-        }
-    }
+    super::handle_cx_part_and_name(
+        &mut res,
+        params.allow_cx_smiles,
+        params.strict_cx_smiles,
+        params.parse_name,
+        &cx_part,
+        &mut name,
+    )?;
     if params.merge_hs {
-        // TODO(stage 4c): MolOps::mergeQueryHs
-        return Err(crate::RDKitError::invariant("mergeHs is not ported yet"));
+        crate::graphmol::mol_ops::query_hs::merge_query_hs(&mut res, false, false)?;
     }
     crate::graphmol::chirality::bond_dirs::set_bond_stereo_from_directions(&mut res)?;
     if !params.skip_cleanup {

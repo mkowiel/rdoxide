@@ -13,25 +13,24 @@
 //! Copyright (C) 2003-2025 Greg Landrum and other RDKit contributors.
 //! Licensed under the BSD 3-Clause license (see LICENSES/RDKit-BSD-3-Clause.txt).
 
-use std::collections::BTreeMap;
-use std::f64::consts::PI;
-
+use super::sgroup_writing::{
+    mol_file_sgroup_info, move_additional_properties_to_sgroups, v3000_sgroup_block,
+};
 use crate::geometry::Point3D;
 use crate::graphmol::atom::{ChiralType, ValenceType};
 use crate::graphmol::bond::{BondDir, BondStereo, BondType};
 use crate::graphmol::chirality::get_use_legacy_stereo_perception;
 use crate::graphmol::conformer::Conformer;
-use crate::graphmol::find_rings::find_sssr;
 use crate::graphmol::kekulize::kekulize;
 use crate::graphmol::periodic_table::PeriodicTable;
-use crate::graphmol::queries::{
-    AtomQuery, BondQuery, get_atom_list_query_vals, is_atom_list_query,
-};
+use crate::graphmol::queries::{BondQuery, get_atom_list_query_vals, is_atom_list_query};
 use crate::graphmol::romol::{ROMol, RWMol};
 use crate::graphmol::smiles_parse::write::in_organic_subset;
-use crate::graphmol::stereo_group::{StereoGroup, StereoGroupType};
+use crate::graphmol::stereo_group::{StereoGroup, StereoGroupType, assign_stereo_group_ids};
+use crate::graphmol::wedge_bonds::{
+    WedgeBonds, WedgeInfo, determine_bond_wedge_state, pick_bonds_to_wedge,
+};
 use crate::rdgeneral::common_properties as cp;
-use crate::rdgeneral::cxx_sort::libcxx_sort_by;
 use crate::rdgeneral::{RDProps, RDValue};
 use crate::{RDKitError, Result};
 
@@ -58,10 +57,6 @@ impl Default for MolWriterParams {
     }
 }
 
-fn not_ported(what: &str) -> RDKitError {
-    RDKitError::Runtime(format!("{what} is not supported by rdoxide yet"))
-}
-
 fn int_prop(props: &impl RDProps, k: &str) -> Option<i32> {
     props.get_prop(k).and_then(RDValue::as_int)
 }
@@ -75,230 +70,6 @@ fn str_prop(props: &impl RDProps, k: &str) -> Option<String> {
         Some(RDValue::String(s)) => Some(s.clone()),
         Some(v) => Some(v.to_rd_string()),
         None => None,
-    }
-}
-
-// ------------------------------------------------------------------ wedging
-
-/// `Chirality::WedgeInfoBase`
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum WedgeInfo {
-    /// `WedgeInfoChiral`: wedge from this atom
-    Chiral(u32),
-    /// `WedgeInfoAtropisomer`
-    Atropisomer(BondDir),
-}
-
-pub type WedgeBonds = BTreeMap<u32, WedgeInfo>;
-
-fn is_tetra(t: ChiralType) -> bool {
-    matches!(t, ChiralType::TetrahedralCW | ChiralType::TetrahedralCCW)
-}
-
-/// `detail::countChiralNbrs`
-fn count_chiral_nbrs(mol: &ROMol, no_nbrs: i32) -> (bool, Vec<i32>) {
-    let mut n = vec![no_nbrs; mol.num_atoms() as usize];
-    for b in mol.bonds() {
-        if matches!(
-            b.bond_dir(),
-            BondDir::BeginWedge | BondDir::BeginDash | BondDir::Unknown
-        ) {
-            if is_tetra(mol.atom(b.begin_atom_idx()).chiral_tag()) {
-                n[b.begin_atom_idx() as usize] = no_nbrs + 1;
-            } else if is_tetra(mol.atom(b.end_atom_idx()).chiral_tag()) {
-                n[b.end_atom_idx() as usize] = no_nbrs + 1;
-            }
-        }
-    }
-    let mut chi_nbrs = false;
-    for at in mol.atoms() {
-        let i = at.idx() as usize;
-        if n[i] > no_nbrs || !is_tetra(at.chiral_tag()) {
-            continue;
-        }
-        n[i] = 0;
-        chi_nbrs = true;
-        for nb in mol.atom_neighbors(at.idx()) {
-            let na = mol.atom(nb);
-            if na.atomic_num() == 1 {
-                n[i] -= 10;
-                continue;
-            }
-            if is_tetra(na.chiral_tag()) {
-                n[i] -= 1;
-            }
-        }
-    }
-    (chi_nbrs, n)
-}
-
-/// `getDoubleBondPresence`
-fn double_bond_presence(mol: &ROMol, atom: u32) -> (i32, i32, i32) {
-    let (mut d, mut known, mut any) = (0, 0, 0);
-    for b in mol.atom_bonds(atom) {
-        if b.bond_type() == BondType::Double {
-            d += 1;
-            if b.stereo() == BondStereo::StereoAny {
-                any += 1;
-            } else if b.stereo() as u8 > BondStereo::StereoAny as u8 {
-                known += 1;
-            }
-        }
-    }
-    (d, known, any)
-}
-
-/// `detail::pickBondToWedge`
-fn pick_bond_to_wedge(
-    mol: &mut ROMol,
-    atom: u32,
-    n_chiral_nbrs: &[i32],
-    wedge_bonds: &WedgeBonds,
-    no_nbrs: i32,
-) -> Result<Option<u32>> {
-    if !mol.ring_info().is_sssr_or_better() {
-        find_sssr(mol, false, false)?;
-    }
-    let mut scores: Vec<(i32, u32)> = Vec::new();
-    for bid in mol.atom_bond_indices(atom).collect::<Vec<_>>() {
-        let b = mol.bond(bid);
-        if b.bond_type() != BondType::Single || wedge_bonds.contains_key(&bid) {
-            continue;
-        }
-        let o = b.other_atom_idx(atom)?;
-        let oa = mol.atom(o);
-        if oa.atomic_num() == 1 {
-            scores.push((-1000000, bid));
-            continue;
-        }
-        let mut score = oa.atomic_num() as i32
-            + 100 * mol.atom_degree(o) as i32
-            + 1000 * i32::from(oa.chiral_tag() != ChiralType::Unspecified);
-        if n_chiral_nbrs[o as usize] < no_nbrs {
-            score -= 100000 * n_chiral_nbrs[o as usize];
-        }
-        score += 10000 * mol.ring_info().num_atom_rings(o)? as i32;
-        score += 20000 * mol.ring_info().num_bond_rings(bid)? as i32;
-        let (d, known, any) = double_bond_presence(mol, o);
-        score += 11000 * d + 12000 * known + 23000 * any;
-        if oa.has_prop(cp::_fromAttachPoint) {
-            score += 500000;
-        }
-        scores.push((score, bid));
-    }
-    // std::min_element: the first minimum
-    Ok(scores.iter().min_by_key(|p| *p).map(|p| p.1))
-}
-
-/// `Chirality::pickBondsToWedge(mol, nullptr, conf)`
-pub fn pick_bonds_to_wedge(mol: &mut ROMol, conf: Option<&Conformer>) -> Result<WedgeBonds> {
-    const NO_NBRS: i32 = 100;
-    let mut indices: Vec<u32> = (0..mol.num_atoms()).collect();
-    let (chi_nbrs, n) = count_chiral_nbrs(mol, NO_NBRS);
-    if chi_nbrs {
-        libcxx_sort_by(&mut indices, |a, b| n[*a as usize] < n[*b as usize]);
-    }
-    let mut wedge = WedgeBonds::new();
-    for idx in indices {
-        if n[idx as usize] > NO_NBRS {
-            continue;
-        }
-        if !is_tetra(mol.atom(idx).chiral_tag()) {
-            break;
-        }
-        if let Some(b) = pick_bond_to_wedge(mol, idx, &n, &wedge, NO_NBRS)? {
-            wedge.insert(b, WedgeInfo::Chiral(idx));
-        }
-    }
-    crate::graphmol::atropisomers::wedge_bonds_from_atropisomers(mol, conf, &mut wedge)?;
-    Ok(wedge)
-}
-
-/// `detail::determineBondWedgeState(bond, fromAtomIdx, conf)`
-fn determine_bond_wedge_state_from(
-    mol: &ROMol,
-    bond: u32,
-    from_atom: u32,
-    conf: Option<&Conformer>,
-) -> Result<BondDir> {
-    let b = mol.bond(bond);
-    if b.bond_type() != BondType::Single {
-        return Err(RDKitError::precondition("bad bond order for wedging"));
-    }
-    let res = b.bond_dir();
-    let Some(conf) = conf else {
-        return Ok(res);
-    };
-    let (atom, bond_atom) = if b.begin_atom_idx() == from_atom {
-        (b.begin_atom_idx(), b.end_atom_idx())
-    } else {
-        (b.end_atom_idx(), b.begin_atom_idx())
-    };
-    let chiral = mol.atom(atom).chiral_tag();
-    if !is_tetra(chiral) {
-        return Err(RDKitError::invariant("bad chiral type for wedging"));
-    }
-    let mut center = conf.atom_pos(atom)?;
-    let mut tmp = conf.atom_pos(bond_atom)?;
-    center.z = 0.0;
-    tmp.z = 0.0;
-    let Ok(ref_vect) = center.direction_vector(&tmp) else {
-        return Ok(res);
-    };
-    let mut idxs: Vec<i32> = vec![bond as i32];
-    let mut angles: Vec<f64> = vec![0.0];
-    for nb in mol.atom_bond_indices(atom) {
-        if nb == bond {
-            continue;
-        }
-        let o = mol.bond(nb).other_atom_idx(atom)?;
-        let mut p = conf.atom_pos(o)?;
-        p.z = 0.0;
-        let Ok(v) = center.direction_vector(&p) else {
-            return Ok(res);
-        };
-        let mut angle = ref_vect.signed_angle_to(&v);
-        if angle < 0.0 {
-            angle += 2. * PI;
-        }
-        let pos = angles
-            .iter()
-            .position(|&a| a.partial_cmp(&angle) != Some(std::cmp::Ordering::Less))
-            .unwrap_or(angles.len());
-        angles.insert(pos, angle);
-        idxs.insert(pos, nb as i32);
-    }
-    let mut n_swaps = mol.perturbation_order(atom, &idxs)?;
-    if angles.len() == 3 {
-        let angle_tol = PI * 1.9 / 180.;
-        if angles[2] - angles[1] >= PI - angle_tol {
-            n_swaps += 1;
-        }
-    }
-    Ok(if chiral == ChiralType::TetrahedralCCW {
-        if n_swaps % 2 == 1 {
-            BondDir::BeginDash
-        } else {
-            BondDir::BeginWedge
-        }
-    } else if n_swaps % 2 == 1 {
-        BondDir::BeginWedge
-    } else {
-        BondDir::BeginDash
-    })
-}
-
-/// `detail::determineBondWedgeState(bond, wedgeBonds, conf)`
-pub fn determine_bond_wedge_state(
-    mol: &ROMol,
-    bond: u32,
-    wedge: &WedgeBonds,
-    conf: Option<&Conformer>,
-) -> Result<BondDir> {
-    match wedge.get(&bond) {
-        None => Ok(mol.bond(bond).bond_dir()),
-        Some(WedgeInfo::Atropisomer(d)) => Ok(*d),
-        Some(WedgeInfo::Chiral(a)) => determine_bond_wedge_state_from(mol, bond, *a, conf),
     }
 }
 
@@ -557,43 +328,9 @@ fn has_complex_query(mol: &ROMol, idx: u32) -> bool {
     true
 }
 
-fn is_list_query(mol: &ROMol, idx: u32) -> bool {
+pub(super) fn is_list_query(mol: &ROMol, idx: u32) -> bool {
     let a = mol.atom(idx);
     is_atom_list_query(a.query(), a.atomic_num())
-}
-
-/// Whether `moveAdditionalPropertiesToSGroups` would add SubstanceGroups.
-fn needs_additional_sgroups(mol: &ROMol) -> bool {
-    let redundant = |q: &AtomQuery| {
-        q.description == "AtomAnd"
-            && q.children.len() == 2
-            && q.children[0].description == "AtomAtomicNum"
-            && !q.children[0].negate
-            && !q.children[1].negate
-            && matches!(
-                q.children[1].description.as_str(),
-                "AtomIsotope" | "AtomFormalCharge"
-            )
-    };
-    for a in mol.atoms() {
-        if a.has_prop(cp::_QueryAtomGenericLabel) {
-            return true;
-        }
-        if let Some(q) = a.query() {
-            if a.has_prop(cp::MRV_SMA) {
-                return true;
-            }
-            if !is_list_query(mol, a.idx())
-                && q.description != "AtomNull"
-                && !q.description.starts_with("AtomType")
-                && !q.description.starts_with("AtomAtomicNum")
-                && !redundant(q)
-            {
-                return true;
-            }
-        }
-    }
-    mol.bonds().iter().any(|b| b.bond_type() == BondType::Zero)
 }
 
 // ------------------------------------------------------------------ atoms
@@ -968,6 +705,45 @@ fn alias_info(mol: &ROMol) -> String {
     ss
 }
 
+/// `GetMolFileZBOInfo`: the `M  ZBO`, `M  HYD` and `M  ZCH` lines of
+/// zero-order bonds and the atoms they connect.
+fn zbo_info(mol: &ROMol) -> Result<String> {
+    let mut res = String::new();
+    let mut affected = vec![false; mol.num_atoms() as usize];
+    let mut entries = Vec::new();
+    for bond in mol
+        .bonds()
+        .iter()
+        .filter(|b| b.bond_type() == BondType::Zero)
+    {
+        entries.push(format!(" {:3} {:3}", bond.idx() + 1, 0));
+        affected[bond.begin_atom_idx() as usize] = true;
+        affected[bond.end_atom_idx() as usize] = true;
+    }
+    let lines = |code: &str, entries: &[String]| -> String {
+        entries
+            .chunks(8)
+            .map(|c| format!("M  {code}{:3}{}\n", c.len(), c.concat()))
+            .collect()
+    };
+    res += &lines("ZBO", &entries);
+    let (mut hyd, mut zch) = (Vec::new(), Vec::new());
+    for idx in (0..mol.num_atoms()).filter(|&i| affected[i as usize]) {
+        hyd.push(format!(
+            " {:3} {:3}",
+            idx + 1,
+            mol.total_num_hs(idx, false)?
+        ));
+        let charge = mol.atom(idx).formal_charge();
+        if charge != 0 {
+            zch.push(format!(" {:3} {:3}", idx + 1, charge));
+        }
+    }
+    res += &lines("HYD", &hyd);
+    res += &lines("ZCH", &zch);
+    Ok(res)
+}
+
 /// `GetMolFilePXAInfo`
 fn pxa_info(mol: &ROMol) -> String {
     let mut res = String::new();
@@ -1143,52 +919,6 @@ fn v3000_bond_line(
     Ok(ss)
 }
 
-/// `assignStereoGroupIds`
-pub fn assign_stereo_group_ids(groups: &mut [StereoGroup]) {
-    fn store(ids: &mut Vec<bool>, sg: &mut StereoGroup) {
-        let id = sg.write_id() as usize;
-        if id == 0 {
-            return;
-        }
-        if id >= ids.len() {
-            ids.resize(id + 1, false);
-        }
-        if ids[id] {
-            crate::rd_log_warning!(
-                "StereoGroup ID {id} is used by more than one group, and will be reassined"
-            );
-            sg.set_write_id(0);
-        } else {
-            ids[id] = true;
-        }
-    }
-    fn assign(ids: &[bool], next: &mut u32, sg: &mut StereoGroup) {
-        if sg.write_id() == 0 {
-            *next += 1;
-            while (*next as usize) < ids.len() && ids[*next as usize] {
-                *next += 1;
-            }
-            sg.set_write_id(*next);
-        }
-    }
-    let (mut and_ids, mut or_ids) = (Vec::new(), Vec::new());
-    for sg in groups.iter_mut() {
-        match sg.group_type() {
-            StereoGroupType::And => store(&mut and_ids, sg),
-            StereoGroupType::Or => store(&mut or_ids, sg),
-            StereoGroupType::Absolute => {}
-        }
-    }
-    let (mut and_id, mut or_id) = (0, 0);
-    for sg in groups.iter_mut() {
-        match sg.group_type() {
-            StereoGroupType::And => assign(&and_ids, &mut and_id, sg),
-            StereoGroupType::Or => assign(&or_ids, &mut or_id, sg),
-            StereoGroupType::Absolute => {}
-        }
-    }
-}
-
 /// `Atropisomers::getAllAtomIdsForStereoGroup`
 fn all_atom_ids_for_stereo_group(mol: &ROMol, g: &StereoGroup, wedge: &WedgeBonds) -> Vec<u32> {
     let mut ids: Vec<u32> = g.atoms().to_vec();
@@ -1269,7 +999,7 @@ pub fn get_v3000_ctab(
         "M  V30 COUNTS {} {} {} {} {}\n",
         mol.num_atoms(),
         mol.num_bonds(),
-        0,
+        mol.substance_groups().len(),
         0,
         chiral_flag
     );
@@ -1289,6 +1019,7 @@ pub fn get_v3000_ctab(
         }
         res += "M  V30 END BOND\n";
     }
+    res += &v3000_sgroup_block(mol)?;
     if let Some(v) = str_prop(mol, cp::molFileLinkNodes) {
         for ln in v.split('|') {
             res += &format!("M  V30 LINKNODE {ln}\n");
@@ -1315,7 +1046,8 @@ fn output_mol_block(
     aromatic_bonds: &[bool],
 ) -> Result<String> {
     let (n_atoms, n_bonds) = (mol.num_atoms(), mol.num_bonds());
-    if format == Format::V2000 && (n_atoms > 999 || n_bonds > 999) {
+    let n_sgroups = mol.substance_groups().len();
+    if format == Format::V2000 && (n_atoms > 999 || n_bonds > 999 || n_sgroups > 999) {
         return Err(RDKitError::Value(
             "V2000 format does not support more than 999 atoms, bonds or SGroups.".into(),
         ));
@@ -1364,12 +1096,24 @@ fn output_mol_block(
                 || has_dative
                 || n_atoms > 999
                 || n_bonds > 999
+                || n_sgroups > 999
                 || !mol.stereo_groups().is_empty()));
     if is_v3000 {
         res += &format!("{:>3}", 0).repeat(10);
         res += "999 V3000\n";
     } else {
-        for v in [n_atoms, n_bonds, 0, 0, chiral_flag, 0, 0, 0, 0, 0] {
+        for v in [
+            n_atoms as usize,
+            n_bonds as usize,
+            0,
+            n_sgroups,
+            chiral_flag as usize,
+            0,
+            0,
+            0,
+            0,
+            0,
+        ] {
             res += &format!("{v:3}");
         }
         res += "999 V2000\n";
@@ -1389,8 +1133,9 @@ fn output_mol_block(
         res += &rgroup_info(mol);
         res += &query_info(mol, &qla)?;
         res += &alias_info(mol);
-        // GetMolFileZBOInfo: zero-order bonds are rejected in prepare_mol
+        res += &zbo_info(mol)?;
         res += &pxa_info(mol);
+        res += &mol_file_sgroup_info(mol)?;
     } else {
         res += &get_v3000_ctab(mol, aromatic_bonds, conf_id, precision)?;
     }
@@ -1415,9 +1160,7 @@ fn prepare_mol(mol: &mut RWMol, params: &MolWriterParams) -> Result<Vec<bool>> {
     if params.include_stereo && mol.num_conformers() == 0 {
         crate::graphmol::depictor::compute_2d_coords(mol, &Default::default())?;
     }
-    if needs_additional_sgroups(mol) {
-        return Err(not_ported("writing SubstanceGroups"));
-    }
+    move_additional_properties_to_sgroups(mol)?;
     Ok(aromatic)
 }
 

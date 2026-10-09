@@ -106,8 +106,52 @@
 [module."rdoxide_python::geometry".sources]
 "Code/Geometry/Wrap/Point.cpp" = "5a5cbaf1521dfdad08ed24641946f1f37e8c35f4"
 
+[module."rdoxide::geometry::grid".sources]
+"Code/Geometry/Grid3D.h" = "87b2499a3fe73e77dd451561d41a03d194086a2f"
+"Code/Geometry/UniformGrid3D.h" = "c1cd3032b407209b129ce1d14a91f1cfbf297ee9"
+"Code/Geometry/UniformGrid3D.cpp" = "68af35a6aa9851e540a001ba99090aaa05c35d37"
+"Code/Geometry/UniformRealValueGrid3D.h" = "26c92babb2a4a4c75651b8ae1877df4c282b27a3"
+"Code/Geometry/UniformRealValueGrid3D.cpp" = "1cb18dfe53f29e6106ffcb53dfce984d1c6f0c2d"
+"Code/Geometry/GridUtils.h" = "8e76cdcf4120d5c72b49c67feaf1022375f8e137"
+"Code/Geometry/GridUtils.cpp" = "49dc0b3bf9973ebc8c75096f93722af84d3497fb"
+
+[module."rdoxide_python::geometry_grids".sources]
+"Code/Geometry/Wrap/UniformGrid3D.cpp" = "79104aa0cf6813b54adca5504cc5c6e503aa0b99"
+"Code/Geometry/Wrap/UniformRealValueGrid3D.cpp" = "644658475b04e414478d176cbbfeb9b58cf9da6b"
+"Code/Geometry/Wrap/rdGeometry.cpp" = "1868be120afedde6ad8ce78e16c3a0fc6851b03f"
+
 [module."python::rdkit.Geometry.__init__".sources]
 "rdkit/Geometry/__init__.py" = "ce2a8f5aae4528ae84fd9797869a16395a612e46"
+
+[module."rdoxide::graphmol::mol_ops::query_hs".sources]
+"Code/GraphMol/AddHs.cpp" = "ac653bc04e5c317b9803d986fcdef668fb17759e"
+
+[module."rdoxide::graphmol::substance_group".sources]
+"Code/GraphMol/SubstanceGroup.cpp" = "9100b668091378e117383421759bbd820c8530e5"
+
+[module."rdoxide_python::substance_group".sources]
+"Code/GraphMol/Wrap/SubstanceGroup.cpp" = "bbe27150bb8c5f19f9ddac2908b8ee8509793870"
+
+[module."rdoxide::graphmol::file_parsers::sgroup_parsing".sources]
+"Code/GraphMol/FileParsers/MolSGroupParsing.cpp" = "87f8e9942f4d0dca37d9c06ab7da59a1aa2b2402"
+"Code/GraphMol/FileParsers/MolSGroupParsing.h" = "86caffe14aa21d4b29b217712ad3f0b6004176fd"
+
+[module."rdoxide::graphmol::file_parsers::sgroup_writing".sources]
+"Code/GraphMol/FileParsers/MolSGroupWriting.cpp" = "d472b5525051ee617db29782f4b638f4a57c73b3"
+"Code/GraphMol/FileParsers/MolSGroupWriting.h" = "a5d1f9bb313d1baa58e5a153e74feb4e30a8cf77"
+
+[module."rdoxide::graphmol::adjust_query".sources]
+"Code/GraphMol/AdjustQuery.cpp" = "1dfe502cfc05eccd5839e7fe88218c15e24aca94"
+
+[module."rdoxide_python::rdmolops_adjust_query".sources]
+"Code/GraphMol/Wrap/MolOps.cpp" = "2dc7ae10c4ce7523938a4db10e31215cfe2162db"
+
+[module."rdoxide_python::rdqueries".sources]
+"Code/GraphMol/Wrap/Queries.cpp" = "39d575ecd9ce29b85f7b271e5b773277df84106a"
+"Code/GraphMol/Wrap/rdqueries.cpp" = "cda87a8814264f0a56790a1e82bb6376ffecaba5"
+
+[module."rdoxide::graphmol::smiles_parse::cx".sources]
+"Code/GraphMol/SmilesParse/CXSmilesOps.cpp" = "000c3236922e74f224235f67e421a71186792530"
 
 [module."rdoxide::graphmol::smiles_parse::lexer".sources]
 "Code/GraphMol/SmilesParse/smiles.ll" = "3bf58ba7948758af44e7ab3f7d8386186d861045"
@@ -499,3 +543,141 @@
 [module."rdoxide_python::rdmolfiles_smisupplier".sources]
 "Code/GraphMol/Wrap/SmilesMolSupplier.cpp" = "c53a84e8b6ae88bb60cd8cc8b97d422c51baa1aa"
 "Code/GraphMol/Wrap/MolSupplier.h" = "a931d5f55aafe8de95c48c9e44fffd2ba0e88d15"
+
+[module."rdoxide::graphmol::file_parsers::smiles_writer".sources]
+"Code/GraphMol/FileParsers/SmilesWriter.cpp" = "040f7c471150f6ad25609638c9b18b83d563ad8c"
+
+[module."rdoxide_python::rdmolfiles_smiwriter".sources]
+"Code/GraphMol/Wrap/SmilesWriter.cpp" = "28e8399d0acb37df9e22dc7f6bd3f5e52e05093b"
+
+[module."rdoxide_python::rdmolfiles_fwdsdsupplier".sources]
+"Code/GraphMol/Wrap/ForwardSDMolSupplier.cpp" = "b2e57f1324ec65c3bf77ac51c7e83417db2adfd6"
+"Code/GraphMol/Wrap/MolSupplier.h" = "a931d5f55aafe8de95c48c9e44fffd2ba0e88d15"
+
+[module."rdoxide::graphmol::descriptors::mqn".sources]
+"Code/GraphMol/Descriptors/MQN.cpp" = "64855a48ede8da8eae3accfbaeb9a1a2b2a99f59"
+
+[module."rdoxide::graphmol::descriptors::data_3d".sources]
+"Code/GraphMol/Descriptors/Data3Ddescriptors.cpp" = "64dee982b1549c380dcacb70a9825916af80bd47"
+"Code/GraphMol/Descriptors/Data3Ddescriptors.h" = "5ecd00508cb86d80f75f20fc3864c9115a729cb1"
+
+[module."rdoxide::graphmol::descriptors::mol_data_3d".sources]
+"Code/GraphMol/Descriptors/MolData3Ddescriptors.cpp" = "829459bca28bc2bb395bafdc33b6b9ce16da64e3"
+"Code/GraphMol/Descriptors/MolData3Ddescriptors.h" = "ae2ff9d7be477def0dc0e9f51bdbfbc549a4c64d"
+
+[module."rdoxide::graphmol::descriptors::autocorr2d".sources]
+"Code/GraphMol/Descriptors/AUTOCORR2D.cpp" = "62021cfeb0b12052dab381f0629a9bc6f4f3dc80"
+"Code/GraphMol/Descriptors/AUTOCORR2D.h" = "c8a6816646c7340bdc5e9bc081ad8a4739482152"
+
+[module."rdoxide_python::rdmoldescriptors_autocorr".sources]
+"Code/GraphMol/Descriptors/Wrap/rdMolDescriptors.cpp" = "4d3c2e1d6315579af9f3bf02b1564224fe48b82e"
+
+[module."rdoxide::graphmol::mol_transforms".sources]
+"Code/GraphMol/MolTransforms/MolTransforms.cpp" = "c3a938860f04602e7a3d5c1bff22e7ea7bbe528f"
+"Code/GraphMol/MolTransforms/MolTransforms.h" = "983dfc6390b3268182be6d43ff28f3b236df9980"
+
+[module."rdoxide_python::rdmoltransforms".sources]
+"Code/GraphMol/MolTransforms/Wrap/rdMolTransforms.cpp" = "df8194342d13f68b80372641e5f9109907aba031"
+
+[module."rdoxide::graphmol::descriptors::pmi".sources]
+"Code/GraphMol/Descriptors/PMI.cpp" = "c2628682addb03435c47f3ae6874d5c6dc851e5a"
+"Code/GraphMol/Descriptors/PMI.h" = "f5fd08df12bd8d826b35a73a842ba84851038a53"
+
+[module."rdoxide::graphmol::descriptors::pbf".sources]
+"Code/GraphMol/Descriptors/PBF.cpp" = "164b6de4896a69b415479c4a28b64c54153fe70d"
+"Code/GraphMol/Descriptors/PBF.h" = "8241caca3b5ccceac3de0127ea7bb73e0bc745d3"
+
+[module."rdoxide_python::rdmoldescriptors_3d".sources]
+"Code/GraphMol/Descriptors/Wrap/rdMolDescriptors.cpp" = "4d3c2e1d6315579af9f3bf02b1564224fe48b82e"
+
+[module."rdoxide::graphmol::descriptors::autocorr3d".sources]
+"Code/GraphMol/Descriptors/AUTOCORR3D.cpp" = "33bfba4c032025be1392872c5b8417afd61417f3"
+"Code/GraphMol/Descriptors/AUTOCORR3D.h" = "4899d6745a2c234d637a33333190a9b667d246ea"
+
+[module."rdoxide::graphmol::descriptors::rdf".sources]
+"Code/GraphMol/Descriptors/RDF.cpp" = "0f48db00e30a229366aea0bc3ce7a5259ac93cf1"
+"Code/GraphMol/Descriptors/RDF.h" = "eb5bf6c46858ebed9db2ed96d62cd79b8f536a2c"
+
+[module."rdoxide::graphmol::descriptors::morse".sources]
+"Code/GraphMol/Descriptors/MORSE.cpp" = "13c986e6e1194712761986d5134064b9f42a2643"
+"Code/GraphMol/Descriptors/MORSE.h" = "1fdcce1dc1fef9e24b2b3c51078abe88bd05900c"
+
+[module."rdoxide_python::rdmoldescriptors_profiles".sources]
+"Code/GraphMol/Descriptors/Wrap/rdMolDescriptors.cpp" = "4d3c2e1d6315579af9f3bf02b1564224fe48b82e"
+
+[module."rdoxide::graphmol::descriptors::coulomb_mat".sources]
+"Code/GraphMol/Descriptors/CoulombMat.cpp" = "0d6fcc401b0978b337da56f45f89bc62ce12f4bc"
+"Code/GraphMol/Descriptors/CoulombMat.h" = "fdd2d1f8607d058d6dd9795d85f4d6312e10d67d"
+
+[module."rdoxide::graphmol::descriptors::usr".sources]
+"Code/GraphMol/Descriptors/USRDescriptor.cpp" = "105e35fac521b707fa1fc2bc99910721466d49d4"
+"Code/GraphMol/Descriptors/USRDescriptor.h" = "ebd34156aa0930848ad68efa070a63327c421154"
+
+[module."rdoxide_python::rdmoldescriptors_usr".sources]
+"Code/GraphMol/Descriptors/Wrap/rdMolDescriptors.cpp" = "4d3c2e1d6315579af9f3bf02b1564224fe48b82e"
+
+[module."rdoxide::graphmol::descriptors::eem".sources]
+"Code/GraphMol/Descriptors/EEM.cpp" = "c576eae23d431618e49faf325260c65287deb041"
+"Code/GraphMol/Descriptors/EEM.h" = "e9bdf762d5ded53424b0df1e6a11e2b5bd8f567c"
+
+[module."rdoxide::graphmol::descriptors::whim".sources]
+"Code/GraphMol/Descriptors/WHIM.cpp" = "0cd80d3e38db2c01b76a71bd93f6632fab4e0f45"
+"Code/GraphMol/Descriptors/WHIM.h" = "50766aa1bafbd15ad562b3ceaf2f1eb796dab341"
+
+[module."rdoxide::graphmol::descriptors::getaway".sources]
+"Code/GraphMol/Descriptors/GETAWAY.cpp" = "7617e4ca8c40ce311bb44dfe43fce8ab8f8b7e17"
+"Code/GraphMol/Descriptors/GETAWAY.h" = "3c0601b195b8a39eb51258ad90e1ea1af8286052"
+
+[module."rdoxide::graphmol::mol_ops::structure".sources]
+"Code/GraphMol/Renumber.cpp" = "e87ef8680a8dd133a959cb3214cec0297b42f073"
+"Code/GraphMol/MolOps.h" = "c5a0698d6bf73d26329ac02a32ac4b694ca2d10f"
+
+[module."rdoxide_python::rdmolops_structure".sources]
+"Code/GraphMol/Wrap/MolOps.cpp" = "2dc7ae10c4ce7523938a4db10e31215cfe2162db"
+
+[module."rdoxide::graphmol::chem_transforms::replace_core".sources]
+"Code/GraphMol/ChemTransforms/ChemTransforms.cpp" = "6171788687c941a6d9f36aa79e397aa0475681f0"
+
+[module."rdoxide::graphmol::chem_transforms::mol_fragmenter".sources]
+"Code/GraphMol/ChemTransforms/MolFragmenter.cpp" = "bdff6355925100354afdbaf2bd58aae235de0fca"
+"Code/GraphMol/ChemTransforms/MolFragmenter.h" = "d4154c0400e51d289a33e45206ec6db99fe7484a"
+
+[module."rdoxide_python::rdmolops_fragments".sources]
+"Code/GraphMol/Wrap/MolOps.cpp" = "2dc7ae10c4ce7523938a4db10e31215cfe2162db"
+
+[module."rdoxide::graphmol::chem_transforms::mol_zip".sources]
+"Code/GraphMol/ChemTransforms/MolZip.cpp" = "5351e21f553e3c1d4aee2be2d6472e03145a9f24"
+"Code/GraphMol/ChemTransforms/MolFragmenter.h" = "d4154c0400e51d289a33e45206ec6db99fe7484a"
+
+[module."rdoxide_python::rdmolops_zip".sources]
+"Code/GraphMol/Wrap/MolOps.cpp" = "2dc7ae10c4ce7523938a4db10e31215cfe2162db"
+
+[module."rdoxide_python::rdmolops_stereo_misc".sources]
+"Code/GraphMol/Wrap/MolOps.cpp" = "2dc7ae10c4ce7523938a4db10e31215cfe2162db"
+"Code/GraphMol/FileParsers/MolFileStereochem.cpp" = "b3d1160d4a0913a8b7cfe0f491e23ed68b35f87c"
+
+[module."rdoxide_python::rdchem_atom_funcs".sources]
+"Code/GraphMol/Wrap/Atom.cpp" = "f1f5d4273c1e6ce60fec9fc220888676ae70e036"
+
+[module."rdoxide::graphmol::wedge_bonds".sources]
+"Code/GraphMol/WedgeBonds.cpp" = "044bdfab9574115913e2f4ff57ae5dc7c99b4dac"
+"Code/GraphMol/Chirality.h" = "00f628293afe048e44e86c120e86acc3a6e9d280"
+
+[module."rdoxide_python::rdmolops_wedging".sources]
+"Code/GraphMol/Wrap/MolOps.cpp" = "2dc7ae10c4ce7523938a4db10e31215cfe2162db"
+
+[module."rdoxide::graphmol::subset".sources]
+"Code/GraphMol/Subset.cpp" = "2cf759a4725b21574e4a9eb913047e6dbd373290"
+"Code/GraphMol/Subset.h" = "0ce93092d0a9bb0a2e3b31a81761f8b55e308afd"
+
+[module."rdoxide_python::rdmolops_subset".sources]
+"Code/GraphMol/Wrap/MolOps.cpp" = "2dc7ae10c4ce7523938a4db10e31215cfe2162db"
+"Code/GraphMol/Subgraphs/SubgraphUtils.cpp" = "871fb0ef2858827922e521b870ff4af068edc52a"
+
+[module."rdoxide::graphmol::chirality::stereo_groups".sources]
+"Code/GraphMol/Chirality.cpp" = "4ae1eb5d92ea880ef07395a25b33c647ec87b09b"
+"Code/GraphMol/FileParsers/MolFileStereochem.cpp" = "b3d1160d4a0913a8b7cfe0f491e23ed68b35f87c"
+
+[module."rdoxide_python::rdmolops_stereo_groups".sources]
+"Code/GraphMol/Wrap/MolOps.cpp" = "2dc7ae10c4ce7523938a4db10e31215cfe2162db"
+"Code/GraphMol/Wrap/ChiralityOps.cpp" = "a4f1c978314b55631ee748e8ff6c9a85613ccd8f"

@@ -1,5 +1,6 @@
 //! Port of RDKit `Code/GraphMol`.
 
+pub mod adjust_query;
 pub mod aromaticity;
 pub mod atom;
 pub mod atropisomers;
@@ -19,6 +20,7 @@ pub mod kekulize;
 pub mod matrices;
 pub mod mol_ops;
 pub mod mol_props;
+pub mod mol_transforms;
 pub mod new_canon;
 pub mod partial_charges;
 pub mod periodic_table;
@@ -30,7 +32,10 @@ pub mod romol;
 pub mod smiles_parse;
 pub mod stereo_group;
 pub mod subgraphs;
+pub mod subset;
+pub mod substance_group;
 pub mod substruct;
+pub mod wedge_bonds;
 
 pub use atom::{Atom, ChiralType, HybridizationType, ValenceType};
 pub use bond::{Bond, BondDir, BondStereo, BondType};

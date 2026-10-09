@@ -11,6 +11,7 @@ use super::mol_file_parser::{
     COMPLEX_QUERIES, GENERIC_GROUPS, calculate_3d_flag, complex_name_query, fpe,
     lookup_atomic_number, not_ported,
 };
+use super::sgroup_parsing::parse_v3000_sgroups_block;
 use super::utils::{
     LineStream, atof, lexical_cast_int, lossy, to_double_field, to_int, to_unsigned,
 };
@@ -887,7 +888,7 @@ pub fn parse_v3000_ctab(
         t = get_v3000_line(s, line)?;
     }
 
-    let sgroup_found = false;
+    let mut sgroup_found = false;
     let mut obj3d_found = false;
     upper(&mut t);
     while t.len() > 5 && starts(&t, b"BEGIN") {
@@ -904,8 +905,19 @@ pub fn parse_v3000_ctab(
                 rd_log_warning!("{msg}");
                 n_sgroups = u32::MAX;
             }
-            let _ = (n_sgroups, sgroup_found);
-            return Err(not_ported("V3000 SGroup data", *line));
+            sgroup_found = true;
+            t = parse_v3000_sgroups_block(s, line, n_sgroups, mol, strict)?;
+            upper(&mut t);
+            if t.len() < 10 || &t[..10] != b"END SGROUP" {
+                let msg = format!("END SGROUP line not found on line {line}");
+                if strict {
+                    return Err(fpe(msg));
+                }
+                rd_log_warning!("{msg}");
+            } else {
+                t = get_v3000_line(s, line)?;
+                upper(&mut t);
+            }
         } else if t.len() >= 16 && &t[6..16] == b"COLLECTION" {
             t = parse_enhanced_stereo(s, line, mol, strict)?;
             upper(&mut t);

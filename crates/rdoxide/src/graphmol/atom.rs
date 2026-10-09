@@ -476,8 +476,11 @@ impl Atom {
 /// `setAtomRLabel`
 pub fn set_atom_rlabel(atom: &mut Atom, rlabel: i32) -> Result<()> {
     if !(0..100).contains(&rlabel) {
-        return Err(RDKitError::precondition(
+        return Err(RDKitError::precondition_at(
             "rlabel out of range for MDL files",
+            "rlabel >= 0 && rlabel < 100",
+            "Code/GraphMol/Atom.cpp",
+            873,
         ));
     }
     if rlabel != 0 {

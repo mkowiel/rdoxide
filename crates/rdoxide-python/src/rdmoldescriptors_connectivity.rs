@@ -2,14 +2,13 @@
 //! (upstream `Descriptors/ConnectivityDescriptors.cpp` and its wrappers in
 //! `Wrap/rdMolDescriptors.cpp`).
 
-use pyo3::exceptions::{PyTypeError, PyValueError};
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use pyo3::types::PyList;
 use rdoxide::graphmol::descriptors::connectivity::{
     self as conn, CHI_VERSION, HALL_KIER_ALPHA_VERSION, KAPPA_VERSION, PHI_VERSION,
 };
 
-use crate::errors::IntoPyResult;
+use crate::errors::{IntoPyResult, expect_list};
 use crate::mol::PyMol;
 use crate::rdmoldescriptors::bool_arg;
 
@@ -79,14 +78,7 @@ fn calc_hall_kier_alpha(
     let n_atoms = mol.mol.num_atoms() as usize;
     // `None` means "do not report the contributions"
     let list = match atomContribs {
-        Some(obj) if !obj.is_none() => Some(obj.cast::<PyList>().map_err(|_| {
-            PyTypeError::new_err(format!(
-                "Expecting an object of type list; got an object of type {} instead",
-                obj.get_type()
-                    .name()
-                    .map_or_else(|_| "?".into(), |n| n.to_string())
-            ))
-        })?),
+        Some(obj) if !obj.is_none() => Some(expect_list(obj)?),
         _ => None,
     };
     if let Some(list) = list {

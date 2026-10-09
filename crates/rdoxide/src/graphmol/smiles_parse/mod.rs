@@ -3,6 +3,7 @@
 //! Copyright (C) 2001-2025 Greg Landrum and other RDKit contributors.
 //! Licensed under the BSD 3-Clause license (see LICENSES/RDKit-BSD-3-Clause.txt).
 
+pub mod cx;
 pub mod lexer;
 pub mod ops;
 pub mod parser;
@@ -134,6 +135,75 @@ fn to_mol(inp: &str, orig: &str) -> Option<RWMol> {
     Some(mol)
 }
 
+/// `handleCXPartAndName`: applies the CXSMILES extension (if any) and takes
+/// the name from what follows it. Strict parsing turns failures into errors;
+/// otherwise the text consumed so far is kept as `_CXSMILES_Data`.
+pub(crate) fn handle_cx_part_and_name(
+    res: &mut RWMol,
+    allow_cx_smiles: bool,
+    strict_cx_smiles: bool,
+    parse_name: bool,
+    cx_part: &str,
+    name: &mut String,
+) -> Result<()> {
+    if cx_part.is_empty() {
+        return Ok(());
+    }
+    let mut pos = 0;
+    let mut cx_failed = false;
+    if allow_cx_smiles {
+        if cx_part.starts_with('|') {
+            if cx::parse_cx_extensions(res, cx_part, &mut pos).is_err() {
+                cx_failed = true;
+                if strict_cx_smiles {
+                    return Err(crate::RDKitError::Value(
+                        "SmilesParseException: CXSMILES extension could not be parsed".into(),
+                    ));
+                }
+            }
+            res.props.set_val(
+                "_CXSMILES_Data",
+                cx_part[..pos.min(cx_part.len())].to_string(),
+            );
+        } else if strict_cx_smiles && !parse_name && !cx_part.is_empty() {
+            return Err(crate::RDKitError::Value(
+                "SmilesParseException: CXSMILES extension does not start with | and parseName=false"
+                    .into(),
+            ));
+        }
+    }
+    if !cx_failed && parse_name && pos < cx_part.len() {
+        *name = cx_part[pos..].trim().to_string();
+    }
+    Ok(())
+}
+
+/// Stereo from the conformers that the CX extension may have added: wedge
+/// bonds give atom parities, a 3D conformer (without a 2D one) gives them
+/// from the geometry.
+pub(crate) fn prepare_conformer_stereo(res: &mut RWMol) -> Result<()> {
+    let confs = res.conformers();
+    let conf = confs.iter().find(|c| !c.is_3d()).map(|c| c.id());
+    let conf3d = confs.iter().find(|c| c.is_3d()).map(|c| c.id());
+    if res.has_prop(cx::NEEDS_DETECT_ATOM_STEREO) {
+        res.clear_prop(cx::NEEDS_DETECT_ATOM_STEREO);
+        crate::graphmol::chirality::from_coords::assign_chiral_types_from_bond_dirs(
+            res,
+            conf.map_or(0, |c| c as i32),
+            true,
+        )?;
+    }
+    if let (None, Some(conf3d)) = (conf, conf3d) {
+        res.update_property_cache(false)?;
+        crate::graphmol::chirality::from_coords::assign_chiral_types_from_3d(
+            res,
+            conf3d as i32,
+            true,
+        )?;
+    }
+    Ok(())
+}
+
 /// `MolFromSmiles(smiles, params)`. `Ok(None)` mirrors upstream's null
 /// result for unparsable input; sanitization failures are returned as errors
 /// (the Python layer logs them and returns `None`).
@@ -142,18 +212,15 @@ pub fn mol_from_smiles(smiles: &str, params: &SmilesParserParams) -> Result<Opti
     let Some(mut res) = to_mol(&lsmiles, &lsmiles) else {
         return Ok(None);
     };
-    if !cx_part.is_empty() && params.parse_name {
-        // CXSMILES extensions are ported later; until then anything after the
-        // first blank that is not a CX block is the name.
-        if !cx_part.starts_with('|') {
-            name = cx_part.clone();
-        } else if let Some(end) = cx_part[1..].find('|') {
-            let rest = cx_part[end + 2..].trim();
-            if !rest.is_empty() {
-                name = rest.to_string();
-            }
-        }
-    }
+    handle_cx_part_and_name(
+        &mut res,
+        params.allow_cx_smiles,
+        params.strict_cx_smiles,
+        params.parse_name,
+        &cx_part,
+        &mut name,
+    )?;
+    prepare_conformer_stereo(&mut res)?;
     if params.sanitize || params.remove_hs {
         crate::graphmol::mol_ops::smiles_post_parse_sanitize(
             &mut res,
@@ -163,13 +230,20 @@ pub fn mol_from_smiles(smiles: &str, params: &SmilesParserParams) -> Result<Opti
     } else {
         crate::graphmol::mol_ops::clear_single_bond_dir_flags(&mut res, true);
     }
+    if res.has_prop(cp::_NeedsQueryScan) {
+        res.clear_prop(cp::_NeedsQueryScan);
+        if !params.sanitize {
+            // the ring bond queries need rings
+            crate::graphmol::find_rings::fast_find_rings(&mut res)?;
+        }
+        crate::graphmol::queries::complete_mol_queries(&mut res, cx::ANY_VALUE)?;
+    }
     if !params.skip_cleanup {
         ops::cleanup_after_parsing(&mut res);
     }
     if !name.is_empty() {
         res.props.set_val(cp::_Name, name);
     }
-    let _ = RDProps::has_prop(&res, cp::_Name);
     Ok(Some(res))
 }
 

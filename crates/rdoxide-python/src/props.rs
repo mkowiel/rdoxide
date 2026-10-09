@@ -133,7 +133,7 @@ pub fn rdvalue_to_py(
             }
             s.into_pyobject(py)?.into_any().unbind()
         }
-        RDValue::VecInt(x) => x.clone().into_pyobject(py)?.into_any().unbind(),
+        RDValue::VecInt(x) => crate::vects::PyVectI::new_py(py, x.clone())?,
         RDValue::VecUnsignedInt(x) => x.clone().into_pyobject(py)?.into_any().unbind(),
         RDValue::VecDouble(x) => x.clone().into_pyobject(py)?.into_any().unbind(),
         RDValue::VecFloat(x) => x.clone().into_pyobject(py)?.into_any().unbind(),
@@ -215,16 +215,20 @@ pub fn set_prop(d: &mut Dict, key: &str, val: RDValue, computed: bool) -> PyResu
 ///
 /// `computed`: whether setters take a `computed` argument (Mol, Conformer).
 /// `$priv`, `$comp`: defaults of `GetPropsAsDict(includePrivate, includeComputed)`.
+/// `has_prop`: the type `HasProp` returns (`i32` for most classes, `bool` where upstream does).
 macro_rules! impl_props {
     ($ty:ty, computed = $computed:tt, dict_defaults = ($priv:expr, $comp:expr)) => {
+        $crate::props::impl_props!($ty, computed = $computed, dict_defaults = ($priv, $comp), has_prop = i32);
+    };
+    ($ty:ty, computed = $computed:tt, dict_defaults = ($priv:expr, $comp:expr), has_prop = $has:ty) => {
         $crate::props::impl_props!(@setters $ty, $computed);
 
         #[pyo3::pymethods]
         impl $ty {
             /// Queries a molecule to see if a particular property has been assigned.
             #[pyo3(name = "HasProp")]
-            fn py_has_prop(&self, py: pyo3::Python<'_>, key: &str) -> pyo3::PyResult<i32> {
-                self.with_dict(py, |d| i32::from(d.has_val(key)))
+            fn py_has_prop(&self, py: pyo3::Python<'_>, key: &str) -> pyo3::PyResult<$has> {
+                self.with_dict(py, |d| <$has>::from(d.has_val(key)))
             }
 
             /// Removes a particular property (does nothing if not already set).
@@ -286,8 +290,9 @@ macro_rules! impl_props {
             /// Returns a list of the properties set.
             #[pyo3(name = "GetPropNames", signature = (includePrivate = false, includeComputed = false))]
             #[allow(non_snake_case)]
-            fn py_get_prop_names(&self, py: pyo3::Python<'_>, includePrivate: bool, includeComputed: bool) -> pyo3::PyResult<Vec<String>> {
-                self.with_dict(py, |d| rdoxide::rdgeneral::RDProps::get_prop_list(d, includePrivate, includeComputed))
+            fn py_get_prop_names(&self, py: pyo3::Python<'_>, includePrivate: bool, includeComputed: bool) -> pyo3::PyResult<$crate::vects::PyVectStr> {
+                let v = self.with_dict(py, |d| rdoxide::rdgeneral::RDProps::get_prop_list(d, includePrivate, includeComputed))?;
+                Ok($crate::vects::PyVectStr { v })
             }
 
             /// Returns a dictionary populated with properties.

@@ -298,7 +298,15 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     crate::rdmolops_subgraphs::add(m)?;
     crate::rdmolops_fingerprints::add(m)?;
     crate::rdmolops_matrices::add(m)?;
+    crate::rdmolops_stereo_groups::add(m)?;
+    crate::rdmolops_adjust_query::add(m)?;
+    crate::rdmolops_stereo_misc::add(m)?;
+    crate::rdmolops_structure::add(m)?;
+    crate::rdmolops_subset::add(m)?;
+    crate::rdmolops_fragments::add(m)?;
     crate::rdmolops_transforms::add(m)?;
+    crate::rdmolops_wedging::add(m)?;
+    crate::rdmolops_zip::add(m)?;
     m.add_function(wrap_pyfunction!(py_set_aromaticity, m)?)?;
     m.add_function(wrap_pyfunction!(py_set_conjugation, m)?)?;
     m.add_function(wrap_pyfunction!(py_set_hybridization, m)?)?;

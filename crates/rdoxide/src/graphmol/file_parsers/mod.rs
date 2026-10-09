@@ -5,7 +5,10 @@ pub mod mol_file_v3000;
 pub mod mol_file_writer;
 pub mod sd_mol_supplier;
 pub mod sd_writer;
+mod sgroup_parsing;
+mod sgroup_writing;
 pub mod smiles_mol_supplier;
+pub mod smiles_writer;
 pub mod utils;
 
 pub use mol_file_parser::{

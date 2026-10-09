@@ -29,6 +29,24 @@ impl Transform3D {
         Transform3D { data }
     }
 
+    /// `getVal(row, col)`
+    pub fn get_val(&self, row: usize, col: usize) -> f64 {
+        self.data[row * 4 + col]
+    }
+
+    /// `setVal(row, col, val)`
+    pub fn set_val(&mut self, row: usize, col: usize, val: f64) {
+        self.data[row * 4 + col] = val;
+    }
+
+    /// `SetTranslation(move)`: the last column of the matrix
+    pub fn set_translation(&mut self, translation: &Point3D) {
+        self.data[3] = translation.x;
+        self.data[7] = translation.y;
+        self.data[11] = translation.z;
+        self.data[15] = 1.0;
+    }
+
     /// `SetRotation(angle, axis)`: resets to the identity, then a rotation by
     /// `angle` (radians) about `axis` (assumed normalized)
     pub fn set_rotation(&mut self, angle: f64, axis: &Point3D) {
@@ -52,6 +70,20 @@ impl Transform3D {
         d[8] = fmuladd(t * x, z, -(sin_t * y));
         d[9] = fmuladd(t * y, z, sin_t * x);
         d[10] = fmuladd(t * z, z, cos_t);
+    }
+
+    /// `operator*=(other)`: this becomes the combination of `other` and the
+    /// current state, i.e. `new(point) = old(other(point))`.
+    pub fn mul_assign(&mut self, other: &Transform3D) {
+        let mut res = [0.0; 16];
+        for i in 0..4 {
+            for j in 0..4 {
+                res[i * 4 + j] = (0..4).fold(0.0, |acc, k| {
+                    fmuladd(self.data[i * 4 + k], other.data[k * 4 + j], acc)
+                });
+            }
+        }
+        self.data = res;
     }
 
     /// `TransformPoint` / `operator*(Transform3D, Point3D)`

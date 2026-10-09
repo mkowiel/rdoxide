@@ -1,0 +1,382 @@
+//! SubstanceGroups in mol blocks; expectations from RDKit 2026.09.1.
+
+use rdoxide::graphmol::RWMol;
+use rdoxide::graphmol::bond::BondType;
+use rdoxide::graphmol::file_parsers::{MolFileParserParams, mol_from_mol_block};
+use rdoxide::graphmol::smiles_parse::smarts_write::mol_to_smarts;
+use rdoxide::graphmol::smiles_parse::write::SmilesWriteParams;
+use rdoxide::rdgeneral::{RDProps, RDValue};
+
+fn v2000(m_lines: &[&str]) -> String {
+    let atoms = (0..5).map(|x| {
+        format!(
+            "{x:10.4}    0.0000    0.0000 {}   0  0  0  0  0  0  0  0  0  0  0  0",
+            "CCOCC".as_bytes()[x] as char
+        )
+    });
+    let bonds = (1..5).map(|i| format!("{i:3}{:3}  1  0", i + 1));
+    let mut lines = vec![
+        "".to_string(),
+        "  test".into(),
+        "".into(),
+        "  5  4  0  0  0  0  0  0  0  0999 V2000".into(),
+    ];
+    lines.extend(atoms.chain(bonds));
+    lines.extend(m_lines.iter().map(|l| l.to_string()));
+    lines.push("M  END".into());
+    lines.join("\n") + "\n"
+}
+
+fn v3000(sgroups: &[&str], bond_types: [u8; 4]) -> String {
+    let mut lines: Vec<String> = [
+        "",
+        "  test",
+        "",
+        "  0  0  0     0  0            999 V3000",
+        "M  V30 BEGIN CTAB",
+    ]
+    .map(String::from)
+    .into();
+    lines.push(format!("M  V30 COUNTS 5 4 {} 0 0", sgroups.len()));
+    lines.push("M  V30 BEGIN ATOM".into());
+    lines.extend((0..5).map(|i| {
+        format!(
+            "M  V30 {} {} {i} 0 0 0",
+            i + 1,
+            "CCOCC".as_bytes()[i] as char
+        )
+    }));
+    lines.push("M  V30 END ATOM".into());
+    lines.push("M  V30 BEGIN BOND".into());
+    lines.extend((0..4).map(|i| format!("M  V30 {} {} {} {}", i + 1, bond_types[i], i + 1, i + 2)));
+    lines.push("M  V30 END BOND".into());
+    lines.push("M  V30 BEGIN SGROUP".into());
+    lines.extend(sgroups.iter().map(|l| l.to_string()));
+    lines.extend(["M  V30 END SGROUP", "M  V30 END CTAB", "M  END"].map(String::from));
+    lines.join("\n") + "\n"
+}
+
+fn try_parse(block: &str, strict: bool) -> rdoxide::Result<Option<RWMol>> {
+    let params = MolFileParserParams {
+        sanitize: false,
+        strict_parsing: strict,
+        ..MolFileParserParams::default()
+    };
+    mol_from_mol_block(block, &params)
+}
+
+fn parse(block: &str, strict: bool) -> Option<RWMol> {
+    try_parse(block, strict).unwrap()
+}
+
+fn prop(group: &rdoxide::graphmol::substance_group::SubstanceGroup, key: &str) -> Option<String> {
+    group.get_prop(key).map(RDValue::to_rd_string)
+}
+
+#[test]
+fn v2000_group_lines_are_combined() {
+    let block = v2000(&[
+        "M  STY  1   1 SRU",
+        "M  SLB  1   1   1",
+        "M  SCN  1   1 HT ",
+        "M  SAL   1  2   2   3",
+        "M  SBL   1  2   1   3",
+        "M  SMT   1 n",
+        "M  SDI   1  4    1.0000    1.0000    1.0000    2.0000",
+        "M  SST  1   1 ALT",
+    ]);
+    let mol = parse(&block, true).unwrap();
+    let group = &mol.substance_groups()[0];
+    assert_eq!((group.atoms(), group.bonds()), (&[1, 2][..], &[0, 2][..]));
+    assert_eq!(group.brackets().len(), 1);
+    for (key, value) in [
+        ("CONNECT", "HT"),
+        ("LABEL", "n"),
+        ("SUBTYPE", "ALT"),
+        ("TYPE", "SRU"),
+    ] {
+        assert_eq!(prop(group, key).as_deref(), Some(value), "{key}");
+    }
+    assert_eq!(group.get_prop("ID"), Some(&RDValue::UnsignedInt(1)));
+}
+
+#[test]
+fn v2000_data_lines_are_joined() {
+    let block = v2000(&[
+        "M  STY  1   1 DAT",
+        "M  SAL   1  1   2",
+        "M  SDT   1 FLD                           F                    ",
+        "M  SCD   1 abc",
+        "M  SED   1 def",
+    ]);
+    let mol = parse(&block, true).unwrap();
+    let group = &mol.substance_groups()[0];
+    assert_eq!(
+        group.get_prop("DATAFIELDS"),
+        Some(&RDValue::VecString(vec!["abcdef".into()]))
+    );
+    assert_eq!(prop(group, "FIELDNAME").as_deref(), Some("FLD"));
+}
+
+#[test]
+fn unsupported_group_types_skip_the_molecule_or_the_group() {
+    let block = v2000(&["M  STY  1   1 XXX"]);
+    assert!(parse(&block, true).is_none());
+    assert!(parse(&block, false).unwrap().substance_groups().is_empty());
+}
+
+#[test]
+fn v3000_labels_quotes_and_arrays() {
+    let block = v3000(
+        &[
+            "M  V30 1 DAT 0 ATOMS=(1 2) FIELDNAME=\"my field\" FIELDINFO=\"a\"\"b\" FIELDDATA=\"hello world\"",
+        ],
+        [1; 4],
+    );
+    let mol = parse(&block, true).unwrap();
+    let group = &mol.substance_groups()[0];
+    assert_eq!(prop(group, "FIELDNAME").as_deref(), Some("my field"));
+    assert_eq!(prop(group, "FIELDINFO").as_deref(), Some("a\"b"));
+    assert_eq!(
+        group.get_prop("DATAFIELDS"),
+        Some(&RDValue::VecString(vec!["hello world".into()]))
+    );
+    assert_eq!(group.atoms(), [1]);
+
+    let block = v3000(
+        &["M  V30 1 SRU 0 ATOMS=(2 2 3) XBONDS=(2 1 3) XBHEAD=(1 1) XBCORR=(2 1 3)"],
+        [1; 4],
+    );
+    let mol = parse(&block, true).unwrap();
+    let group = &mol.substance_groups()[0];
+    assert_eq!(
+        group.get_prop("XBCORR"),
+        Some(&RDValue::VecUnsignedInt(vec![0, 2]))
+    );
+}
+
+#[test]
+fn v3000_problems_depend_on_strictness() {
+    // an unsupported type skips the molecule, the other problems are errors
+    assert!(parse(&v3000(&["M  V30 1 XXX 0 ATOMS=(1 1)"], [1; 4]), true).is_none());
+    for line in [
+        "M  V30 1 SRU 0 ATOMS=(7 1 1 1 1 1 1 1)",
+        "M  V30 1 SRU 0 ATOMS=(1 1) SUBTYPE=QQQ",
+    ] {
+        assert!(try_parse(&v3000(&[line], [1; 4]), true).is_err(), "{line}");
+    }
+    let lenient = parse(
+        &v3000(&["M  V30 1 SRU 0 ATOMS=(1 1) CONNECT=QQ"], [1; 4]),
+        false,
+    )
+    .unwrap();
+    assert!(lenient.substance_groups().is_empty());
+}
+
+#[test]
+fn structure_groups_are_applied_and_removed() {
+    let smartsq =
+        "M  V30 1 DAT 0 ATOMS=(1 2) FIELDNAME=QUERY QUERYTYPE=SMARTSQ FIELDDATA=\"[N,O]\"";
+    let mut mol = parse(&v3000(&[smartsq], [1; 4]), true).unwrap();
+    assert!(mol.substance_groups().is_empty());
+    assert_eq!(
+        mol_to_smarts(&mut mol, &SmilesWriteParams::default()).unwrap(),
+        "[#6]-[N,O]-[#8]-[#6]-[#6]"
+    );
+
+    let coordinate =
+        "M  V30 1 DAT 0 ATOMS=(2 2 3) FIELDNAME=MRV_COORDINATE_BOND_TYPE FIELDDATA=\"2\"";
+    let mol = parse(&v3000(&[coordinate], [1, 0, 1, 1]), true).unwrap();
+    assert_eq!(mol.bond(1).bond_type(), BondType::Dative);
+
+    let zch = "M  V30 1 DAT 0 ATOMS=(2 1 2) FIELDNAME=ZCH FIELDDATA=\"1;-1\"";
+    let mol = parse(&v3000(&[zch], [1; 4]), true).unwrap();
+    assert_eq!(
+        (mol.atom(0).formal_charge(), mol.atom(1).formal_charge()),
+        (1, -1)
+    );
+
+    let other = "M  V30 1 DAT 0 ATOMS=(1 1) FIELDNAME=other FIELDDATA=\"x\"";
+    assert_eq!(
+        parse(&v3000(&[other], [1; 4]), true)
+            .unwrap()
+            .substance_groups()
+            .len(),
+        1
+    );
+}
+
+// ------------------------------------------------------------- writing
+
+mod writing {
+    use rdoxide::graphmol::depictor::compute_2d_coords;
+    use rdoxide::graphmol::file_parsers::mol_file_writer::{MolWriterParams, mol_to_mol_block};
+    use rdoxide::graphmol::smiles_parse::{SmilesParserParams, mol_from_smiles};
+    use rdoxide::graphmol::substance_group::{SubstanceGroup, add_substance_group};
+    use rdoxide::rdgeneral::RDProps;
+
+    use super::*;
+
+    fn depicted(smiles: &str) -> RWMol {
+        let mut mol = mol_from_smiles(smiles, &SmilesParserParams::default())
+            .unwrap()
+            .unwrap();
+        compute_2d_coords(&mut mol, &Default::default()).unwrap();
+        mol
+    }
+
+    fn sru_mol() -> RWMol {
+        let mut mol = depicted("CCOCC");
+        let mut sg = SubstanceGroup::new("SRU");
+        sg.set_atoms(&mol, vec![1, 2]).unwrap();
+        sg.set_bonds(&mol, vec![0, 2]).unwrap();
+        sg.set_prop("LABEL", "n", false).unwrap();
+        sg.set_prop("CONNECT", "HT", false).unwrap();
+        sg.set_prop("ID", 1u32, false).unwrap();
+        add_substance_group(&mut mol, sg);
+        mol
+    }
+
+    fn lines<'a>(block: &'a str, prefix: &str) -> Vec<&'a str> {
+        block.lines().filter(|l| l.starts_with(prefix)).collect()
+    }
+
+    fn write(mol: &RWMol, v3000: bool) -> String {
+        let params = MolWriterParams {
+            force_v3000: v3000,
+            ..MolWriterParams::default()
+        };
+        mol_to_mol_block(mol, &params, -1).unwrap()
+    }
+
+    #[test]
+    fn v2000_lines() {
+        let block = write(&sru_mol(), false);
+        assert!(block.contains("  5  4  0  1  0  0  0  0  0  0999 V2000"));
+        assert_eq!(
+            lines(&block, "M  S"),
+            [
+                "M  STY  1   1 SRU",
+                "M  SLB  1   1   1",
+                "M  SCN  1   1 HT ",
+                "M  SAL   1  2   2   3",
+                "M  SBL   1  2   1   3",
+                "M  SMT   1 n"
+            ]
+        );
+    }
+
+    #[test]
+    fn v3000_lines_and_round_trip() {
+        let block = write(&sru_mol(), true);
+        assert!(block.contains("M  V30 COUNTS 5 4 1 0 0"));
+        assert!(block.contains("M  V30 1 SRU 1 ATOMS=(2 2 3) XBONDS=(2 1 3) CONNECT=HT LABEL=n"));
+        for v3000 in [false, true] {
+            let back = parse(&write(&sru_mol(), v3000), true).unwrap();
+            let group = &back.substance_groups()[0];
+            assert_eq!((group.atoms(), group.bonds()), (&[1, 2][..], &[0, 2][..]));
+        }
+    }
+
+    #[test]
+    fn zero_order_bonds_get_lines_and_groups() {
+        let mut mol = depicted("[Fe].[NH3+]");
+        mol.add_bond(0, 1, BondType::Zero).unwrap();
+        let block = write(&mol, false);
+        for expected in [
+            "M  ZBO  1   1   0",
+            "M  HYD  2   1   0   2   3",
+            "M  ZCH  1   2   1",
+        ] {
+            assert!(block.contains(expected), "{expected}");
+        }
+        let back = parse(&block, false).unwrap();
+        assert_eq!(back.bond(0).bond_type(), BondType::Zero);
+        assert_eq!(back.atom(1).formal_charge(), 1);
+    }
+}
+
+/// `M  APO`, `M  LIN` and `M  MRV SMA` lines
+mod marvin_lines {
+    use super::*;
+
+    fn str_prop(mol: &RWMol, key: &str) -> Option<String> {
+        mol.get_prop(key).map(RDValue::to_rd_string)
+    }
+
+    #[test]
+    fn attach_points_are_stored_as_atom_properties() {
+        let mol = parse(&v2000(&["M  APO  2   1   1   5   3"]), true).unwrap();
+        assert_eq!(str_prop_atom(&mol, 0).as_deref(), Some("1"));
+        assert_eq!(str_prop_atom(&mol, 4).as_deref(), Some("-1"));
+        assert_eq!(str_prop_atom(&mol, 2), None);
+    }
+
+    fn str_prop_atom(mol: &RWMol, idx: u32) -> Option<String> {
+        mol.atom(idx)
+            .get_prop("molAttchpt")
+            .map(RDValue::to_rd_string)
+    }
+
+    #[test]
+    fn duplicate_attach_points_only_fail_in_strict_mode() {
+        let block = v2000(&["M  APO  2   1   1   1   2"]);
+        assert!(try_parse(&block, true).is_err());
+        let mol = parse(&block, false).unwrap();
+        assert_eq!(str_prop_atom(&mol, 0).as_deref(), Some("1"));
+    }
+
+    #[test]
+    fn bad_attach_points_are_rejected() {
+        for line in [
+            "M  APO  1   1   4",
+            "M  APO  1   9   1",
+            "M  APO  1   x   1",
+        ] {
+            assert!(try_parse(&v2000(&[line]), true).is_err(), "{line}");
+        }
+    }
+
+    #[test]
+    fn link_nodes_are_translated_to_v3000_text() {
+        let mol = parse(&v2000(&["M  LIN  1   2   3   2   1"]), true).unwrap();
+        assert_eq!(
+            str_prop(&mol, "_molLinkNodes").as_deref(),
+            Some("1 3 2 2 2 2 1")
+        );
+        let mol = parse(&v2000(&["M  LIN  2   2   3   2   1   4   3   2   2"]), true).unwrap();
+        assert_eq!(
+            str_prop(&mol, "_molLinkNodes").as_deref(),
+            Some("1 3 2 2 2 2 1|1 3 2 4 2 4 2")
+        );
+    }
+
+    #[test]
+    fn bad_link_nodes_are_rejected() {
+        // a single substituent fails as it does in RDKit
+        for line in [
+            "M  LIN  1   2   3   2",
+            "M  LIN  1   2   1   1",
+            "M  LIN  1   9   3   1",
+            "M  LIN  q",
+        ] {
+            assert!(try_parse(&v2000(&[line]), true).is_err(), "{line}");
+        }
+    }
+
+    #[test]
+    fn marvin_smarts_become_recursive_queries() {
+        let mol = parse(&v2000(&["M  MRV SMA   1 [*;A]"]), true).unwrap();
+        let atom = mol.atom(0);
+        assert_eq!(
+            atom.get_prop("MRV SMA")
+                .map(RDValue::to_rd_string)
+                .as_deref(),
+            Some("[*;A]")
+        );
+        assert!(atom.has_query());
+        for line in ["M  MRV SMA   1 [[[", "M  MRV SMA   9 [C]"] {
+            assert!(try_parse(&v2000(&[line]), true).is_err(), "{line}");
+        }
+    }
+}

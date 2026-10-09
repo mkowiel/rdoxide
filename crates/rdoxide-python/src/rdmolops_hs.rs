@@ -6,11 +6,13 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple};
 use rdoxide::graphmol::chirality::{self, bond_dirs, legacy};
 use rdoxide::graphmol::mol_ops::add_hs::{AddHsParameters, add_hs, remove_all_hs_parameters};
+use rdoxide::graphmol::mol_ops::query_hs::{has_query_hs, merge_query_hs};
 use rdoxide::graphmol::mol_ops::{RemoveHsParameters, remove_hs};
 use rdoxide::graphmol::romol::ROMol;
 
 use crate::errors::IntoPyResult;
 use crate::mol::PyMol;
+use crate::pyconv::python_object_to_vect;
 
 /// Parameters controlling which Hs are removed.
 #[pyclass(
@@ -382,23 +384,7 @@ fn py_add_hs(args: &Bound<'_, PyTuple>, kwargs: Option<&Bound<'_, PyDict>>) -> P
         )
     };
     // pythonObjectToVect(onlyOnAtoms, nAtoms): falsy -> all atoms
-    let only = match only_on {
-        Some(o) if o.is_truthy()? => {
-            let n = mol.mol.num_atoms();
-            let mut v = Vec::new();
-            for x in o.try_iter()? {
-                let x: u32 = x?.extract()?;
-                if x >= n {
-                    return Err(pyo3::exceptions::PyValueError::new_err(
-                        "list element larger than allowed value",
-                    ));
-                }
-                v.push(x);
-            }
-            Some(v)
-        }
-        _ => None,
-    };
+    let only = python_object_to_vect(only_on.as_ref(), Some(mol.mol.num_atoms()))?;
     let mut res: ROMol = mol.mol.clone();
     add_hs(&mut res, &params, only.as_deref()).py()?;
     Ok(PyMol { mol: res })
@@ -434,6 +420,39 @@ fn py_get_use_legacy_stereo_perception() -> bool {
     chirality::get_use_legacy_stereo_perception()
 }
 
+/// merges hydrogens into their neighboring atoms as queries
+#[pyfunction]
+#[pyo3(
+    name = "MergeQueryHs",
+    signature = (mol, mergeUnmappedOnly = false, mergeIsotopes = false)
+)]
+#[allow(non_snake_case)]
+fn py_merge_query_hs(
+    py: Python<'_>,
+    mol: PyRef<'_, PyMol>,
+    mergeUnmappedOnly: bool,
+    mergeIsotopes: bool,
+) -> PyResult<PyMol> {
+    let mut res = mol.mol.clone();
+    py.detach(|| merge_query_hs(&mut res, mergeUnmappedOnly, mergeIsotopes))
+        .py()?;
+    Ok(PyMol { mol: res })
+}
+
+/// Check to see if the molecule has query Hs, this is normally used on query molecules
+/// such as those returned from MolFromSmarts
+/// Example:
+///       (hasQueryHs, hasUnmergeableQueryHs) = HasQueryHs(mol)
+///
+/// if hasUnmergeableQueryHs, these query hs cannot be removed by calling
+/// MergeQueryHs
+#[pyfunction]
+#[pyo3(name = "HasQueryHs", signature = (mol))]
+fn py_has_query_hs<'py>(py: Python<'py>, mol: PyRef<'_, PyMol>) -> PyResult<Bound<'py, PyTuple>> {
+    let (has, unmergeable) = has_query_hs(&mol.mol).py()?;
+    PyTuple::new(py, [has, unmergeable])
+}
+
 pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_set_allow_nontetrahedral_chirality, m)?)?;
     m.add_function(wrap_pyfunction!(py_get_allow_nontetrahedral_chirality, m)?)?;
@@ -443,6 +462,8 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyAddHsParameters>()?;
     m.add_function(wrap_pyfunction!(py_add_hs, m)?)?;
     m.add_function(wrap_pyfunction!(py_remove_hs, m)?)?;
+    m.add_function(wrap_pyfunction!(py_merge_query_hs, m)?)?;
+    m.add_function(wrap_pyfunction!(py_has_query_hs, m)?)?;
     m.add_function(wrap_pyfunction!(py_remove_all_hs, m)?)?;
     m.add_function(wrap_pyfunction!(py_assign_stereochemistry, m)?)?;
     m.add_function(wrap_pyfunction!(py_compute_atom_cip_ranks, m)?)?;

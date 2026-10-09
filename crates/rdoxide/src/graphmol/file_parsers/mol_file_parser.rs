@@ -1,16 +1,17 @@
 //! MDL Mol block reader (`MolFromMolBlock`, `MolFromMolDataStream`).
 //!
 //! Ported from RDKit `Code/GraphMol/FileParsers/MolFileParser.cpp`
-//! (2026.09.1). The V2000 CTAB is ported; V3000 blocks, SGroups and a few
-//! rarely used property lines (ZBO/ZCH/HYD/MRV/APO/LIN) are reported as
-//! parse errors until they are ported.
+//! (2026.09.1). V2000 CTABs (SGroups included, see `sgroup_parsing`) and
+//! V3000 blocks are ported; a few rarely used property lines
+//! (MRV/APO/LIN) are reported as parse errors until they are ported.
 //!
 //! Copyright (C) 2002-2025 Greg Landrum and other RDKit contributors.
 //! Licensed under the BSD 3-Clause license (see LICENSES/RDKit-BSD-3-Clause.txt).
 
+use super::sgroup_parsing::{V2000SGroups, is_sgroup_line, process_sgroups};
 use super::utils::{
-    LineStream, is_bad_cast, lexical_cast_int, lossy, strip_spaces_and_cast_unsigned, substr,
-    substr_from, to_double_field, to_int, to_unsigned,
+    LineStream, is_bad_cast, lexical_cast_int, lossy, strip_spaces, strip_spaces_and_cast_unsigned,
+    substr, substr_from, to_double_field, to_int, to_unsigned,
 };
 use crate::geometry::Point3D;
 use crate::graphmol::atom::{Atom, ValenceType};
@@ -31,17 +32,19 @@ use crate::graphmol::queries::{
     make_atom_implicit_h_count_query, make_atom_null_query, make_atom_num_query,
     make_atom_ring_bond_count_query, make_atom_unsaturated_query, make_bond_is_in_ring_query,
     make_bond_null_query, make_double_or_aromatic_bond_query, make_m_atom_query,
-    make_mh_atom_query, make_q_atom_query, make_qh_atom_query, make_single_or_aromatic_bond_query,
-    make_single_or_double_bond_query, make_x_atom_query, make_xh_atom_query,
+    make_mh_atom_query, make_q_atom_query, make_qh_atom_query, make_recursive_structure_query,
+    make_single_or_aromatic_bond_query, make_single_or_double_bond_query, make_x_atom_query,
+    make_xh_atom_query,
 };
 use crate::graphmol::query_ops::{
     atom_expand_query, bond_expand_query, query_atom_from_atom, query_bond_from_bond,
     replace_atom_with_query_atom,
 };
 use crate::graphmol::romol::RWMol;
+use crate::graphmol::smiles_parse::smarts::{SmartsParserParams, mol_from_smarts};
 use crate::rdgeneral::common_properties as cp;
 use crate::rdgeneral::{RDProps, RDValue};
-use crate::{RDKitError, Result, rd_log_warning};
+use crate::{RDKitError, Result, rd_log_error, rd_log_warning};
 
 /// `v2::FileParsers::MolFileParserParams`
 #[derive(Debug, Clone, PartialEq)]
@@ -890,6 +893,249 @@ fn parse_atom_alias_or_value(
     Ok(())
 }
 
+/// `ParseZCHLine`, `ParseHYDLine` and `ParseZBOLine` (Alex Clark's ZBO
+/// proposal, JCIM 51:3149-57 (2011)): `M  XXX nn` followed by (index,
+/// value) pairs; `apply` gets the zero-based index and the value, which is
+/// `None` for a blank field.
+fn parse_zero_order_line(
+    mol: &mut RWMol,
+    text: &[u8],
+    line: u32,
+    code: &str,
+    n_items: u32,
+    apply: impl Fn(&mut RWMol, u32, Option<i32>) -> Result<()>,
+) -> Result<()> {
+    for (id, value) in atom_value_entries(text, line)? {
+        if id == 0 || id > n_items {
+            return Err(fpe(format!("Bad {code} specification on line {line}")));
+        }
+        apply(mol, id - 1, value)?;
+    }
+    Ok(())
+}
+
+/// `ParseZCHLine`
+fn parse_zch_line(mol: &mut RWMol, text: &[u8], line: u32) -> Result<()> {
+    let n = mol.num_atoms();
+    parse_zero_order_line(mol, text, line, "ZCH", n, |mol, idx, v| {
+        mol.atom_mut(idx).set_formal_charge(v.unwrap_or(0));
+        Ok(())
+    })
+}
+
+/// `ParseHYDLine`
+fn parse_hyd_line(mol: &mut RWMol, text: &[u8], line: u32) -> Result<()> {
+    let n = mol.num_atoms();
+    parse_zero_order_line(mol, text, line, "HYD", n, |mol, idx, v| {
+        if let Some(hs) = v.filter(|&hs| hs >= 0) {
+            let atom = mol.atom_mut(idx);
+            atom.props.set_val("_ZBO_H", true);
+            atom.set_num_explicit_hs(hs as u32);
+        }
+        Ok(())
+    })
+}
+
+/// `ParseZBOLine`
+fn parse_zbo_line(mol: &mut RWMol, text: &[u8], line: u32) -> Result<()> {
+    let n = mol.num_bonds();
+    parse_zero_order_line(mol, text, line, "ZBO", n, |mol, idx, order| {
+        let bond_type = match order.unwrap_or(0) {
+            0 => Some(BondType::Zero),
+            o => u8::try_from(o).ok().and_then(BondType::from_u8),
+        };
+        let t =
+            bond_type.ok_or_else(|| fpe(format!("Bad ZBO bond order {order:?} on line {line}")))?;
+        mol.bond_mut(idx).set_bond_type(t);
+        Ok(())
+    })
+}
+
+/// The 4 character field at `pos` of an `M  APO`/`M  LIN` line.
+fn field4(text: &[u8], pos: usize) -> Result<&[u8]> {
+    substr(text, pos, 4)
+}
+
+fn is_blank_field(f: &[u8]) -> bool {
+    f == b"    "
+}
+
+fn cannot_convert_int(text: &[u8], pos: usize, line: u32) -> impl FnOnce() -> String {
+    let field = lossy(field4(text, pos).unwrap_or_default());
+    move || format!("Cannot convert '{field}' to int on line {line}")
+}
+
+/// The leading entry count of an `M  APO` / `M  LIN` line.
+fn entry_count(text: &[u8], line: u32) -> Result<u32> {
+    let field = substr(text, 6, 3)?;
+    cast_err(strip_spaces_and_cast_unsigned(field), || {
+        format!("Cannot convert '{}' to int on line {line}", lossy(field))
+    })
+}
+
+/// An optional numeric field: blank (or beyond the end of the line) means
+/// unset.
+fn optional_field(text: &[u8], pos: usize, line: u32) -> Result<Option<u32>> {
+    if text.len() < pos + 4 || is_blank_field(field4(text, pos)?) {
+        return Ok(None);
+    }
+    let field = field4(text, pos)?;
+    cast_err(
+        strip_spaces_and_cast_unsigned(field),
+        cannot_convert_int(text, pos, line),
+    )
+    .map(Some)
+}
+
+/// `ParseMarvinSmartsLine`
+fn parse_marvin_smarts_line(mol: &mut RWMol, text: &[u8], line: u32) -> Result<()> {
+    const ATOM_NUM_START: usize = 10;
+    const SMARTS_START: usize = 15;
+    // M  MRV SMA   1 [*;A]
+    if !text.starts_with(b"M  MRV SMA") {
+        return Ok(());
+    }
+    let idx_txt = substr(text, ATOM_NUM_START, SMARTS_START - ATOM_NUM_START)?;
+    let idx = cast_err(strip_spaces_and_cast_unsigned(idx_txt), || {
+        format!(
+            "Cannot convert '{}' to an atom index on line {line}",
+            lossy(idx_txt)
+        )
+    })?
+    .wrapping_sub(1);
+    if idx >= mol.num_atoms() {
+        return Err(RDKitError::range("idx", idx as i64, mol.num_atoms()));
+    }
+    let sma = lossy(substr_from(text, SMARTS_START)?);
+    mol.atom_mut(idx).props.set_val(cp::MRV_SMA, sma.clone());
+    let query_mol = mol_from_smarts(&sma, &SmartsParserParams::default())
+        .ok()
+        .flatten()
+        .ok_or_else(|| fpe(format!("Cannot parse smarts: '{sma}' on line {line}")))?;
+    and_expand(mol, idx, make_recursive_structure_query(query_mol, 0))?;
+    mol.atom_mut(idx).props.set_val(cp::_MolFileAtomQuery, 1i32);
+    Ok(())
+}
+
+/// `ParseAttachPointLine`
+fn parse_attach_point_line(mol: &mut RWMol, text: &[u8], line: u32, strict: bool) -> Result<()> {
+    if !text.starts_with(b"M  APO") {
+        return Err(RDKitError::precondition_at(
+            "bad APO line",
+            "text.substr(0, 6) == std::string(\"M  APO\")",
+            "Code/GraphMol/FileParsers/MolFileParser.cpp",
+            947,
+        ));
+    }
+    let nent = entry_count(text, line)?;
+    let mut spos = 9;
+    for _ in 0..nent {
+        let aid = cast_err(
+            strip_spaces_and_cast_unsigned(field4(text, spos)?),
+            cannot_convert_int(text, spos, line),
+        )?;
+        spos += 4;
+        let mut val = 0i32;
+        if text.len() >= spos + 4 && !is_blank_field(field4(text, spos)?) {
+            val = cast_err(
+                lexical_cast_int(strip_spaces(field4(text, spos)?)),
+                cannot_convert_int(text, spos, line),
+            )?;
+        }
+        if aid == 0 || aid > mol.num_atoms() {
+            return Err(fpe(format!("Bad APO specification on line {line}")));
+        }
+        spos += 4;
+        let idx = aid - 1;
+        if !(0..=3).contains(&val) {
+            return Err(fpe(format!(
+                "Value {val} from APO specification on line {line} is invalid"
+            )));
+        }
+        if val == 0 {
+            continue;
+        }
+        // this is -1 in v3k mol blocks, so use that
+        let val = if val == 3 { -1 } else { val };
+        let atom = mol.atom_mut(idx);
+        if atom.has_prop(cp::molAttachPoint) {
+            let msg = format!(
+                "Multiple ATTCHPT values for atom {} on line {line}",
+                idx + 1
+            );
+            if strict {
+                return Err(fpe(msg));
+            }
+            rd_log_warning!("{msg}");
+        } else {
+            atom.props.set_val(cp::molAttachPoint, val);
+        }
+    }
+    Ok(())
+}
+
+/// `ParseLinkNodeLine`: the V2000 format is translated to the V3000 one.
+fn parse_link_node_line(mol: &mut RWMol, text: &[u8], line: u32) -> Result<()> {
+    if !text.starts_with(b"M  LIN") {
+        return Err(RDKitError::precondition_at(
+            "bad LIN line",
+            "text.substr(0, 6) == std::string(\"M  LIN\")",
+            "Code/GraphMol/FileParsers/MolFileParser.cpp",
+            1020,
+        ));
+    }
+    let nent = entry_count(text, line)?;
+    let n_atoms = mol.num_atoms();
+    let mut prop_val = String::new();
+    let mut spos = 9;
+    for _ in 0..nent {
+        let aid = cast_err(
+            strip_spaces_and_cast_unsigned(field4(text, spos)?),
+            cannot_convert_int(text, spos, line),
+        )?;
+        if aid == 0 || aid > n_atoms {
+            return Err(fpe(format!(
+                "LIN specification has bad atom idx on line {line}"
+            )));
+        }
+        spos += 4;
+        let repeat_count = optional_field(text, spos, line)?.ok_or_else(|| {
+            fpe(format!(
+                "LIN specification missing repeat count on line {line}"
+            ))
+        })?;
+        spos += 4;
+        if repeat_count < 2 {
+            return Err(fpe(format!(
+                "LIN specification: repeat count must be >=2 on line {line}"
+            )));
+        }
+        let subst_b = optional_field(text, spos, line)?.unwrap_or(0);
+        spos += 4;
+        let subst_c = optional_field(text, spos, line)?.unwrap_or(0);
+        spos += 4;
+        if subst_b == 0 || subst_b > n_atoms || subst_c > n_atoms {
+            return Err(fpe(format!(
+                "LIN specification has bad substituent idx on line {line}"
+            )));
+        }
+        if !prop_val.is_empty() {
+            prop_val.push('|');
+        }
+        if subst_c == 0 {
+            // upstream feeds the substituent C to a format string without a
+            // slot for it; `boost::format` throws on the surplus argument,
+            // so LIN lines with a single substituent never parse.
+            return Err(fpe(
+                "boost::too_many_args: format-string referred to less arguments than were passed",
+            ));
+        }
+        prop_val += &format!("1 {repeat_count} 2 {aid} {subst_b} {aid} {subst_c}");
+        mol.props.set_val(cp::molFileLinkNodes, prop_val.clone());
+    }
+    Ok(())
+}
+
 fn starts(t: &[u8], p: &[u8]) -> bool {
     t.starts_with(p)
 }
@@ -920,6 +1166,7 @@ fn parse_mol_block_properties(
         parse_old_atom_list(mol, &temp, *line)?;
     }
 
+    let mut sgroups = V2000SGroups::default();
     let mut first_charge_line = true;
     let line_beg = |t: &[u8]| t[..t.len().min(6)].to_vec();
     let mut lb = line_beg(&temp);
@@ -972,13 +1219,13 @@ fn parse_mol_block_properties(
                         "Unsupported SGroup subtype 'M  CRS' on line {l}"
                     )));
                 }
-                b"M  STY" | b"M  SST" | b"M  SLB" | b"M  SCN" | b"M  SDS" | b"M  SAL"
-                | b"M  SBL" | b"M  SPA" | b"M  SMT" | b"M  SDI" | b"M  SBV" | b"M  SDT"
-                | b"M  SDD" | b"M  SCD" | b"M  SED" | b"M  SPL" | b"M  SNC" | b"M  SAP"
-                | b"M  SCL" | b"M  SBT" => return Err(not_ported("SGroup data", l)),
-                b"M  ZBO" | b"M  ZCH" | b"M  HYD" | b"M  MRV" | b"M  APO" | b"M  LIN" => {
-                    return Err(not_ported(&lossy(&lb), l));
-                }
+                b if is_sgroup_line(b) => sgroups.parse_line(mol, &temp, l, strict)?,
+                b"M  ZBO" => parse_zbo_line(mol, &temp, l)?,
+                b"M  ZCH" => parse_zch_line(mol, &temp, l)?,
+                b"M  HYD" => parse_hyd_line(mol, &temp, l)?,
+                b"M  MRV" => parse_marvin_smarts_line(mol, &temp, l)?,
+                b"M  APO" => parse_attach_point_line(mol, &temp, l, strict)?,
+                b"M  LIN" => parse_link_node_line(mol, &temp, l)?,
                 _ => {}
             },
         }
@@ -986,7 +1233,11 @@ fn parse_mol_block_properties(
         temp = s.get_line();
         lb = line_beg(&temp);
     }
-    Ok(first(&temp) == b'M' && starts(&temp, b"M  END"))
+    let complete = first(&temp) == b'M' && starts(&temp, b"M  END");
+    if complete {
+        sgroups.finish(mol, strict)?;
+    }
+    Ok(complete)
 }
 
 /// `calculate3dFlag`
@@ -1133,7 +1384,7 @@ fn process_mol_props(mol: &mut RWMol) -> Result<()> {
         }
         mol.atom_mut(aidx).props.clear_val(cp::molTotValence);
     }
-    Ok(())
+    process_sgroups(mol)
 }
 
 /// `FileParserUtils::finishMolProcessing`
@@ -1273,40 +1524,66 @@ pub fn mol_from_mol_data_stream(
     }
     res.props.set_val(cp::_MolFileChiralFlag, chiral_flag);
 
-    let file_complete = if ctab_version == 2000 {
-        parse_v2000_ctab(
-            s,
-            line,
-            &mut res,
-            &mut chirality_possible,
-            n_atoms,
-            n_bonds,
-            params.strict_parsing,
-        )?
-    } else {
-        if n_atoms != 0 || n_bonds != 0 {
-            let msg = format!(
-                "V3000 mol blocks should have 0s in the initial counts line. (line: {line})"
-            );
-            if params.strict_parsing {
-                return Err(fpe(msg));
-            }
-            rd_log_warning!("{msg}");
-        }
-        let (expect_mend, expect_macro_atoms) = if params.parsing_scsr_mol {
-            (false, true)
+    let parsed = (|| -> Result<bool> {
+        if ctab_version == 2000 {
+            parse_v2000_ctab(
+                s,
+                line,
+                &mut res,
+                &mut chirality_possible,
+                n_atoms,
+                n_bonds,
+                params.strict_parsing,
+            )
         } else {
-            (true, false)
-        };
-        super::mol_file_v3000::parse_v3000_ctab(
-            s,
-            line,
-            &mut res,
-            &mut chirality_possible,
-            params.strict_parsing,
-            expect_mend,
-            expect_macro_atoms,
-        )?
+            if n_atoms != 0 || n_bonds != 0 {
+                let msg = format!(
+                    "V3000 mol blocks should have 0s in the initial counts line. (line: {line})"
+                );
+                if params.strict_parsing {
+                    return Err(fpe(msg));
+                }
+                rd_log_warning!("{msg}");
+            }
+            let (expect_mend, expect_macro_atoms) = if params.parsing_scsr_mol {
+                (false, true)
+            } else {
+                (true, false)
+            };
+            super::mol_file_v3000::parse_v3000_ctab(
+                s,
+                line,
+                &mut res,
+                &mut chirality_possible,
+                params.strict_parsing,
+                expect_mend,
+                expect_macro_atoms,
+            )
+        }
+    })();
+    let file_complete = match parsed {
+        Ok(complete) => complete,
+        Err(RDKitError::UnhandledFeature(msg)) => {
+            // an unsupported feature: skip the rest of the molecule
+            rd_log_error!(" Unhandled CTAB feature: '{msg}'. Molecule skipped.");
+            let mut temp = if s.eof() { Vec::new() } else { s.get_line() };
+            *line += 1;
+            while !s.eof()
+                && !s.fail()
+                && !temp.starts_with(b"M  END")
+                && !temp.starts_with(b"$$$$")
+            {
+                temp = s.get_line();
+                *line += 1;
+            }
+            if s.eof() && !temp.starts_with(b"M  END") && !temp.starts_with(b"$$$$") {
+                return Err(fpe(format!(
+                    "Problems encountered parsing Mol data, M  END missing around line {line}"
+                )));
+            }
+            return Ok(None);
+        }
+        Err(e) => return Err(e),
     };
     if !file_complete {
         return Err(fpe(format!(

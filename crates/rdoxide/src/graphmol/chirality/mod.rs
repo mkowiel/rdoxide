@@ -5,6 +5,7 @@ pub mod bond_dirs;
 pub mod from_coords;
 pub mod legacy;
 pub mod nontetrahedral;
+pub mod stereo_groups;
 
 use std::sync::atomic::{AtomicU8, Ordering};
 
@@ -58,6 +59,7 @@ pub fn get_use_legacy_stereo_perception() -> bool {
 
 use crate::graphmol::bond::{BondDir, BondType};
 use crate::graphmol::romol::ROMol;
+use crate::rdgeneral::RDProps;
 use crate::rdgeneral::common_properties as cp;
 
 /// `MolOps::clearSingleBondDirFlags`
@@ -88,6 +90,18 @@ pub fn clear_dir_flags(mol: &mut ROMol, only_wedge_type_bond_dirs: bool) {
             || !matches!(b.bond_dir(), BondDir::EndDownRight | BondDir::EndUpRight)
         {
             b.set_bond_dir(BondDir::None);
+        }
+    }
+}
+
+/// `Chirality::removeNonExplicit3DChirality`: clears the tags that were
+/// derived from a 3D structure rather than marked in the mol block.
+pub fn remove_non_explicit_3d_chirality(mol: &mut ROMol) {
+    for idx in 0..mol.num_atoms() {
+        let atom = mol.atom_mut(idx);
+        if atom.props.has_val(cp::_NonExplicit3DChirality) {
+            atom.clear_prop(cp::_NonExplicit3DChirality);
+            atom.set_chiral_tag(crate::graphmol::atom::ChiralType::Unspecified);
         }
     }
 }

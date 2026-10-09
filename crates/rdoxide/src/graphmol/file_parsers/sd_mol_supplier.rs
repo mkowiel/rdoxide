@@ -226,9 +226,10 @@ impl SDMolSupplier {
         self.set_data_bytes(text.to_vec());
     }
 
-    fn set_data_bytes(&mut self, data: Vec<u8>) {
-        // init()
+    /// `ForwardSDMolSupplier::init()` on a new input.
+    fn init_forward(&mut self, data: Vec<u8>) {
         self.df_end = false;
+        self.eof_hit_on_read = false;
         self.d_line = 0;
         self.process_property_lists = true;
         self.d_len = -1;
@@ -236,6 +237,10 @@ impl SDMolSupplier {
         self.d_molpos.clear();
         self.data = Some(data);
         self.state = (0, false, false);
+    }
+
+    fn set_data_bytes(&mut self, data: Vec<u8>) {
+        self.init_forward(data);
         self.d_molpos.push(0);
         self.check_for_end();
         if self.df_end {
@@ -455,7 +460,7 @@ impl SDMolSupplier {
             match e {
                 RDKitError::FileParse(m) => {
                     rd_log_error!("ERROR: {m}");
-                    rd_log_error!("ERROR: moving to the beginning of the next molecule\n");
+                    rd_log_error!("ERROR: moving to the beginning of the next molecule");
                     self.skip_to_next_record(s, false);
                 }
                 RDKitError::Sanitize(se) => {
@@ -463,7 +468,7 @@ impl SDMolSupplier {
                         "ERROR: Could not sanitize molecule ending on line {}",
                         self.d_line
                     );
-                    rd_log_error!("ERROR: {}\n", RDKitError::Sanitize(se));
+                    rd_log_error!("ERROR: {}", RDKitError::Sanitize(se));
                     self.skip_to_next_record(s, true);
                 }
                 _ => {
@@ -471,7 +476,7 @@ impl SDMolSupplier {
                         self.eof_hit_on_read = true;
                     }
                     rd_log_error!("Unexpected error hit on line {}", self.d_line);
-                    rd_log_error!("ERROR: moving to the beginning of the next molecule\n");
+                    rd_log_error!("ERROR: moving to the beginning of the next molecule");
                     self.skip_to_next_record(s, true);
                 }
             }
@@ -641,5 +646,70 @@ impl SDMolSupplier {
         self.reset()?;
         self.d_len = self.d_molpos.len() as i64;
         Ok(())
+    }
+}
+/// `v2::FileParsers::ForwardSDMolSupplier`: molecules are read in order and
+/// there is no random access or `reset()`.
+///
+/// Upstream's `SDMolSupplier` derives from this class; here both share the
+/// record-reading engine of [`SDMolSupplier`], and this type exposes only the
+/// forward-only interface. The input is held in memory.
+#[derive(Debug, Clone)]
+pub struct ForwardSDMolSupplier {
+    inner: SDMolSupplier,
+}
+
+impl ForwardSDMolSupplier {
+    /// `ForwardSDMolSupplier(stream, takeOwnership, params)` over the whole
+    /// content of the stream.
+    pub fn from_bytes(data: Vec<u8>, params: MolFileParserParams) -> Self {
+        let mut inner = SDMolSupplier {
+            params,
+            ..Default::default()
+        };
+        inner.init_forward(data);
+        ForwardSDMolSupplier { inner }
+    }
+
+    /// The input is a file; an empty file is a supplier without molecules.
+    pub fn from_file(file_name: &str, params: MolFileParserParams) -> Result<Self> {
+        let data = std::fs::read(file_name)
+            .map_err(|_| RDKitError::BadFile(format!("Bad input file {file_name}")))?;
+        Ok(Self::from_bytes(data, params))
+    }
+
+    /// Releases the input; further use fails with a precondition error.
+    pub fn close(&mut self) {
+        self.inner.close();
+    }
+
+    /// `next()`: `Ok(None)` is an unparsable record (or the end of the input);
+    /// check [`Self::at_end`] to tell them apart.
+    pub fn next_mol(&mut self) -> Result<Option<RWMol>> {
+        self.inner.with_stream(|this, s| {
+            if s.eof() {
+                this.df_end = true;
+                None
+            } else {
+                this.next_in(s)
+            }
+        })
+    }
+
+    pub fn at_end(&self) -> Result<bool> {
+        self.inner.at_end()
+    }
+
+    /// Whether the end of the input was hit while parsing the previous entry.
+    pub fn eof_hit_on_read(&self) -> bool {
+        self.inner.eof_hit_on_read()
+    }
+
+    pub fn process_property_lists(&self) -> bool {
+        self.inner.process_property_lists
+    }
+
+    pub fn set_process_property_lists(&mut self, val: bool) {
+        self.inner.process_property_lists = val;
     }
 }
