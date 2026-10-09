@@ -5,7 +5,7 @@ use rdoxide::graphmol::RWMol;
 use rdoxide::graphmol::smiles_parse::smarts::{SmartsParserParams, mol_from_smarts};
 use rdoxide::graphmol::smiles_parse::{SmilesParserParams, mol_from_smiles};
 use rdoxide::graphmol::substruct::{
-    SubstructMatchParameters, substruct_match, substruct_match_count,
+    FinalMatchCheck, MatchCheck, SubstructMatchParameters, substruct_match, substruct_match_count,
 };
 
 fn smi(s: &str) -> RWMol {
@@ -108,5 +108,68 @@ fn chirality() {
         substruct_match(&db, &smi("F/C=C\\F"), &ch)
             .unwrap()
             .is_empty()
+    );
+}
+
+#[test]
+fn extra_atom_check_filters_and_overrides() {
+    // the callback sees every matched pair: only atoms 1 and 2 are accepted
+    let m = smi("CCOCC");
+    let q = smi("CO");
+    let first_carbon: MatchCheck = MatchCheck::new(|_, _, _, mi| mi == 1 || mi == 2);
+    let ps = SubstructMatchParameters {
+        extra_atom_check: Some(first_carbon.clone()),
+        ..Default::default()
+    };
+    assert_eq!(
+        atoms(&substruct_match(&m, &q, &ps).unwrap()),
+        vec![vec![1, 2]]
+    );
+
+    // overriding the default check ignores element labels
+    let ps = SubstructMatchParameters {
+        extra_atom_check: Some(MatchCheck::new(|_, qi, _, mi| {
+            qi == 0 && mi == 0 || qi == 1
+        })),
+        extra_atom_check_overrides_default: true,
+        ..Default::default()
+    };
+    let r = substruct_match(&m, &q, &ps).unwrap();
+    assert_eq!(atoms(&r), vec![vec![0, 1]]);
+}
+
+#[test]
+fn extra_bond_check_filters() {
+    let m = smi("CC=CC");
+    let q = smi("CC");
+    let ps = SubstructMatchParameters {
+        extra_bond_check: Some(MatchCheck::new(|_, _, mol, mb| {
+            mol.bond(mb).bond_type_as_double().unwrap() == 1.0
+        })),
+        ..Default::default()
+    };
+    let r = substruct_match(&m, &q, &ps).unwrap();
+    assert_eq!(atoms(&r), vec![vec![0, 1], vec![2, 3]]);
+}
+
+#[test]
+fn extra_final_check_validates_matches() {
+    let m = smi("CCOCC");
+    let q = smi("CCO");
+    let all = SubstructMatchParameters::default();
+    assert_eq!(substruct_match(&m, &q, &all).unwrap().len(), 2);
+    let none = SubstructMatchParameters {
+        extra_final_check: Some(FinalMatchCheck::new(|_, _| false)),
+        ..Default::default()
+    };
+    assert!(substruct_match(&m, &q, &none).unwrap().is_empty());
+    // the closure sees the matched atoms in query order
+    let large = SubstructMatchParameters {
+        extra_final_check: Some(FinalMatchCheck::new(|_, aids| aids.iter().sum::<u32>() > 5)),
+        ..Default::default()
+    };
+    assert_eq!(
+        atoms(&substruct_match(&m, &q, &large).unwrap()),
+        vec![vec![4, 3, 2]]
     );
 }
