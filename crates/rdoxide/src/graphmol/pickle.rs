@@ -49,7 +49,7 @@ pub const ENDIAN_ID: i32 = 0xDEAD_BEEFu32 as i32;
 
 /// `MolPickler::Tags`
 #[allow(dead_code)]
-mod tags {
+pub(crate) mod tags {
     pub const VERSION: u8 = 0;
     pub const BEGINATOM: u8 = 1;
     pub const ENDATOM: u8 = 10;
@@ -513,6 +513,80 @@ fn atom_props_to_ignore() -> Vec<&'static str> {
 
 // ================================================================== queries
 
+/// The serializable part of a query node (upstream
+/// `PicklerOps::QueryDetails`); shared by the binary pickler and the JSON
+/// writer.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum QueryDetails {
+    /// AND/OR/XOR/NULL
+    Tag(u8),
+    /// the equality-like comparisons and the atom-ring query
+    ValTol {
+        tag: u8,
+        val: i32,
+        tol: i32,
+    },
+    Range {
+        lower: i32,
+        upper: i32,
+        tol: i32,
+        ends: u8,
+    },
+    Set(BTreeSet<i32>),
+    Property(String),
+    PropertyWithValue {
+        prop: String,
+        val: PropValue,
+        tol: f64,
+    },
+}
+
+/// `PicklerOps::getQueryDetails`; `None` for recursive queries, which both
+/// formats handle themselves.
+pub(crate) fn query_details<F: QueryTarget>(q: &Query<F>) -> Option<QueryDetails> {
+    let val_tol = |tag: u8| QueryDetails::ValTol {
+        tag,
+        val: q.val,
+        tol: q.tol,
+    };
+    Some(match &q.kind {
+        QueryKind::Recursive { .. } => return None,
+        QueryKind::And => QueryDetails::Tag(QUERY_AND),
+        QueryKind::Or => QueryDetails::Tag(QUERY_OR),
+        QueryKind::XOr => QueryDetails::Tag(QUERY_XOR),
+        QueryKind::Base { .. } => QueryDetails::Tag(QUERY_NULL),
+        QueryKind::Equality => val_tol(QUERY_EQUALS),
+        QueryKind::Greater => val_tol(QUERY_GREATER),
+        QueryKind::GreaterEqual => val_tol(QUERY_GREATEREQUAL),
+        QueryKind::Less => val_tol(QUERY_LESS),
+        QueryKind::LessEqual => val_tol(QUERY_LESSEQUAL),
+        QueryKind::AtomRing => val_tol(QUERY_ATOMRING),
+        QueryKind::HasProp(name) => QueryDetails::Property(name.clone()),
+        QueryKind::Range {
+            lower,
+            upper,
+            lower_open,
+            upper_open,
+        } => QueryDetails::Range {
+            lower: *lower,
+            upper: *upper,
+            tol: q.tol,
+            ends: ((*lower_open as u8) << 1) | *upper_open as u8,
+        },
+        QueryKind::Set(set) => QueryDetails::Set(set.clone()),
+        QueryKind::HasPropWithValue { prop, val, tol } => QueryDetails::PropertyWithValue {
+            prop: prop.clone(),
+            val: val.clone(),
+            // string comparisons have no tolerance
+            tol: if matches!(val, PropValue::String(_)) {
+                0.0
+            } else {
+                *tol
+            },
+        },
+    })
+}
+
 /// `pickleQuery`
 fn pickle_query<F: QueryTarget>(w: &mut W, q: &Query<F>) -> Result<()> {
     w.str(&q.description);
@@ -523,72 +597,62 @@ fn pickle_query<F: QueryTarget>(w: &mut W, q: &Query<F>) -> Result<()> {
     if q.negate {
         w.u8(QUERY_ISNEGATED);
     }
-    let val_tol = |w: &mut W, tag: u8, q: &Query<F>| {
-        w.u8(tag);
-        w.u8(QUERY_VALUE);
-        w.i32(q.val);
-        w.i32(q.tol);
-    };
-    match &q.kind {
-        QueryKind::Recursive { mol, .. } => {
+    match (&q.kind, query_details(q)) {
+        (QueryKind::Recursive { mol, .. }, _) => {
             w.u8(QUERY_RECURSIVE);
             w.u8(QUERY_VALUE);
             let p = pickle_mol(&mol.0, get_default_pickle_properties())?;
             w.0.extend_from_slice(&p);
         }
-        QueryKind::And => w.u8(QUERY_AND),
-        QueryKind::Or => w.u8(QUERY_OR),
-        QueryKind::XOr => w.u8(QUERY_XOR),
-        QueryKind::Equality => val_tol(w, QUERY_EQUALS, q),
-        QueryKind::Greater => val_tol(w, QUERY_GREATER, q),
-        QueryKind::GreaterEqual => val_tol(w, QUERY_GREATEREQUAL, q),
-        QueryKind::Less => val_tol(w, QUERY_LESS, q),
-        QueryKind::LessEqual => val_tol(w, QUERY_LESSEQUAL, q),
-        QueryKind::AtomRing => val_tol(w, QUERY_ATOMRING, q),
-        QueryKind::HasProp(name) => {
-            w.u8(QUERY_PROPERTY);
+        (_, Some(QueryDetails::Tag(tag))) => w.u8(tag),
+        (_, Some(QueryDetails::ValTol { tag, val, tol })) => {
+            w.u8(tag);
             w.u8(QUERY_VALUE);
-            w.str(name);
+            w.i32(val);
+            w.i32(tol);
         }
-        QueryKind::Base { .. } => w.u8(QUERY_NULL),
-        QueryKind::Range {
-            lower,
-            upper,
-            lower_open,
-            upper_open,
-        } => {
+        (
+            _,
+            Some(QueryDetails::Range {
+                lower,
+                upper,
+                tol,
+                ends,
+            }),
+        ) => {
             w.u8(QUERY_RANGE);
             w.u8(QUERY_VALUE);
-            w.i32(*lower);
-            w.i32(*upper);
-            w.i32(q.tol);
-            w.u8(((*lower_open as u8) << 1) | *upper_open as u8);
+            w.i32(lower);
+            w.i32(upper);
+            w.i32(tol);
+            w.u8(ends);
         }
-        QueryKind::Set(set) => {
+        (_, Some(QueryDetails::Set(set))) => {
             w.u8(QUERY_SET);
             w.u8(QUERY_VALUE);
             w.i32(set.len() as i32);
             set.iter().for_each(|&v| w.i32(v));
         }
-        QueryKind::HasPropWithValue { prop, val, tol } => {
+        (_, Some(QueryDetails::Property(name))) => {
+            w.u8(QUERY_PROPERTY);
+            w.u8(QUERY_VALUE);
+            w.str(&name);
+        }
+        (_, Some(QueryDetails::PropertyWithValue { prop, val, tol })) => {
             w.u8(QUERY_PROPERTY_WITH_VALUE);
             w.u8(QUERY_VALUE);
-            let tol = if matches!(val, PropValue::String(_)) {
-                0.0
-            } else {
-                *tol
-            };
             w.f64(tol);
             let v = match val {
-                PropValue::Int(i) => RDValue::Int(*i),
-                PropValue::UInt(u) => RDValue::UnsignedInt(*u),
-                PropValue::Bool(b) => RDValue::Bool(*b),
-                PropValue::Float(f) => RDValue::Float(*f),
-                PropValue::Double(d) => RDValue::Double(*d),
-                PropValue::String(s) => RDValue::String(s.clone()),
+                PropValue::Int(i) => RDValue::Int(i),
+                PropValue::UInt(u) => RDValue::UnsignedInt(u),
+                PropValue::Bool(b) => RDValue::Bool(b),
+                PropValue::Float(f) => RDValue::Float(f),
+                PropValue::Double(d) => RDValue::Double(d),
+                PropValue::String(s) => RDValue::String(s),
             };
-            write_prop(w, prop, &v);
+            write_prop(w, &prop, &v);
         }
+        (_, None) => unreachable!("only recursive queries have no details"),
     }
     w.u8(QUERY_NUMCHILDREN);
     w.u8(q.children.len() as u8);
@@ -679,7 +743,7 @@ fn build_base_query<F: QueryTarget>(r: &mut R<'_>, tag: u8, version: i32) -> Res
 }
 
 /// `QueryOps::finalizeQueryFromDescription` (atoms)
-fn finalize_atom_query(q: &mut AtomQuery) -> Result<()> {
+pub(crate) fn finalize_atom_query(q: &mut AtomQuery) -> Result<()> {
     let full = q.description.clone();
     let (descr, qtype) = if let Some(d) = full.strip_prefix("range_") {
         (d, 'r')
@@ -766,7 +830,7 @@ fn finalize_atom_query(q: &mut AtomQuery) -> Result<()> {
 }
 
 /// `QueryOps::finalizeQueryFromDescription` (bonds)
-fn finalize_bond_query(q: &mut BondQuery) -> Result<()> {
+pub(crate) fn finalize_bond_query(q: &mut BondQuery) -> Result<()> {
     let f = match q.description.as_str() {
         "BondRingSize" => {
             if !(3..=20).contains(&q.val) {
