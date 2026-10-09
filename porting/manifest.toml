@@ -380,6 +380,20 @@
 "Code/DataStructs/BitOps.cpp" = "60e8b371375b015429b458295e735f778efe2cb7"
 "Code/DataStructs/BitOps.h" = "e18431058bd84a3adb2a0101abc687526623a54b"
 
+[module."rdoxide::datastructs::fpb_reader".sources]
+"Code/DataStructs/FPBReader.cpp" = "50f05e241fc23dd17885fb7297390a411814eb2c"
+"Code/DataStructs/FPBReader.h" = "7b22c3caeffa02307871099fcec0c02af5de08a5"
+
+[module."rdoxide::datastructs::multi_fpb_reader".sources]
+"Code/DataStructs/MultiFPBReader.cpp" = "566afe8e69f84e371eb756a79bdc3dc09a48dab8"
+"Code/DataStructs/MultiFPBReader.h" = "3f807f6fe319119ba37025ac6ad63d8dd92b97a9"
+
+[module."rdoxide_python::datastructs_fpb".sources]
+"Code/DataStructs/Wrap/wrap_FPB.cpp" = "57414b22a2cdb7ee9a0adff13014cfab17f89f94"
+
+[module."rdoxide::datastructs::bitmap".sources]
+"Code/DataStructs/BitOps.cpp" = "60e8b371375b015429b458295e735f778efe2cb7"
+
 [module."rdoxide_python::datastructs".sources]
 "Code/DataStructs/Wrap/DataStructs.cpp" = "4b28e37bc4881df060259a715912bb2fbcbd887c"
 "Code/DataStructs/Wrap/wrap_BitOps.cpp" = "cd1280597fecd22e676956edf4d5682477b47158"
