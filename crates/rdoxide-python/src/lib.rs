@@ -61,6 +61,7 @@ mod rdmolfiles_smiwriter;
 mod rdmolfiles_write;
 mod rdmolfiles_xyz;
 mod rdmolhash;
+mod rdmolinterchange;
 mod rdmolops;
 mod rdmolops_adjust_query;
 mod rdmolops_fingerprints;
@@ -158,6 +159,12 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
     )?;
     add_submodule(m, "rdMolHash", "rdkit.Chem.rdMolHash", rdmolhash::init)?;
     add_submodule(m, "rdMMPA", "rdkit.Chem.rdMMPA", rdmmpa::init)?;
+    add_submodule(
+        m,
+        "rdMolInterchange",
+        "rdkit.Chem.rdMolInterchange",
+        rdmolinterchange::init,
+    )?;
     add_submodule(
         m,
         "rdDetermineBonds",

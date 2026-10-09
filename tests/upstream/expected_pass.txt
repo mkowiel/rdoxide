@@ -161,6 +161,8 @@ Code/GraphMol/MolHash/Wrap/testMolHash.py::TestCase::test1
 Code/GraphMol/MolHash/Wrap/testMolHash.py::TestCase::testCxSmiles
 Code/GraphMol/MolHash/Wrap/testMolHash.py::TestCase::testProtomerV2
 Code/GraphMol/MolHash/Wrap/testMolHash.py::TestCase::testTautomerV2
+Code/GraphMol/MolInterchange/Wrap/testMolInterchange.py::TestCase::test1
+Code/GraphMol/MolInterchange/Wrap/testMolInterchange.py::TestCase::test2
 Code/GraphMol/MolTransforms/Wrap/testMolTransforms.py::TestCase::test1Canonicalization
 Code/GraphMol/MolTransforms/Wrap/testMolTransforms.py::TestCase::testComputePrincipalAxesAndMoments
 Code/GraphMol/MolTransforms/Wrap/testMolTransforms.py::TestCase::testComputePrincipalAxesAndMomentsFromGyrationMatrix

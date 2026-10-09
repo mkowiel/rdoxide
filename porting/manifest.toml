@@ -830,3 +830,12 @@
 
 [module."rdoxide_python::rddeterminebonds".sources]
 "Code/GraphMol/DetermineBonds/Wrap/rdDetermineBonds.cpp" = "199188b06ca0bd23210fd75923360c495f16fc6e"
+
+[module."rdoxide::graphmol::mol_interchange".sources]
+"Code/GraphMol/MolInterchange/MolInterchange.h" = "b5b4daca6452d9d351ce3223b4edb21063b1feab"
+"Code/GraphMol/MolInterchange/details.h" = "7887b4b48cc360942d62d3abe4430ba29f1d3a2f"
+"Code/GraphMol/MolInterchange/Parser.cpp" = "a9f9add700106a35b261c6a1aa974fcab6a4783b"
+"Code/GraphMol/MolInterchange/Writer.cpp" = "c9c6519383554815237f149a879a03a00aaaa612"
+
+[module."rdoxide_python::rdmolinterchange".sources]
+"Code/GraphMol/MolInterchange/Wrap/rdMolInterchange.cpp" = "1d36c0b7b8be4cba566b6c90027410cd1df39092"

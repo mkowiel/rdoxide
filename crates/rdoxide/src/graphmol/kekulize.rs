@@ -10,6 +10,7 @@ use super::atom::{ValenceType, is_aromatic_atom, is_early_atom};
 use super::bond::{BondDir, BondType};
 use super::find_rings::{convert_to_bonds, find_sssr};
 use super::periodic_table::PeriodicTable;
+use super::queries::has_bond_type_query;
 use super::romol::RWMol;
 use crate::rdgeneral::utils::union_rings;
 use crate::{RDKitError, Result, SanitizeError};
@@ -478,11 +479,22 @@ pub fn kekulize_fragment(
     if !atoms_to_use.iter().any(|&a| a) {
         return Ok(());
     }
-    let bonds_to_use = bonds_to_use.to_vec();
-    let mut found_aromatic = mol
-        .bonds()
-        .iter()
-        .any(|b| bonds_to_use[b.idx() as usize] && b.is_aromatic());
+    let mut bonds_to_use = bonds_to_use.to_vec();
+    // there's no point doing kekulization if there are no aromatic bonds
+    // without queries
+    let mut found_aromatic = false;
+    for bond in mol.bonds() {
+        let idx = bond.idx() as usize;
+        if !bonds_to_use[idx] {
+            continue;
+        }
+        if bond.query().is_some_and(has_bond_type_query) {
+            // we don't kekulize bonds with bond type queries
+            bonds_to_use[idx] = false;
+        } else if bond.is_aromatic() {
+            found_aromatic = true;
+        }
+    }
     let n = mol.num_atoms();
     let mut valences = vec![0i32; n as usize];
     let mut dummy_ats = vec![false; n as usize];
