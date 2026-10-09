@@ -72,3 +72,11 @@ def test_fragment_cxsmiles():
     assert frag.startswith(Chem.MolFragmentToSmiles(m, atomsToUse=[1, 2, 3, 4]))
     assert frag.endswith("|o1:2|") or "|" in frag
     assert Chem.MolFragmentToCXSmiles(Chem.MolFromSmiles("CCO"), atomsToUse=[0, 1]) == "CC"
+
+
+def test_canonicalize_enhanced_stereo_roundtrip():
+    from rdkit import Chem
+
+    m = Chem.MolFromSmiles("C[C@H](F)C[C@@H](Cl)Br |&1:1,4|")
+    Chem.CanonicalizeEnhancedStereo(m)
+    assert len(m.GetStereoGroups()) == 1

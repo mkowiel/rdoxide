@@ -1,0 +1,13 @@
+linchemin (https://github.com/syngenta/linchemin), MIT License
+
+The oxidation-number algorithm in crates/rdoxide/src/graphmol/descriptors/
+oxidation_numbers.rs follows RDKit's Descriptors/OxidationNumbers.cpp, which in
+turn is based on
+  src/linchemin/cheminfo/functions.py (commit f44fda38e856eaa876483c94284ee6788d2c27f4)
+of linchemin and is therefore also subject to linchemin's MIT license, found at
+  https://github.com/syngenta/linchemin/blob/f44fda38e856eaa876483c94284ee6788d2c27f4/LICENSE
+
+The MIT License requires that the copyright notice and permission notice of
+that LICENSE be retained in copies or substantial portions of the software;
+the notice is therefore kept at the URL above and must be reproduced here if
+this file is ever redistributed on its own.

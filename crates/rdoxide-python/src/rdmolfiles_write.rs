@@ -11,6 +11,8 @@ use rdoxide::graphmol::smiles_parse::write::{
     SmilesWriteParams, mol_fragment_to_smiles, mol_to_random_smiles_vect, mol_to_smiles,
 };
 
+use rdoxide::graphmol::canon::canonicalize_enhanced_stereo;
+
 use crate::enums::add_enum;
 use crate::errors::IntoPyResult;
 use crate::mol::PyMol;
@@ -450,6 +452,13 @@ fn py_mol_to_random_smiles_vect<'py>(
     PyList::new(py, res)
 }
 
+/// Rewrites the enhanced-stereo groups of a molecule into canonical form.
+#[pyfunction]
+#[pyo3(name = "CanonicalizeEnhancedStereo", signature = (mol))]
+fn py_canonicalize_enhanced_stereo(mut mol: PyRefMut<'_, PyMol>) -> PyResult<()> {
+    canonicalize_enhanced_stereo(&mut mol.mol, None).py()
+}
+
 /// Returns a SMARTS string for a molecule
 ///   ARGUMENTS:
 ///
@@ -583,5 +592,6 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_mol_fragment_to_smiles, m)?)?;
     m.add_function(wrap_pyfunction!(py_mol_fragment_to_cx_smiles, m)?)?;
     m.add_function(wrap_pyfunction!(py_mol_to_random_smiles_vect, m)?)?;
+    m.add_function(wrap_pyfunction!(py_canonicalize_enhanced_stereo, m)?)?;
     Ok(())
 }

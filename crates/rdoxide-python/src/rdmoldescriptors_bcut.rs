@@ -8,8 +8,19 @@ use rdoxide::graphmol::descriptors::bcut::{
     BCUT2D_VERSION, bcut2d, bcut2d_with_prop_name, bcut2d_with_props,
 };
 
+use rdoxide::graphmol::descriptors::oxidation_numbers::calc_oxidation_numbers;
+
 use crate::errors::IntoPyResult;
 use crate::mol::PyMol;
+
+/// Adds the oxidation number/state to the atoms of a molecule as property
+/// OxidationNumber on each atom.  Use Pauling electronegativities.  This is
+/// experimental code, still under development.
+#[pyfunction]
+#[pyo3(name = "CalcOxidationNumbers", signature = (mol))]
+fn py_calc_oxidation_numbers(mut mol: PyRefMut<'_, PyMol>) -> PyResult<()> {
+    calc_oxidation_numbers(&mut mol.mol).py()
+}
 
 /// Implements BCUT descriptors From J. Chem. Inf. Comput. Sci., Vol. 39, No. 1, 1999
 /// Diagonal elements are (currently) atomic mass, gasteiger charge, crippen logP and crippen MR
@@ -50,5 +61,6 @@ fn py_bcut2d<'py>(
 
 pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("_BCUT2D_version", BCUT2D_VERSION)?;
+    m.add_function(wrap_pyfunction!(py_calc_oxidation_numbers, m)?)?;
     m.add_function(wrap_pyfunction!(py_bcut2d, m)?)
 }
