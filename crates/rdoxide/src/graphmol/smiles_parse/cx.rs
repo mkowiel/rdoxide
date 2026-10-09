@@ -5,9 +5,7 @@
 //! unspecified double bonds, dative/hydrogen/zero-order bonds, and the query
 //! features (unsaturation, ring bond count, substitution count, the special
 //! atom labels), substance groups (data `SgD:`, polymer `Sg:` and the
-//! hierarchy `SgH:`) and link nodes. Variable attachment points are not
-//! ported yet; extensions that use them fail to parse (the warning names
-//! the feature).
+//! hierarchy `SgH:`), link nodes and variable attachment points.
 //!
 //! Ported from RDKit `Code/GraphMol/SmilesParse/CXSmilesOps.cpp` (2026.09.1).
 //!
@@ -1097,10 +1095,58 @@ impl CxParser<'_> {
         true
     }
 
-    /// An extension that this port does not handle yet.
-    fn unsupported(&self, what: &str) -> bool {
-        rd_log_warning!("CXSMILES {what} are not supported by rdoxide yet");
-        false
+    /// `|m:atom:other.other,...|`: the bond to `atom` (an atom with a single
+    /// bond) is attached to any of the other atoms. Stored as the mol file
+    /// bond end points and attach properties.
+    fn parse_variable_attachments(&mut self) -> bool {
+        if !self.text[self.first..].starts_with(b"m:") {
+            return false;
+        }
+        self.first += 2;
+        while self.first < self.last() && self.ch().is_ascii_digit() {
+            let Some(at1) = self.read_int() else {
+                return false;
+            };
+            if self.valid_atom(at1) && self.mol.atom_degree(at1) != 1 {
+                rd_log_warning!("position variation bond to atom with more than one bond");
+                return false;
+            }
+            if self.first < self.last() && self.ch() == b':' {
+                self.first += 1;
+            } else {
+                rd_log_warning!("improperly formatted m: block");
+                return false;
+            }
+            let mut others = Vec::new();
+            while self.first < self.last() && self.ch().is_ascii_digit() {
+                let Some(aidx) = self.read_int() else {
+                    return false;
+                };
+                if self.valid_atom(aidx) {
+                    others.push((aidx + 1).to_string());
+                }
+                if self.first < self.last() && self.ch() == b'.' {
+                    self.first += 1;
+                }
+            }
+            if self.valid_atom(at1) {
+                let mut end_pts = format!("({}", others.len());
+                for idx in &others {
+                    end_pts += &format!(" {idx}");
+                }
+                end_pts.push(')');
+                for bond in self.mol.atom_bond_indices(at1).collect::<Vec<_>>() {
+                    let b = self.mol.bond_mut(bond);
+                    b.dict_mut()
+                        .set_val(cp::_MolFileBondEndPts, end_pts.clone());
+                    b.dict_mut().set_val(cp::_MolFileBondAttach, "ANY");
+                }
+            }
+            if self.first < self.last() && self.ch() == b',' {
+                self.first += 1;
+            }
+        }
+        true
     }
 
     fn parse_it(&mut self) -> bool {
@@ -1162,7 +1208,7 @@ impl CxParser<'_> {
                 }
                 b'u' => self.parse_unsaturation(),
                 b's' => self.parse_substitution(),
-                b'm' => self.unsupported("variable attachment points"),
+                b'm' => self.parse_variable_attachments(),
                 b'w' => self.parse_wedged_bonds(),
                 b'c' if self.first + 2 < self.last()
                     && self.ch_at(1) == b't'
