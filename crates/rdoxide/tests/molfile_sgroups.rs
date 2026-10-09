@@ -295,3 +295,88 @@ mod writing {
         assert_eq!(back.atom(1).formal_charge(), 1);
     }
 }
+
+/// `M  APO`, `M  LIN` and `M  MRV SMA` lines
+mod marvin_lines {
+    use super::*;
+
+    fn str_prop(mol: &RWMol, key: &str) -> Option<String> {
+        mol.get_prop(key).map(RDValue::to_rd_string)
+    }
+
+    #[test]
+    fn attach_points_are_stored_as_atom_properties() {
+        let mol = parse(&v2000(&["M  APO  2   1   1   5   3"]), true).unwrap();
+        assert_eq!(str_prop_atom(&mol, 0).as_deref(), Some("1"));
+        assert_eq!(str_prop_atom(&mol, 4).as_deref(), Some("-1"));
+        assert_eq!(str_prop_atom(&mol, 2), None);
+    }
+
+    fn str_prop_atom(mol: &RWMol, idx: u32) -> Option<String> {
+        mol.atom(idx)
+            .get_prop("molAttchpt")
+            .map(RDValue::to_rd_string)
+    }
+
+    #[test]
+    fn duplicate_attach_points_only_fail_in_strict_mode() {
+        let block = v2000(&["M  APO  2   1   1   1   2"]);
+        assert!(try_parse(&block, true).is_err());
+        let mol = parse(&block, false).unwrap();
+        assert_eq!(str_prop_atom(&mol, 0).as_deref(), Some("1"));
+    }
+
+    #[test]
+    fn bad_attach_points_are_rejected() {
+        for line in [
+            "M  APO  1   1   4",
+            "M  APO  1   9   1",
+            "M  APO  1   x   1",
+        ] {
+            assert!(try_parse(&v2000(&[line]), true).is_err(), "{line}");
+        }
+    }
+
+    #[test]
+    fn link_nodes_are_translated_to_v3000_text() {
+        let mol = parse(&v2000(&["M  LIN  1   2   3   2   1"]), true).unwrap();
+        assert_eq!(
+            str_prop(&mol, "_molLinkNodes").as_deref(),
+            Some("1 3 2 2 2 2 1")
+        );
+        let mol = parse(&v2000(&["M  LIN  2   2   3   2   1   4   3   2   2"]), true).unwrap();
+        assert_eq!(
+            str_prop(&mol, "_molLinkNodes").as_deref(),
+            Some("1 3 2 2 2 2 1|1 3 2 4 2 4 2")
+        );
+    }
+
+    #[test]
+    fn bad_link_nodes_are_rejected() {
+        // a single substituent fails as it does in RDKit
+        for line in [
+            "M  LIN  1   2   3   2",
+            "M  LIN  1   2   1   1",
+            "M  LIN  1   9   3   1",
+            "M  LIN  q",
+        ] {
+            assert!(try_parse(&v2000(&[line]), true).is_err(), "{line}");
+        }
+    }
+
+    #[test]
+    fn marvin_smarts_become_recursive_queries() {
+        let mol = parse(&v2000(&["M  MRV SMA   1 [*;A]"]), true).unwrap();
+        let atom = mol.atom(0);
+        assert_eq!(
+            atom.get_prop("MRV SMA")
+                .map(RDValue::to_rd_string)
+                .as_deref(),
+            Some("[*;A]")
+        );
+        assert!(atom.has_query());
+        for line in ["M  MRV SMA   1 [[[", "M  MRV SMA   9 [C]"] {
+            assert!(try_parse(&v2000(&[line]), true).is_err(), "{line}");
+        }
+    }
+}
