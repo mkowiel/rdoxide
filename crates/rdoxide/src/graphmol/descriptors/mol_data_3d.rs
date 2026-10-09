@@ -58,6 +58,20 @@ pub fn relative_ion_pol(mol: &ROMol) -> Vec<f64> {
     weights(mol, &data_3d::ION_POL, last(&data_3d::POL))
 }
 
+/// `GetUn`: a weight of one for every atom.
+pub fn unit_weights(mol: &ROMol) -> Vec<f64> {
+    vec![1.0; mol.num_atoms() as usize]
+}
+
+/// `GetRelativeRcov`: covalent radius relative to carbon.
+pub fn relative_rcov(mol: &ROMol) -> Vec<f64> {
+    let carbon = data_3d::RCOV[5];
+    weights(mol, &data_3d::RCOV, last(&data_3d::ION_POL))
+        .into_iter()
+        .map(|r| r / carbon)
+        .collect()
+}
+
 /// `GetCustomAtomProp`: the double property of every atom, 1 where it is
 /// missing.
 pub fn custom_atom_prop(mol: &ROMol, name: &str) -> Result<Vec<f64>> {

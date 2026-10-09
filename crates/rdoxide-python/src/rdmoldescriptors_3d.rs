@@ -15,7 +15,7 @@ use crate::rdmoldescriptors::bool_arg;
 
 /// The failed `PRECONDITION(mol.getNumConformers() >= 1, ...)` of the entry
 /// point at `file:line`; its text names the C++ source line.
-fn require_conformer(mol: &ROMol, file: &'static str, line: u32) -> PyResult<()> {
+pub(crate) fn require_conformer(mol: &ROMol, file: &'static str, line: u32) -> PyResult<()> {
     if mol.num_conformers() == 0 {
         return Err(check_failed(
             Site {

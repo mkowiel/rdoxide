@@ -33,6 +33,7 @@ mod rdmoldescriptors_autocorr;
 mod rdmoldescriptors_bcut;
 mod rdmoldescriptors_connectivity;
 mod rdmoldescriptors_molsurf;
+mod rdmoldescriptors_profiles;
 mod rdmoldescriptors_property;
 mod rdmoldescriptors_props;
 mod rdmolfiles;

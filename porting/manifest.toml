@@ -559,3 +559,18 @@
 
 [module."rdoxide_python::rdmoldescriptors_3d".sources]
 "Code/GraphMol/Descriptors/Wrap/rdMolDescriptors.cpp" = "4d3c2e1d6315579af9f3bf02b1564224fe48b82e"
+
+[module."rdoxide::graphmol::descriptors::autocorr3d".sources]
+"Code/GraphMol/Descriptors/AUTOCORR3D.cpp" = "33bfba4c032025be1392872c5b8417afd61417f3"
+"Code/GraphMol/Descriptors/AUTOCORR3D.h" = "4899d6745a2c234d637a33333190a9b667d246ea"
+
+[module."rdoxide::graphmol::descriptors::rdf".sources]
+"Code/GraphMol/Descriptors/RDF.cpp" = "0f48db00e30a229366aea0bc3ce7a5259ac93cf1"
+"Code/GraphMol/Descriptors/RDF.h" = "eb5bf6c46858ebed9db2ed96d62cd79b8f536a2c"
+
+[module."rdoxide::graphmol::descriptors::morse".sources]
+"Code/GraphMol/Descriptors/MORSE.cpp" = "13c986e6e1194712761986d5134064b9f42a2643"
+"Code/GraphMol/Descriptors/MORSE.h" = "1fdcce1dc1fef9e24b2b3c51078abe88bd05900c"
+
+[module."rdoxide_python::rdmoldescriptors_profiles".sources]
+"Code/GraphMol/Descriptors/Wrap/rdMolDescriptors.cpp" = "4d3c2e1d6315579af9f3bf02b1564224fe48b82e"

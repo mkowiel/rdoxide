@@ -61,6 +61,12 @@ Code/Geometry/Wrap/testGeometry.py::TestCase::test8InitPoint2DFromPoint3D
 Code/Geometry/Wrap/testGeometry.py::TestCase::test9RealGridOps
 Code/Geometry/Wrap/testGeometry.py::TestCase::testPointPickles
 Code/Geometry/Wrap/testGeometry.py::TestCase::testSymmetry
+Code/GraphMol/Descriptors/Wrap/test3D.py::TestCase::test1AUTOCORR2D
+Code/GraphMol/Descriptors/Wrap/test3D.py::TestCase::test2AUTOCORR3D
+Code/GraphMol/Descriptors/Wrap/test3D.py::TestCase::test4MORSE
+Code/GraphMol/Descriptors/Wrap/test3D.py::TestCase::test5RDF
+Code/GraphMol/Descriptors/Wrap/test3D.py::TestCase::testGithub2037
+Code/GraphMol/Descriptors/Wrap/test3D.py::TestCase::testGithub4167
 Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testAtomPairOptions
 Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testAtomPairTypesChirality
 Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testAtomPairs
