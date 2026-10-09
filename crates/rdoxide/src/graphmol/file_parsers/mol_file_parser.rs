@@ -3,8 +3,7 @@
 //! Ported from RDKit `Code/GraphMol/FileParsers/MolFileParser.cpp`
 //! (2026.09.1). V2000 CTABs (SGroups included, see `sgroup_parsing`) and
 //! V3000 blocks are ported; a few rarely used property lines
-//! (ZBO/ZCH/HYD/MRV/APO/LIN) are reported as parse errors until they are
-//! ported.
+//! (MRV/APO/LIN) are reported as parse errors until they are ported.
 //!
 //! Copyright (C) 2002-2025 Greg Landrum and other RDKit contributors.
 //! Licensed under the BSD 3-Clause license (see LICENSES/RDKit-BSD-3-Clause.txt).
@@ -892,6 +891,64 @@ fn parse_atom_alias_or_value(
     Ok(())
 }
 
+/// `ParseZCHLine`, `ParseHYDLine` and `ParseZBOLine` (Alex Clark's ZBO
+/// proposal, JCIM 51:3149-57 (2011)): `M  XXX nn` followed by (index,
+/// value) pairs; `apply` gets the zero-based index and the value, which is
+/// `None` for a blank field.
+fn parse_zero_order_line(
+    mol: &mut RWMol,
+    text: &[u8],
+    line: u32,
+    code: &str,
+    n_items: u32,
+    apply: impl Fn(&mut RWMol, u32, Option<i32>) -> Result<()>,
+) -> Result<()> {
+    for (id, value) in atom_value_entries(text, line)? {
+        if id == 0 || id > n_items {
+            return Err(fpe(format!("Bad {code} specification on line {line}")));
+        }
+        apply(mol, id - 1, value)?;
+    }
+    Ok(())
+}
+
+/// `ParseZCHLine`
+fn parse_zch_line(mol: &mut RWMol, text: &[u8], line: u32) -> Result<()> {
+    let n = mol.num_atoms();
+    parse_zero_order_line(mol, text, line, "ZCH", n, |mol, idx, v| {
+        mol.atom_mut(idx).set_formal_charge(v.unwrap_or(0));
+        Ok(())
+    })
+}
+
+/// `ParseHYDLine`
+fn parse_hyd_line(mol: &mut RWMol, text: &[u8], line: u32) -> Result<()> {
+    let n = mol.num_atoms();
+    parse_zero_order_line(mol, text, line, "HYD", n, |mol, idx, v| {
+        if let Some(hs) = v.filter(|&hs| hs >= 0) {
+            let atom = mol.atom_mut(idx);
+            atom.props.set_val("_ZBO_H", true);
+            atom.set_num_explicit_hs(hs as u32);
+        }
+        Ok(())
+    })
+}
+
+/// `ParseZBOLine`
+fn parse_zbo_line(mol: &mut RWMol, text: &[u8], line: u32) -> Result<()> {
+    let n = mol.num_bonds();
+    parse_zero_order_line(mol, text, line, "ZBO", n, |mol, idx, order| {
+        let bond_type = match order.unwrap_or(0) {
+            0 => Some(BondType::Zero),
+            o => u8::try_from(o).ok().and_then(BondType::from_u8),
+        };
+        let t =
+            bond_type.ok_or_else(|| fpe(format!("Bad ZBO bond order {order:?} on line {line}")))?;
+        mol.bond_mut(idx).set_bond_type(t);
+        Ok(())
+    })
+}
+
 fn starts(t: &[u8], p: &[u8]) -> bool {
     t.starts_with(p)
 }
@@ -976,7 +1033,10 @@ fn parse_mol_block_properties(
                     )));
                 }
                 b if is_sgroup_line(b) => sgroups.parse_line(mol, &temp, l, strict)?,
-                b"M  ZBO" | b"M  ZCH" | b"M  HYD" | b"M  MRV" | b"M  APO" | b"M  LIN" => {
+                b"M  ZBO" => parse_zbo_line(mol, &temp, l)?,
+                b"M  ZCH" => parse_zch_line(mol, &temp, l)?,
+                b"M  HYD" => parse_hyd_line(mol, &temp, l)?,
+                b"M  MRV" | b"M  APO" | b"M  LIN" => {
                     return Err(not_ported(&lossy(&lb), l));
                 }
                 _ => {}

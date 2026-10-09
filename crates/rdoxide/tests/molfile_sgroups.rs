@@ -205,3 +205,93 @@ fn structure_groups_are_applied_and_removed() {
         1
     );
 }
+
+// ------------------------------------------------------------- writing
+
+mod writing {
+    use rdoxide::graphmol::depictor::compute_2d_coords;
+    use rdoxide::graphmol::file_parsers::mol_file_writer::{MolWriterParams, mol_to_mol_block};
+    use rdoxide::graphmol::smiles_parse::{SmilesParserParams, mol_from_smiles};
+    use rdoxide::graphmol::substance_group::{SubstanceGroup, add_substance_group};
+    use rdoxide::rdgeneral::RDProps;
+
+    use super::*;
+
+    fn depicted(smiles: &str) -> RWMol {
+        let mut mol = mol_from_smiles(smiles, &SmilesParserParams::default())
+            .unwrap()
+            .unwrap();
+        compute_2d_coords(&mut mol, &Default::default()).unwrap();
+        mol
+    }
+
+    fn sru_mol() -> RWMol {
+        let mut mol = depicted("CCOCC");
+        let mut sg = SubstanceGroup::new("SRU");
+        sg.set_atoms(&mol, vec![1, 2]).unwrap();
+        sg.set_bonds(&mol, vec![0, 2]).unwrap();
+        sg.set_prop("LABEL", "n", false).unwrap();
+        sg.set_prop("CONNECT", "HT", false).unwrap();
+        sg.set_prop("ID", 1u32, false).unwrap();
+        add_substance_group(&mut mol, sg);
+        mol
+    }
+
+    fn lines<'a>(block: &'a str, prefix: &str) -> Vec<&'a str> {
+        block.lines().filter(|l| l.starts_with(prefix)).collect()
+    }
+
+    fn write(mol: &RWMol, v3000: bool) -> String {
+        let params = MolWriterParams {
+            force_v3000: v3000,
+            ..MolWriterParams::default()
+        };
+        mol_to_mol_block(mol, &params, -1).unwrap()
+    }
+
+    #[test]
+    fn v2000_lines() {
+        let block = write(&sru_mol(), false);
+        assert!(block.contains("  5  4  0  1  0  0  0  0  0  0999 V2000"));
+        assert_eq!(
+            lines(&block, "M  S"),
+            [
+                "M  STY  1   1 SRU",
+                "M  SLB  1   1   1",
+                "M  SCN  1   1 HT ",
+                "M  SAL   1  2   2   3",
+                "M  SBL   1  2   1   3",
+                "M  SMT   1 n"
+            ]
+        );
+    }
+
+    #[test]
+    fn v3000_lines_and_round_trip() {
+        let block = write(&sru_mol(), true);
+        assert!(block.contains("M  V30 COUNTS 5 4 1 0 0"));
+        assert!(block.contains("M  V30 1 SRU 1 ATOMS=(2 2 3) XBONDS=(2 1 3) CONNECT=HT LABEL=n"));
+        for v3000 in [false, true] {
+            let back = parse(&write(&sru_mol(), v3000), true).unwrap();
+            let group = &back.substance_groups()[0];
+            assert_eq!((group.atoms(), group.bonds()), (&[1, 2][..], &[0, 2][..]));
+        }
+    }
+
+    #[test]
+    fn zero_order_bonds_get_lines_and_groups() {
+        let mut mol = depicted("[Fe].[NH3+]");
+        mol.add_bond(0, 1, BondType::Zero).unwrap();
+        let block = write(&mol, false);
+        for expected in [
+            "M  ZBO  1   1   0",
+            "M  HYD  2   1   0   2   3",
+            "M  ZCH  1   2   1",
+        ] {
+            assert!(block.contains(expected), "{expected}");
+        }
+        let back = parse(&block, false).unwrap();
+        assert_eq!(back.bond(0).bond_type(), BondType::Zero);
+        assert_eq!(back.atom(1).formal_charge(), 1);
+    }
+}

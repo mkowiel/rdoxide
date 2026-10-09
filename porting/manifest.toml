@@ -136,6 +136,10 @@
 "Code/GraphMol/FileParsers/MolSGroupParsing.cpp" = "87f8e9942f4d0dca37d9c06ab7da59a1aa2b2402"
 "Code/GraphMol/FileParsers/MolSGroupParsing.h" = "86caffe14aa21d4b29b217712ad3f0b6004176fd"
 
+[module."rdoxide::graphmol::file_parsers::sgroup_writing".sources]
+"Code/GraphMol/FileParsers/MolSGroupWriting.cpp" = "d472b5525051ee617db29782f4b638f4a57c73b3"
+"Code/GraphMol/FileParsers/MolSGroupWriting.h" = "a5d1f9bb313d1baa58e5a153e74feb4e30a8cf77"
+
 [module."rdoxide::graphmol::adjust_query".sources]
 "Code/GraphMol/AdjustQuery.cpp" = "1dfe502cfc05eccd5839e7fe88218c15e24aca94"
 

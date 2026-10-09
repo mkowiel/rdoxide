@@ -13,6 +13,9 @@
 //! Copyright (C) 2003-2025 Greg Landrum and other RDKit contributors.
 //! Licensed under the BSD 3-Clause license (see LICENSES/RDKit-BSD-3-Clause.txt).
 
+use super::sgroup_writing::{
+    mol_file_sgroup_info, move_additional_properties_to_sgroups, v3000_sgroup_block,
+};
 use crate::geometry::Point3D;
 use crate::graphmol::atom::{ChiralType, ValenceType};
 use crate::graphmol::bond::{BondDir, BondStereo, BondType};
@@ -20,9 +23,7 @@ use crate::graphmol::chirality::get_use_legacy_stereo_perception;
 use crate::graphmol::conformer::Conformer;
 use crate::graphmol::kekulize::kekulize;
 use crate::graphmol::periodic_table::PeriodicTable;
-use crate::graphmol::queries::{
-    AtomQuery, BondQuery, get_atom_list_query_vals, is_atom_list_query,
-};
+use crate::graphmol::queries::{BondQuery, get_atom_list_query_vals, is_atom_list_query};
 use crate::graphmol::romol::{ROMol, RWMol};
 use crate::graphmol::smiles_parse::write::in_organic_subset;
 use crate::graphmol::stereo_group::{StereoGroup, StereoGroupType, assign_stereo_group_ids};
@@ -54,10 +55,6 @@ impl Default for MolWriterParams {
             precision: 6,
         }
     }
-}
-
-fn not_ported(what: &str) -> RDKitError {
-    RDKitError::Runtime(format!("{what} is not supported by rdoxide yet"))
 }
 
 fn int_prop(props: &impl RDProps, k: &str) -> Option<i32> {
@@ -331,43 +328,9 @@ fn has_complex_query(mol: &ROMol, idx: u32) -> bool {
     true
 }
 
-fn is_list_query(mol: &ROMol, idx: u32) -> bool {
+pub(super) fn is_list_query(mol: &ROMol, idx: u32) -> bool {
     let a = mol.atom(idx);
     is_atom_list_query(a.query(), a.atomic_num())
-}
-
-/// Whether `moveAdditionalPropertiesToSGroups` would add SubstanceGroups.
-fn needs_additional_sgroups(mol: &ROMol) -> bool {
-    let redundant = |q: &AtomQuery| {
-        q.description == "AtomAnd"
-            && q.children.len() == 2
-            && q.children[0].description == "AtomAtomicNum"
-            && !q.children[0].negate
-            && !q.children[1].negate
-            && matches!(
-                q.children[1].description.as_str(),
-                "AtomIsotope" | "AtomFormalCharge"
-            )
-    };
-    for a in mol.atoms() {
-        if a.has_prop(cp::_QueryAtomGenericLabel) {
-            return true;
-        }
-        if let Some(q) = a.query() {
-            if a.has_prop(cp::MRV_SMA) {
-                return true;
-            }
-            if !is_list_query(mol, a.idx())
-                && q.description != "AtomNull"
-                && !q.description.starts_with("AtomType")
-                && !q.description.starts_with("AtomAtomicNum")
-                && !redundant(q)
-            {
-                return true;
-            }
-        }
-    }
-    mol.bonds().iter().any(|b| b.bond_type() == BondType::Zero)
 }
 
 // ------------------------------------------------------------------ atoms
@@ -742,6 +705,45 @@ fn alias_info(mol: &ROMol) -> String {
     ss
 }
 
+/// `GetMolFileZBOInfo`: the `M  ZBO`, `M  HYD` and `M  ZCH` lines of
+/// zero-order bonds and the atoms they connect.
+fn zbo_info(mol: &ROMol) -> Result<String> {
+    let mut res = String::new();
+    let mut affected = vec![false; mol.num_atoms() as usize];
+    let mut entries = Vec::new();
+    for bond in mol
+        .bonds()
+        .iter()
+        .filter(|b| b.bond_type() == BondType::Zero)
+    {
+        entries.push(format!(" {:3} {:3}", bond.idx() + 1, 0));
+        affected[bond.begin_atom_idx() as usize] = true;
+        affected[bond.end_atom_idx() as usize] = true;
+    }
+    let lines = |code: &str, entries: &[String]| -> String {
+        entries
+            .chunks(8)
+            .map(|c| format!("M  {code}{:3}{}\n", c.len(), c.concat()))
+            .collect()
+    };
+    res += &lines("ZBO", &entries);
+    let (mut hyd, mut zch) = (Vec::new(), Vec::new());
+    for idx in (0..mol.num_atoms()).filter(|&i| affected[i as usize]) {
+        hyd.push(format!(
+            " {:3} {:3}",
+            idx + 1,
+            mol.total_num_hs(idx, false)?
+        ));
+        let charge = mol.atom(idx).formal_charge();
+        if charge != 0 {
+            zch.push(format!(" {:3} {:3}", idx + 1, charge));
+        }
+    }
+    res += &lines("HYD", &hyd);
+    res += &lines("ZCH", &zch);
+    Ok(res)
+}
+
 /// `GetMolFilePXAInfo`
 fn pxa_info(mol: &ROMol) -> String {
     let mut res = String::new();
@@ -997,7 +999,7 @@ pub fn get_v3000_ctab(
         "M  V30 COUNTS {} {} {} {} {}\n",
         mol.num_atoms(),
         mol.num_bonds(),
-        0,
+        mol.substance_groups().len(),
         0,
         chiral_flag
     );
@@ -1017,6 +1019,7 @@ pub fn get_v3000_ctab(
         }
         res += "M  V30 END BOND\n";
     }
+    res += &v3000_sgroup_block(mol)?;
     if let Some(v) = str_prop(mol, cp::molFileLinkNodes) {
         for ln in v.split('|') {
             res += &format!("M  V30 LINKNODE {ln}\n");
@@ -1043,7 +1046,8 @@ fn output_mol_block(
     aromatic_bonds: &[bool],
 ) -> Result<String> {
     let (n_atoms, n_bonds) = (mol.num_atoms(), mol.num_bonds());
-    if format == Format::V2000 && (n_atoms > 999 || n_bonds > 999) {
+    let n_sgroups = mol.substance_groups().len();
+    if format == Format::V2000 && (n_atoms > 999 || n_bonds > 999 || n_sgroups > 999) {
         return Err(RDKitError::Value(
             "V2000 format does not support more than 999 atoms, bonds or SGroups.".into(),
         ));
@@ -1092,12 +1096,24 @@ fn output_mol_block(
                 || has_dative
                 || n_atoms > 999
                 || n_bonds > 999
+                || n_sgroups > 999
                 || !mol.stereo_groups().is_empty()));
     if is_v3000 {
         res += &format!("{:>3}", 0).repeat(10);
         res += "999 V3000\n";
     } else {
-        for v in [n_atoms, n_bonds, 0, 0, chiral_flag, 0, 0, 0, 0, 0] {
+        for v in [
+            n_atoms as usize,
+            n_bonds as usize,
+            0,
+            n_sgroups,
+            chiral_flag as usize,
+            0,
+            0,
+            0,
+            0,
+            0,
+        ] {
             res += &format!("{v:3}");
         }
         res += "999 V2000\n";
@@ -1117,8 +1133,9 @@ fn output_mol_block(
         res += &rgroup_info(mol);
         res += &query_info(mol, &qla)?;
         res += &alias_info(mol);
-        // GetMolFileZBOInfo: zero-order bonds are rejected in prepare_mol
+        res += &zbo_info(mol)?;
         res += &pxa_info(mol);
+        res += &mol_file_sgroup_info(mol)?;
     } else {
         res += &get_v3000_ctab(mol, aromatic_bonds, conf_id, precision)?;
     }
@@ -1143,9 +1160,7 @@ fn prepare_mol(mol: &mut RWMol, params: &MolWriterParams) -> Result<Vec<bool>> {
     if params.include_stereo && mol.num_conformers() == 0 {
         crate::graphmol::depictor::compute_2d_coords(mol, &Default::default())?;
     }
-    if needs_additional_sgroups(mol) {
-        return Err(not_ported("writing SubstanceGroups"));
-    }
+    move_additional_properties_to_sgroups(mol)?;
     Ok(aromatic)
 }
 
