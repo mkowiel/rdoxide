@@ -22,6 +22,17 @@ from rdkit.Chem.rdchem import *
 from rdkit.Chem.rdmolfiles import *
 from rdkit.Chem.rdmolops import *
 
+# rdoxide: the native submodules are registered in sys.modules up front, so
+# the import system never binds them as attributes of this package; do it
+# here so that `Chem.rdmolops`, `Chem.rdMolDescriptors`, ... work as upstream.
+import sys as _sys
+
+for _name, _module in list(_sys.modules.items()):
+  _prefix, _, _attr = _name.rpartition('.')
+  if _prefix == __name__ and _module is not None:
+    globals().setdefault(_attr, _module)
+del _sys, _name, _module, _prefix, _attr
+
 # ---- verbatim from upstream rdkit/Chem/__init__.py (from QuickSmartsMatch on) ----
 
 
