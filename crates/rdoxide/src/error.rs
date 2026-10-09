@@ -87,6 +87,36 @@ impl RDKitError {
         }
     }
 
+    /// A failed `CHECK_INVARIANT(expr, message)` of the C++ sources at
+    /// `file:line` (the last line of the statement); logged like upstream.
+    pub fn invariant_at(message: impl fmt::Display, expr: &str, file: &str, line: u32) -> Self {
+        Self::check_at("Invariant Violation", message, expr, file, line)
+    }
+
+    /// A failed `PRECONDITION(expr, message)` of the C++ sources at
+    /// `file:line` (the last line of the statement); logged like upstream.
+    pub fn precondition_at(message: impl fmt::Display, expr: &str, file: &str, line: u32) -> Self {
+        Self::check_at("Pre-condition Violation", message, expr, file, line)
+    }
+
+    fn check_at(
+        kind: &'static str,
+        message: impl fmt::Display,
+        expr: &str,
+        file: &str,
+        line: u32,
+    ) -> Self {
+        crate::rd_log_error!(
+            "\n\n****\n{kind}\n{message}\nViolation occurred on line {line} in file {file}\nFailed Expression: {expr}\n****\n"
+        );
+        RDKitError::Invariant {
+            kind,
+            message: format!(
+                "{message}\n\tViolation occurred on line {line} in file {file}\n\tFailed Expression: {expr}"
+            ),
+        }
+    }
+
     /// `URANGE_CHECK(x, hi)` failure; logged to the error log like upstream.
     pub fn range(name: &str, x: impl fmt::Display, hi: impl fmt::Display) -> Self {
         let err = RDKitError::Invariant {

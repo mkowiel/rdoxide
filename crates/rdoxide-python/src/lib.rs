@@ -56,6 +56,7 @@ mod rdmolops_matrices;
 mod rdmolops_structure;
 mod rdmolops_subgraphs;
 mod rdmolops_transforms;
+mod rdmolops_zip;
 mod rdmoltransforms;
 mod rdpartialcharges;
 mod ringinfo;

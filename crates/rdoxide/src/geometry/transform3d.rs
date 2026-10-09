@@ -72,6 +72,20 @@ impl Transform3D {
         d[10] = fmuladd(t * z, z, cos_t);
     }
 
+    /// `operator*=(other)`: this becomes the combination of `other` and the
+    /// current state, i.e. `new(point) = old(other(point))`.
+    pub fn mul_assign(&mut self, other: &Transform3D) {
+        let mut res = [0.0; 16];
+        for i in 0..4 {
+            for j in 0..4 {
+                res[i * 4 + j] = (0..4).fold(0.0, |acc, k| {
+                    fmuladd(self.data[i * 4 + k], other.data[k * 4 + j], acc)
+                });
+            }
+        }
+        self.data = res;
+    }
+
     /// `TransformPoint` / `operator*(Transform3D, Point3D)`
     pub fn transform_point(&self, p: &Point3D) -> Point3D {
         let d = &self.data;

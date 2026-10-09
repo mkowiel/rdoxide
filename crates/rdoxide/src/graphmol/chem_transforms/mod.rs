@@ -10,6 +10,7 @@
 //! Licensed under the BSD 3-Clause license (see LICENSES/RDKit-BSD-3-Clause.txt).
 
 pub mod mol_fragmenter;
+pub mod mol_zip;
 pub mod replace_core;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -31,6 +32,7 @@ pub use mol_fragmenter::{
     FragmenterBondType, fragment_on_bond_patterns, fragment_on_bonds, fragment_on_brics_bonds,
     fragment_on_some_bonds,
 };
+pub use mol_zip::{MolzipLabel, MolzipParams, molzip, molzip_fragments, molzip_row, molzip_single};
 pub use replace_core::{replace_core, replace_core_with_match};
 
 /// `details::updateSubMolConfs`: rebuilds the conformers of `res` from those

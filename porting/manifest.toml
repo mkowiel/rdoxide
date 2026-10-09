@@ -614,3 +614,10 @@
 
 [module."rdoxide_python::rdmolops_fragments".sources]
 "Code/GraphMol/Wrap/MolOps.cpp" = "2dc7ae10c4ce7523938a4db10e31215cfe2162db"
+
+[module."rdoxide::graphmol::chem_transforms::mol_zip".sources]
+"Code/GraphMol/ChemTransforms/MolZip.cpp" = "5351e21f553e3c1d4aee2be2d6472e03145a9f24"
+"Code/GraphMol/ChemTransforms/MolFragmenter.h" = "d4154c0400e51d289a33e45206ec6db99fe7484a"
+
+[module."rdoxide_python::rdmolops_zip".sources]
+"Code/GraphMol/Wrap/MolOps.cpp" = "2dc7ae10c4ce7523938a4db10e31215cfe2162db"
