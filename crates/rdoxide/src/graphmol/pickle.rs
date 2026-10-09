@@ -3,7 +3,7 @@
 //!
 //! Ported from RDKit `Code/GraphMol/MolPickler.{h,cpp}` and
 //! `Code/RDGeneral/StreamOps.h` (2026.09.1). Pickles written by RDKit can be
-//! read here and vice versa. Not ported yet: monomer info, the version-1 format and custom (ExplicitBitVect) property handlers.
+//! read here and vice versa. Not ported yet: the version-1 format and custom (ExplicitBitVect) property handlers.
 //!
 //! Copyright (C) 2001-2025 Greg Landrum and other RDKit contributors.
 //! Licensed under the BSD 3-Clause license (see LICENSES/RDKit-BSD-3-Clause.txt).
@@ -16,6 +16,7 @@ use crate::graphmol::atom::{Atom, ChiralType, HybridizationType};
 use crate::graphmol::bond::{Bond, BondDir, BondStereo, BondType};
 use crate::graphmol::conformer::Conformer;
 use crate::graphmol::find_rings::find_ring_families;
+use crate::graphmol::monomer_info::{AtomMonomerInfo, AtomMonomerType};
 use crate::graphmol::queries::{
     AtomFn, AtomQuery, BondFn, BondQuery, PropValue, Query, QueryKind, QueryMol, QueryTarget,
 };
@@ -96,7 +97,25 @@ pub(crate) mod tags {
     pub const BEGINFINDOTHERORUNKNOWN: u8 = 68;
     pub const QUERY_PROPERTY: u8 = 69;
     pub const QUERY_PROPERTY_WITH_VALUE: u8 = 70;
+    pub const ATOM_PDB_RESIDUE_SERIALNUMBER: u8 = 46;
+    pub const ATOM_PDB_RESIDUE_ALTLOC: u8 = 47;
+    pub const ATOM_PDB_RESIDUE_RESIDUENAME: u8 = 48;
+    pub const ATOM_PDB_RESIDUE_CHAINID: u8 = 49;
+    pub const ATOM_PDB_RESIDUE_INSERTIONCODE: u8 = 50;
+    pub const ATOM_PDB_RESIDUE_OCCUPANCY: u8 = 51;
+    pub const ATOM_PDB_RESIDUE_TEMPFACTOR: u8 = 52;
+    pub const ATOM_PDB_RESIDUE_ISHETEROATOM: u8 = 53;
+    pub const ATOM_PDB_RESIDUE_SECONDARYSTRUCTURE: u8 = 54;
+    pub const ATOM_PDB_RESIDUE_RESIDUENUMBER: u8 = 55;
+    pub const ATOM_PDB_RESIDUE_SEGMENTNUMBER: u8 = 56;
+    pub const END_PDB_RESIDUE: u8 = 57;
+    pub const ATOM_PDB_RESIDUE_MONOMERCLASS: u8 = 71;
     pub const BEGIN_ATOM_MONOMER_INFO: u8 = 72;
+    pub const ATOM_MONOMER_INFO_RESIDUENAME: u8 = 73;
+    pub const ATOM_MONOMER_INFO_RESIDUENUMBER: u8 = 74;
+    pub const ATOM_MONOMER_INFO_CHAINID: u8 = 75;
+    pub const ATOM_MONOMER_INFO_MONOMERCLASS: u8 = 76;
+    pub const END_ATOM_MONOMER_INFO: u8 = 77;
     pub const INVALID_TAG: u8 = 255;
 }
 use tags::*;
@@ -1072,6 +1091,9 @@ fn pickle_atom(w: &mut W, a: &Atom) -> Result<()> {
     if a.has_prop(cp::dummyLabel) {
         flags |= 1 << 2;
     }
+    if a.monomer_info().is_some() {
+        flags |= 1 << 1;
+    }
     w.u8(flags);
     let mut t = W::default();
     let pf = pickle_atom_data(&mut t, a);
@@ -1095,7 +1117,135 @@ fn pickle_atom(w: &mut W, a: &Atom) -> Result<()> {
         w.u8(ATOM_DUMMYLABEL);
         w.str(&v.to_rd_string());
     }
+    if let Some(info) = a.monomer_info() {
+        pickle_monomer_info(w, info);
+    }
     Ok(())
+}
+
+/// `pickleAtomPDBResidueInfo` / `pickleAtomMonomerInfo`, including the
+/// surrounding begin/end tags.
+fn pickle_monomer_info(w: &mut W, info: &AtomMonomerInfo) {
+    let tagged_str = |w: &mut W, tag: u8, s: &str| {
+        if !s.is_empty() {
+            w.u8(tag);
+            w.str(s);
+        }
+    };
+    match &info.pdb {
+        Some(p) => {
+            w.u8(BEGIN_PDB_RESIDUE);
+            w.str(&info.name);
+            w.u32(info.monomer_type as u32);
+            if p.serial_number != 0 {
+                w.u8(ATOM_PDB_RESIDUE_SERIALNUMBER);
+                w.i32(p.serial_number as i32);
+            }
+            tagged_str(w, ATOM_PDB_RESIDUE_ALTLOC, &p.alt_loc);
+            tagged_str(w, ATOM_PDB_RESIDUE_RESIDUENAME, &info.residue_name);
+            if info.residue_number != 0 {
+                w.u8(ATOM_PDB_RESIDUE_RESIDUENUMBER);
+                w.i32(info.residue_number);
+            }
+            tagged_str(w, ATOM_PDB_RESIDUE_CHAINID, &info.chain_id);
+            tagged_str(w, ATOM_PDB_RESIDUE_INSERTIONCODE, &p.insertion_code);
+            if p.occupancy != 0.0 {
+                w.u8(ATOM_PDB_RESIDUE_OCCUPANCY);
+                w.f64(p.occupancy);
+            }
+            if p.temp_factor != 0.0 {
+                w.u8(ATOM_PDB_RESIDUE_TEMPFACTOR);
+                w.f64(p.temp_factor);
+            }
+            if p.is_hetero_atom {
+                w.u8(ATOM_PDB_RESIDUE_ISHETEROATOM);
+                w.u8(1);
+            }
+            if p.secondary_structure != 0 {
+                w.u8(ATOM_PDB_RESIDUE_SECONDARYSTRUCTURE);
+                w.u32(p.secondary_structure);
+            }
+            if p.segment_number != 0 {
+                w.u8(ATOM_PDB_RESIDUE_SEGMENTNUMBER);
+                w.u32(p.segment_number);
+            }
+            tagged_str(w, ATOM_PDB_RESIDUE_MONOMERCLASS, &info.monomer_class);
+            w.u8(END_PDB_RESIDUE);
+        }
+        None => {
+            w.u8(BEGIN_ATOM_MONOMER_INFO);
+            w.str(&info.name);
+            w.u8(info.monomer_type as u8);
+            tagged_str(w, ATOM_MONOMER_INFO_RESIDUENAME, &info.residue_name);
+            if info.residue_number != 0 {
+                w.u8(ATOM_MONOMER_INFO_RESIDUENUMBER);
+                w.i32(info.residue_number);
+            }
+            tagged_str(w, ATOM_MONOMER_INFO_CHAINID, &info.chain_id);
+            tagged_str(w, ATOM_MONOMER_INFO_MONOMERCLASS, &info.monomer_class);
+            w.u8(END_ATOM_MONOMER_INFO);
+        }
+    }
+}
+
+/// `unpickleAtomPDBResidueInfo` (the `BEGIN_PDB_RESIDUE` tag is already read).
+fn unpickle_pdb_residue_info(r: &mut R<'_>, version: i32) -> Result<AtomMonomerInfo> {
+    let name = r.str()?;
+    let typ = r.u32()?;
+    let monomer_type = AtomMonomerType::from_u8(typ as u8).unwrap_or_default();
+    if monomer_type != AtomMonomerType::PdbResidue {
+        // upstream returns the bare base class and leaves the stream at the
+        // PDB end tag, which the caller does not consume either
+        return Ok(AtomMonomerInfo::new(monomer_type, &name));
+    }
+    let mut info = AtomMonomerInfo::new_pdb(&name);
+    loop {
+        let tag = r.tag(version)?;
+        match tag {
+            ATOM_PDB_RESIDUE_SERIALNUMBER => info.pdb_mut().serial_number = r.i32()? as u32,
+            ATOM_PDB_RESIDUE_ALTLOC => info.pdb_mut().alt_loc = r.str()?,
+            ATOM_PDB_RESIDUE_RESIDUENAME => info.residue_name = r.str()?,
+            ATOM_PDB_RESIDUE_RESIDUENUMBER => info.residue_number = r.i32()?,
+            ATOM_PDB_RESIDUE_CHAINID => info.chain_id = r.str()?,
+            ATOM_PDB_RESIDUE_INSERTIONCODE => info.pdb_mut().insertion_code = r.str()?,
+            ATOM_PDB_RESIDUE_OCCUPANCY => info.pdb_mut().occupancy = r.f64()?,
+            ATOM_PDB_RESIDUE_TEMPFACTOR => info.pdb_mut().temp_factor = r.f64()?,
+            ATOM_PDB_RESIDUE_ISHETEROATOM => info.pdb_mut().is_hetero_atom = r.u8()? != 0,
+            ATOM_PDB_RESIDUE_SECONDARYSTRUCTURE => info.pdb_mut().secondary_structure = r.u32()?,
+            ATOM_PDB_RESIDUE_SEGMENTNUMBER => info.pdb_mut().segment_number = r.u32()?,
+            ATOM_PDB_RESIDUE_MONOMERCLASS => info.monomer_class = r.str()?,
+            END_PDB_RESIDUE => break,
+            _ => {
+                return Err(pickle_error(
+                    "unrecognized tag while parsing atom peptide residue info",
+                ));
+            }
+        }
+    }
+    Ok(info)
+}
+
+/// `unpickleAtomMonomerInfo` (the `BEGIN_ATOM_MONOMER_INFO` tag is already read).
+fn unpickle_monomer_info(r: &mut R<'_>, version: i32) -> Result<AtomMonomerInfo> {
+    let name = r.str()?;
+    let typ = r.u8()?;
+    let mut info = AtomMonomerInfo::new(AtomMonomerType::from_u8(typ).unwrap_or_default(), &name);
+    loop {
+        let tag = r.tag(version)?;
+        match tag {
+            ATOM_MONOMER_INFO_RESIDUENAME => info.residue_name = r.str()?,
+            ATOM_MONOMER_INFO_RESIDUENUMBER => info.residue_number = r.i32()?,
+            ATOM_MONOMER_INFO_CHAINID => info.chain_id = r.str()?,
+            ATOM_MONOMER_INFO_MONOMERCLASS => info.monomer_class = r.str()?,
+            END_ATOM_MONOMER_INFO => break,
+            _ => {
+                return Err(pickle_error(format!(
+                    "unrecognized tag while parsing atom monomer info {tag}"
+                )));
+            }
+        }
+    }
+    Ok(info)
 }
 
 /// `_addAtomFromPickle`
@@ -1193,10 +1343,16 @@ fn atom_from_pickle(r: &mut R<'_>, version: i32) -> Result<(Atom, Option<Point3D
         }
     }
     if has_monomer {
-        // TODO(stage 2b): AtomPDBResidueInfo / AtomMonomerInfo
-        return Err(pickle_error(
-            "rdoxide: pickles with monomer info are not supported yet",
-        ));
+        let info = match r.tag(version)? {
+            BEGIN_PDB_RESIDUE => unpickle_pdb_residue_info(r, version)?,
+            BEGIN_ATOM_MONOMER_INFO => unpickle_monomer_info(r, version)?,
+            _ => {
+                return Err(pickle_error(
+                    "Bad pickle format: BEGIN_PDB_RESIDUE or BEGIN_ATOM_MONOMER_INFO tag not found.",
+                ));
+            }
+        };
+        a.set_monomer_info(Some(info));
     }
     Ok((a, pos))
 }

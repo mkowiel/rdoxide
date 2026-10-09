@@ -820,6 +820,16 @@
 "Code/GraphMol/FileParsers/XYZFileParser.cpp" = "01575a0d892d508372539bf1030cb754e10c8ecf"
 "Code/GraphMol/FileParsers/XYZFileWriter.cpp" = "d1ffa49b1e8c8f008db2e52bfa91cc3e1238619a"
 
+[module."rdoxide::graphmol::file_parsers::pdb_parser".sources]
+"Code/GraphMol/FileParsers/PDBParser.cpp" = "e8a5dedcb11909dd386e0d6f972727fc7fa74145"
+
+[module."rdoxide::graphmol::file_parsers::pdb_writer".sources]
+"Code/GraphMol/FileParsers/PDBWriter.cpp" = "b32ed2014df06b1ca43951d2a2495cc225390b53"
+
+[module."rdoxide::graphmol::monomer_info".sources]
+"Code/GraphMol/MonomerInfo.h" = "6e53c694f732d9f2a44b38c71420269555f9960c"
+"Code/GraphMol/Wrap/MonomerInfo.cpp" = "f2455537cb9d9dd2deafbe7cb4d356d75e40eb93"
+
 [module."rdoxide::graphmol::file_parsers::proximity_bonds".sources]
 "Code/GraphMol/FileParsers/ProximityBonds.cpp" = "d7bb8ec690dab4cb975dc13da658b08a5fa684e4"
 "Code/GraphMol/FileParsers/ProximityBonds.h" = "52f094916a52eb0d0da350332b5b04f19036c422"

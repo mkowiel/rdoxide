@@ -375,6 +375,8 @@ rdkit/Chem/UnitTestMol3D.py::TestCase::testIssue3231
 rdkit/Chem/UnitTestMol3D.py::TestCase::testIssue3505
 rdkit/Chem/UnitTestMol3D.py::TestCase::testNoExtrasIfEnumeratingAllWithEnhancedStereo
 rdkit/Chem/UnitTestMol3D.py::TestCase::testTorsionAngleLeargerThan14
+rdkit/Chem/UnitTestMol3D.py::TestCase::testTorsionFingerprints
+rdkit/Chem/UnitTestMol3D.py::TestCase::testTorsionFingerprintsAtomReordering
 rdkit/Chem/UnitTestMol3D.py::TestCase::testTorsionFingerprintsColinearBonds
 rdkit/Chem/UnitTestOldBugs.py::TestCase::testBug12a
 rdkit/Chem/UnitTestOldBugs.py::TestCase::testBug12b
