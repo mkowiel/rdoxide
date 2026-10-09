@@ -836,6 +836,12 @@
 [module."rdoxide::graphmol::file_parsers::sequence_writer".sources]
 "Code/GraphMol/FileParsers/SequenceWriters.cpp" = "15ca9e93ef90c1d46ec86b9d6db034589ca8ed34"
 
+[module."rdoxide::graphmol::file_parsers::helm_parser".sources]
+"Code/GraphMol/FileParsers/SequenceParsers.cpp" = "709c3fc907ad3114f0e24832e68f147872ec0563"
+
+[module."rdoxide::graphmol::file_parsers::helm_writer".sources]
+"Code/GraphMol/FileParsers/SequenceWriters.cpp" = "15ca9e93ef90c1d46ec86b9d6db034589ca8ed34"
+
 [module."rdoxide::graphmol::file_parsers::proximity_bonds".sources]
 "Code/GraphMol/FileParsers/ProximityBonds.cpp" = "d7bb8ec690dab4cb975dc13da658b08a5fa684e4"
 "Code/GraphMol/FileParsers/ProximityBonds.h" = "52f094916a52eb0d0da350332b5b04f19036c422"

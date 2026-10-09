@@ -68,24 +68,34 @@ impl Frame {
     }
 }
 
+/// The running residue info of a chain: serial numbers from 1, residues from 0.
+fn fresh_info(chain: &str) -> AtomMonomerInfo {
+    let mut info = AtomMonomerInfo::new_pdb("");
+    info.chain_id = chain.to_string();
+    let pdb = info.pdb_mut();
+    pdb.serial_number = 1;
+    pdb.alt_loc = " ".into();
+    pdb.insertion_code = " ".into();
+    info
+}
+
 /// The molecule under construction with the running PDB residue info.
-struct Builder {
-    mol: RWMol,
-    info: AtomMonomerInfo,
+pub(super) struct Builder {
+    pub(super) mol: RWMol,
+    pub(super) info: AtomMonomerInfo,
 }
 
 impl Builder {
-    fn new() -> Self {
-        let mut info = AtomMonomerInfo::new_pdb("");
-        info.chain_id = "A".into();
-        let pdb = info.pdb_mut();
-        pdb.serial_number = 1;
-        pdb.alt_loc = " ".into();
-        pdb.insertion_code = " ".into();
+    pub(super) fn new() -> Self {
         Builder {
             mol: RWMol::new(),
-            info,
+            info: fresh_info("A"),
         }
+    }
+
+    /// Starts numbering a new chain (a fresh `AtomPDBResidueInfo`).
+    pub(super) fn start_chain(&mut self, chain: &str) {
+        self.info = fresh_info(chain);
     }
 
     fn residue_number(&self) -> i32 {
@@ -94,7 +104,7 @@ impl Builder {
 
     /// `info.setResidueNumber(resno + 1)`, `setIsHeteroAtom(false)`,
     /// `setResidueName(name)`: the start of a residue.
-    fn begin_residue(&mut self, name: &str) {
+    pub(super) fn begin_residue(&mut self, name: &str) {
         self.info.residue_number += 1;
         self.info.pdb_mut().is_hetero_atom = false;
         self.info.residue_name = name.to_string();
@@ -102,7 +112,7 @@ impl Builder {
 
     /// `CreateAAAtom`: the element follows from the PDB atom name; the info
     /// is a copy of the running one, whose serial number advances.
-    fn atom(&mut self, name: &str) -> Result<u32> {
+    pub(super) fn atom(&mut self, name: &str) -> Result<u32> {
         let b = name.as_bytes();
         let num = match (b[0], b[1]) {
             (b' ', b'C') => 6,
@@ -122,7 +132,7 @@ impl Builder {
     }
 
     /// `CreateAABond`
-    fn bond(&mut self, a: u32, b: u32, order: u8) -> Result<()> {
+    pub(super) fn bond(&mut self, a: u32, b: u32, order: u8) -> Result<()> {
         let kind = if order == 2 {
             BondType::Double
         } else {
@@ -186,7 +196,7 @@ impl Builder {
 
     /// `CreateAminoAcid`: returns the N terminal, C terminal and side chain
     /// attachment atoms (`r1`, `r2`, `r3`).
-    fn amino_acid(&mut self, code: &str) -> Result<[Option<u32>; 3]> {
+    pub(super) fn amino_acid(&mut self, code: &str) -> Result<[Option<u32>; 3]> {
         self.begin_residue(code);
         let mut frame = Frame::default();
         if let Some((_, ops)) = AMINO_ACIDS.iter().find(|(name, _)| *name == code) {
@@ -197,7 +207,7 @@ impl Builder {
 
     /// `CreateNucleicAcid`: `code` is the three character residue name
     /// (`"  A"` for RNA, `" DA"` for DNA).
-    fn nucleic_acid(&mut self, code: &str, p_cap5: bool) -> Result<[Option<u32>; 3]> {
+    pub(super) fn nucleic_acid(&mut self, code: &str, p_cap5: bool) -> Result<[Option<u32>; 3]> {
         use Op::*;
         use Slot::*;
         let first = self.residue_number() == 0;
@@ -286,7 +296,7 @@ impl Builder {
     }
 
     /// `CreatePCap3`: the 3' terminal phosphate group.
-    fn p_cap3(&mut self, prev: u32) -> Result<()> {
+    pub(super) fn p_cap3(&mut self, prev: u32) -> Result<()> {
         self.info.residue_number += 1;
         self.info.pdb_mut().is_hetero_atom = true;
         self.info.residue_name = "2PO".into();

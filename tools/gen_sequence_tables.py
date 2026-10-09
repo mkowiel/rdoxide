@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Generate crates/rdoxide/src/graphmol/file_parsers/sequence_tables.rs from
-upstream Code/GraphMol/FileParsers/SequenceParsers.cpp.
+upstream Code/GraphMol/FileParsers/SequenceParsers.cpp and SequenceWriters.cpp.
 
 Upstream builds each residue with straight-line C++ (`CreateAAAtom`,
 `CreateAABond`, ...). The statements are regular, so they are translated
@@ -12,6 +12,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "upstream/rdkit/Code/GraphMol/FileParsers/SequenceParsers.cpp"
+WRITER_SRC = ROOT / "upstream/rdkit/Code/GraphMol/FileParsers/SequenceWriters.cpp"
 OUT = ROOT / "crates/rdoxide/src/graphmol/file_parsers/sequence_tables.rs"
 
 SLOT = r"(r[123]|atom\[\d+\])"
@@ -50,6 +51,29 @@ def ops(block: str) -> list[str]:
 def region(text: str, start: str, end: str) -> str:
     a = text.index(start)
     return text[a : text.index(end, a)]
+
+
+def helm_peptide_monomers(text: str) -> list[tuple[str, str]]:
+    """The (monomer id, residue code) pairs of `LookupHELMPeptideMonomer`:
+    nested switches on the characters of the id with `ptr[n] == '\\0'` ends."""
+    body = region(text, "static const char *LookupHELMPeptideMonomer", "static const char *ParseHELMPeptide")
+    pairs = []
+    top = nested = None
+    pending = None
+    for line in body.splitlines():
+        indent = len(line) - len(line.lstrip())
+        if m := re.match(r"case '(\w)':", line.strip()):
+            if indent == 4:
+                top, nested = m[1], None
+            else:
+                nested = m[1]
+        elif m := re.match(r"if \((.*)\) \{", line.strip()):
+            pending = m[1]
+        elif m := re.match(r'return "(\w+)";', line.strip()):
+            chars = re.findall(r"ptr\[(\d)\] == '(\w)'", pending)
+            ident = (top or "") + (nested or "") + "".join(c for _, c in sorted(chars))
+            pairs.append((ident, m[1]))
+    return pairs
 
 
 def emit(items: list[str]) -> str:
@@ -95,8 +119,26 @@ def main() -> None:
     for base, o in bases:
         lines.append(f"    (b'{base}', &[\n{emit(o)}\n    ]),")
     lines.append("];")
+    monomers = helm_peptide_monomers(text)
+    lines += [
+        "",
+        "/// The HELM peptide monomer ids (`[Abu]`, `[dA]`, ...) and the residue each stands for.",
+        "pub(super) static HELM_PEPTIDE_MONOMERS: &[(&str, &str)] = &[",
+    ]
+    lines += [f'    ("{ident}", "{code}"),' for ident, code in monomers]
+    lines.append("];")
+    writer = WRITER_SRC.read_text()
+    body = region(writer, "static const char *getHELMAAMonomer", "static bool IsEupeptideBond")
+    writes = re.findall(r'strcmp\(ptr, "(\w+)"\)\) \{\s*return "([^"]+)";', body)
+    lines += [
+        "",
+        "/// The HELM monomer written for a residue (`getHELMAAMonomer`).",
+        "pub(super) static HELM_PEPTIDE_WRITER: &[(&str, &str)] = &[",
+    ]
+    lines += [f'    ("{res}", "{mono}"),' for res, mono in writes]
+    lines.append("];")
     OUT.write_text("\n".join(lines) + "\n")
-    print(f"{len(residues)} residues, {len(bases)} bases")
+    print(f"{len(residues)} residues, {len(bases)} bases, {len(monomers)} HELM monomers")
 
 
 if __name__ == "__main__":

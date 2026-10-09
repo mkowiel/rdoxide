@@ -1,8 +1,11 @@
 //! Sequence and FASTA reading and writing (upstream `Wrap/rdmolfiles.cpp`):
-//! `MolFromSequence`, `MolToSequence`, `MolFromFASTA` and `MolToFASTA`.
+//! `MolFromSequence`, `MolToSequence`, `MolFromFASTA`, `MolToFASTA`,
+//! `MolFromHELM` and `MolToHELM`.
 
 use pyo3::prelude::*;
 use rdoxide::RDKitError;
+use rdoxide::graphmol::file_parsers::helm_parser::helm_to_mol;
+use rdoxide::graphmol::file_parsers::helm_writer::mol_to_helm;
 use rdoxide::graphmol::file_parsers::sequence_parser::{fasta_to_mol, sequence_to_mol};
 use rdoxide::graphmol::file_parsers::sequence_writer::{mol_to_fasta, mol_to_sequence};
 
@@ -134,10 +137,51 @@ fn py_mol_to_fasta(mol: PyRef<'_, PyMol>) -> String {
     mol_to_fasta(&mol.mol)
 }
 
+/// Construct a molecule from a HELM string (currently supports standard amino acids, DNA and RNA bases).
+///
+///   ARGUMENTS:
+///
+///     - text: string containing the HELM
+///
+///     - sanitize: (optional) toggles sanitization of the molecule.
+///       Defaults to true.
+///
+///   RETURNS:
+///
+///     a Mol object, None on failure.
+#[pyfunction]
+#[pyo3(name = "MolFromHELM", signature = (text, sanitize = true))]
+fn py_mol_from_helm(
+    py: Python<'_>,
+    text: &Bound<'_, PyAny>,
+    sanitize: bool,
+) -> PyResult<Option<PyMol>> {
+    let text = text_arg(text)?;
+    Ok(finish(py.detach(|| helm_to_mol(&text, sanitize))))
+}
+
+/// Returns the HELM string for a molecule
+///   ARGUMENTS:
+///
+///     - mol: the molecule
+///
+///   NOTE: the molecule should contain monomer information in AtomMonomerInfo structures
+///
+///   RETURNS:
+///
+///     a string
+#[pyfunction]
+#[pyo3(name = "MolToHELM", signature = (mol))]
+fn py_mol_to_helm(mol: PyRef<'_, PyMol>) -> String {
+    mol_to_helm(&mol.mol)
+}
+
 pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_mol_from_sequence, m)?)?;
     m.add_function(wrap_pyfunction!(py_mol_to_sequence, m)?)?;
     m.add_function(wrap_pyfunction!(py_mol_from_fasta, m)?)?;
     m.add_function(wrap_pyfunction!(py_mol_to_fasta, m)?)?;
+    m.add_function(wrap_pyfunction!(py_mol_from_helm, m)?)?;
+    m.add_function(wrap_pyfunction!(py_mol_to_helm, m)?)?;
     Ok(())
 }

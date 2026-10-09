@@ -52,3 +52,33 @@ def test_fasta():
 def test_sanitize_flag():
     m = Chem.MolFromSequence("A", sanitize=False)
     assert m.GetNumAtoms() == 6
+
+
+def test_helm_peptide_roundtrip():
+    for helm in ("PEPTIDE1{A.C.D}$$$$", "PEPTIDE1{A.[dA].G}$$$$", "PEPTIDE1{[ac].A.G.[am]}$$$$"):
+        m = Chem.MolFromHELM(helm)
+        assert m is not None, helm
+        assert Chem.MolToHELM(m) == helm
+
+
+def test_helm_connections():
+    helm = "PEPTIDE1{A.C.D}|PEPTIDE2{G.C}$PEPTIDE1,PEPTIDE2,2:R3-2:R3$$$"
+    m = Chem.MolFromHELM(helm)
+    assert Chem.MolToHELM(m) == helm
+    assert len(Chem.GetMolFrags(m)) == 1
+    # a head-to-tail cycle replaces the terminal OXT
+    cyc = Chem.MolFromHELM("PEPTIDE1{A.C.D.G}$PEPTIDE1,PEPTIDE1,1:R1-4:R2$$$")
+    assert cyc.GetNumAtoms() == Chem.MolFromHELM("PEPTIDE1{A.C.D.G}$$$$").GetNumAtoms() - 1
+
+
+def test_helm_nucleic_acids():
+    for helm in ("RNA1{R(A)P.R(C)P.R(G)}$$$$", "RNA1{P.R(A)P.R(C)P}$$$$"):
+        m = Chem.MolFromHELM(helm)
+        assert Chem.MolToHELM(m) == helm
+
+
+def test_helm_invalid():
+    for bad in ("", "PEPTIDE1{A.X}$$$$", "PEPTIDE1{A.C}$PEPTIDE1,PEPTIDE1,1:R3-2:R3$$$"):
+        assert Chem.MolFromHELM(bad) is None
+    assert Chem.MolFromHELM("$$$$").GetNumAtoms() == 0
+    assert Chem.MolToHELM(Chem.MolFromSmiles("CC")) == ""
