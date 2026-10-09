@@ -245,6 +245,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     crate::rdmolfiles_molblock::init(m)?;
     crate::rdmolfiles_molwrite::init(m)?;
     crate::rdmolfiles_sdsupplier::init(m)?;
+    crate::rdmolfiles_fwdsdsupplier::init(m)?;
     crate::rdmolfiles_smisupplier::init(m)?;
     crate::rdmolfiles_sdwriter::init(m)?;
     crate::rdmolfiles_smiwriter::init(m)?;

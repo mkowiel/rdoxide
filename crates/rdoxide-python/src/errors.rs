@@ -27,3 +27,39 @@ impl<T> IntoPyResult<T> for Result<T, RDKitError> {
         self.map_err(to_py)
     }
 }
+
+/// The kind of upstream check that failed.
+#[derive(Clone, Copy)]
+pub enum Check {
+    Precondition,
+    Invariant,
+}
+
+/// A failed `PRECONDITION`/`CHECK_INVARIANT` of the C++ sources. The error
+/// text names the C++ source line, so each call site passes its own.
+#[derive(Clone, Copy)]
+pub struct Site {
+    pub check: Check,
+    pub file: &'static str,
+    pub line: u32,
+    pub expr: &'static str,
+}
+
+/// The `RuntimeError` of a failed upstream check; also logged like upstream
+/// does.
+pub fn check_failed(site: Site, message: &str) -> PyErr {
+    let kind = match site.check {
+        Check::Precondition => "Pre-condition Violation",
+        Check::Invariant => "Invariant Violation",
+    };
+    let body = format!(
+        "{kind}\n{message}\nViolation occurred on line {} in file {}\nFailed Expression: {}\n",
+        site.line, site.file, site.expr
+    );
+    rdoxide::rd_log_error!("\n\n****\n{body}****\n");
+    PyRuntimeError::new_err(format!(
+        "{}\tRDKIT: {}\n\tBOOST: \n",
+        body.replace('\n', "\n\t").trim_end_matches('\t'),
+        rdoxide::rdgeneral::RDKIT_VERSION
+    ))
+}

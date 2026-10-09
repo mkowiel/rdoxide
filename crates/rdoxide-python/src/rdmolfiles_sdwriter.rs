@@ -5,18 +5,21 @@ use pyo3::prelude::*;
 use rdoxide::graphmol::file_parsers::sd_writer::mol_to_sd_text;
 
 use crate::errors::IntoPyResult;
+use crate::errors::{Check, Site};
 use crate::mol::PyMol;
-use crate::writer_sink::{Check, Site, WriterSink, close_sink, no_stream};
+use crate::writer_sink::{WriterSink, close_sink, no_stream};
 
 const WRITE: Site = Site {
     check: Check::Precondition,
     file: "Code/GraphMol/FileParsers/SDWriter.cpp",
     line: 171,
+    expr: "dp_ostream",
 };
 const FLUSH: Site = Site {
     check: Check::Precondition,
     file: "Code/GraphMol/FileParsers/MolWriters.h",
     line: 169,
+    expr: "dp_ostream",
 };
 
 /// A class for writing molecules to SD files.
@@ -98,7 +101,7 @@ impl PySDWriter {
     fn set_props(&mut self, props: Vec<String>) {
         if self.molid > 0 {
             rdoxide::rd_log_warning!(
-                "WARNING: Setting property list after a few molecules have been written\n"
+                "WARNING: Setting property list after a few molecules have been written"
             );
         }
         self.props = props;

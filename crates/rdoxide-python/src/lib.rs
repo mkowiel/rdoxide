@@ -34,6 +34,7 @@ mod rdmoldescriptors_molsurf;
 mod rdmoldescriptors_property;
 mod rdmoldescriptors_props;
 mod rdmolfiles;
+mod rdmolfiles_fwdsdsupplier;
 mod rdmolfiles_molblock;
 mod rdmolfiles_molwrite;
 mod rdmolfiles_sdsupplier;

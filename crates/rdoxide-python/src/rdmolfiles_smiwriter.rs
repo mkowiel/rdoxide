@@ -5,19 +5,22 @@ use pyo3::prelude::*;
 use rdoxide::graphmol::file_parsers::smiles_writer::SmilesWriter;
 
 use crate::errors::IntoPyResult;
+use crate::errors::{Check, Site};
 use crate::mol::PyMol;
-use crate::writer_sink::{Check, Site, WriterSink, close_sink, no_stream};
+use crate::writer_sink::{WriterSink, close_sink, no_stream};
 
 const FILE: &str = "Code/GraphMol/FileParsers/SmilesWriter.cpp";
 const WRITE: Site = Site {
     check: Check::Invariant,
     file: FILE,
     line: 116,
+    expr: "dp_ostream",
 };
 const FLUSH: Site = Site {
     check: Check::Precondition,
     file: "Code/GraphMol/FileParsers/MolWriters.h",
     line: 89,
+    expr: "dp_ostream",
 };
 
 /// A class for writing molecules to text files.

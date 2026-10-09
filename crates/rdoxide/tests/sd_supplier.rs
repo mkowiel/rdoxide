@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 use rdoxide::RDKitError;
 use rdoxide::graphmol::file_parsers::MolFileParserParams;
-use rdoxide::graphmol::file_parsers::sd_mol_supplier::SDMolSupplier;
+use rdoxide::graphmol::file_parsers::sd_mol_supplier::{ForwardSDMolSupplier, SDMolSupplier};
 use rdoxide::graphmol::smiles_parse::write::{SmilesWriteParams, mol_to_smiles};
 use rdoxide::rdgeneral::{RDProps, RDValue};
 
@@ -111,4 +111,39 @@ fn writer_roundtrip() {
         again.push(mol_to_smiles(&mut m, &SmilesWriteParams::default()).unwrap());
     }
     assert_eq!(again, smiles);
+}
+
+#[test]
+fn forward_supplier_reads_every_record_in_order() {
+    let mut s = ForwardSDMolSupplier::from_file(
+        &data("first_200.props.sdf"),
+        MolFileParserParams::default(),
+    )
+    .unwrap();
+    assert!(!s.at_end().unwrap());
+    let mut counts = Vec::new();
+    while !s.at_end().unwrap() {
+        let mol = s.next_mol().unwrap();
+        // the empty record after the last `$$$$` is not a molecule
+        if s.at_end().unwrap() && s.eof_hit_on_read() {
+            break;
+        }
+        counts.push(mol.map(|m| m.num_atoms()));
+    }
+    assert_eq!(counts.len(), 200);
+    assert_eq!(counts[0], Some(9));
+    assert!(s.eof_hit_on_read());
+}
+
+#[test]
+fn forward_supplier_closed_and_missing_inputs() {
+    let mut s = ForwardSDMolSupplier::from_bytes(Vec::new(), MolFileParserParams::default());
+    assert!(s.next_mol().unwrap().is_none());
+    assert!(s.at_end().unwrap());
+    s.close();
+    assert!(matches!(s.next_mol(), Err(RDKitError::Invariant { .. })));
+    assert!(matches!(
+        ForwardSDMolSupplier::from_file("/nonexistent.sdf", MolFileParserParams::default()),
+        Err(RDKitError::BadFile(_))
+    ));
 }

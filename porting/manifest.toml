@@ -519,3 +519,7 @@
 
 [module."rdoxide_python::rdmolfiles_smiwriter".sources]
 "Code/GraphMol/Wrap/SmilesWriter.cpp" = "28e8399d0acb37df9e22dc7f6bd3f5e52e05093b"
+
+[module."rdoxide_python::rdmolfiles_fwdsdsupplier".sources]
+"Code/GraphMol/Wrap/ForwardSDMolSupplier.cpp" = "b2e57f1324ec65c3bf77ac51c7e83417db2adfd6"
+"Code/GraphMol/Wrap/MolSupplier.h" = "a931d5f55aafe8de95c48c9e44fffd2ba0e88d15"

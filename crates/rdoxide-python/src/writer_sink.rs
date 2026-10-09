@@ -3,8 +3,11 @@
 
 use std::io::Write;
 
-use pyo3::exceptions::{PyIOError, PyRuntimeError};
+use pyo3::exceptions::PyIOError;
 use pyo3::prelude::*;
+
+use crate::errors::Site;
+use crate::errors::check_failed;
 
 enum Target {
     File(std::io::BufWriter<std::fs::File>),
@@ -14,38 +17,9 @@ enum Target {
 
 pub struct WriterSink(Target);
 
-/// The kind of upstream check that fails when a closed writer is used.
-#[derive(Clone, Copy)]
-pub enum Check {
-    Precondition,
-    Invariant,
-}
-
-/// Where upstream checks `dp_ostream`: the error text names the C++ source
-/// line, so each call site passes its own.
-#[derive(Clone, Copy)]
-pub struct Site {
-    pub check: Check,
-    pub file: &'static str,
-    pub line: u32,
-}
-
-/// The error of using a closed writer; also logged like upstream does.
+/// The error of using a closed writer.
 pub fn no_stream(site: Site) -> PyErr {
-    let kind = match site.check {
-        Check::Precondition => "Pre-condition Violation",
-        Check::Invariant => "Invariant Violation",
-    };
-    let body = format!(
-        "{kind}\nno output stream\nViolation occurred on line {} in file {}\nFailed Expression: dp_ostream\n",
-        site.line, site.file
-    );
-    rdoxide::rd_log_error!("\n\n****\n{body}****\n");
-    PyRuntimeError::new_err(format!(
-        "{}\tRDKIT: {}\n\tBOOST: \n",
-        body.replace('\n', "\n\t").trim_end_matches('\t'),
-        rdoxide::rdgeneral::RDKIT_VERSION
-    ))
+    check_failed(site, "no output stream")
 }
 
 impl WriterSink {

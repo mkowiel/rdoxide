@@ -286,8 +286,9 @@ macro_rules! impl_props {
             /// Returns a list of the properties set.
             #[pyo3(name = "GetPropNames", signature = (includePrivate = false, includeComputed = false))]
             #[allow(non_snake_case)]
-            fn py_get_prop_names(&self, py: pyo3::Python<'_>, includePrivate: bool, includeComputed: bool) -> pyo3::PyResult<Vec<String>> {
-                self.with_dict(py, |d| rdoxide::rdgeneral::RDProps::get_prop_list(d, includePrivate, includeComputed))
+            fn py_get_prop_names(&self, py: pyo3::Python<'_>, includePrivate: bool, includeComputed: bool) -> pyo3::PyResult<$crate::vects::PyVectStr> {
+                let v = self.with_dict(py, |d| rdoxide::rdgeneral::RDProps::get_prop_list(d, includePrivate, includeComputed))?;
+                Ok($crate::vects::PyVectStr { v })
             }
 
             /// Returns a dictionary populated with properties.
