@@ -296,6 +296,12 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     )?;
     add_enum_exported(m, "ChiralType", &PyChiralType::members(), None)?;
     add_enum_exported(m, "ValenceType", &PyValenceType::members(), None)?;
+    add_enum(
+        m,
+        "AtomMonomerType",
+        &crate::monomer_info::PyAtomMonomerType::members(),
+        None,
+    )?;
     add_enum(m, "BondType", &PyBondType::members(), None)?;
     add_enum(m, "BondDir", &PyBondDir::members(), None)?;
     add_enum(m, "BondStereo", &PyBondStereo::members(), None)?;
@@ -365,6 +371,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<crate::atom::PyAtom>()?;
     m.add_class::<crate::atom::PyQueryAtom>()?;
     crate::rdchem_atom_funcs::add(m)?;
+    crate::monomer_info::init(m)?;
     m.add_class::<crate::bond::PyBond>()?;
     m.add_class::<crate::bond::PyQueryBond>()?;
     m.add_class::<crate::conformer::PyConformer>()?;

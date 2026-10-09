@@ -148,6 +148,8 @@ pub struct Atom {
     pub(crate) props: Dict,
     /// `QueryAtom::dp_query` (a `QueryAtom` is an atom with a query)
     pub(crate) query: Option<Box<crate::graphmol::queries::AtomQuery>>,
+    /// `Atom::dp_monomerInfo`
+    pub(crate) monomer_info: Option<Box<super::monomer_info::AtomMonomerInfo>>,
 }
 
 impl Default for Atom {
@@ -185,7 +187,23 @@ impl Atom {
             has_owner: false,
             props: Dict::new(),
             query: None,
+            monomer_info: None,
         }
+    }
+
+    /// `Atom::getMonomerInfo`
+    pub fn monomer_info(&self) -> Option<&super::monomer_info::AtomMonomerInfo> {
+        self.monomer_info.as_deref()
+    }
+
+    /// `Atom::getMonomerInfo` (mutable access)
+    pub fn monomer_info_mut(&mut self) -> Option<&mut super::monomer_info::AtomMonomerInfo> {
+        self.monomer_info.as_deref_mut()
+    }
+
+    /// `Atom::setMonomerInfo`
+    pub fn set_monomer_info(&mut self, info: Option<super::monomer_info::AtomMonomerInfo>) {
+        self.monomer_info = info.map(Box::new);
     }
 
     /// `Atom(const std::string &symbol)`

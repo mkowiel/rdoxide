@@ -13,6 +13,7 @@ use crate::bond::PyBond;
 use crate::enums_impl::{PyChiralType, PyHybridizationType, PyValenceType};
 use crate::errors::IntoPyResult;
 use crate::mol::PyMol;
+use crate::monomer_info::{self, PyMonomerInfo};
 use crate::props::impl_props;
 
 /// Where the atom lives.
@@ -586,6 +587,38 @@ impl PyAtom {
     #[pyo3(name = "ClearPropertyCache")]
     fn clear_property_cache(&mut self, py: Python<'_>) -> PyResult<()> {
         self.with_mut(py, Atom::clear_property_cache)
+    }
+
+    /// Returns the atom's MonomerInfo object, if there is one.
+    #[pyo3(name = "GetMonomerInfo")]
+    fn get_monomer_info(slf: &Bound<'_, Self>) -> PyResult<Option<Py<PyMonomerInfo>>> {
+        monomer_info::get_monomer_info(slf.py(), &slf.clone().unbind())
+    }
+
+    /// Returns the atom's MonomerInfo object, if there is one.
+    #[pyo3(name = "GetPDBResidueInfo")]
+    fn get_pdb_residue_info(slf: &Bound<'_, Self>) -> PyResult<Option<Py<PyMonomerInfo>>> {
+        monomer_info::get_pdb_residue_info(slf.py(), &slf.clone().unbind())
+    }
+
+    /// Sets the atom's MonomerInfo object.
+    #[pyo3(name = "SetMonomerInfo")]
+    fn set_monomer_info(
+        &mut self,
+        py: Python<'_>,
+        info: Option<&Bound<'_, PyMonomerInfo>>,
+    ) -> PyResult<()> {
+        monomer_info::set_monomer_info(py, self, info, false)
+    }
+
+    /// Sets the atom's MonomerInfo object.
+    #[pyo3(name = "SetPDBResidueInfo")]
+    fn set_pdb_residue_info(
+        &mut self,
+        py: Python<'_>,
+        info: Option<&Bound<'_, PyMonomerInfo>>,
+    ) -> PyResult<()> {
+        monomer_info::set_monomer_info(py, self, info, true)
     }
 
     /// Gets the atoms map number, returns 0 if not set
