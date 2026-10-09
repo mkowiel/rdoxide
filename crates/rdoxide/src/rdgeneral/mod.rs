@@ -5,6 +5,7 @@ pub mod cxx_sort;
 pub mod dict;
 pub mod fp;
 pub mod log;
+pub mod ptree;
 pub mod random;
 pub mod strings;
 pub mod threads;

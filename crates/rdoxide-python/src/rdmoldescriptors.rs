@@ -170,7 +170,7 @@ fn get_hashed_morgan_fingerprint(
     py: Python<'_>,
     mol: PyRef<'_, PyMol>,
     radius: u32,
-    nBits: i64,
+    nBits: u32,
     invariants: Option<&Bound<'_, PyAny>>,
     fromAtoms: Option<&Bound<'_, PyAny>>,
     useChirality: bool,
@@ -179,11 +179,7 @@ fn get_hashed_morgan_fingerprint(
     bitInfo: Option<&Bound<'_, PyAny>>,
     includeRedundantEnvironments: bool,
 ) -> PyResult<PyUIntSIV> {
-    let kind = if nBits < 0 {
-        MorganKind::Unfolded { use_counts: true }
-    } else {
-        MorganKind::Hashed(nBits as u32)
-    };
+    let kind = MorganKind::Hashed(nBits);
     let r = morgan_helper(
         py,
         &mol,

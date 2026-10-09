@@ -64,8 +64,11 @@ fn bcut_from_burden(burden: &mut [f64], atom_props: &[f64]) -> Result<(f64, f64)
 /// `BCUT2D(mol, atom_props)`: (highest, lowest) eigenvalue.
 pub fn bcut2d_with_props(mol: &ROMol, atom_props: &[f64]) -> Result<(f64, f64)> {
     if atom_props.len() != mol.num_atoms() as usize {
-        return Err(RDKitError::precondition(
+        return Err(RDKitError::precondition_at(
             "Number of atom props not equal to number of atoms",
+            "atom_props.size() == num_atoms",
+            "Code/GraphMol/Descriptors/BCUT.cpp",
+            89,
         ));
     }
     if mol.num_atoms() == 0 {

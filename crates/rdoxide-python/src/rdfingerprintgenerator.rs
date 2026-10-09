@@ -5,6 +5,7 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
 use rdoxide::graphmol::fingerprints::atom_pair::AtomPairArguments;
+use rdoxide::graphmol::fingerprints::json::{generator_from_json, generator_to_json};
 use rdoxide::graphmol::fingerprints::morgan::MorganArguments;
 use rdoxide::graphmol::fingerprints::rdkit_fp::RDKitFPArguments;
 use rdoxide::graphmol::fingerprints::torsion::TopologicalTorsionArguments;
@@ -456,6 +457,12 @@ impl PyFPGen {
         })
     }
 
+    /// Serialize the generator to a JSON string.
+    #[pyo3(name = "ToJSON")]
+    fn to_json(&self) -> PyResult<String> {
+        generator_to_json(&self.gen_).py()
+    }
+
     #[pyo3(name = "GetInfoString")]
     fn get_info_string(&self) -> String {
         self.gen_.info_string()
@@ -605,6 +612,16 @@ bulk_function!(
     /// Generates fingerprints for a list of molecules.
     py_fps, "GetFPs", fingerprint, PyExplicitBitVect
 );
+
+/// Deserialize a FingerprintGenerator from a JSON string
+#[pyfunction]
+#[pyo3(name = "FingerprintGeneratorFromJSON", signature = (jsonString))]
+#[allow(non_snake_case)]
+fn fingerprint_generator_from_json(jsonString: &str) -> PyResult<PyFPGen> {
+    Ok(PyFPGen {
+        gen_: generator_from_json(jsonString).py()?,
+    })
+}
 
 /// `FingerprintOptions`: a view on the options of its generator.
 #[pyclass(
@@ -1190,6 +1207,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
         ],
         None,
     )?;
+    m.add_function(wrap_pyfunction!(fingerprint_generator_from_json, m)?)?;
     m.add_function(wrap_pyfunction!(py_sparse_count_fps, m)?)?;
     m.add_function(wrap_pyfunction!(py_sparse_fps, m)?)?;
     m.add_function(wrap_pyfunction!(py_count_fps, m)?)?;
