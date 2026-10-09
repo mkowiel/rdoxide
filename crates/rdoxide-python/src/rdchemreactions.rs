@@ -26,11 +26,14 @@ use rdoxide::graphmol::chem_reactions::sanitize::{
     chem_draw_rxn_adjust_params, default_rxn_adjust_params, flags as sf,
     match_only_at_rgroups_adjust_params, sanitize_rxn, sanitize_rxn_as_mols,
 };
-use rdoxide::graphmol::chem_reactions::writer::{reaction_to_smarts, reaction_to_smiles};
+use rdoxide::graphmol::chem_reactions::writer::{
+    reaction_to_cx_smarts, reaction_to_cx_smiles, reaction_to_smarts, reaction_to_smiles,
+};
 use rdoxide::graphmol::chem_reactions::{self as cr, ChemicalReaction, runner};
 use rdoxide::graphmol::file_parsers::MolFileParserParams;
 use rdoxide::graphmol::functional_group_hierarchy::flattened_functional_group_hierarchy;
 use rdoxide::graphmol::romol::ROMol;
+use rdoxide::graphmol::smiles_parse::cx_write::cx_fields;
 use rdoxide::graphmol::smiles_parse::write::SmilesWriteParams;
 
 use crate::enums::{add_enum_exported, to_py as enum_to_py};
@@ -757,6 +760,36 @@ fn py_reaction_to_smiles(
     reaction_to_smiles(&synced(reaction).rxn, &params).py()
 }
 
+/// construct a reaction CXSMARTS string for a ChemicalReaction
+#[pyfunction]
+#[pyo3(name = "ReactionToCXSmarts", signature = (reaction, params = None, flags = cx_fields::ALL))]
+fn py_reaction_to_cx_smarts(
+    py: Python<'_>,
+    reaction: &Bound<'_, PyChemicalReaction>,
+    params: Option<&Bound<'_, PyAny>>,
+    flags: u32,
+) -> PyResult<String> {
+    let params = write_params(params, false, false)?;
+    let rxn = synced(reaction).rxn.clone();
+    py.detach(|| reaction_to_cx_smarts(&rxn, &params, flags))
+        .py()
+}
+
+/// construct a reaction CXSMILES string for a ChemicalReaction
+#[pyfunction]
+#[pyo3(name = "ReactionToCXSmiles", signature = (reaction, params = None, flags = cx_fields::ALL))]
+fn py_reaction_to_cx_smiles(
+    py: Python<'_>,
+    reaction: &Bound<'_, PyChemicalReaction>,
+    params: Option<&Bound<'_, PyAny>>,
+    flags: u32,
+) -> PyResult<String> {
+    let params = write_params(params, true, true)?;
+    let rxn = synced(reaction).rxn.clone();
+    py.detach(|| reaction_to_cx_smiles(&rxn, &params, flags))
+        .py()
+}
+
 /// construct a molecule for a ChemicalReaction with RXN role property set
 #[pyfunction]
 #[pyo3(name = "ReactionToMolecule")]
@@ -1142,6 +1175,8 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_reaction_from_smiles, m)?)?;
     m.add_function(wrap_pyfunction!(py_reaction_to_smarts, m)?)?;
     m.add_function(wrap_pyfunction!(py_reaction_to_smiles, m)?)?;
+    m.add_function(wrap_pyfunction!(py_reaction_to_cx_smarts, m)?)?;
+    m.add_function(wrap_pyfunction!(py_reaction_to_cx_smiles, m)?)?;
     m.add_function(wrap_pyfunction!(py_reaction_to_molecule, m)?)?;
     m.add_function(wrap_pyfunction!(py_reaction_from_molecule, m)?)?;
     m.add_function(wrap_pyfunction!(py_reaction_from_rxn_file, m)?)?;

@@ -6,6 +6,7 @@ use std::collections::BTreeMap;
 use super::{ChemicalReaction, update_products_stereochem};
 use crate::graphmol::mol_ops::frags::get_mol_frags_as_mols;
 use crate::graphmol::romol::ROMol;
+use crate::graphmol::smiles_parse::cx::parse_cx_extensions_at;
 use crate::graphmol::smiles_parse::ops::cleanup_after_parsing;
 use crate::graphmol::smiles_parse::smarts::{SmartsParserParams, mol_from_smarts};
 use crate::graphmol::smiles_parse::{SmilesParserParams, mol_from_smiles};
@@ -218,9 +219,20 @@ fn parse_reaction(
     }
 
     if params.allow_cx_smiles && !cx_part.is_empty() {
-        return Err(parser_error(
-            "CXSMILES extensions are not yet supported in reactions",
-        ));
+        // the indices in the block run over all templates, in order
+        let (mut start_atom, mut start_bond) = (0, 0);
+        for mol in rxn.templates_mut() {
+            let mut pos = 0;
+            parse_cx_extensions_at(mol, cx_part, &mut pos, start_atom, start_bond).map_err(
+                |_| {
+                    RDKitError::Value(
+                        "SmilesParseException: failure parsing CXSMILES extensions".into(),
+                    )
+                },
+            )?;
+            start_atom += mol.num_atoms();
+            start_bond += mol.num_bonds();
+        }
     }
 
     for mol in rxn.templates_mut() {

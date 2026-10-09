@@ -272,3 +272,33 @@ def test_handed_out_templates_are_live():
   rxn.Initialize()
   assert rxn.GetReactantTemplate(0).GetAtomWithIdx(0).GetProp("edited") == "yes"
   assert rxn.GetReactants()[0].GetAtomWithIdx(0).GetProp("edited") == "yes"
+
+
+def test_cxsmarts_reaction():
+  # CXExtensionsTests.test_cxsmarts_reaction
+  text = ("[CH3:1][CH:2]([CH3:3])[*:4].[OH:5][CH2:6][*:7]>O=C=O>"
+          "[CH3:1][CH:2]([CH3:3])[CH2:6][OH:5] |$;;;_AP1;;;_AP1;;;;;;;;$|")
+  rxn = rdChemReactions.ReactionFromSmarts(text)
+  flags = Chem.CXSmilesFields.CX_ALL ^ Chem.CXSmilesFields.CX_ATOM_PROPS
+  assert rdChemReactions.ReactionToCXSmarts(rxn, Chem.SmilesWriteParams(), flags) == (
+    "[C&H3:1][C&H1:2]([C&H3:3])[*:4].[O&H1:5][C&H2:6][*:7]>O=C=O>"
+    "[C&H3:1][C&H1:2]([C&H3:3])[C&H2:6][O&H1:5] |$;;;_AP1;;;_AP1;;;;;;;;$|")
+
+
+def test_cx_extensions_span_all_templates():
+  # labels and properties are numbered over reactants, agents, then products
+  rxn = rdChemReactions.ReactionFromSmarts(
+    "[C:1](=[O:2])O.[N:3]>>[C:1](=[O:2])[N:3] |$_R1;;;;;;$,atomProp:1.foo.bar|")
+  assert rxn.GetReactantTemplate(0).GetAtomWithIdx(0).GetProp("atomLabel") == "_R1"
+  assert rxn.GetReactantTemplate(0).GetAtomWithIdx(1).GetProp("foo") == "bar"
+  assert not rxn.GetReactantTemplate(1).GetAtomWithIdx(0).HasProp("atomLabel")
+  assert rdChemReactions.ReactionToCXSmarts(rxn) == (
+    "[C:1](=[O:2])O.[N:3]>>[C:1](=[O:2])[N:3] |$_R1;;;;;;$,atomProp:1.foo.bar|")
+  assert rdChemReactions.ReactionToCXSmiles(rxn) == (
+    "O[C:1]=[O:2].[NH3:3]>>[C:1](=[O:2])[N:3] |$;_R1;;;;;$,atomProp:2.foo.bar|")
+
+
+def test_cxsmiles_reaction_second_template():
+  rxn = rdChemReactions.ReactionFromSmiles("CC.CO>>CCO |$;;;a;;;b$|")
+  assert rxn.GetReactantTemplate(1).GetAtomWithIdx(1).GetProp("atomLabel") == "a"
+  assert rxn.GetProductTemplate(0).GetAtomWithIdx(2).GetProp("atomLabel") == "b"
