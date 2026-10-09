@@ -6,7 +6,7 @@ use pyo3::exceptions::{
 };
 use pyo3::prelude::*;
 use pyo3::sync::PyOnceLock;
-use pyo3::types::PyList;
+use pyo3::types::{PyDict, PyList};
 use rdoxide::RDKitError;
 
 pub fn to_py(err: RDKitError) -> PyErr {
@@ -81,6 +81,17 @@ pub fn expect_list<'a, 'py>(obj: &'a Bound<'py, PyAny>) -> PyResult<&'a Bound<'p
     obj.cast::<PyList>().map_err(|_| {
         PyTypeError::new_err(format!(
             "Expecting an object of type list; got an object of type {} instead",
+            type_name(obj)
+        ))
+    })
+}
+
+/// `python::extract<python::dict>(obj)` of the Boost wrappers: the dict, or
+/// the `TypeError` Boost raises for other objects.
+pub fn expect_dict<'a, 'py>(obj: &'a Bound<'py, PyAny>) -> PyResult<&'a Bound<'py, PyDict>> {
+    obj.cast::<PyDict>().map_err(|_| {
+        PyTypeError::new_err(format!(
+            "Expecting an object of type dict; got an object of type {} instead",
             type_name(obj)
         ))
     })

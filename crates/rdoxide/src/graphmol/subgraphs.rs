@@ -6,7 +6,8 @@ use crate::error::{RDKitError, Result};
 use crate::graphmol::fingerprints::{hash_combine, hash_vect};
 use crate::graphmol::matrices::get_distance_mat;
 use crate::graphmol::periodic_table::PeriodicTable;
-use crate::graphmol::romol::ROMol;
+use crate::graphmol::romol::{ROMol, RWMol};
+use crate::graphmol::subset::{SubsetInfo, SubsetMethod, SubsetOptions, copy_mol_subset};
 
 /// `PATH_TYPE`
 pub type Path = Vec<i32>;
@@ -513,4 +514,22 @@ pub fn uniquify_paths(mol: &ROMol, paths: &[Path], use_bo: bool) -> Result<Vec<P
         }
     }
     Ok(res)
+}
+
+/// `Subgraphs::pathToSubmol`: the molecule made of the bonds in `path` (and
+/// their atoms), with coordinates; also returns the old -> new atom indices.
+pub fn path_to_submol(
+    mol: &ROMol,
+    path: &[i32],
+    use_query: bool,
+) -> Result<(RWMol, BTreeMap<u32, u32>)> {
+    let options = SubsetOptions {
+        copy_as_query: use_query,
+        copy_coordinates: true,
+        method: SubsetMethod::Bonds,
+        ..SubsetOptions::default()
+    };
+    let bonds: Vec<u32> = path.iter().map(|&b| b as u32).collect();
+    let (submol, SubsetInfo { atom_mapping, .. }) = copy_mol_subset(mol, &bonds, &options)?;
+    Ok((submol, atom_mapping))
 }

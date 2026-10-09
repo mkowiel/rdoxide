@@ -635,3 +635,11 @@
 
 [module."rdoxide_python::rdmolops_wedging".sources]
 "Code/GraphMol/Wrap/MolOps.cpp" = "2dc7ae10c4ce7523938a4db10e31215cfe2162db"
+
+[module."rdoxide::graphmol::subset".sources]
+"Code/GraphMol/Subset.cpp" = "2cf759a4725b21574e4a9eb913047e6dbd373290"
+"Code/GraphMol/Subset.h" = "0ce93092d0a9bb0a2e3b31a81761f8b55e308afd"
+
+[module."rdoxide_python::rdmolops_subset".sources]
+"Code/GraphMol/Wrap/MolOps.cpp" = "2dc7ae10c4ce7523938a4db10e31215cfe2162db"
+"Code/GraphMol/Subgraphs/SubgraphUtils.cpp" = "871fb0ef2858827922e521b870ff4af068edc52a"

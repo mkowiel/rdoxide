@@ -31,6 +31,7 @@ pub mod romol;
 pub mod smiles_parse;
 pub mod stereo_group;
 pub mod subgraphs;
+pub mod subset;
 pub mod substruct;
 pub mod wedge_bonds;
 

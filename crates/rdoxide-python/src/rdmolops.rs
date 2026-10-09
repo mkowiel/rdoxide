@@ -300,6 +300,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     crate::rdmolops_matrices::add(m)?;
     crate::rdmolops_stereo_misc::add(m)?;
     crate::rdmolops_structure::add(m)?;
+    crate::rdmolops_subset::add(m)?;
     crate::rdmolops_fragments::add(m)?;
     crate::rdmolops_transforms::add(m)?;
     crate::rdmolops_wedging::add(m)?;
