@@ -7,6 +7,7 @@
 | `LLVM-Apache-2.0-with-LLVM-exception.txt` | `crates/rdoxide/src/rdgeneral/cxx_sort.rs`, a translation of libc++'s `std::sort` (LLVM Project), used to reproduce the element order of RDKit's unstable sorts. |
 | `RDKit-ChemReactions-Novartis-BSD-3-Clause.txt` | Code translated from `Code/GraphMol/ChemReactions` (Novartis). Source: `Code/GraphMol/ChemReactions/license.txt`. |
 | `RDKit-Descriptors3D-Godin-BSD-3-Clause.txt` | Code translated from the descriptor files by Guillaume Godin (Institute of Cancer Research): `AUTOCORR2D/3D`, `MolData3Ddescriptors`, `Data3Ddescriptors` (and later `WHIM`, `RDF`, `MORSE`, `GETAWAY`, ...): `crates/rdoxide/src/graphmol/descriptors/data_3d.rs`, `autocorr2d.rs`. Source: the file headers in `Code/GraphMol/Descriptors/`. |
+| `Eigen-MPL-2.0.txt` | `crates/rdoxide/src/numerics/eigen_3x3.rs`, a translation of the symmetric eigensolver of Eigen 5.0.1 (`SelfAdjointEigenSolver`, `Tridiagonalization`, `JacobiRotation`; Copyright Gael Guennebaud, Benoit Jacob, Jitse Niesen), which RDKit uses for principal axes. Mozilla Public License 2.0: the file stays under MPL-2.0 (file-level copyleft) and names its sources. |
 
 When porting a component that carries its own license (anything under
 upstream `External/`, fonts in `Data/Fonts`, ...), copy its license file here,

@@ -29,6 +29,24 @@ impl Transform3D {
         Transform3D { data }
     }
 
+    /// `getVal(row, col)`
+    pub fn get_val(&self, row: usize, col: usize) -> f64 {
+        self.data[row * 4 + col]
+    }
+
+    /// `setVal(row, col, val)`
+    pub fn set_val(&mut self, row: usize, col: usize, val: f64) {
+        self.data[row * 4 + col] = val;
+    }
+
+    /// `SetTranslation(move)`: the last column of the matrix
+    pub fn set_translation(&mut self, translation: &Point3D) {
+        self.data[3] = translation.x;
+        self.data[7] = translation.y;
+        self.data[11] = translation.z;
+        self.data[15] = 1.0;
+    }
+
     /// `SetRotation(angle, axis)`: resets to the identity, then a rotation by
     /// `angle` (radians) about `axis` (assumed normalized)
     pub fn set_rotation(&mut self, angle: f64, axis: &Point3D) {

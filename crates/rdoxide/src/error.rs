@@ -65,6 +65,26 @@ impl RDKitError {
             message: message.into(),
         }
     }
+    /// `URANGE_CHECK(x, hi)` failure raised at `file:line` of the C++ sources
+    /// (which the error text names); logged to the error log like upstream.
+    pub fn range_at(
+        name: &str,
+        x: impl fmt::Display,
+        hi: impl fmt::Display,
+        file: &str,
+        line: u32,
+    ) -> Self {
+        crate::rd_log_error!(
+            "\n\n****\nRange Error\n{name}\nViolation occurred on line {line} in file {file}\nFailed Expression: {x} < {hi}\n****\n"
+        );
+        RDKitError::Invariant {
+            kind: "Range Error",
+            message: format!(
+                "{name}\n\tViolation occurred on line {line} in file {file}\n\tFailed Expression: {x} < {hi}"
+            ),
+        }
+    }
+
     /// `URANGE_CHECK(x, hi)` failure; logged to the error log like upstream.
     pub fn range(name: &str, x: impl fmt::Display, hi: impl fmt::Display) -> Self {
         let err = RDKitError::Invariant {
@@ -82,7 +102,7 @@ impl fmt::Display for RDKitError {
             RDKitError::Invariant { kind, message } => {
                 write!(
                     f,
-                    "{kind}\n\t{message}\n\tRDKIT: {}\n",
+                    "{kind}\n\t{message}\n\tRDKIT: {}\n\tBOOST: \n",
                     crate::rdgeneral::RDKIT_VERSION
                 )
             }

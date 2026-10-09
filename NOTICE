@@ -26,7 +26,8 @@ Licensing summary
   (Code/GraphMol/atomic_data.cpp) and remain under the RDKit BSD license.
 
 The combined work is therefore distributed under "MIT AND BSD-3-Clause AND
-Apache-2.0 WITH LLVM-exception".
+Apache-2.0 WITH LLVM-exception AND MPL-2.0" (MPL-2.0 applies only to the file
+translated from Eigen).
 Redistributions (source or binary) must retain this NOTICE file and the
 license texts in LICENSE and LICENSES/.
 
@@ -40,6 +41,8 @@ LICENSES/RDKit-BSD-3-Clause.txt                          RDKit core
 LICENSES/RDKit-ChemReactions-Novartis-BSD-3-Clause.txt   RDKit ChemReactions
 LICENSES/RDKit-Descriptors3D-Godin-BSD-3-Clause.txt       RDKit AUTOCORR/WHIM/RDF/... descriptors
                                                          (Guillaume Godin, Institute of Cancer Research)
+LICENSES/Eigen-MPL-2.0.txt                                Eigen (symmetric 3x3 eigensolver, numerics/eigen_3x3.rs),
+                                                         Copyright (C) Gael Guennebaud, Benoit Jacob, Jitse Niesen
 LICENSES/RingDecomposerLib-BSD-3-Clause.txt              RingDecomposerLib (ring families, SSSR),
                                                          Copyright (c) 2016 University of Hamburg,
                                                          ZBH - Center for Bioinformatics

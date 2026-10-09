@@ -102,6 +102,14 @@ Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testRDKitFPGenerato
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testRDKitFPGeneratorAndFromAtoms
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testTopologicalTorsionGenerator
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testTopologicalTorsionShortestPaths
+Code/GraphMol/MolTransforms/Wrap/testMolTransforms.py::TestCase::test1Canonicalization
+Code/GraphMol/MolTransforms/Wrap/testMolTransforms.py::TestCase::testComputePrincipalAxesAndMoments
+Code/GraphMol/MolTransforms/Wrap/testMolTransforms.py::TestCase::testComputePrincipalAxesAndMomentsFromGyrationMatrix
+Code/GraphMol/MolTransforms/Wrap/testMolTransforms.py::TestCase::testEigen3CanonicalTransformAgainstNumpy
+Code/GraphMol/MolTransforms/Wrap/testMolTransforms.py::TestCase::testGetSetAngle
+Code/GraphMol/MolTransforms/Wrap/testMolTransforms.py::TestCase::testGetSetBondLength
+Code/GraphMol/MolTransforms/Wrap/testMolTransforms.py::TestCase::testGetSetDihedral
+Code/GraphMol/MolTransforms/Wrap/testMolTransforms.py::TestCase::testGetSetDihedralThroughTripleBond
 Code/GraphMol/PartialCharges/Wrap/testPartialCharges.py::TestCase::test0HalgrenSet
 Code/GraphMol/PartialCharges/Wrap/testPartialCharges.py::TestCase::test1PPDataset
 Code/GraphMol/PartialCharges/Wrap/testPartialCharges.py::TestCase::test2Params

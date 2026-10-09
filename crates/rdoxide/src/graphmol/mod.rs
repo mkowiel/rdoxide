@@ -19,6 +19,7 @@ pub mod kekulize;
 pub mod matrices;
 pub mod mol_ops;
 pub mod mol_props;
+pub mod mol_transforms;
 pub mod new_canon;
 pub mod partial_charges;
 pub mod periodic_table;
