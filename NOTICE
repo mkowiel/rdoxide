@@ -57,3 +57,10 @@ libc++ (LLVM Project)
   SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
   rdoxide translates the std::sort algorithm (crates/rdoxide/src/rdgeneral/cxx_sort.rs).
   License: LICENSES/LLVM-Apache-2.0-with-LLVM-exception.txt
+
+Abbreviation tables
+  The default abbreviation labels in crates/rdoxide/src/graphmol/abbreviations.rs are
+  copied from RDKit's Abbreviations module (BSD-3-Clause), which adapted them from the
+  superatom table of Open Babel (https://github.com/openbabel/superatoms), originally
+  from the OSRA project (http://cactus.nci.nih.gov/osra/). Only short label/SMILES
+  pairs are carried over; no Open Babel code is used.

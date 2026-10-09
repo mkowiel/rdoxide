@@ -807,3 +807,11 @@
 
 [module."rdoxide_python::rdmhfpfingerprint".sources]
 "Code/GraphMol/Fingerprints/Wrap/MHFPWrapper.cpp" = "9c003b9de63e7c8cb9eff68c433abe294897b90b"
+
+[module."rdoxide::graphmol::abbreviations".sources]
+"Code/GraphMol/Abbreviations/Abbreviations.cpp" = "0162b72316e16471891a5ad5dd9741f4d83b5dec"
+"Code/GraphMol/Abbreviations/Abbreviations.h" = "cb631dfb745a54ae655fd2129a9d84ec80d76f53"
+"Code/GraphMol/Abbreviations/AbbreviationsUtils.cpp" = "9a3a644bf2135918d12b21e3afd40031ee44ddff"
+
+[module."rdoxide_python::rdabbreviations".sources]
+"Code/GraphMol/Abbreviations/Wrap/rdAbbreviations.cpp" = "66b036defaa16415e5ecd1f16bf1692f07e42a74"
