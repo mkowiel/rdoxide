@@ -776,6 +776,40 @@ fn check_cx_features(mol: &ROMol) {
     }
 }
 
+/// `getCXExtensions(mols, flags)`: one block for several molecules, which
+/// are numbered one after the other (the templates of a reaction). Every
+/// molecule needs the SMILES output order properties.
+pub fn get_cx_extensions_for_mols(mols: &[&ROMol], flags: u32) -> Result<String> {
+    let mut combined = ROMol::new();
+    let (mut atom_order, mut bond_order) = (Vec::new(), Vec::new());
+    for mol in mols {
+        check_cx_features(mol);
+        let (Some(atoms), Some(bonds)) = (
+            uint_vec_prop(*mol, cp::_smilesAtomOutputOrder),
+            uint_vec_prop(*mol, cp::_smilesBondOutputOrder),
+        ) else {
+            return Err(RDKitError::Value(
+                "Input molecule does not have the required smiles ordering properties set".into(),
+            ));
+        };
+        let (atom_offset, bond_offset) = (combined.num_atoms(), combined.num_bonds());
+        combined.insert_mol(mol)?;
+        atom_order.extend(atoms.iter().map(|i| i + atom_offset));
+        bond_order.extend(bonds.iter().map(|i| i + bond_offset));
+    }
+    combined.set_prop(
+        cp::_smilesAtomOutputOrder,
+        RDValue::VecUnsignedInt(atom_order),
+        true,
+    )?;
+    combined.set_prop(
+        cp::_smilesBondOutputOrder,
+        RDValue::VecUnsignedInt(bond_order),
+        true,
+    )?;
+    get_cx_extensions(&mut combined, flags)
+}
+
 /// `getCXExtensions(mol, flags)`: the `|...|` block for a molecule that was
 /// just written to SMILES (`_smilesAtomOutputOrder` and
 /// `_smilesBondOutputOrder` must be set); empty if there is nothing to write.

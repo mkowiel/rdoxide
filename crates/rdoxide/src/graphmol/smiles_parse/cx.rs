@@ -105,6 +105,12 @@ struct CxParser<'a> {
     mol: &'a mut RWMol,
     /// stereo groups seen so far, as `10 * id + type` (Github #6050)
     sg_tracker: Vec<u32>,
+    /// Index of the first atom of `mol` in the numbering used by the
+    /// extension text. Non-zero when several molecules (the templates of a
+    /// reaction) share one block.
+    start_atom_idx: u32,
+    /// Same for bonds.
+    start_bond_idx: u32,
 }
 
 impl CxParser<'_> {
@@ -125,12 +131,19 @@ impl CxParser<'_> {
         self.first >= self.last()
     }
 
+    /// Whether the (text-numbered) atom `idx` belongs to `mol`.
     fn valid_atom(&self, idx: u32) -> bool {
-        idx < self.mol.num_atoms()
+        (self.start_atom_idx..self.start_atom_idx + self.mol.num_atoms()).contains(&idx)
     }
 
+    /// Whether the (text-numbered) bond `idx` belongs to `mol`.
     fn valid_bond(&self, idx: u32) -> bool {
-        idx < self.mol.num_bonds()
+        (self.start_bond_idx..self.start_bond_idx + self.mol.num_bonds()).contains(&idx)
+    }
+
+    /// Index in `mol` of the text-numbered atom `idx`.
+    fn local_atom(&self, idx: u32) -> u32 {
+        idx.wrapping_sub(self.start_atom_idx)
     }
 
     fn read_int(&mut self) -> Option<u32> {
@@ -174,6 +187,7 @@ impl CxParser<'_> {
     /// `get_bond_with_smiles_idx`: ring-closure bonds are appended after the
     /// ordinary bonds and carry their position in the SMILES.
     fn bond_with_smiles_idx(&self, idx: u32) -> Option<u32> {
+        let idx = idx.checked_sub(self.start_bond_idx)?;
         let mut earlier_ring_bonds = 0;
         for bond in self.mol.bonds() {
             if let Some(smiles_idx) = bond
@@ -202,8 +216,9 @@ impl CxParser<'_> {
                 return false;
             };
             if !token.is_empty() && self.valid_atom(atom_idx) {
+                let local = self.local_atom(atom_idx);
                 self.mol
-                    .atom_mut(atom_idx)
+                    .atom_mut(local)
                     .props
                     .set_val(cp::molFileValue, token);
             }
@@ -245,7 +260,8 @@ impl CxParser<'_> {
                         return false;
                     };
                     if self.valid_atom(atom_idx) && !value.is_empty() {
-                        self.mol.atom_mut(atom_idx).props.set_val(&name, value);
+                        let local = self.local_atom(atom_idx);
+                        self.mol.atom_mut(local).props.set_val(&name, value);
                     }
                 }
             }
@@ -273,10 +289,8 @@ impl CxParser<'_> {
                 return false;
             };
             if !token.is_empty() && self.valid_atom(atom_idx) {
-                self.mol
-                    .atom_mut(atom_idx)
-                    .props
-                    .set_val(cp::atomLabel, token);
+                let local = self.local_atom(atom_idx);
+                self.mol.atom_mut(local).props.set_val(cp::atomLabel, token);
             }
             atom_idx += 1;
             if self.first <= self.last() && self.ch() != b'$' {
@@ -318,7 +332,7 @@ impl CxParser<'_> {
                         is_3d = true;
                     }
                 }
-                positions.push((atom_idx, pt));
+                positions.push((self.local_atom(atom_idx), pt));
             }
             atom_idx += 1;
             if self.first <= self.last() && self.ch() != b')' {
@@ -361,6 +375,7 @@ impl CxParser<'_> {
                     rd_log_warning!("BOND NOT FOUND! {bond_idx} involving atom {atom_idx}");
                     return false;
                 };
+                let atom_idx = self.local_atom(atom_idx);
                 let b = self.mol.bond_mut(bond);
                 if b.begin_atom_idx() != atom_idx && b.end_atom_idx() != atom_idx {
                     rd_log_warning!("BOND NOT FOUND! {bond_idx} involving atom {atom_idx}");
@@ -420,6 +435,7 @@ impl CxParser<'_> {
 
     /// Adds `query` to the (query-ified) atom with the given index.
     fn expand_atom_query(&mut self, idx: u32, query: crate::graphmol::queries::AtomQuery) -> bool {
+        let idx = self.local_atom(idx);
         if !self.mol.atom(idx).has_query() && replace_atom_with_query_atom(self.mol, idx).is_err() {
             return false;
         }
@@ -609,6 +625,7 @@ impl CxParser<'_> {
             return false;
         }
         // the atom has to be the start atom of the bond
+        let atom_idx = self.local_atom(atom_idx);
         let b = self.mol.bond_mut(bond);
         if atom_idx != b.begin_atom_idx() {
             if atom_idx != b.end_atom_idx() {
@@ -697,7 +714,8 @@ impl CxParser<'_> {
 
     fn set_radicals(&mut self, idx: u32, count: u32) {
         if self.valid_atom(idx) {
-            self.mol.atom_mut(idx).set_num_radical_electrons(count);
+            let local = self.local_atom(idx);
+            self.mol.atom_mut(local).set_num_radical_electrons(count);
         }
     }
 
@@ -744,6 +762,7 @@ impl CxParser<'_> {
                 return false;
             };
             if self.valid_atom(atom_idx) {
+                let atom_idx = self.local_atom(atom_idx);
                 if atoms.contains(&atom_idx) {
                     rd_log_warning!(
                         "Atom {atom_idx} appears more than once in stereo group specification!"
@@ -853,7 +872,10 @@ impl CxParser<'_> {
         for idx in atoms {
             if self.valid_atom(idx) {
                 keep = true;
-                if sgroup.add_atom_with_idx(self.mol, idx).is_err() {
+                if sgroup
+                    .add_atom_with_idx(self.mol, idx - self.start_atom_idx)
+                    .is_err()
+                {
                     return false;
                 }
             }
@@ -971,7 +993,10 @@ impl CxParser<'_> {
         let mut keep = false;
         for idx in self.read_int_list(b',') {
             if self.valid_atom(idx) {
-                if sgroup.add_atom_with_idx(self.mol, idx).is_err() {
+                if sgroup
+                    .add_atom_with_idx(self.mol, idx - self.start_atom_idx)
+                    .is_err()
+                {
                     return false;
                 }
                 keep = true;
@@ -999,6 +1024,7 @@ impl CxParser<'_> {
                     if keep && !head.is_empty() {
                         keep = head.iter().all(|&b| self.valid_atom(b));
                         head.retain(|&b| self.valid_atom(b));
+                        head.iter_mut().for_each(|b| *b -= self.start_atom_idx);
                         let _ =
                             sgroup.set_prop(HEAD_CROSSINGS, RDValue::VecUnsignedInt(head), true);
                     }
@@ -1010,6 +1036,7 @@ impl CxParser<'_> {
                     if keep && !tail.is_empty() {
                         keep = tail.iter().all(|&b| self.valid_atom(b));
                         tail.retain(|&b| self.valid_atom(b));
+                        tail.iter_mut().for_each(|b| *b -= self.start_atom_idx);
                         let _ =
                             sgroup.set_prop(TAIL_CROSSINGS, RDValue::VecUnsignedInt(tail), true);
                     }
@@ -1065,9 +1092,9 @@ impl CxParser<'_> {
                 let Some(i2) = self.read_int() else {
                     return false;
                 };
-                (idx1, idx2) = (i1, i2);
-            } else if self.valid_atom(atom) && self.mol.atom_degree(atom) == 2 {
-                let mut nbrs = self.mol.atom_neighbors(atom);
+                (idx1, idx2) = (self.local_atom(i1), self.local_atom(i2));
+            } else if self.valid_atom(atom) && self.mol.atom_degree(self.local_atom(atom)) == 2 {
+                let mut nbrs = self.mol.atom_neighbors(self.local_atom(atom));
                 idx1 = nbrs.next().unwrap_or(0);
                 idx2 = nbrs.next().unwrap_or(0);
             } else if self.valid_atom(atom) {
@@ -1082,9 +1109,9 @@ impl CxParser<'_> {
                 }
                 accum += &format!(
                     "{start_reps} {end_reps} 2 {} {} {} {}",
-                    atom + 1,
+                    self.local_atom(atom) + 1,
                     idx1.wrapping_add(1),
-                    atom + 1,
+                    self.local_atom(atom) + 1,
                     idx2.wrapping_add(1)
                 );
             }
@@ -1107,7 +1134,7 @@ impl CxParser<'_> {
             let Some(at1) = self.read_int() else {
                 return false;
             };
-            if self.valid_atom(at1) && self.mol.atom_degree(at1) != 1 {
+            if self.valid_atom(at1) && self.mol.atom_degree(self.local_atom(at1)) != 1 {
                 rd_log_warning!("position variation bond to atom with more than one bond");
                 return false;
             }
@@ -1123,7 +1150,7 @@ impl CxParser<'_> {
                     return false;
                 };
                 if self.valid_atom(aidx) {
-                    others.push((aidx + 1).to_string());
+                    others.push((self.local_atom(aidx) + 1).to_string());
                 }
                 if self.first < self.last() && self.ch() == b'.' {
                     self.first += 1;
@@ -1135,7 +1162,11 @@ impl CxParser<'_> {
                     end_pts += &format!(" {idx}");
                 }
                 end_pts.push(')');
-                for bond in self.mol.atom_bond_indices(at1).collect::<Vec<_>>() {
+                for bond in self
+                    .mol
+                    .atom_bond_indices(self.local_atom(at1))
+                    .collect::<Vec<_>>()
+                {
                     let b = self.mol.bond_mut(bond);
                     b.dict_mut()
                         .set_val(cp::_MolFileBondEndPts, end_pts.clone());
@@ -1343,6 +1374,20 @@ pub fn parse_cx_extensions(
     text: &str,
     pos: &mut usize,
 ) -> Result<(), CxParseError> {
+    parse_cx_extensions_at(mol, text, pos, 0, 0)
+}
+
+/// Like [`parse_cx_extensions`] for a block shared by several molecules (the
+/// templates of a reaction): the indices in `text` count from the first atom
+/// and bond of the first molecule, `mol` starting at `start_atom_idx` and
+/// `start_bond_idx`.
+pub fn parse_cx_extensions_at(
+    mol: &mut RWMol,
+    text: &str,
+    pos: &mut usize,
+    start_atom_idx: u32,
+    start_bond_idx: u32,
+) -> Result<(), CxParseError> {
     if text.is_empty() {
         return Ok(());
     }
@@ -1354,6 +1399,8 @@ pub fn parse_cx_extensions(
         first: 0,
         mol,
         sg_tracker: Vec::new(),
+        start_atom_idx,
+        start_bond_idx,
     };
     let ok = parser.parse_it();
     *pos = parser.first;

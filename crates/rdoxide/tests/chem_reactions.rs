@@ -239,3 +239,19 @@ fn preprocess_adds_functional_group_queries() {
     let err = preprocess_reaction_with_default_groups(&mut rxn, molFileValue).unwrap_err();
     assert!(matches!(err, rdoxide::RDKitError::Key(k) if k == "boromicacid"));
 }
+
+#[test]
+fn cx_extensions_are_numbered_over_all_templates() {
+    use rdoxide::graphmol::chem_reactions::writer::reaction_to_cx_smarts;
+    use rdoxide::graphmol::smiles_parse::cx_write::cx_fields;
+    // expectations from RDKit 2026.03.6
+    let text = "[C:1](=[O:2])O.[N:3]>>[C:1](=[O:2])[N:3] |$_R1;;;;;;$,atomProp:1.foo.bar|";
+    let rxn = reaction_from_smarts(text, &ReactionSmartsParserParams::new()).unwrap();
+    use rdoxide::rdgeneral::RDProps;
+    let label = |t: usize, a: u32| rxn.reactants()[t].atom(a).has_prop("atomLabel");
+    assert!(label(0, 0));
+    assert!(!label(1, 0));
+    let written =
+        reaction_to_cx_smarts(&rxn, &SmilesWriteParams::default(), cx_fields::ALL).unwrap();
+    assert_eq!(written, text);
+}
