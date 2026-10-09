@@ -2,6 +2,7 @@
 //! `FingerprintUtil.{h,cpp}`).
 
 pub mod atom_pair;
+pub mod json;
 pub mod layered;
 pub mod legacy;
 pub mod maccs;

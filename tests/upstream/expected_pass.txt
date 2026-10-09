@@ -88,10 +88,12 @@ Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testAtomPairType
 Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testAtomPairTypesChirality
 Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testAtomPairs
 Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testBCUT
+Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testBCUTUserProps
 Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testBitInfo
 Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testCrippen
 Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testCustomVSA
 Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testGithub1749
+Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testGithub1761
 Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testGithub1973
 Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testHashedAtomPairs
 Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testHashedTopologicalTorsions
@@ -120,6 +122,7 @@ Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testCountBounds
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testFingerprintGeneratorOptionsLifetime
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testFingerprintOptions
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testGetAtomsPerBit
+Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testJSONSerialization
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testMorganGenerator
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testMorganGeneratorMultiMol
 Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testMorganRedundantEnvironments
