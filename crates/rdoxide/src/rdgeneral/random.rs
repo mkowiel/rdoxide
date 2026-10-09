@@ -215,30 +215,39 @@ impl<const N: usize, const M: usize> MersenneTwister<N, M> {
         y ^ (y >> 18)
     }
 
-    /// `boost::uniform_int<int>(lo, hi)(engine)`: the bucket-rejection method
-    /// of `boost::random::detail::generate_uniform_int` for a 32-bit engine.
+    /// Bucket-rejection draw of `boost::random::detail::generate_uniform_int`
+    /// for a 32-bit engine: a value in `[0, range]`.
+    fn draw_up_to(&mut self, range: u32) -> u32 {
+        if range == 0 {
+            return 0;
+        }
+        if range == u32::MAX {
+            return self.next_u32();
+        }
+        // engine range [0, 2^32 - 1] is wider than the requested one
+        let mut bucket_size = u32::MAX / (range + 1);
+        if u32::MAX % (range + 1) == range {
+            bucket_size += 1;
+        }
+        loop {
+            let r = self.next_u32() / bucket_size;
+            if r <= range {
+                return r;
+            }
+        }
+    }
+
+    /// `boost::uniform_int<int>(lo, hi)(engine)`.
     pub fn uniform_int(&mut self, lo: i32, hi: i32) -> i32 {
         assert!(lo <= hi, "uniform_int: empty range");
         let range = (hi as i64 - lo as i64) as u32;
-        if range == 0 {
-            return lo;
-        }
-        let result = if range == u32::MAX {
-            self.next_u32()
-        } else {
-            // engine range [0, 2^32 - 1] is wider than the requested one
-            let mut bucket_size = u32::MAX / (range + 1);
-            if u32::MAX % (range + 1) == range {
-                bucket_size += 1;
-            }
-            loop {
-                let r = self.next_u32() / bucket_size;
-                if r <= range {
-                    break r;
-                }
-            }
-        };
-        (lo as i64 + i64::from(result)) as i32
+        (lo as i64 + i64::from(self.draw_up_to(range))) as i32
+    }
+
+    /// `boost::random::uniform_int_distribution<uint32_t>(lo, hi)(engine)`.
+    pub fn uniform_u32(&mut self, lo: u32, hi: u32) -> u32 {
+        assert!(lo <= hi, "uniform_u32: empty range");
+        lo + self.draw_up_to(hi - lo)
     }
 }
 

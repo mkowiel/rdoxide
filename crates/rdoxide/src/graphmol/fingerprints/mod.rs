@@ -6,6 +6,7 @@ pub mod json;
 pub mod layered;
 pub mod legacy;
 pub mod maccs;
+pub mod mhfp;
 pub mod morgan;
 pub mod pattern;
 pub mod rdkit_fp;
