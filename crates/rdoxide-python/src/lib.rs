@@ -57,6 +57,7 @@ mod rdmolfiles_mtsupplier;
 mod rdmolfiles_pdb;
 mod rdmolfiles_sdsupplier;
 mod rdmolfiles_sdwriter;
+mod rdmolfiles_sequence;
 mod rdmolfiles_smarts;
 mod rdmolfiles_smisupplier;
 mod rdmolfiles_smiwriter;
