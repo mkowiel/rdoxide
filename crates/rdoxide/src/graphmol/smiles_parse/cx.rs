@@ -4,8 +4,8 @@
 //! enhanced stereo (stereo groups), wedged and wiggly bonds, cis/trans and
 //! unspecified double bonds, dative/hydrogen/zero-order bonds, and the query
 //! features (unsaturation, ring bond count, substitution count, the special
-//! atom labels), and substance groups (data `SgD:`, polymer `Sg:` and the
-//! hierarchy `SgH:`). Link nodes and variable attachment points are not
+//! atom labels), substance groups (data `SgD:`, polymer `Sg:` and the
+//! hierarchy `SgH:`) and link nodes. Variable attachment points are not
 //! ported yet; extensions that use them fail to parse (the warning names
 //! the feature).
 //!
@@ -1030,6 +1030,73 @@ impl CxParser<'_> {
         true
     }
 
+    /// `|LN:atom:min.max[.outer1.outer2],...|`: stored as the
+    /// `molFileLinkNodes` property (1-based atoms, "min max 2 a n1 a n2").
+    /// The outer atoms may be left out when the atom has two neighbors.
+    fn parse_linknodes(&mut self) -> bool {
+        if !self.text[self.first..].starts_with(b"LN:") {
+            return false;
+        }
+        self.first += 3;
+        let mut accum = String::new();
+        while self.ch().is_ascii_digit() {
+            let Some(atom) = self.read_int() else {
+                return false;
+            };
+            if self.first + 1 >= self.last() || self.ch() != b':' {
+                return false;
+            }
+            self.first += 1;
+            let Some(start_reps) = self.read_int() else {
+                return false;
+            };
+            if self.first + 1 >= self.last() || self.ch() != b'.' {
+                return false;
+            }
+            self.first += 1;
+            let Some(end_reps) = self.read_int() else {
+                return false;
+            };
+            let (mut idx1, mut idx2) = (0, 0);
+            if self.first < self.last() && self.ch() == b'.' {
+                self.first += 1;
+                let Some(i1) = self.read_int() else {
+                    return false;
+                };
+                self.first += 1;
+                let Some(i2) = self.read_int() else {
+                    return false;
+                };
+                (idx1, idx2) = (i1, i2);
+            } else if self.valid_atom(atom) && self.mol.atom_degree(atom) == 2 {
+                let mut nbrs = self.mol.atom_neighbors(atom);
+                idx1 = nbrs.next().unwrap_or(0);
+                idx2 = nbrs.next().unwrap_or(0);
+            } else if self.valid_atom(atom) {
+                return false;
+            }
+            if self.first < self.last() && self.ch() == b',' {
+                self.first += 1;
+            }
+            if self.valid_atom(atom) {
+                if !accum.is_empty() {
+                    accum.push('|');
+                }
+                accum += &format!(
+                    "{start_reps} {end_reps} 2 {} {} {} {}",
+                    atom + 1,
+                    idx1.wrapping_add(1),
+                    atom + 1,
+                    idx2.wrapping_add(1)
+                );
+            }
+        }
+        if !accum.is_empty() {
+            self.mol.dict_mut().set_val(cp::molFileLinkNodes, accum);
+        }
+        true
+    }
+
     /// An extension that this port does not handle yet.
     fn unsupported(&self, what: &str) -> bool {
         rd_log_warning!("CXSMILES {what} are not supported by rdoxide yet");
@@ -1074,7 +1141,7 @@ impl CxParser<'_> {
                     self.parse_ring_bonds()
                 }
                 b'L' if self.first + 1 < self.last() && self.ch_at(1) == b'N' => {
-                    self.unsupported("link nodes")
+                    self.parse_linknodes()
                 }
                 b'S' if self.first + 2 < self.last()
                     && self.ch_at(1) == b'g'
