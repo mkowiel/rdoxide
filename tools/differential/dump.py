@@ -325,6 +325,15 @@ def patternfp_record(smi):
     return rec or None
 
 
+def molhash_record(smi):
+    """Every MolHash function of a molecule (the CXSMILES variants are not ported)."""
+    from rdkit.Chem import rdMolHash
+    m = Chem.MolFromSmiles(smi)
+    if m is None:
+        return None
+    return {f.name: rdMolHash.MolHash(m, f) for f in sorted(rdMolHash.HashFunction.values.values(), key=int)}
+
+
 def erg_record(smi):
     """Reduced graph and ErG fingerprints of a molecule."""
     from rdkit import RDLogger
@@ -843,6 +852,8 @@ def dump(mode, smi):
         return None if m is None else addhs_records(m)
     if mode == "erg":
         return erg_record(smi)
+    if mode == "molhash":
+        return molhash_record(smi)
     if mode == "layeredfp":
         return layeredfp_record(smi)
     if mode == "patternfp":

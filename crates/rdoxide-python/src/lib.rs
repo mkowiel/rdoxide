@@ -53,6 +53,7 @@ mod rdmolfiles_smarts;
 mod rdmolfiles_smisupplier;
 mod rdmolfiles_smiwriter;
 mod rdmolfiles_write;
+mod rdmolhash;
 mod rdmolops;
 mod rdmolops_adjust_query;
 mod rdmolops_fingerprints;
@@ -148,6 +149,7 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
         "rdkit.Chem.rdSubstructLibrary",
         rdsubstructlibrary::init,
     )?;
+    add_submodule(m, "rdMolHash", "rdkit.Chem.rdMolHash", rdmolhash::init)?;
     add_submodule(
         m,
         "rdPartialCharges",
