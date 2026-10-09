@@ -757,3 +757,13 @@
 
 [module."rdoxide_python::rdreducedgraphs".sources]
 "Code/GraphMol/ReducedGraphs/Wrap/rdReducedGraphs.cpp" = "ff0064f49fbfbab14e57ceecf9e32885df10de99"
+
+[module."rdoxide::graphmol::substruct_library".sources]
+"Code/GraphMol/SubstructLibrary/SubstructLibrary.cpp" = "8fc46a24351165e14148609bdbee575901ef4283"
+"Code/GraphMol/SubstructLibrary/SubstructLibrary.h" = "5eaf2c8db298878f685dc13ce04fe8ec3f59e7df"
+"Code/GraphMol/SubstructLibrary/PatternFactory.cpp" = "78c2c0d7be3647479fc168e6b59470ea1eb89f06"
+"Code/GraphMol/SubstructLibrary/PatternFactory.h" = "3d3c5ca1d3b762ace425d6850acbe74570391bee"
+
+[module."rdoxide_python::rdsubstructlibrary".sources]
+"Code/GraphMol/SubstructLibrary/Wrap/SubstructLibraryWrap.cpp" = "ca6a9b9123ea1efdf4d347060031763383965245"
+"Code/GraphMol/SubstructLibrary/Wrap/rdSubstructLibrary.cpp" = "e852d8f6dba0c62e6831933d0a765b3c7e0d9321"
