@@ -9,4 +9,6 @@ pub mod lipinski;
 pub mod mol_data_3d;
 pub mod mol_surf;
 pub mod mqn;
+pub mod pbf;
+pub mod pmi;
 pub mod property;

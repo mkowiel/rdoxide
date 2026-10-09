@@ -902,7 +902,7 @@ impl ROMol {
 
     fn conformer_position(&self, id: i32) -> Result<usize> {
         if self.conformers.is_empty() {
-            return Err(RDKitError::Value(
+            return Err(RDKitError::Conformer(
                 "No conformations available on the molecule".into(),
             ));
         }
@@ -912,7 +912,7 @@ impl ROMol {
         self.conformers
             .iter()
             .position(|c| c.id == id as u32)
-            .ok_or_else(|| RDKitError::Value(format!("Can't find conformation with ID: {id}")))
+            .ok_or_else(|| RDKitError::Conformer(format!("Can't find conformation with ID: {id}")))
     }
 
     /// `getConformer(id)`; `id < 0` returns the first one.

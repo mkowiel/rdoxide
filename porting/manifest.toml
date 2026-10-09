@@ -548,3 +548,14 @@
 
 [module."rdoxide_python::rdmoltransforms".sources]
 "Code/GraphMol/MolTransforms/Wrap/rdMolTransforms.cpp" = "df8194342d13f68b80372641e5f9109907aba031"
+
+[module."rdoxide::graphmol::descriptors::pmi".sources]
+"Code/GraphMol/Descriptors/PMI.cpp" = "c2628682addb03435c47f3ae6874d5c6dc851e5a"
+"Code/GraphMol/Descriptors/PMI.h" = "f5fd08df12bd8d826b35a73a842ba84851038a53"
+
+[module."rdoxide::graphmol::descriptors::pbf".sources]
+"Code/GraphMol/Descriptors/PBF.cpp" = "164b6de4896a69b415479c4a28b64c54153fe70d"
+"Code/GraphMol/Descriptors/PBF.h" = "8241caca3b5ccceac3de0127ea7bb73e0bc745d3"
+
+[module."rdoxide_python::rdmoldescriptors_3d".sources]
+"Code/GraphMol/Descriptors/Wrap/rdMolDescriptors.cpp" = "4d3c2e1d6315579af9f3bf02b1564224fe48b82e"

@@ -9,6 +9,7 @@ pub fn to_py(err: RDKitError) -> PyErr {
     match err {
         RDKitError::Invariant { .. } => PyRuntimeError::new_err(err.to_string()),
         RDKitError::Value(m) => PyValueError::new_err(m),
+        RDKitError::Conformer(_) => PyValueError::new_err("Bad Conformer Id"),
         RDKitError::Key(m) => PyKeyError::new_err(m),
         RDKitError::Index(m) => PyIndexError::new_err(m),
         RDKitError::Runtime(m) | RDKitError::FileParse(m) => PyRuntimeError::new_err(m),

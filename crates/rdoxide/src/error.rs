@@ -20,6 +20,8 @@ pub enum RDKitError {
     /// `FileParseException` -> `RuntimeError` (most Python readers catch it
     /// and return `None`).
     FileParse(String),
+    /// `ConformerException` -> `ValueError("Bad Conformer Id")`
+    Conformer(String),
     /// `BadFileException` -> `OSError`
     BadFile(String),
     /// Sanitization failures (`MolSanitizeException` hierarchy).
@@ -111,6 +113,7 @@ impl fmt::Display for RDKitError {
             | RDKitError::Index(m)
             | RDKitError::Runtime(m)
             | RDKitError::FileParse(m)
+            | RDKitError::Conformer(m)
             | RDKitError::BadFile(m) => f.write_str(m),
             RDKitError::Sanitize(e) => match e {
                 SanitizeError::Generic { message }
