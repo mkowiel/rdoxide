@@ -36,7 +36,12 @@ fn gone() -> PyErr {
 }
 
 fn no_owner() -> PyErr {
-    crate::errors::to_py(rdoxide::RDKitError::precondition("no owner"))
+    crate::errors::to_py(rdoxide::RDKitError::precondition_at(
+        "no owner",
+        "dp_mol",
+        "Code/GraphMol/Atom.h",
+        158,
+    ))
 }
 
 impl PyAtom {

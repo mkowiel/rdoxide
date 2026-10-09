@@ -441,8 +441,48 @@ fn pick_bisector(nbr1: &Point3D, nbr2: &Point3D, nbr3: &Point3D) -> Point3D {
 
 /// `MolOps::setTerminalAtomCoords`: places terminal atom `idx` bonded to `other_idx`.
 pub fn set_terminal_atom_coords(mol: &mut RWMol, idx: u32, other_idx: u32) -> Result<()> {
+    const FILE: &str = "Code/GraphMol/AddHs.cpp";
     if other_idx == idx {
-        return Err(RDKitError::precondition("degenerate atoms"));
+        return Err(RDKitError::precondition_at(
+            "degenerate atoms",
+            "otherIdx != idx",
+            FILE,
+            183,
+        ));
+    }
+    if idx >= mol.num_atoms() {
+        return Err(RDKitError::range_at(
+            "idx",
+            idx,
+            mol.num_atoms(),
+            "Code/GraphMol/ROMol.cpp",
+            202,
+        ));
+    }
+    if mol.atom_degree(idx) != 1 {
+        return Err(RDKitError::precondition_at(
+            "bad atom degree",
+            "mol.getAtomDegree(atom) == 1",
+            FILE,
+            185,
+        ));
+    }
+    if other_idx >= mol.num_atoms() {
+        return Err(RDKitError::range_at(
+            "idx1",
+            other_idx,
+            mol.num_atoms(),
+            "Code/GraphMol/ROMol.cpp",
+            344,
+        ));
+    }
+    if mol.get_bond_between_atoms(other_idx, idx)?.is_none() {
+        return Err(RDKitError::precondition_at(
+            "no bond between atoms",
+            "bond",
+            FILE,
+            187,
+        ));
     }
     let pt = PeriodicTable::get();
     let bond_length = pt.get_rb0(1)? + pt.get_rb0(mol.atom(other_idx).atomic_num())?;
@@ -707,4 +747,14 @@ pub fn add_hs(
         }
     }
     Ok(())
+}
+
+/// `MolOps::needsHs`: whether any atom has implicit hydrogens.
+pub fn needs_hs(mol: &crate::graphmol::romol::ROMol) -> Result<bool> {
+    for idx in 0..mol.num_atoms() {
+        if mol.total_num_hs(idx, false)? > 0 {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
