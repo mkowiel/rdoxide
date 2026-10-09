@@ -767,3 +767,13 @@
 [module."rdoxide_python::rdsubstructlibrary".sources]
 "Code/GraphMol/SubstructLibrary/Wrap/SubstructLibraryWrap.cpp" = "ca6a9b9123ea1efdf4d347060031763383965245"
 "Code/GraphMol/SubstructLibrary/Wrap/rdSubstructLibrary.cpp" = "e852d8f6dba0c62e6831933d0a765b3c7e0d9321"
+
+[module."rdoxide::graphmol::mol_hash".sources]
+"Code/GraphMol/MolHash/hashfunctions.cpp" = "5be6991ca3764e624889169e7f2821f6b8159520"
+"Code/GraphMol/MolHash/normalize.cpp" = "2d35e6dbc28caa9e4e1a0e1a0a8612b6001e3f79"
+"Code/GraphMol/MolHash/MolHash.h" = "061b7d60577274ae89ce59ec489c02f58faa58c2"
+"Code/GraphMol/MolHash/mf.h" = "08e19d8084f54139a2b59eb46e959d2eacb8f19c"
+"Code/GraphMol/MolHash/nmmolhash.h" = "e138ba5c1ef9d523507c8ac106439b429902d2f8"
+
+[module."rdoxide_python::rdmolhash".sources]
+"Code/GraphMol/MolHash/Wrap/rdMolHash.cpp" = "e73c98c535bdc473a44aa58cdd97c3e9b2da9d2c"
