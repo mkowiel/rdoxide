@@ -322,3 +322,7 @@ to = "python/rdkit/Chem/FastSDMolSupplier.py"
 [[copy]]
 from = "rdkit/Chem/EnumerateStereoisomers.py"
 to = "python/rdkit/Chem/EnumerateStereoisomers.py"
+
+[[copy]]
+from = "rdkit/Chem/MolStandardize/__init__.py"
+to = "python/rdkit/Chem/MolStandardize/__init__.py"

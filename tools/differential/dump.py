@@ -846,7 +846,107 @@ def lipinski_record(smi):
     return res
 
 
+def standardize_record(smi):
+    """rdMolStandardize results; RDOXIDE_STANDARDIZE (comma-separated keys)
+    limits the comparison to the steps ported so far."""
+    import os
+
+    from rdkit.Chem.MolStandardize import rdMolStandardize as ms
+    m = Chem.MolFromSmiles(smi)
+    if m is None:
+        return None
+    steps = {
+        "removeFragments": lambda x: ms.RemoveFragments(x),
+        "fragmentRemover": lambda x: ms.FragmentRemover().remove(x),
+        "fragmentRemoverSkip": lambda x: ms.FragmentRemover(skip_if_all_match=True).remove(x),
+        "largestFragment": lambda x: ms.LargestFragmentChooser().choose(x),
+        "largestOrganic": lambda x: ms.LargestFragmentChooser(preferOrganic=True).choose(x),
+        "largestHeavy": lambda x: ms.LargestFragmentChooser(_heavy_params()).choose(x),
+        "normalize": lambda x: ms.Normalize(x),
+        "normalizeInPlace": lambda x: (ms.NormalizeInPlace(x), x)[1],
+        "reionize": lambda x: ms.Reionize(x),
+        "uncharge": lambda x: ms.Uncharger().uncharge(x),
+        "unchargeNoncanon": lambda x: ms.Uncharger(canonicalOrder=False).uncharge(x),
+        "disconnect": lambda x: ms.DisconnectOrganometallics(x),
+        "metalDisconnector": lambda x: ms.MetalDisconnector().Disconnect(x),
+        "metalDisconnectorAll": lambda x: ms.MetalDisconnector(_metal_opts()).Disconnect(x),
+        "cleanup": lambda x: ms.Cleanup(x),
+        "fragmentParent": lambda x: ms.FragmentParent(x),
+        "chargeParent": lambda x: ms.ChargeParent(x),
+        "isotopeParent": lambda x: ms.IsotopeParent(x),
+        "stereoParent": lambda x: ms.StereoParent(x),
+        "canonicalTautomer": lambda x: ms.CanonicalTautomer(x),
+        "tautomerParent": lambda x: ms.TautomerParent(x),
+        "superParent": lambda x: ms.SuperParent(x),
+        "standardizeSmiles": lambda x: ms.StandardizeSmiles(Chem.MolToSmiles(x)),
+        "validate": lambda x: ms.ValidateSmiles(Chem.MolToSmiles(x)),
+        "validators": lambda x: _validators(ms, x),
+        "tautomers": lambda x: _tautomers(ms, x),
+    }
+    keys = os.environ.get("RDOXIDE_STANDARDIZE")
+    keys = keys.split(",") if keys else list(steps)
+    res = {}
+    for k in keys:
+        try:
+            out = steps[k](Chem.Mol(m))
+        except Exception as e:  # noqa: BLE001
+            res[k] = type(e).__name__
+            continue
+        res[k] = Chem.MolToSmiles(out) if isinstance(out, Chem.Mol) else out
+    return res
+
+
+def _validators(ms, m):
+    from rdkit.Chem import rdDepictor
+    res = {}
+    vals = {
+        "rdkit": ms.RDKitValidation(), "molvs": ms.MolVSValidation(), "neutral": ms.NeutralValidation(),
+        "isotope": ms.IsotopeValidation(), "isotopeStrict": ms.IsotopeValidation(strict=True),
+        "radical": ms.DisallowedRadicalValidation(), "features": ms.FeaturesValidation(),
+        "allowed": ms.AllowedAtomsValidation([Chem.Atom(x) for x in (6, 7, 8, 1)]),
+        "disallowed": ms.DisallowedAtomsValidation([Chem.Atom(x) for x in (9, 17, 35)]),
+        "is2d": ms.Is2DValidation(), "layout": ms.Layout2DValidation(), "stereo": ms.StereoValidation(),
+    }
+    m2 = Chem.Mol(m)
+    rdDepictor.Compute2DCoords(m2)
+    Chem.WedgeMolBonds(m2, m2.GetConformer())
+    for k, v in vals.items():
+        for all_ in (False, True):
+            for tag, mol in (("", m), ("2d", m2)):
+                try:
+                    res[f"{k}{tag}{int(all_)}"] = v.validate(mol, reportAllFailures=all_)
+                except Exception as e:  # noqa: BLE001
+                    res[f"{k}{tag}{int(all_)}"] = type(e).__name__
+    return res
+
+
+def _metal_opts():
+    from rdkit.Chem.MolStandardize import rdMolStandardize as ms
+    o = ms.MetalDisconnectorOptions()
+    o.splitGrignards = True
+    o.splitAromaticC = True
+    return o
+
+
+def _heavy_params():
+    from rdkit.Chem.MolStandardize import rdMolStandardize as ms
+    p = ms.CleanupParameters()
+    p.largestFragmentChooserCountHeavyAtomsOnly = True
+    return p
+
+
+def _tautomers(ms, m):
+    te = ms.TautomerEnumerator()
+    te.SetMaxTautomers(50)
+    res = te.Enumerate(m)
+    return {"status": str(res.status), "smiles": list(res.smiles),
+            "canonical": Chem.MolToSmiles(te.Canonicalize(m)),
+            "score": te.ScoreTautomer(m)}
+
+
 def dump(mode, smi):
+    if mode == "standardize":
+        return standardize_record(smi)
     if mode == "lipinski":
         return lipinski_record(smi)
     if mode == "molprops":

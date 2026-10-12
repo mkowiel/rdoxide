@@ -83,6 +83,9 @@ mod rdmolops_subset;
 mod rdmolops_transforms;
 mod rdmolops_wedging;
 mod rdmolops_zip;
+mod rdmolstandardize;
+mod rdmolstandardize_pipeline;
+mod rdmolstandardize_tautomer;
 mod rdmoltransforms;
 mod rdpartialcharges;
 mod rdqueries;
@@ -184,6 +187,12 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
         rdsubstructlibrary::init,
     )?;
     add_submodule(m, "rdMolHash", "rdkit.Chem.rdMolHash", rdmolhash::init)?;
+    add_submodule(
+        m,
+        "rdMolStandardize",
+        "rdkit.Chem.MolStandardize.rdMolStandardize",
+        rdmolstandardize::init,
+    )?;
     add_submodule(m, "rdMMPA", "rdkit.Chem.rdMMPA", rdmmpa::init)?;
     add_submodule(
         m,

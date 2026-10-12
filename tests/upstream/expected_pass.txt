@@ -626,6 +626,8 @@ rdkit/Chem/Fingerprints/UnitTestSimScreener.py::TestCase::test1_TopNScreener
 rdkit/Chem/Fingerprints/UnitTestSimScreener.py::TestCase::test2_ThresholdScreener
 rdkit/Chem/Fingerprints/UnitTestSimScreener.py::TestCase::test3_ThresholdScreener_folding
 rdkit/Chem/Fingerprints/UnitTestSimScreener.py::TestCase::test_SimilarityScreener
+rdkit/Chem/MolStandardize/UnitTestMolStandardize.py::TestCase::testBasic
+rdkit/Chem/MolStandardize/UnitTestMolStandardize.py::TestCase::testLength
 rdkit/Chem/Scaffolds/UnitTestMurckoScaffold.py::DocTestCase::runTest
 rdkit/Chem/Scaffolds/UnitTestMurckoScaffold.py::TestCase::test1MurckoScaffold
 rdkit/Chem/Scaffolds/UnitTestMurckoScaffold.py::TestCase::test2MurckoScaffold

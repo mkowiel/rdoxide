@@ -146,6 +146,76 @@ def regen_atomic_data() -> None:
           f"data/element_names.txt: {len(names)} names")
 
 
+_MOLSTANDARDIZE_TABLES = [
+    # (upstream .in file, initializer name, output file, fields per entry)
+    ("AcidBaseCatalog/acid_base_pairs.in", "defaultAcidBasePairs", "acid_base_pairs.tsv", 3),
+    ("FragmentCatalog/fragmentPatterns.in", "defaultFragments", "fragment_patterns.tsv", 2),
+    ("TransformCatalog/normalizations.in", "defaultNormalizations", "normalizations.tsv", 2),
+    ("TautomerCatalog/tautomerTransforms.in", "defaultTautomerTransforms",
+     "tautomer_transforms.tsv", 4),
+    ("TautomerCatalog/tautomerTransforms.v1.in", "defaultTautomerTransformsv1",
+     "tautomer_transforms_v1.tsv", 4),
+]
+
+
+def _cxx_initializer_entries(src: str, name: str) -> list[list[str]]:
+    """The string literals of each top-level element of the brace initializer
+    of `name` (adjacent literals concatenated, as the C++ compiler does)."""
+    toks = re.findall(r'//[^\n]*|"(?:[^"\\]|\\.)*"|[{}(),]|[^\s{}(),"/]+|/', src)
+    i = next(k for k, t in enumerate(toks) if t == name)
+    while toks[i] != "{":
+        i += 1
+    entries, cur, depth, prev_lit = [], [], 0, False
+    for t in toks[i:]:
+        if t.startswith("//"):
+            continue
+        if t.startswith('"'):
+            lit = t[1:-1]
+            if "\\" in lit:
+                raise ValueError(f"{name}: escape sequences are not handled: {t}")
+            if prev_lit:
+                cur[-1] += lit
+            else:
+                cur.append(lit)
+            prev_lit = True
+            continue
+        prev_lit = False
+        if t in "{(":
+            depth += 1
+        elif t in "})":
+            depth -= 1
+            if depth == 0:
+                break
+        elif t == "," and depth == 1:
+            entries.append(cur)
+            cur = []
+    if cur:
+        entries.append(cur)
+    return entries
+
+
+def regen_molstandardize() -> None:
+    """The default MolStandardize tables (compiled-in C++ initializers upstream)
+    as tab-separated files for `graphmol::mol_standardize::catalogs`."""
+    srcdir = UPSTREAM_DIR / "Code/GraphMol/MolStandardize"
+    outdir = DATA / "molstandardize"
+    outdir.mkdir(exist_ok=True)
+    for path, name, out, nfields in _MOLSTANDARDIZE_TABLES:
+        entries = _cxx_initializer_entries((srcdir / path).read_text(), name)
+        for e in entries:
+            if len(e) != nfields or any("\t" in f or "\n" in f for f in e):
+                raise ValueError(f"{path}: unexpected entry {e}")
+        (outdir / out).write_text(
+            f"# Extracted from RDKit Code/GraphMol/MolStandardize/{path} ({name})\n"
+            "# by tools/sync_upstream.py.\n"
+            "# Copyright (C) RDKit contributors (BSD-3-Clause).\n"
+            "# DO NOT EDIT - regenerate with `python3 tools/sync_upstream.py regen`.\n"
+            "# One entry per line, fields separated by tabs (empty fields allowed).\n"
+            + "".join("\t".join(e) + "\n" for e in entries)
+        )
+        print(f"molstandardize/{out}: {len(entries)} entries")
+
+
 def regen_common_properties() -> None:
     """Generate rdgeneral/common_properties.rs from Code/RDGeneral/types.h."""
     src = (UPSTREAM_DIR / "Code/RDGeneral/types.h").read_text()
@@ -209,6 +279,7 @@ def cmd_regen(_args) -> None:
     if not UPSTREAM_DIR.exists():
         sys.exit("upstream/rdkit missing - run `sync_upstream.py fetch` first")
     regen_atomic_data()
+    regen_molstandardize()
     regen_common_properties()
     regen_copies()
 
