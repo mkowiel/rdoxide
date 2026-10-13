@@ -96,6 +96,7 @@ mod ringinfo;
 mod stereo_group;
 mod substance_group;
 mod substruct;
+mod vector_suite;
 mod vects;
 mod writer_sink;
 

@@ -140,3 +140,60 @@ def test_pipeline():
     assert any(e.detail.startswith("One or more disconnected fragments") for e in res.log)
     bad = ms.Pipeline().run("garbage")
     assert bad.status & ms.PipelineStatus.INPUT_ERROR
+
+
+def test_vector_suites():
+    v = ms.GetDefaultTautomerScoreSubstructs()
+    assert [t.name for t in v[1:3]] == ["oxim", "C=O"] and type(v[1:3]) is ms.SubstructTermVector
+    assert ms.SubstructTerm("C=O", "[#6]=,:[#8]", 2) in v and 5 not in v
+    with pytest.raises(IndexError, match="Index out of range"):
+        v[100]
+    with pytest.raises(IndexError, match="slice step size not supported."):
+        v[::2]
+    with pytest.raises(TypeError, match="Attempting to append an invalid type"):
+        v.append(1)
+    del v[0:2]
+    assert len(v) == 10
+    for cls in (ms.PipelineLog, ms.PipelineResult, ms.TautomerEnumeratorResult):
+        with pytest.raises(RuntimeError, match="cannot be instantiated"):
+            cls()
+
+
+def test_pipeline_log_is_shared():
+    m = Chem.MolFromSmiles("CC[O-].[Na+]")
+    from rdkit.Chem import rdDepictor
+    rdDepictor.Compute2DCoords(m)
+    res = ms.Pipeline().run(Chem.MolToMolBlock(m))
+    n = len(res.log)
+    res.log.append(res.log[0])
+    assert len(res.log) == n + 1
+
+
+def _without_rings(smi):
+    src = Chem.MolFromSmiles(smi)
+    rw = Chem.RWMol()
+    for a in src.GetAtoms():
+        rw.AddAtom(Chem.Atom(a))
+    for b in src.GetBonds():
+        rw.AddBond(b.GetBeginAtomIdx(), b.GetEndAtomIdx(), b.GetBondType())
+    m = rw.GetMol()
+    m.UpdatePropertyCache(False)
+    return m
+
+
+def test_scoring_leaves_rings_on_the_input():
+    m = _without_rings("c1ccccc1C1CCCC1")
+    with pytest.raises(RuntimeError):
+        m.GetRingInfo().NumRings()
+    assert ms.ScoreRings(m) == 250
+    assert m.GetRingInfo().NumRings() == 2
+
+
+def test_catalog_files_are_cached(tmp_path):
+    path = tmp_path / "acidbase.txt"
+    path.write_text("acid\tC(=O)[OH]\tC(=O)[O-]\n")
+    p = ms.CleanupParameters()
+    p.acidbaseFile = str(path)
+    first = smi(ms.Reionize(Chem.MolFromSmiles("OC(=O)CC(=O)[O-]"), p))
+    path.write_text("not a valid line\n")
+    assert smi(ms.Reionize(Chem.MolFromSmiles("OC(=O)CC(=O)[O-]"), p)) == first

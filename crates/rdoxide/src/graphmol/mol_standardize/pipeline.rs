@@ -387,7 +387,7 @@ pub fn remove_error_prefix(message: &str) -> String {
 
 /// `Operations::validate`
 pub fn validate(
-    mol: RWMol,
+    mut mol: RWMol,
     result: &mut PipelineResult,
     options: &PipelineOptions,
 ) -> Result<Option<RWMol>> {
@@ -433,7 +433,7 @@ pub fn validate(
         (ValidationMethod::Stereo, STEREO_VALIDATION_ERROR),
     ];
     for (v, st) in &validations {
-        let errors = v.validate(&mol, options.report_all_failures)?;
+        let errors = v.validate_in_place(&mut mol, options.report_all_failures)?;
         for e in &errors {
             result.append(*st, &remove_error_prefix(e));
         }

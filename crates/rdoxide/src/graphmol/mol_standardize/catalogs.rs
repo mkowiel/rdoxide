@@ -10,7 +10,9 @@
 //! The default tables are compiled in upstream (`*.in` initializers); they
 //! are extracted to `data/molstandardize/*.tsv` by `tools/sync_upstream.py`.
 
-use std::sync::OnceLock;
+use std::collections::HashMap;
+use std::hash::Hash;
+use std::sync::{Arc, Mutex, OnceLock};
 
 use crate::error::{RDKitError, Result};
 use crate::graphmol::bond::BondType;
@@ -499,6 +501,64 @@ impl TautomerCatalogParams {
     }
 }
 
+// ------------------------------------------------------------------ caching
+
+/// A flyweight table: params by key.
+type Cache<K, V> = OnceLock<Mutex<HashMap<K, Arc<V>>>>;
+
+/// `boost::flyweight<key_value<K, Params>, no_tracking>`: params built once
+/// per key and kept for the lifetime of the process (a file is read only the
+/// first time its name is used). Failed constructions are not cached.
+fn flyweight<K, V>(
+    cache: &'static Cache<K, V>,
+    key: &K,
+    make: impl FnOnce() -> Result<V>,
+) -> Result<Arc<V>>
+where
+    K: Eq + Hash + Clone,
+{
+    let map = cache.get_or_init(|| Mutex::new(HashMap::new()));
+    if let Some(v) = map.lock().unwrap_or_else(|e| e.into_inner()).get(key) {
+        return Ok(v.clone());
+    }
+    // built outside the lock (parsing runs reactions/SMARTS code that may log)
+    let v = Arc::new(make()?);
+    let mut guard = map.lock().unwrap_or_else(|e| e.into_inner());
+    Ok(guard.entry(key.clone()).or_insert(v).clone())
+}
+
+impl TransformCatalogParams {
+    /// `param_filename_flyweight(transformFile)` of `Normalizer`.
+    pub fn cached_from_file(file_name: &str) -> Result<Arc<Self>> {
+        static CACHE: Cache<String, TransformCatalogParams> = OnceLock::new();
+        flyweight(&CACHE, &file_name.to_string(), || {
+            Self::from_file(file_name)
+        })
+    }
+
+    /// `param_data_flyweight(normalizations)` of `Normalizer`.
+    pub fn cached_from_data(data: &[(String, String)]) -> Result<Arc<Self>> {
+        static CACHE: Cache<Vec<(String, String)>, TransformCatalogParams> = OnceLock::new();
+        flyweight(&CACHE, &data.to_vec(), || Self::from_data(data))
+    }
+}
+
+impl AcidBaseCatalogParams {
+    /// `param_filename_flyweight(acidbaseFile)` of `Reionizer`.
+    pub fn cached_from_file(file_name: &str) -> Result<Arc<Self>> {
+        static CACHE: Cache<String, AcidBaseCatalogParams> = OnceLock::new();
+        flyweight(&CACHE, &file_name.to_string(), || {
+            Self::from_file(file_name)
+        })
+    }
+
+    /// `param_data_flyweight(data)` of `Reionizer`.
+    pub fn cached_from_data(data: &[(String, String, String)]) -> Result<Arc<Self>> {
+        static CACHE: Cache<Vec<(String, String, String)>, AcidBaseCatalogParams> = OnceLock::new();
+        flyweight(&CACHE, &data.to_vec(), || Self::from_data(data))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -523,5 +583,18 @@ mod tests {
         );
         assert_eq!(TautomerCatalogParams::defaults().transforms().len(), 37);
         assert_eq!(TautomerCatalogParams::defaults_v1().transforms().len(), 36);
+    }
+
+    #[test]
+    fn files_are_read_once() {
+        let path = std::env::temp_dir().join(format!("rdoxide_ab_{}.txt", std::process::id()));
+        std::fs::write(&path, "acid\tC(=O)[OH]\tC(=O)[O-]\n").unwrap();
+        let name = path.to_str().unwrap();
+        let first = AcidBaseCatalogParams::cached_from_file(name).unwrap();
+        std::fs::write(&path, "").unwrap();
+        let second = AcidBaseCatalogParams::cached_from_file(name).unwrap();
+        assert!(Arc::ptr_eq(&first, &second));
+        assert_eq!(second.pairs().len(), 1);
+        std::fs::remove_file(&path).unwrap();
     }
 }

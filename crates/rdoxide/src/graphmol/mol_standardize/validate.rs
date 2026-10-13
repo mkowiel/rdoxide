@@ -4,6 +4,7 @@
 //!
 //! Ported from RDKit `Code/GraphMol/MolStandardize/Validate.{h,cpp}`.
 
+use std::borrow::Cow;
 use std::f64::consts::PI;
 
 use super::catalogs::FragmentCatalogParams;
@@ -107,8 +108,45 @@ fn template_matches(tmpl: &Atom, mol: &ROMol, idx: u32) -> Result<bool> {
 }
 
 impl ValidationMethod {
-    /// `validate(mol, reportAllFailures)`: the error/info messages.
+    /// `validate(mol, reportAllFailures)`: the error/info messages; `mol` is
+    /// not modified.
     pub fn validate(&self, mol: &ROMol, report_all_failures: bool) -> Result<Vec<String>> {
+        self.run(&mut Cow::Borrowed(mol), report_all_failures)
+    }
+
+    /// `validate` as upstream runs it: `Layout2DValidation` stores the ring
+    /// information it computes (`fastFindRings`) on `mol`.
+    pub fn validate_in_place(
+        &self,
+        mol: &mut ROMol,
+        report_all_failures: bool,
+    ) -> Result<Vec<String>> {
+        let mut target = Cow::Owned(std::mem::take(mol));
+        let res = self.run(&mut target, report_all_failures);
+        *mol = target.into_owned();
+        res
+    }
+
+    /// The validation of `target`; only the ring perception of
+    /// `Layout2DValidation` writes to it (a borrowed molecule is copied then).
+    fn run(&self, target: &mut Cow<'_, ROMol>, report_all_failures: bool) -> Result<Vec<String>> {
+        if let ValidationMethod::Composite(validations) = self {
+            let mut errors = Vec::new();
+            for v in validations {
+                let partial = v.run(target, report_all_failures)?;
+                if !partial.is_empty() {
+                    errors.extend(partial);
+                    if !report_all_failures {
+                        break;
+                    }
+                }
+            }
+            return Ok(errors);
+        }
+        if let ValidationMethod::Layout2D(l) = self {
+            return layout_2d_validation(target, l, report_all_failures);
+        }
+        let mol: &ROMol = target;
         match self {
             ValidationMethod::RDKit {
                 allow_empty_molecules,
@@ -137,18 +175,8 @@ impl ValidationMethod {
             ValidationMethod::Isotope { strict } => {
                 isotope_validation(mol, *strict, report_all_failures)
             }
-            ValidationMethod::Composite(validations) => {
-                let mut errors = Vec::new();
-                for v in validations {
-                    let partial = v.validate(mol, report_all_failures)?;
-                    if !partial.is_empty() {
-                        errors.extend(partial);
-                        if !report_all_failures {
-                            break;
-                        }
-                    }
-                }
-                Ok(errors)
+            ValidationMethod::Composite(_) | ValidationMethod::Layout2D(_) => {
+                unreachable!("handled above")
             }
             ValidationMethod::AllowedAtoms(allowed) => {
                 let mut errors = Vec::new();
@@ -200,7 +228,6 @@ impl ValidationMethod {
             ValidationMethod::Is2D { threshold } => {
                 is_2d_validation(mol, *threshold, report_all_failures)
             }
-            ValidationMethod::Layout2D(l) => layout_2d_validation(mol, l, report_all_failures),
             ValidationMethod::Stereo => {
                 let mut errors = Vec::new();
                 for i in 0..mol.num_atoms() {
@@ -479,10 +506,11 @@ pub fn squared_median_bond_length(mol: &ROMol, conf: &Conformer) -> Result<f64> 
 }
 
 fn layout_2d_validation(
-    mol: &ROMol,
+    target: &mut Cow<'_, ROMol>,
     l: &Layout2DValidation,
     report_all_failures: bool,
 ) -> Result<Vec<String>> {
+    let mol: &ROMol = target;
     let mut errors = Vec::new();
     if mol.num_conformers() == 0 {
         errors.push("ERROR: [Layout2DValidation] The molecule has no coordinates".into());
@@ -520,17 +548,15 @@ fn layout_2d_validation(
             }
         }
     }
-    // ring info is needed for the exemptions
-    let mut with_rings;
-    let mol = if (l.allow_long_bonds_in_rings || l.allow_atom_bond_clash_exemption)
+    // ring info is needed for the exemptions (upstream computes it on the
+    // const input molecule)
+    if (l.allow_long_bonds_in_rings || l.allow_atom_bond_clash_exemption)
         && !mol.ring_info().is_initialized()
     {
-        with_rings = mol.clone();
-        fast_find_rings(&mut with_rings)?;
-        &with_rings
-    } else {
-        mol
-    };
+        fast_find_rings(target.to_mut())?;
+    }
+    let mol: &ROMol = target;
+    let conf = mol.conformer(-1)?;
     let bond_length_threshold = l.bond_length_limit * l.bond_length_limit * reference;
     for bond in mol.bonds() {
         let (i, j) = (bond.begin_atom_idx(), bond.end_atom_idx());

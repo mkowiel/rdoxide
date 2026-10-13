@@ -60,7 +60,7 @@ impl Default for Normalizer {
     fn default() -> Self {
         rd_log_info!("Initializing Normalizer");
         Normalizer {
-            params: Arc::new(TransformCatalogParams::defaults().clone()),
+            params: TransformCatalogParams::cached_from_file("").expect("default normalizations"),
             max_restarts: 200,
         }
     }
@@ -68,18 +68,16 @@ impl Default for Normalizer {
 
 impl Normalizer {
     /// `Normalizer(normalizeFile, maxRestarts)`; an empty file name selects
-    /// the default transforms.
+    /// the default transforms. The parsed file is cached by name.
     pub fn from_file(file_name: &str, max_restarts: u32) -> Result<Self> {
         rd_log_info!("Initializing Normalizer");
-        let params = if file_name.is_empty() {
-            TransformCatalogParams::defaults().clone()
-        } else {
-            TransformCatalogParams::from_file(file_name)?
-        };
-        Ok(Self::with_params(params, max_restarts))
+        Ok(Self::with_shared_params(
+            TransformCatalogParams::cached_from_file(file_name)?,
+            max_restarts,
+        ))
     }
 
-    /// `Normalizer(std::istream &, maxRestarts)`
+    /// `Normalizer(std::istream &, maxRestarts)` (not cached)
     pub fn from_text(text: &str, max_restarts: u32) -> Result<Self> {
         rd_log_info!("Initializing Normalizer");
         Ok(Self::with_params(
@@ -88,18 +86,22 @@ impl Normalizer {
         ))
     }
 
-    /// `Normalizer(normalizations, maxRestarts)`
+    /// `Normalizer(normalizations, maxRestarts)`; cached by the data.
     pub fn from_data(data: &[(String, String)], max_restarts: u32) -> Result<Self> {
         rd_log_info!("Initializing Normalizer");
-        Ok(Self::with_params(
-            TransformCatalogParams::from_data(data)?,
+        Ok(Self::with_shared_params(
+            TransformCatalogParams::cached_from_data(data)?,
             max_restarts,
         ))
     }
 
     pub fn with_params(params: TransformCatalogParams, max_restarts: u32) -> Self {
+        Self::with_shared_params(Arc::new(params), max_restarts)
+    }
+
+    pub fn with_shared_params(params: Arc<TransformCatalogParams>, max_restarts: u32) -> Self {
         Normalizer {
-            params: Arc::new(params),
+            params,
             max_restarts,
         }
     }

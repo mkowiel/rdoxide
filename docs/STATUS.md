@@ -190,13 +190,10 @@ New Python test files are also run against the official wheel to validate expect
 
 ## Known deviations (to revisit)
 
-* MolStandardize: catalog files named in `CleanupParameters` (normalizations, acid/base,
-  fragments, tautomers) are read on every construction; upstream caches them by file name for
-  the lifetime of the process. `ScoreRings` & co. compute missing ring information on a copy
-  instead of on the passed molecule. `SubstructTermVector` and `PipelineLog` are minimal
-  list-like classes. Upstream tests that need `rdCIPLabeler` or InChI are not run. The
-  multi-molecule `*InPlace(mols, numThreads)` overloads treat `numThreads <= 0` as "all
-  (but |n|) cores"; upstream strides its loop by `numThreads` and never ends for 0.
+* MolStandardize: the multi-molecule `*InPlace(mols, numThreads)` overloads treat
+  `numThreads <= 0` as "all (but |n|) cores"; upstream strides its loop by `numThreads` and
+  never ends for 0 (and repeats molecules for negative values). Upstream tests that need
+  `rdCIPLabeler` or InChI are not run.
 
 * Floating-point results follow the native RDKit build of the platform: on aarch64 rdoxide fuses
   multiply-adds exactly where clang does (`rdgeneral::fp::fmuladd`), on x86-64 it does not. The

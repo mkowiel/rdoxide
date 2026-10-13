@@ -1,15 +1,14 @@
 //! The pipeline part of `rdkit.Chem.MolStandardize.rdMolStandardize`
 //! (upstream `GraphMol/MolStandardize/nbWrap/Pipeline.cpp`).
 
-use pyo3::exceptions::PyIndexError;
 use pyo3::prelude::*;
-use pyo3::types::PyList;
 use rdoxide::graphmol::mol_standardize::pipeline::{
     Pipeline, PipelineLogEntry, PipelineOptions, PipelineResult, status,
 };
 
 use crate::enums::{add_enum, to_py};
 use crate::errors::IntoPyResult;
+use crate::vector_suite::{VectorSuite, no_python_init, vector_suite_methods};
 
 const STATUS: [(&str, i64); 22] = [
     ("NO_EVENT", status::NO_EVENT as i64),
@@ -170,7 +169,7 @@ impl PyPipelineLogEntry {
     }
 }
 
-/// The log entries of a pipeline run (a read-only list).
+/// The log entries of a pipeline run (upstream's `vector_indexing_suite`).
 #[pyclass(
     name = "PipelineLog",
     module = "rdkit.Chem.MolStandardize.rdMolStandardize",
@@ -182,39 +181,44 @@ pub struct PyPipelineLog {
     entries: Vec<PipelineLogEntry>,
 }
 
-#[pymethods]
-impl PyPipelineLog {
-    fn __len__(&self) -> usize {
-        self.entries.len()
+impl VectorSuite for PyPipelineLog {
+    type Item = PipelineLogEntry;
+
+    fn items(&self) -> &Vec<PipelineLogEntry> {
+        &self.entries
     }
 
-    fn __bool__(&self) -> bool {
-        !self.entries.is_empty()
+    fn items_mut(&mut self) -> &mut Vec<PipelineLogEntry> {
+        &mut self.entries
     }
 
-    fn __getitem__(&self, i: i64) -> PyResult<PyPipelineLogEntry> {
-        let n = self.entries.len() as i64;
-        let i = if i < 0 { i + n } else { i };
-        if i < 0 || i >= n {
-            return Err(PyIndexError::new_err("list index out of range"));
-        }
-        Ok(PyPipelineLogEntry {
-            inner: self.entries[i as usize].clone(),
-        })
+    fn to_py<'py>(py: Python<'py>, item: &PipelineLogEntry) -> PyResult<Bound<'py, PyAny>> {
+        Ok(Bound::new(
+            py,
+            PyPipelineLogEntry {
+                inner: item.clone(),
+            },
+        )?
+        .into_any())
     }
 
-    fn __iter__<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let items = self
-            .entries
-            .iter()
-            .map(|e| PyPipelineLogEntry { inner: e.clone() })
-            .collect::<Vec<_>>();
-        PyList::new(py, items)?
-            .into_any()
-            .try_iter()
-            .map(Bound::into_any)
+    fn from_py(obj: &Bound<'_, PyAny>) -> Option<PipelineLogEntry> {
+        obj.cast::<PyPipelineLogEntry>()
+            .ok()
+            .map(|e| e.borrow().inner.clone())
+    }
+
+    fn new_vector<'py>(
+        py: Python<'py>,
+        items: Vec<PipelineLogEntry>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        Ok(Bound::new(py, PyPipelineLog { entries: items })?.into_any())
     }
 }
+
+vector_suite_methods!(PyPipelineLog);
+
+no_python_init!(PyPipelineLogEntry, PyPipelineLog, PyPipelineResult);
 
 #[pyclass(
     name = "PipelineResult",
@@ -223,6 +227,8 @@ impl PyPipelineLog {
 #[derive(Debug)]
 pub struct PyPipelineResult {
     inner: PipelineResult,
+    /// the log, shared with Python (upstream returns it by reference)
+    log: Py<PyPipelineLog>,
 }
 
 #[pymethods]
@@ -238,10 +244,8 @@ impl PyPipelineResult {
     }
 
     #[getter]
-    fn log(&self) -> PyPipelineLog {
-        PyPipelineLog {
-            entries: self.inner.log.clone(),
-        }
+    fn log(&self, py: Python<'_>) -> Py<PyPipelineLog> {
+        self.log.clone_ref(py)
     }
 
     #[getter(inputMolData)]
@@ -282,8 +286,10 @@ impl PyPipeline {
     #[pyo3(signature = (molData))]
     #[allow(non_snake_case)]
     fn run(&self, py: Python<'_>, molData: &str) -> PyResult<PyPipelineResult> {
-        let inner = py.detach(|| self.inner.run(molData)).py()?;
-        Ok(PyPipelineResult { inner })
+        let mut inner = py.detach(|| self.inner.run(molData)).py()?;
+        let entries = std::mem::take(&mut inner.log);
+        let log = Py::new(py, PyPipelineLog { entries })?;
+        Ok(PyPipelineResult { inner, log })
     }
 }
 

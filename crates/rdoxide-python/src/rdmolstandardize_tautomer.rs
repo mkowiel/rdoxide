@@ -11,14 +11,15 @@ use rdoxide::graphmol::ROMol;
 use rdoxide::graphmol::mol_standardize::tautomer::{
     SubstructTerm, TAUTOMER_SCORING_VERSION, Tautomer, TautomerEnumerator,
     TautomerEnumeratorCallback, TautomerEnumeratorResult, TautomerEnumeratorStatus,
-    default_tautomer_score_substructs, score_hetero_hs, score_rings, score_substructs,
-    score_tautomer,
+    default_tautomer_score_substructs, ensure_symm_sssr, score_hetero_hs, score_rings,
+    score_substructs, score_tautomer,
 };
 
 use crate::enums::{add_enum, to_py};
-use crate::errors::{IntoPyResult, to_py as err_to_py};
+use crate::errors::{IntoPyResult, argument_error_in, boost_type_name, to_py as err_to_py};
 use crate::mol::PyMol;
 use crate::rdmolstandardize::PyCleanupParameters;
+use crate::vector_suite::{VectorSuite, no_python_init, vector_suite_methods};
 
 const STATUS: [(&str, i64); 4] = [
     ("Completed", 0),
@@ -428,7 +429,9 @@ impl PyTautomerEnumerator {
     /// returns the score for a tautomer using the default scoring scheme.
     #[staticmethod]
     #[pyo3(name = "ScoreTautomer")]
-    fn score_tautomer_py(mol: PyRef<'_, PyMol>) -> PyResult<i32> {
+    fn score_tautomer_py(mut mol: PyRefMut<'_, PyMol>) -> PyResult<i32> {
+        // upstream leaves the symmetrized SSSR on the molecule
+        ensure_symm_sssr(&mut mol.mol).py()?;
         score_tautomer(&mol.mol).py()
     }
 
@@ -583,7 +586,9 @@ fn get_v1_tautomer_enumerator() -> PyTautomerEnumerator {
 /// Aromatic rings score 100, all carbon aromatic rings score 250
 #[pyfunction]
 #[pyo3(name = "ScoreRings")]
-fn score_rings_py(mol: PyRef<'_, PyMol>) -> PyResult<i32> {
+fn score_rings_py(mut mol: PyRefMut<'_, PyMol>) -> PyResult<i32> {
+    // upstream leaves the symmetrized SSSR on the molecule
+    ensure_symm_sssr(&mut mol.mol).py()?;
     score_rings(&mol.mol).py()
 }
 
@@ -640,7 +645,7 @@ impl PySubstructTerm {
     }
 }
 
-/// A list of SubstructTerm objects (nanobind's `bind_vector`).
+/// A list of SubstructTerm objects (upstream's `vector_indexing_suite`).
 #[pyclass(
     name = "SubstructTermVector",
     module = "rdkit.Chem.MolStandardize.rdMolStandardize",
@@ -659,100 +664,62 @@ fn term_of(o: &Bound<'_, PyAny>) -> PyResult<SubstructTerm> {
         .clone())
 }
 
-impl PySubstructTermVector {
-    fn index(&self, i: i64) -> PyResult<usize> {
-        let n = self.terms.len() as i64;
-        let i = if i < 0 { i + n } else { i };
-        if i < 0 || i >= n {
-            return Err(PyIndexError::new_err("list index out of range"));
-        }
-        Ok(i as usize)
+impl VectorSuite for PySubstructTermVector {
+    type Item = SubstructTerm;
+
+    fn items(&self) -> &Vec<SubstructTerm> {
+        &self.terms
+    }
+
+    fn items_mut(&mut self) -> &mut Vec<SubstructTerm> {
+        &mut self.terms
+    }
+
+    fn to_py<'py>(py: Python<'py>, item: &SubstructTerm) -> PyResult<Bound<'py, PyAny>> {
+        Ok(Bound::new(
+            py,
+            PySubstructTerm {
+                inner: item.clone(),
+            },
+        )?
+        .into_any())
+    }
+
+    fn from_py(obj: &Bound<'_, PyAny>) -> Option<SubstructTerm> {
+        obj.cast::<PySubstructTerm>()
+            .ok()
+            .map(|t| t.borrow().inner.clone())
+    }
+
+    fn new_vector<'py>(py: Python<'py>, items: Vec<SubstructTerm>) -> PyResult<Bound<'py, PyAny>> {
+        Ok(Bound::new(py, PySubstructTermVector { terms: items })?.into_any())
     }
 }
 
 #[pymethods]
 impl PySubstructTermVector {
     #[new]
-    #[pyo3(signature = (arg = None))]
-    fn new(arg: Option<&Bound<'_, PyAny>>) -> PyResult<Self> {
-        let mut v = PySubstructTermVector::default();
-        if let Some(arg) = arg {
-            for t in arg.try_iter()? {
-                v.terms.push(term_of(&t?)?);
-            }
+    #[pyo3(signature = (*args))]
+    fn new(args: &Bound<'_, PyTuple>) -> PyResult<Self> {
+        if !args.is_empty() {
+            let got: Vec<String> = std::iter::once("SubstructTermVector".to_string())
+                .chain(args.iter().map(|a| boost_type_name(&a)))
+                .collect();
+            return Err(argument_error_in(
+                args.py(),
+                "SubstructTermVector",
+                "__init__",
+                &got,
+                "__init__(_object*)",
+            ));
         }
-        Ok(v)
-    }
-
-    fn __len__(&self) -> usize {
-        self.terms.len()
-    }
-
-    fn __bool__(&self) -> bool {
-        !self.terms.is_empty()
-    }
-
-    fn __getitem__(&self, i: i64) -> PyResult<PySubstructTerm> {
-        Ok(PySubstructTerm {
-            inner: self.terms[self.index(i)?].clone(),
-        })
-    }
-
-    fn __setitem__(&mut self, i: i64, value: &Bound<'_, PyAny>) -> PyResult<()> {
-        let i = self.index(i)?;
-        self.terms[i] = term_of(value)?;
-        Ok(())
-    }
-
-    fn __delitem__(&mut self, i: i64) -> PyResult<()> {
-        let i = self.index(i)?;
-        self.terms.remove(i);
-        Ok(())
-    }
-
-    fn __iter__<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let items = self
-            .terms
-            .iter()
-            .map(|t| PySubstructTerm { inner: t.clone() })
-            .collect::<Vec<_>>();
-        PyList::new(py, items)?
-            .into_any()
-            .try_iter()
-            .map(Bound::into_any)
-    }
-
-    fn append(&mut self, value: &Bound<'_, PyAny>) -> PyResult<()> {
-        self.terms.push(term_of(value)?);
-        Ok(())
-    }
-
-    fn extend(&mut self, values: &Bound<'_, PyAny>) -> PyResult<()> {
-        for v in values.try_iter()? {
-            self.terms.push(term_of(&v?)?);
-        }
-        Ok(())
-    }
-
-    fn insert(&mut self, i: i64, value: &Bound<'_, PyAny>) -> PyResult<()> {
-        let n = self.terms.len() as i64;
-        let i = (if i < 0 { i + n } else { i }).clamp(0, n) as usize;
-        self.terms.insert(i, term_of(value)?);
-        Ok(())
-    }
-
-    #[pyo3(signature = (index = -1))]
-    fn pop(&mut self, index: i64) -> PyResult<PySubstructTerm> {
-        let i = self.index(index)?;
-        Ok(PySubstructTerm {
-            inner: self.terms.remove(i),
-        })
-    }
-
-    fn clear(&mut self) {
-        self.terms.clear();
+        Ok(PySubstructTermVector::default())
     }
 }
+
+vector_suite_methods!(PySubstructTermVector);
+
+no_python_init!(PyTautomer, PySmilesTautomerMap, PyTautomerEnumeratorResult);
 
 /// scores the tautomer substructures
 #[pyfunction]

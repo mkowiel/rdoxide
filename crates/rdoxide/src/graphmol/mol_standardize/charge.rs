@@ -86,7 +86,7 @@ impl Default for Reionizer {
     /// `Reionizer()`: the default acid/base pairs and charge corrections.
     fn default() -> Self {
         Reionizer {
-            params: Arc::new(AcidBaseCatalogParams::defaults().clone()),
+            params: AcidBaseCatalogParams::cached_from_file("").expect("default acid/base pairs"),
             ccs: charge_corrections(),
         }
     }
@@ -97,14 +97,12 @@ type AcidMatch = (usize, Vec<u32>);
 
 impl Reionizer {
     /// `Reionizer(acidbaseFile[, ccs])`; an empty file name selects the
-    /// default pairs.
+    /// default pairs. The parsed file is cached by name.
     pub fn from_file(file_name: &str, ccs: Option<Vec<ChargeCorrection>>) -> Result<Self> {
-        let params = if file_name.is_empty() {
-            AcidBaseCatalogParams::defaults().clone()
-        } else {
-            AcidBaseCatalogParams::from_file(file_name)?
-        };
-        Ok(Self::with_params(params, ccs))
+        Ok(Self::with_shared_params(
+            AcidBaseCatalogParams::cached_from_file(file_name)?,
+            ccs,
+        ))
     }
 
     /// `Reionizer(std::istream &, ccs)`
@@ -115,20 +113,27 @@ impl Reionizer {
         ))
     }
 
-    /// `Reionizer(data[, ccs])`
+    /// `Reionizer(data[, ccs])`; cached by the data.
     pub fn from_data(
         data: &[(String, String, String)],
         ccs: Option<Vec<ChargeCorrection>>,
     ) -> Result<Self> {
-        Ok(Self::with_params(
-            AcidBaseCatalogParams::from_data(data)?,
+        Ok(Self::with_shared_params(
+            AcidBaseCatalogParams::cached_from_data(data)?,
             ccs,
         ))
     }
 
     pub fn with_params(params: AcidBaseCatalogParams, ccs: Option<Vec<ChargeCorrection>>) -> Self {
+        Self::with_shared_params(Arc::new(params), ccs)
+    }
+
+    pub fn with_shared_params(
+        params: Arc<AcidBaseCatalogParams>,
+        ccs: Option<Vec<ChargeCorrection>>,
+    ) -> Self {
         Reionizer {
-            params: Arc::new(params),
+            params,
             ccs: ccs.unwrap_or_else(charge_corrections),
         }
     }

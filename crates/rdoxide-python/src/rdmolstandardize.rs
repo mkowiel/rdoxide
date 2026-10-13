@@ -961,11 +961,14 @@ impl PyValidationMethod {
         mol: &Bound<'_, PyMol>,
         reportAllFailures: bool,
     ) -> PyResult<Vec<String>> {
-        let mol_obj = mol;
-        let mol = mol.borrow();
+        // validations may store ring information on the molecule, as
+        // upstream's Layout2DValidation does
         if let Some(inner) = &self.inner {
-            let mol = &mol.mol;
-            return py.detach(|| inner.validate(mol, reportAllFailures)).py();
+            let mut m = mol.borrow_mut();
+            let m = &mut m.mol;
+            return py
+                .detach(|| inner.validate_in_place(m, reportAllFailures))
+                .py();
         }
         let Some(members) = &self.members else {
             return Err(PyRuntimeError::new_err(
@@ -975,10 +978,12 @@ impl PyValidationMethod {
         let mut errors = Vec::new();
         for m in members {
             let partial: Vec<String> = match m {
-                Member::Native(v) => v.validate(&mol.mol, reportAllFailures).py()?,
+                Member::Native(v) => v
+                    .validate_in_place(&mut mol.borrow_mut().mol, reportAllFailures)
+                    .py()?,
                 Member::Python(obj) => obj
                     .bind(py)
-                    .call_method1("validate", (mol_obj, reportAllFailures))?
+                    .call_method1("validate", (mol, reportAllFailures))?
                     .extract()?,
             };
             if !partial.is_empty() {

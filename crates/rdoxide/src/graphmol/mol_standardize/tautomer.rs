@@ -197,6 +197,15 @@ fn score_rings_impl(mol: &ROMol) -> i32 {
     score
 }
 
+/// The symmetrized SSSR that `scoreRings` computes on (and leaves in) the
+/// molecule it scores when it is missing.
+pub fn ensure_symm_sssr(mol: &mut ROMol) -> Result<()> {
+    if !mol.ring_info().is_symm_sssr() {
+        symmetrize_sssr(mol, SymmetrizeSSSRAlgorithm::Default, true, false, false)?;
+    }
+    Ok(())
+}
+
 /// `scoreRings`: 100 per aromatic ring, 250 per all-carbon aromatic ring.
 pub fn score_rings(mol: &ROMol) -> Result<i32> {
     Ok(score_rings_impl(&*with_symm_rings(mol)?))
