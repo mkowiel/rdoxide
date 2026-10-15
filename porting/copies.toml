@@ -358,3 +358,7 @@ to = "tests/data/molfiles/mmff_complex1.mol"
 [[copy]]
 from = "Code/GraphMol/ForceFieldHelpers/MMFF/test_data/Issue239.mol"
 to = "tests/data/molfiles/mmff_Issue239.mol"
+
+[[copy]]
+from = "rdkit/Chem/FilterCatalog.py"
+to = "python/rdkit/Chem/FilterCatalog.py"

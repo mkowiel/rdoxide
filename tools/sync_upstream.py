@@ -302,6 +302,111 @@ def _strip_cpp_comments(text: str) -> str:
     return "\n".join(out)
 
 
+def _cpp_tokens(text: str):
+    """Tokens of C++ source (comments and preprocessor lines dropped):
+    ('s', decoded string) | ('n', int) | ('i', identifier) | ('p', punctuation)."""
+    i, n = 0, len(text)
+    toks = []
+    while i < n:
+        c = text[i]
+        if c in " \t\r\n":
+            i += 1
+        elif text.startswith("//", i):
+            i = text.find("\n", i)
+            i = n if i < 0 else i
+        elif text.startswith("/*", i):
+            i = text.index("*/", i) + 2
+        elif c == "#":
+            i = text.find("\n", i)
+            i = n if i < 0 else i
+        elif c == '"':
+            j, out = i + 1, []
+            while text[j] != '"':
+                if text[j] == "\\":
+                    j += 1
+                    out.append({"n": "\n", "t": "\t"}.get(text[j], text[j]))
+                else:
+                    out.append(text[j])
+                j += 1
+            toks.append(("s", "".join(out)))
+            i = j + 1
+        elif c.isdigit():
+            j = i
+            while j < n and text[j].isalnum():
+                j += 1
+            toks.append(("n", int(text[i:j].rstrip("uU"))))
+            i = j
+        elif c.isalpha() or c == "_":
+            j = i
+            while j < n and (text[j].isalnum() or text[j] == "_"):
+                j += 1
+            toks.append(("i", text[i:j]))
+            i = j
+        else:
+            toks.append(("p", c))
+            i += 1
+    return toks
+
+
+def regen_filtercatalog() -> None:
+    """The built-in filter catalogs (Brenk, NIH, PAINS, ZINC, ChEMBL) from
+    `Filters.cpp` and its `*.in` files as `crates/rdoxide/data/filtercatalog.txt`:
+    `@NAME` starts a catalog, `P<TAB>key<TAB>value` is a property and
+    `E<TAB>name<TAB>smarts<TAB>max<TAB>comment` an entry."""
+    srcdir = UPSTREAM_DIR / "Code/GraphMol/FilterCatalog"
+    text = (srcdir / "Filters.cpp").read_text()
+    text = re.sub(
+        r'^#include "([\w.]+\.in)"',
+        lambda m: (srcdir / m.group(1)).read_text(),
+        text,
+        flags=re.M,
+    )
+    toks = _cpp_tokens(text)
+    entries, props = {}, {}
+    i = 0
+    while i < len(toks):
+        if toks[i] == ("i", "const") and toks[i + 1][1] in ("FilterData_t", "FilterProperty_t"):
+            kind, name = toks[i + 1][1], toks[i + 2][1]
+            if toks[i + 3] != ("p", "[") or toks[i + 5] != ("p", "="):
+                i += 1
+                continue
+            j = i + 7  # after the opening brace
+            rows = []
+            while toks[j] != ("p", "}") or toks[j - 1] == ("p", "}") and False:
+                assert toks[j] == ("p", "{"), (name, toks[j])
+                j += 1
+                fields = [[]]
+                while toks[j] != ("p", "}"):
+                    if toks[j] == ("p", ","):
+                        fields.append([])
+                    else:
+                        fields[-1].append(toks[j])
+                    j += 1
+                j += 1
+                if toks[j] == ("p", ","):
+                    j += 1
+                rows.append(["".join(str(t[1]) for t in f) for f in fields])
+            (entries if kind == "FilterData_t" else props)[name] = rows
+            i = j
+        else:
+            i += 1
+    out = [
+        "# Extracted from RDKit Code/GraphMol/FilterCatalog/Filters.cpp and *.in",
+        "# by tools/sync_upstream.py.",
+        "# Copyright (c) 2015, Novartis Institutes for BioMedical Research Inc. (BSD-3-Clause).",
+        "# DO NOT EDIT - regenerate with `python3 tools/sync_upstream.py regen`.",
+    ]
+    for name, rows in entries.items():
+        out.append(f"@{name}")
+        for key, value in props[f"{name}_PROPS"]:
+            out.append(f"P\t{key}\t{value}")
+        for ename, smarts, mx, comment in rows:
+            assert "\t" not in ename + smarts + comment and "\n" not in ename + smarts + comment
+            out.append(f"E\t{ename}\t{smarts}\t{mx}\t{comment}")
+    (DATA / "filtercatalog.txt").write_text("\n".join(out) + "\n")
+    print(f"filtercatalog.txt: {len(entries)} catalogs, {sum(map(len, entries.values()))} entries")
+
+
 def regen_crystalff() -> None:
     """The experimental torsion-angle preferences of CrystalFF/ETKDG as
     `crates/rdoxide/data/crystalff/*.txt`: SMARTS and cosine-series constants
@@ -424,6 +529,7 @@ def cmd_regen(_args) -> None:
     regen_uff_params()
     regen_mmff_params()
     regen_crystalff()
+    regen_filtercatalog()
     regen_common_properties()
     regen_copies()
 

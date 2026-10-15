@@ -379,22 +379,35 @@ const FUNC_DATA: &[FuncData] = &[
     ),
 ];
 
-fn build(normalize: bool) -> BTreeMap<String, ROMol> {
+fn pattern_of(f: &FuncData) -> ROMol {
     let params = SmartsParserParams {
         merge_hs: true,
         ..SmartsParserParams::default()
     };
+    let mut pattern = mol_from_smarts(f.smarts, &params)
+        .ok()
+        .flatten()
+        .unwrap_or_else(|| panic!("bad functional group SMARTS for {}", f.name));
+    pattern.dict_mut().set_val("Label", f.label);
+    if let Some(reaction) = f.removal_reaction {
+        pattern.dict_mut().set_val("RemovalReaction", reaction);
+    }
+    pattern
+}
+
+/// The definitions in hierarchy order: (level, dotted name, pattern).
+pub fn functional_group_definitions() -> Vec<(usize, &'static str, ROMol)> {
+    FUNC_DATA
+        .iter()
+        .map(|f| (usize::from(f.level), f.name, pattern_of(f)))
+        .collect()
+}
+
+fn build(normalize: bool) -> BTreeMap<String, ROMol> {
     FUNC_DATA
         .iter()
         .map(|f| {
-            let mut pattern = mol_from_smarts(f.smarts, &params)
-                .ok()
-                .flatten()
-                .unwrap_or_else(|| panic!("bad functional group SMARTS for {}", f.name));
-            pattern.dict_mut().set_val("Label", f.label);
-            if let Some(reaction) = f.removal_reaction {
-                pattern.dict_mut().set_val("RemovalReaction", reaction);
-            }
+            let pattern = pattern_of(f);
             let key = if normalize {
                 f.name.to_lowercase()
             } else {

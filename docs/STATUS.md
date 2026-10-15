@@ -132,6 +132,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 23f | Python `rdkit.Chem.rdDistGeom` (`EmbedParameters`, presets, `EmbedMolecule`/`EmbedMultipleConfs` in both call styles, `GetMoleculeBoundsMatrix`, `GetExperimentalTorsions`, failure-cause enums) and `rdkit.DistanceGeometry.DistGeom` (`DoTriangleSmoothing`, `EmbedBoundsMatrix`). `EmbedParametersToJSON` and the JSON reader (`EmbedderUtils`) are ported too | ✅ | upstream `testDistGeom.py` 30/30; `rdkitBuild` now has upstream's field layout |
 | 24a | FMCS core (`graphmol::fmcs`): `MCSParameters`/comparators, seeds and growing, hash/duplicate caches, incremental matching, ring-fusion and chirality checks, thresholds, `StoreAll`, `InitialSeed`, SMARTS/query result, JSON parameters. VF2 (`substruct`) is now generic over the graph type. Not ported: verbose statistics output | ✅ | benzene/chain/threshold/degenerate/complete-rings cases |
 | 24b | Python `rdkit.Chem.rdFMCS` (`FindMCS` both forms, `MCSParameters`, compare-parameter classes, enums, `MCSResult`; custom atom/bond comparators, progress, final-match and acceptance callbacks as Python subclasses) | ✅ | upstream `testFMCS.py` 60/60 |
+| 25 | FilterCatalog (`graphmol::filter_catalog`: matchers And/Or/Not/SmartsMatcher/ExclusionList/FilterHierarchyMatcher, entries, catalogs, all built-in catalogs PAINS/Brenk/NIH/ZINC/ChEMBL from generated data, `RunFilterCatalog`, functional group hierarchy) and Python `rdfiltercatalog` / `Chem.FilterCatalog` (matchers may be Python subclasses). Not supported: Boost serialization (as in an upstream build without it) | ✅ | upstream `FilterCatalog/Wrap/rough_test.py` 17/17; catalog sizes match upstream |
 | 7–13 | see PLAN.md | ⬜ | |
 
 ## Python package files
@@ -316,3 +317,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-15 — Stage 23e: Embedder. Next: Python rdDistGeom (EmbedMolecule, EmbedMultipleConfs, ETKDG presets, GetMoleculeBoundsMatrix, EmbedParameters JSON), then upstream rdDistGeom tests.
 * 2026-10-15 — Stage 23f: Python rdDistGeom and DistanceGeometry.DistGeom; upstream testDistGeom.py passes, incl. EmbedderUtils JSON. Next: FMCS, FilterCatalog, RGroupDecomposition.
 * 2026-10-15 — Stage 24a/24b: FMCS core and Python rdFMCS; upstream testFMCS.py passes. Next: FilterCatalog, RGroupDecomposition.
+* 2026-10-16 — Stage 25: FilterCatalog and Python rdfiltercatalog. Next: RGroupDecomposition, MinimizeTrajectory, new stereo perception.
