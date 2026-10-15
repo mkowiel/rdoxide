@@ -44,8 +44,10 @@ pub struct FilterMatch {
 
 impl PartialEq for FilterMatch {
     fn eq(&self, other: &Self) -> bool {
-        std::ptr::addr_eq(Arc::as_ptr(&self.filter_match), Arc::as_ptr(&other.filter_match))
-            && self.atom_pairs == other.atom_pairs
+        std::ptr::addr_eq(
+            Arc::as_ptr(&self.filter_match),
+            Arc::as_ptr(&other.filter_match),
+        ) && self.atom_pairs == other.atom_pairs
     }
 }
 
@@ -93,7 +95,8 @@ impl FilterMatcher for And {
         if !self.is_valid() {
             return Err(RDKitError::precondition(msg));
         }
-        Ok(required(&self.arg1, msg)?.has_match(mol)? && required(&self.arg2, msg)?.has_match(mol)?)
+        Ok(required(&self.arg1, msg)?.has_match(mol)?
+            && required(&self.arg2, msg)?.has_match(mol)?)
     }
 
     fn get_matches(&self, mol: &ROMol, match_vect: &mut Vec<FilterMatch>) -> Result<bool> {
@@ -150,7 +153,8 @@ impl FilterMatcher for Or {
         if !self.is_valid() {
             return Err(RDKitError::precondition(msg));
         }
-        Ok(required(&self.arg1, msg)?.has_match(mol)? || required(&self.arg2, msg)?.has_match(mol)?)
+        Ok(required(&self.arg1, msg)?.has_match(mol)?
+            || required(&self.arg2, msg)?.has_match(mol)?)
     }
 
     fn get_matches(&self, mol: &ROMol, match_vect: &mut Vec<FilterMatch>) -> Result<bool> {
@@ -196,7 +200,9 @@ impl FilterMatcher for Not {
     fn has_match(&self, mol: &ROMol) -> Result<bool> {
         let arg = required(&self.arg1, "FilterMatchOps::Not: arg1 is null")?;
         if !arg.is_valid() {
-            return Err(RDKitError::precondition("FilterMatchOps::Not: arg1 is null"));
+            return Err(RDKitError::precondition(
+                "FilterMatchOps::Not: arg1 is null",
+            ));
         }
         Ok(!arg.has_match(mol)?)
     }
@@ -204,7 +210,9 @@ impl FilterMatcher for Not {
     fn get_matches(&self, mol: &ROMol, _: &mut Vec<FilterMatch>) -> Result<bool> {
         let arg = required(&self.arg1, "FilterMatchOps::Not: arg1 is null")?;
         if !arg.is_valid() {
-            return Err(RDKitError::precondition("FilterMatchOps::Not: arg1 is null"));
+            return Err(RDKitError::precondition(
+                "FilterMatchOps::Not: arg1 is null",
+            ));
         }
         let mut match_vect = Vec::new();
         Ok(!arg.get_matches(mol, &mut match_vect)?)
@@ -234,7 +242,10 @@ fn parse_smarts(smarts: &str) -> Option<Arc<ROMol>> {
         merge_hs: true,
         ..SmartsParserParams::default()
     };
-    mol_from_smarts(smarts, &params).ok().flatten().map(Arc::new)
+    mol_from_smarts(smarts, &params)
+        .ok()
+        .flatten()
+        .map(Arc::new)
 }
 
 impl SmartsMatcher {

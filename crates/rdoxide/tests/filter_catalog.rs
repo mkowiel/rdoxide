@@ -2,9 +2,9 @@
 
 use std::sync::Arc;
 
+use rdoxide::graphmol::ROMol;
 use rdoxide::graphmol::filter_catalog::*;
 use rdoxide::graphmol::smiles_parse::{SmilesParserParams, mol_from_smiles};
-use rdoxide::graphmol::ROMol;
 
 fn mol(smi: &str) -> ROMol {
     mol_from_smiles(smi, &SmilesParserParams::default())
@@ -24,7 +24,11 @@ fn builtin_catalog_sizes() {
         (catalogs::ZINC, 50),
         (catalogs::CHEMBL, 770),
     ] {
-        assert_eq!(FilterCatalog::from_catalogs(flag).unwrap().num_entries(), n, "{flag}");
+        assert_eq!(
+            FilterCatalog::from_catalogs(flag).unwrap().num_entries(),
+            n,
+            "{flag}"
+        );
     }
 }
 

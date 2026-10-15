@@ -77,7 +77,9 @@ fn builtin_catalogs() -> &'static BTreeMap<&'static str, BuiltinCatalog> {
                 );
                 continue;
             }
-            let cat = map.get_mut(current.expect("catalog header")).expect("catalog");
+            let cat = map
+                .get_mut(current.expect("catalog header"))
+                .expect("catalog");
             let f: Vec<&str> = line.split('\t').collect();
             match f[0] {
                 "P" => cat.props.push((f[1].to_string(), f[2].to_string())),
@@ -261,7 +263,9 @@ impl FilterCatalog {
 
     /// `getEntry`: an out of range index is an `IndexError`.
     pub fn entry(&self, idx: usize) -> Result<&Arc<FilterCatalogEntry>> {
-        self.entries.get(idx).ok_or(RDKitError::Index(idx.to_string()))
+        self.entries
+            .get(idx)
+            .ok_or(RDKitError::Index(idx.to_string()))
     }
 
     /// `getIdxForEntry`: `u32::MAX` when the entry is not in the catalog.
@@ -317,7 +321,10 @@ pub fn run_filter_catalog(
     smiles: &[String],
     num_threads: i32,
 ) -> Vec<Result<Vec<Arc<FilterCatalogEntry>>>> {
-    let bad_smiles = Arc::new(FilterCatalogEntry::with_matcher("no valid RDKit molecule", None));
+    let bad_smiles = Arc::new(FilterCatalogEntry::with_matcher(
+        "no valid RDKit molecule",
+        None,
+    ));
     par_map(smiles, num_threads, |smi| {
         match mol_from_smiles(smi, &SmilesParserParams::default()) {
             Ok(Some(mol)) => catalog.matches(&mol),
