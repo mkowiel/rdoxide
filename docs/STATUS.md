@@ -123,6 +123,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 22a | MMFF parameter tables (`forcefield::mmff::params`: Def/Prop/PBCI/Chg/Bond/Bndk/Herschbach-Laurie/CovRad-Pauling/Angle/Stbn/Dfsb/Oop/Tor/VdW incl. the MMFF94s variants, equivalence-level and wildcard lookups) | ✅ | unit tests on table loading and lookups; tables extracted from upstream by `sync_upstream.py regen` |
 | 22b | MMFF atom typing (`graphmol::forcefield_helpers::mmff`: `MmffMolProperties` — heavy-atom and hydrogen types, formal/partial charges, bond/angle/stretch-bend/torsion types, table lookups with the empirical-rule fallbacks for bond, angle and torsion parameters, `sanitize_mmff_mol`) | ✅ | integration test `mmff_typer` (types of alcohols, acids, carboxylates, aromatics; charge conservation); validated against the upstream tests once the Python API lands |
 | 22c | MMFF force-field terms and builder (`forcefield::mmff::terms`: bond stretch, angle bend, stretch-bend, out-of-plane, torsion, vdW, electrostatic and combined nonbonded contributions; `forcefield_helpers::mmff`: `construct_force_field`, neighbor matrix, per-term `add_*`; verbose listings not produced) | ✅ | finite-difference gradient tests of every term; minimization of upstream's small1/small2/benzene/toluene/complex1 converges |
+| 22d | MMFF Python API (`MMFFGetMoleculeProperties`/`MMFFMolProperties`, `MMFFOptimizeMolecule`, `MMFFOptimizeMoleculeConfs` (parallel), `MMFFGetMoleculeForceField`, `MMFFHasAllMoleculeParams`, `MMFFSanitizeMolecule`, `CreateEmptyForceFieldForMol`, `OptimizeMolecule(Confs)`; the MMFF constraints) | ✅ | upstream `testHelpers.py` 21/21 and `testConstraints.py` 12/12 (energies, parameters, charges); `tests/python/test_forcefield_mmff.py` |
 | 7–13 | see PLAN.md | ⬜ | |
 
 ## Python package files
@@ -299,3 +300,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-15 — Stage 22a: MMFF parameter tables and lookups. Next: MMFF atom typer, builder and terms, then the Python MMFF API.
 * 2026-10-15 — Stage 22b: MMFF atom typer, charges and parameter lookup. Next: MMFF builder and force-field terms, then the Python MMFF API.
 * 2026-10-15 — Stage 22c: MMFF force-field terms and builder. Next: the Python MMFF API (MMFFGetMoleculeProperties, MMFFOptimizeMolecule(Confs), MMFFGetMoleculeForceField, ...).
+* 2026-10-15 — Stage 22d: MMFF Python API; upstream testHelpers.py/testConstraints.py pass. Next: DistGeom/ETKDG, FMCS, FilterCatalog, RGroupDecomposition.
