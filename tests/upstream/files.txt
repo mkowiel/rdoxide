@@ -18,3 +18,4 @@ rdkit/ML/Cluster/UnitTest*.py
 rdkit/SimDivFilters/UnitTest*.py
 Code/DataManip/**/Wrap/test*.py
 Code/GraphMol/MolHash/Wrap/testMolHash.py
+Code/ForceField/Wrap/test*.py

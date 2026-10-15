@@ -523,6 +523,10 @@ impl ForceFieldContrib for TorsionAngleContrib {
     fn box_clone(&self) -> Box<dyn ForceFieldContrib> {
         Box::new(self.clone())
     }
+
+    fn scale_torsion_force_constant(&mut self, count: u32) {
+        self.scale_force_constant(count);
+    }
 }
 
 // ---------------------------------------------------------------- inversion

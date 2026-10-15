@@ -1044,3 +1044,18 @@
 "Code/ForceField/UFF/Nonbonded.cpp" = "f43c9f38b24185d0b49eab80cf9d569b50790cab"
 "Code/ForceField/UFF/Utils.h" = "bc4a1b6078d671ea526428606fe02ffd48ae4645"
 "Code/ForceField/UFF/Utils.cpp" = "f9cf385281f2b6cd8a63e33d8418ed6651cd696b"
+
+[module."rdoxide::graphmol::forcefield_helpers".sources]
+"Code/GraphMol/ForceFieldHelpers/FFConvenience.h" = "03be1abb186ed2b02e635c04b744a9396130666c"
+"Code/GraphMol/ForceFieldHelpers/UFF/UFF.h" = "f12a66e7df201eabd50a43624a5ff62b0db8ab88"
+
+[module."rdoxide::graphmol::forcefield_helpers::uff".sources]
+"Code/GraphMol/ForceFieldHelpers/UFF/AtomTyper.h" = "5b20a5ece7202bc6022c39b4cf503037089e0314"
+"Code/GraphMol/ForceFieldHelpers/UFF/AtomTyper.cpp" = "abdbeaa31a94e4d1ce41ab0f187d9d98a801dd71"
+"Code/GraphMol/ForceFieldHelpers/UFF/Builder.h" = "4fd57ab25cff5dba6d95ddc0a7a35ec151a038cb"
+"Code/GraphMol/ForceFieldHelpers/UFF/Builder.cpp" = "1750059b43cae821788e3d3725f1e282b83de3dd"
+
+[module."rdoxide_python::rdforcefield".sources]
+"Code/ForceField/Wrap/ForceField.cpp" = "665f8d820ba207a50868c1f77638ad6da2ed8aec"
+"Code/ForceField/Wrap/PyForceField.h" = "55cc4eb9c5a8cd6124f92af2b471a635f29ce51f"
+"Code/GraphMol/ForceFieldHelpers/Wrap/rdForceFields.cpp" = "0a17ff9109cc6bc06b9b49e0f5b422ac8921b643"

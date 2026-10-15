@@ -55,6 +55,7 @@ Code/DataStructs/Wrap/testSparseIntVect.py::TestCase::test6BulkDice
 Code/DataStructs/Wrap/testSparseIntVect.py::TestCase::test6BulkTversky
 Code/DataStructs/Wrap/testSparseIntVect.py::TestCase::test7ToList
 Code/DataStructs/Wrap/testSparseIntVect.py::TestCase::testPickle1
+Code/ForceField/Wrap/testConstraints.py::TestCase::testUFFFixedAtoms
 Code/Geometry/Wrap/testGeometry.py::TestCase::test10Dihedrals
 Code/Geometry/Wrap/testGeometry.py::TestCase::test11UniformGridIndices
 Code/Geometry/Wrap/testGeometry.py::TestCase::test12UniformRealGridIndices
@@ -152,6 +153,14 @@ Code/GraphMol/Fingerprints/Wrap/testGenerators.py::TestCase::testTopologicalTors
 Code/GraphMol/Fingerprints/Wrap/testMHFP.py::TestCase::testBulkFunctions
 Code/GraphMol/Fingerprints/Wrap/testMHFP.py::TestCase::testMHFPDistance
 Code/GraphMol/Fingerprints/Wrap/testMHFP.py::TestCase::testMHFPFingerprint
+Code/GraphMol/ForceFieldHelpers/Wrap/testHelpers.py::TestCase::test1
+Code/GraphMol/ForceFieldHelpers/Wrap/testHelpers.py::TestCase::test10
+Code/GraphMol/ForceFieldHelpers/Wrap/testHelpers.py::TestCase::test12
+Code/GraphMol/ForceFieldHelpers/Wrap/testHelpers.py::TestCase::test14
+Code/GraphMol/ForceFieldHelpers/Wrap/testHelpers.py::TestCase::test2
+Code/GraphMol/ForceFieldHelpers/Wrap/testHelpers.py::TestCase::test3
+Code/GraphMol/ForceFieldHelpers/Wrap/testHelpers.py::TestCase::test4
+Code/GraphMol/ForceFieldHelpers/Wrap/testHelpers.py::TestCase::test_uff_get_forcefield_runs
 Code/GraphMol/MMPA/Wrap/testMMPA.py::TestCase::test1
 Code/GraphMol/MMPA/Wrap/testMMPA.py::TestCase::test2
 Code/GraphMol/MMPA/Wrap/testMMPA.py::TestCase::test3

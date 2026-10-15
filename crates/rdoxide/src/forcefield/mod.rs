@@ -19,6 +19,9 @@ pub trait ForceFieldContrib: Send + Sync {
     /// adds the contribution to the gradient at `pos` into `grad`
     fn add_grad(&self, pos: &[f64], grad: &mut [f64]);
     fn box_clone(&self) -> Box<dyn ForceFieldContrib>;
+    /// divides the force constant of a torsion term (`scaleForceConstant`);
+    /// other terms ignore it
+    fn scale_torsion_force_constant(&mut self, _count: u32) {}
 }
 
 impl Clone for Box<dyn ForceFieldContrib> {
@@ -90,6 +93,14 @@ impl ForceField {
 
     pub fn contribs(&self) -> &[Box<dyn ForceFieldContrib>] {
         &self.contribs
+    }
+
+    /// Divides the force constants of the torsion terms from index `first`
+    /// on by `count`.
+    pub fn scale_torsions_from(&mut self, first: usize, count: u32) {
+        for c in &mut self.contribs[first..] {
+            c.scale_torsion_force_constant(count);
+        }
     }
 
     pub fn fixed_points(&self) -> &[usize] {
