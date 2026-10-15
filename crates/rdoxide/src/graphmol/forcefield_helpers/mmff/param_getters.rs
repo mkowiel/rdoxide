@@ -6,6 +6,7 @@ use super::props::{MmffMolProperties, stretch_bend_type};
 use super::rings::periodic_table_row;
 use crate::error::Result;
 use crate::forcefield::mmff::params::{Angle, Bond, Oop, Stbn, Tor};
+use crate::forcefield::mmff::terms::VdWRijstarEps;
 use crate::graphmol::romol::ROMol;
 
 fn is_double_zero(x: f64) -> bool {
@@ -236,5 +237,17 @@ impl MmffMolProperties {
         self.params()
             .oop(types[0], types[1], types[2], types[3])
             .copied()
+    }
+
+    /// Van der Waals parameters of the atom pair (none if the properties are
+    /// invalid or a type has no vdW parameters).
+    pub fn vdw_params(&self, idx1: u32, idx2: u32) -> Option<VdWRijstarEps> {
+        if !self.valid {
+            return None;
+        }
+        let params = self.params();
+        let i = params.vdw(u32::from(self.atom_type(idx1)))?;
+        let j = params.vdw(u32::from(self.atom_type(idx2)))?;
+        Some(VdWRijstarEps::new(params.vdw_constants(), i, j))
     }
 }
