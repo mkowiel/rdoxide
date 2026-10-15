@@ -144,3 +144,38 @@ def test_parameters():
 
 def test_module_layout():
     assert rdForceField.ForceField is ChemicalForceFields.ForceField
+
+
+def test_distance_constraint_pulls_atoms():
+    m = benzene()
+    ff = ChemicalForceFields.UFFGetMoleculeForceField(m)
+    ff.UFFAddDistanceConstraint(0, 3, False, 4.0, 4.0, 500.0)
+    assert ff.Minimize(maxIts=500) in (0, 1)
+    pos = m.GetConformer().GetPositions()
+    assert ((pos[0] - pos[3]) ** 2).sum() ** 0.5 > 3.0
+
+
+def test_constraint_errors():
+    ff = ChemicalForceFields.UFFGetMoleculeForceField(benzene())
+    with pytest.raises(RuntimeError):
+        ff.UFFAddDistanceConstraint(0, 99, False, 1.0, 2.0, 10.0)
+    with pytest.raises(RuntimeError):
+        ff.UFFAddDistanceConstraint(0, 1, False, 3.0, 2.0, 10.0)
+    with pytest.raises(RuntimeError):
+        ff.UFFAddAngleConstraint(0, 1, 2, False, 10.0, 200.0, 10.0)
+
+
+def test_extra_points():
+    m = benzene()
+    ff = ChemicalForceFields.UFFGetMoleculeForceField(m)
+    assert ff.NumPoints() == 12
+    ff.AddExtraPoint(5.0, 0.0, 0.0)
+    assert ff.NumPoints() == 13
+    assert ff.GetExtraPointPos(0) == (5.0, 0.0, 0.0)
+    with pytest.raises(IndexError):
+        ff.GetExtraPointPos(1)
+    # a fixed extra point can anchor a position-like distance constraint
+    ff.UFFAddDistanceConstraint(0, 12, False, 1.0, 1.0, 100.0)
+    ff.Minimize(maxIts=500)
+    assert ff.GetExtraPointPos(0) == (5.0, 0.0, 0.0)
+    assert len(ff.Positions()) == 39
