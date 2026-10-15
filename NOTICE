@@ -17,7 +17,7 @@ LICENSES/RDKit-ChemReactions-Novartis-BSD-3-Clause.txt.
 Licensing summary
 -----------------
 * Original rdoxide code (build tooling, Rust/PyO3 glue written from scratch)
-  is MIT licensed (see LICENSE).
+  is licensed under the BSD 3-Clause License (see LICENSE).
 * Files translated from, or copied verbatim from, RDKit remain subject to
   the RDKit BSD 3-Clause license; each such file names its upstream source in
   its header. The pure-Python modules under python/rdkit/ that are copied
@@ -25,10 +25,10 @@ Licensing summary
 * Data tables under crates/rdoxide/data/ are extracted from RDKit
   (Code/GraphMol/atomic_data.cpp) and remain under the RDKit BSD license.
 
-The combined work is therefore distributed under "MIT AND BSD-3-Clause AND
-Apache-2.0 WITH LLVM-exception AND MPL-2.0 AND BSL-1.0" (MPL-2.0 applies only to the
-files translated from Eigen, BSL-1.0 only to the number reader translated from
-Boost.JSON).
+The combined work is therefore distributed under "BSD-3-Clause AND MIT AND
+Apache-2.0 WITH LLVM-exception AND MPL-2.0 AND BSL-1.0" (MIT applies only to the
+files derived from linchemin and xyz2mol, MPL-2.0 only to the files translated
+from Eigen, BSL-1.0 only to the number reader translated from Boost.JSON).
 Redistributions (source or binary) must retain this NOTICE file and the
 license texts in LICENSE and LICENSES/.
 

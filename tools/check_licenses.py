@@ -26,7 +26,7 @@ ROOT = Path(__file__).resolve().parent.parent
 TABLE = ROOT / "LICENSES" / "CRATES.md"
 
 # Permissive licenses compatible with distributing rdoxide under its own
-# (MIT AND BSD-3-Clause AND Apache-2.0 WITH LLVM-exception) terms. Anything else
+# (BSD-3-Clause AND MIT AND Apache-2.0 WITH LLVM-exception) terms. Anything else
 # (GPL, LGPL, MPL, unknown, ...) needs a deliberate decision and a new entry.
 ALLOWED = {
     "0BSD",
