@@ -17,6 +17,7 @@ files changed so the corresponding Rust code can be updated.
 from __future__ import annotations
 
 import argparse
+import math
 import re
 import shutil
 import subprocess
@@ -280,6 +281,82 @@ def regen_mmff_params() -> None:
         print(f"mmff/{name}.tsv: {text.count(chr(10))} lines")
 
 
+def _strip_cpp_comments(text: str) -> str:
+    """`text` without `//` line comments (outside of string literals)."""
+    out = []
+    for line in text.splitlines():
+        in_str = False
+        i = 0
+        while i < len(line):
+            c = line[i]
+            if c == "\\" and in_str:
+                i += 2
+                continue
+            if c == '"':
+                in_str = not in_str
+            elif not in_str and line.startswith("//", i):
+                line = line[:i]
+                break
+            i += 1
+        out.append(line)
+    return "\n".join(out)
+
+
+def regen_crystalff() -> None:
+    """The experimental torsion-angle preferences of CrystalFF/ETKDG as
+    `crates/rdoxide/data/crystalff/*.txt`: SMARTS and cosine-series constants
+    (`torsion_*.txt`, one pattern per line) or Gaussian fits
+    (`gauss_*.tsv`: SMARTS, heights, positions and widths)."""
+    srcdir = UPSTREAM_DIR / "Code/GraphMol/ForceFieldHelpers/CrystalFF/torsionData"
+    outdir = DATA / "crystalff"
+    outdir.mkdir(exist_ok=True)
+    header = (
+        "# Extracted from RDKit Code/GraphMol/ForceFieldHelpers/CrystalFF/torsionData/{src}\n"
+        "# by tools/sync_upstream.py.\n"
+        "# Copyright (C) RDKit contributors (BSD-3-Clause).\n"
+        "# DO NOT EDIT - regenerate with `python3 tools/sync_upstream.py regen`.\n"
+    )
+    cosine = {
+        "torsion_v1": "torsionPreferences_v1.in",
+        "torsion_v2": "torsionPreferences_v2.in",
+        "torsion_smallrings": "torsionPreferences_smallrings.in",
+        "torsion_macrocycles": "torsionPreferences_macrocycles.in",
+    }
+    for name, src in cosine.items():
+        text = (srcdir / src).read_text()
+        # skip the block comment, then take the literals after the `=`
+        body = _strip_cpp_comments(text[text.index("const std::string") :])
+        body = body[body.index("=") + 1 :]
+        data = _c_string_literals(_literal_run(body, 0))
+        (outdir / f"{name}.txt").write_text(header.format(src=src) + data)
+        print(f"crystalff/{name}.txt: {data.count(chr(10))} lines")
+    gauss = {
+        "gauss_v4": "gaussTorsionPreferences_v4.h",
+        "gauss_smallrings": "gaussTorsionPreferences_v4_smallrings.h",
+        "gauss_macrocycles": "gaussTorsionPreferences_v4_macrocycles.h",
+    }
+    entry = re.compile(
+        r'^\{("(?:[^"\\]|\\.)*"),\s*\{([^}]*)\},\s*\{([^}]*)\},\s*\{([^}]*)\}\},?$'
+    )
+    for name, src in gauss.items():
+        lines = _strip_cpp_comments((srcdir / src).read_text()).splitlines()
+        rows = []
+        for line in lines:
+            line = line.strip()
+            if not line.startswith('{"'):
+                continue
+            m = entry.match(line)
+            assert m, f"unparsable torsion entry in {src}: {line}"
+            smarts = m.group(1)[1:-1]
+            cols = [smarts]
+            for group in m.groups()[1:]:
+                values = [eval(v, {"PI": math.pi}) for v in group.split(",")]
+                cols.append(",".join(repr(float(v)) for v in values))
+            rows.append("\t".join(cols))
+        (outdir / f"{name}.tsv").write_text(header.format(src=src) + "\n".join(rows) + "\n")
+        print(f"crystalff/{name}.tsv: {len(rows)} entries")
+
+
 def regen_common_properties() -> None:
     """Generate rdgeneral/common_properties.rs from Code/RDGeneral/types.h."""
     src = (UPSTREAM_DIR / "Code/RDGeneral/types.h").read_text()
@@ -346,6 +423,7 @@ def cmd_regen(_args) -> None:
     regen_molstandardize()
     regen_uff_params()
     regen_mmff_params()
+    regen_crystalff()
     regen_common_properties()
     regen_copies()
 

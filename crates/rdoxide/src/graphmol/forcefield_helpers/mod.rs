@@ -1,5 +1,6 @@
 //! Force-field helpers (upstream `GraphMol/ForceFieldHelpers`).
 
+pub mod crystal_ff;
 pub mod mmff;
 pub mod uff;
 
