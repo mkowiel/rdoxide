@@ -2,9 +2,8 @@
 //! into a core and its R groups.
 //!
 //! Not ported: the genetic algorithm matching strategy (`RGroupGa`, which
-//! needs `External/GA`), tautomer matching of cores (needs `TautomerQuery`)
-//! and enumeration of the input cores (needs `MolEnumerator::enumerate`);
-//! requesting them is an error.
+//! needs `External/GA`) and enumeration of the input cores (needs
+//! `MolEnumerator::enumerate`); requesting them is an error.
 
 mod core;
 mod data;

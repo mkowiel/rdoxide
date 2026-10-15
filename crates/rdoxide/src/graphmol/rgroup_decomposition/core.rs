@@ -2,6 +2,7 @@
 //! `RGroupDecomposition/RGroupCore.{h,cpp}`).
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::{Arc, OnceLock};
 
 use super::params::RGroupDecompositionParameters;
 use super::params::rgroup_labels::ISOTOPE_LABELS;
@@ -18,6 +19,7 @@ use crate::graphmol::mol_ops::sanitize_flags::{SANITIZE_CLEANUP, SANITIZE_SYMMRI
 use crate::graphmol::mol_ops::sanitize_mol;
 use crate::graphmol::romol::{ROMol, RWMol};
 use crate::graphmol::substruct::{FinalCheck, MatchVect, SubstructMatchParameters, bond_compat};
+use crate::graphmol::tautomer_query::TautomerQuery;
 use crate::rdgeneral::RDProps;
 use crate::{RDKitError, Result};
 
@@ -55,6 +57,9 @@ pub struct RCore {
     pub number_user_rgroups: usize,
     /// terminal user-labelled dummy atom of the core -> its neighbor
     terminal_rgroup_atom_to_neighbor: BTreeMap<i32, i32>,
+    /// the tautomer query of the matching molecule, built on first use; `None`
+    /// inside when the molecule cannot be made into one
+    matching_tautomer_query: OnceLock<Option<Arc<TautomerQuery>>>,
 }
 
 impl RCore {
@@ -75,7 +80,20 @@ impl RCore {
             .iter()
             .filter(|&&b| b)
             .count();
+        self.matching_tautomer_query = OnceLock::new();
         self.build_matching_mol()
+    }
+
+    /// `getMatchingTautomerQuery`: `None` when the matching molecule does
+    /// not sanitize well enough to enumerate its tautomers.
+    pub fn matching_tautomer_query(&self) -> Option<Arc<TautomerQuery>> {
+        self.matching_tautomer_query
+            .get_or_init(|| {
+                let mut copy = self.matching_mol.clone();
+                copy.update_property_cache(false).ok()?;
+                TautomerQuery::from_mol(&copy, "").ok().map(Arc::new)
+            })
+            .clone()
     }
 
     fn find_indices_with_rlabel(&mut self) {

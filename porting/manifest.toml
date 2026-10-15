@@ -1238,3 +1238,7 @@
 [module."rdoxide_python::rdrgroupdecomposition".sources]
 "Code/GraphMol/RGroupDecomposition/Wrap/rdRGroupComposition.cpp" = "bb89a8cc3df5afaf466b12599139fc101050dccf"
 "Code/GraphMol/RGroupDecomposition/nbWrap/rdRGroupComposition.cpp" = "cad80a0741cbb5ede58fd534f2fe6dc3515e6bc3"
+
+[module."rdoxide::graphmol::tautomer_query".sources]
+"Code/GraphMol/TautomerQuery/TautomerQuery.cpp" = "fe003547d57285221a23290f3618919aff1f0a15"
+"Code/GraphMol/TautomerQuery/TautomerQuery.h" = "e82839b75c0fd38e71efb95a422b8f91fd59d2b5"
