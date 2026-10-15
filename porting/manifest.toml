@@ -1127,3 +1127,24 @@
 "Code/GraphMol/DistGeomHelpers/BoundsMatrixBuilderDetails.h" = "85c802c6175dfb4d7edb0e930a2dd03101995ddc"
 "Code/GraphMol/DistGeomHelpers/ZMatrixBuilder.h" = "c154ad4842012a80062fc61a46d42523e866825f"
 "Code/GraphMol/DistGeomHelpers/Embedder.h" = "94c3f05f5ba2d39569ace94265b9f2fb96413c0e"
+
+[module."rdoxide::forcefield::crystal_ff".sources]
+"Code/GraphMol/ForceFieldHelpers/CrystalFF/TorsionAngleContribs.h" = "7435e6bcc18938427e5ee8146682a945f6206d8f"
+"Code/GraphMol/ForceFieldHelpers/CrystalFF/TorsionAngleContribs.cpp" = "33cbc9841d36b1bc75e44bbcd220f32107fbd1d9"
+"Code/GraphMol/ForceFieldHelpers/CrystalFF/GaussianTorsionAngleContribs.h" = "27adf340b03db1860adf6c4662105caddc451cde"
+"Code/GraphMol/ForceFieldHelpers/CrystalFF/GaussianTorsionAngleContribs.cpp" = "2ab986841e098e2637ae8f90ec5bf469c13f13e3"
+"Code/GraphMol/ForceFieldHelpers/CrystalFF/PlanarityContribs.h" = "b3bfd2b78f092d740e3b707574c6d95859ee4e95"
+"Code/GraphMol/ForceFieldHelpers/CrystalFF/PlanarityContribs.cpp" = "2b674457f48fd31b48c9b1e864c718e873e3b6f6"
+"Code/GraphMol/ForceFieldHelpers/CrystalFF/TorsionAngleM6.h" = "95c84b2169ee8cb361692579712f370ee4acae7a"
+"Code/GraphMol/ForceFieldHelpers/CrystalFF/TorsionAngleM6.cpp" = "618a0750c0c18dc698e6f5ca8eaa0ef439ad2902"
+
+[module."rdoxide::graphmol::forcefield_helpers::crystal_ff".sources]
+"Code/GraphMol/ForceFieldHelpers/CrystalFF/TorsionPreferences.h" = "41f388c42b7703ebd8872276fbffa1e2bd508918"
+"Code/GraphMol/ForceFieldHelpers/CrystalFF/TorsionPreferences.cpp" = "ce124211b333e06904c36fe930f1aa78baa537ea"
+"Code/GraphMol/ForceFieldHelpers/CrystalFF/torsionData/torsionPreferences_v1.in" = "0b0a8baefd33d8fb3ddd446eb456d6d5e0412c52"
+"Code/GraphMol/ForceFieldHelpers/CrystalFF/torsionData/torsionPreferences_v2.in" = "87db85b3f5ee8132f5a7265812feb0e5042b13f7"
+"Code/GraphMol/ForceFieldHelpers/CrystalFF/torsionData/torsionPreferences_smallrings.in" = "b896f0b6b897427c90d54e21e296afd1b784615a"
+"Code/GraphMol/ForceFieldHelpers/CrystalFF/torsionData/torsionPreferences_macrocycles.in" = "3599abd37511bb7b842066a43a725c4d5629c1cb"
+"Code/GraphMol/ForceFieldHelpers/CrystalFF/torsionData/gaussTorsionPreferences_v4.h" = "76734d03349477438f6bea95f3fb0c4030098383"
+"Code/GraphMol/ForceFieldHelpers/CrystalFF/torsionData/gaussTorsionPreferences_v4_smallrings.h" = "c78f76ceb5be1764da1affabbd6207f038d7eba9"
+"Code/GraphMol/ForceFieldHelpers/CrystalFF/torsionData/gaussTorsionPreferences_v4_macrocycles.h" = "2791d706b660ed89411a38fdae6ab739130569a5"
