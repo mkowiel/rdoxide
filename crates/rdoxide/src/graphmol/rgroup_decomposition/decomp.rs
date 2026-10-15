@@ -190,12 +190,13 @@ impl RGroupDecomposition {
         let mut global_min_heavy_nbrs = -1i32;
         let mut filtered: Vec<MatchVect> = Vec::new();
         for (&key, core) in &self.data.cores {
-            if params.do_tautomers {
-                return Err(RDKitError::Runtime(
-                    "doTautomers is not supported: TautomerQuery is not ported".into(),
-                ));
-            }
-            let base_matches = substruct_match(mol, &core.matching_mol, &sss_params)?;
+            let base_matches = match core
+                .matching_tautomer_query()
+                .filter(|_| params.do_tautomers)
+            {
+                Some(query) => query.substruct_of(mol, &sss_params)?.0,
+                None => substruct_match(mol, &core.matching_mol, &sss_params)?,
+            };
             let mut tmatches: Vec<MatchVect> = Vec::new();
             for base in &base_matches {
                 tmatches.extend(core.match_terminal_user_rgroups(mol, base, &sss_params)?);

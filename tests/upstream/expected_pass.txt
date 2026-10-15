@@ -386,6 +386,7 @@ Code/GraphMol/RGroupDecomposition/Wrap/test_rgroups.py::TestCase::testRelabelMap
 Code/GraphMol/RGroupDecomposition/Wrap/test_rgroups.py::TestCase::testRemoveAllHydrogenFlags
 Code/GraphMol/RGroupDecomposition/Wrap/test_rgroups.py::TestCase::testRgroupMolZip
 Code/GraphMol/RGroupDecomposition/Wrap/test_rgroups.py::TestCase::testSubstructMatchParameters
+Code/GraphMol/RGroupDecomposition/Wrap/test_rgroups.py::TestCase::testTautomerCore
 Code/GraphMol/RGroupDecomposition/Wrap/test_rgroups.py::TestCase::test_aligned_cores
 Code/GraphMol/RGroupDecomposition/Wrap/test_rgroups.py::TestCase::test_aligned_cores2
 Code/GraphMol/RGroupDecomposition/Wrap/test_rgroups.py::TestCase::test_getrgrouplabels

@@ -62,6 +62,10 @@ impl FinalMatchCheck {
     pub fn new(f: impl Fn(&ROMol, &[u32]) -> bool + Send + Sync + 'static) -> Self {
         FinalMatchCheck(Arc::new(f))
     }
+
+    pub(crate) fn call(&self, mol: &ROMol, matched: &[u32]) -> bool {
+        (self.0)(mol, matched)
+    }
 }
 
 /// `AtomCoordsMatchFunctor`: atoms match when their positions in the
@@ -1085,6 +1089,24 @@ fn check_params(ps: &SubstructMatchParameters) -> Result<()> {
         ));
     }
     Ok(())
+}
+
+/// `atomCompat(queryAtom, molAtom, params)` for callers outside the matcher.
+pub(crate) fn atom_compat(
+    query: &ROMol,
+    query_atom: u32,
+    mol: &ROMol,
+    mol_atom: u32,
+    ps: &SubstructMatchParameters,
+) -> Result<bool> {
+    let rec = RecursionSets::new();
+    Ctx {
+        query,
+        mol,
+        ps,
+        rec: &rec,
+    }
+    .atom_compat(query_atom, mol_atom)
 }
 
 /// `bondCompat(queryBond, molBond, params)` for callers outside the matcher.
