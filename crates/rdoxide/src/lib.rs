@@ -14,6 +14,7 @@ pub mod data_manip;
 pub mod datastructs;
 pub mod error;
 pub mod external;
+pub mod forcefield;
 pub mod geometry;
 pub mod graphmol;
 pub mod ml;

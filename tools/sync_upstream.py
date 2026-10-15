@@ -216,6 +216,24 @@ def regen_molstandardize() -> None:
         print(f"molstandardize/{out}: {len(entries)} entries")
 
 
+def regen_uff_params() -> None:
+    """The default UFF parameter table (a concatenated C string literal
+    upstream) as `crates/rdoxide/data/uff_params.tsv`."""
+    src = (UPSTREAM_DIR / "Code/ForceField/UFF/Params.cpp").read_text()
+    body = src[src.index("defaultParamData =") :]
+    body = body[: body.index(";")]
+    literals = re.findall(r'"((?:[^"\\]|\\.)*)"', body)
+    text = "".join(literals).replace("\\t", "\t").replace("\\n", "\n")
+    (DATA / "uff_params.tsv").write_text(
+        "# Extracted from RDKit Code/ForceField/UFF/Params.cpp (defaultParamData)\n"
+        "# by tools/sync_upstream.py.\n"
+        "# Copyright (C) RDKit contributors (BSD-3-Clause).\n"
+        "# DO NOT EDIT - regenerate with `python3 tools/sync_upstream.py regen`.\n"
+        + text
+    )
+    print(f"uff_params.tsv: {text.count(chr(10))} lines")
+
+
 def regen_common_properties() -> None:
     """Generate rdgeneral/common_properties.rs from Code/RDGeneral/types.h."""
     src = (UPSTREAM_DIR / "Code/RDGeneral/types.h").read_text()
@@ -280,6 +298,7 @@ def cmd_regen(_args) -> None:
         sys.exit("upstream/rdkit missing - run `sync_upstream.py fetch` first")
     regen_atomic_data()
     regen_molstandardize()
+    regen_uff_params()
     regen_common_properties()
     regen_copies()
 
