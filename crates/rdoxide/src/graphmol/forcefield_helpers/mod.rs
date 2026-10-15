@@ -1,5 +1,6 @@
 //! Force-field helpers (upstream `GraphMol/ForceFieldHelpers`).
 
+pub mod mmff;
 pub mod uff;
 
 use crate::error::Result;
