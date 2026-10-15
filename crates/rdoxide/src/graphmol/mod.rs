@@ -57,6 +57,7 @@ pub mod substance_group;
 pub mod substruct;
 pub mod substruct_library;
 pub mod tautomer_query;
+pub mod trajectory;
 pub mod wedge_bonds;
 
 pub use atom::{Atom, ChiralType, HybridizationType, ValenceType};

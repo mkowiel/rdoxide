@@ -617,6 +617,15 @@ Code/GraphMol/Wrap/testSGroups.py::TestCase::testXBONDS
 Code/GraphMol/Wrap/testSubstructureMatch.py::TestCase::testCoordsFunctor
 Code/GraphMol/Wrap/testSubstructureMatch.py::TestCase::testExtraAtomMatch
 Code/GraphMol/Wrap/testSubstructureMatch.py::TestCase::testExtraBondMatch
+Code/GraphMol/Wrap/testTrajectory.py::TestCase::testAddConformersFromAmberTrajectory
+Code/GraphMol/Wrap/testTrajectory.py::TestCase::testAddConformersFromGromosTrajectory
+Code/GraphMol/Wrap/testTrajectory.py::TestCase::testAddConformersFromTrajectory
+Code/GraphMol/Wrap/testTrajectory.py::TestCase::testReadAmber
+Code/GraphMol/Wrap/testTrajectory.py::TestCase::testReadAmberPython
+Code/GraphMol/Wrap/testTrajectory.py::TestCase::testReadGromos
+Code/GraphMol/Wrap/testTrajectory.py::TestCase::testSnapshot
+Code/GraphMol/Wrap/testTrajectory.py::TestCase::testTrajectory2D
+Code/GraphMol/Wrap/testTrajectory.py::TestCase::testTrajectory3D
 Code/GraphMol/Wrap/test_cdxml.py::TestCase::test_cdxml
 Code/GraphMol/Wrap/test_lazy_numpy.py::TestLazyNumpy::test_adjacency_matrix_loads_numpy
 Code/GraphMol/Wrap/test_lazy_numpy.py::TestLazyNumpy::test_basic_smiles_roundtrip_without_numpy

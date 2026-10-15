@@ -100,6 +100,7 @@ mod rdrgroupdecomposition;
 mod rdsimdivpickers;
 mod rdsubstructlibrary;
 mod rdtautomerquery;
+mod rdtrajectory;
 mod ringinfo;
 mod stereo_group;
 mod substance_group;
@@ -147,6 +148,12 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
         "rdTautomerQuery",
         "rdkit.Chem.rdTautomerQuery",
         rdtautomerquery::init,
+    )?;
+    add_submodule(
+        m,
+        "rdtrajectory",
+        "rdkit.Chem.rdtrajectory",
+        rdtrajectory::init,
     )?;
     add_submodule(m, "rdFMCS", "rdkit.Chem.rdFMCS", rdfmcs::init)?;
     add_submodule(

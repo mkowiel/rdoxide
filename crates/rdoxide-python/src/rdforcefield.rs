@@ -237,6 +237,34 @@ impl PyForceField {
         Ok(res)
     }
 
+    /// Runs some minimization iterations, recording the minimization trajectory every snapshotFreq steps.
+    ///
+    /// Returns a (int, []) tuple; the int is 0 if the minimization succeeded, while the list contains Snapshot objects.
+    #[pyo3(name = "MinimizeTrajectory", signature = (snapshotFreq, maxIts = 200, forceTol = 1e-4, energyTol = 1e-6))]
+    #[allow(non_snake_case)]
+    fn minimize_trajectory<'py>(
+        &mut self,
+        py: Python<'py>,
+        snapshotFreq: u32,
+        maxIts: u32,
+        forceTol: f64,
+        energyTol: f64,
+    ) -> PyResult<Bound<'py, PyTuple>> {
+        self.pull(py)?;
+        let field = &mut self.field;
+        let (res, snapshots) = py
+            .detach(|| field.minimize_with_snapshots(snapshotFreq, maxIts, forceTol, energyTol))
+            .py()?;
+        self.push(py)?;
+        PyTuple::new(
+            py,
+            [
+                res.into_pyobject(py)?.into_any(),
+                crate::rdtrajectory::snapshot_list(py, snapshots)?.into_any(),
+            ],
+        )
+    }
+
     /// Initializes the force field (the points are read again from the
     /// molecule, so there is nothing else to do).
     #[pyo3(name = "Initialize")]

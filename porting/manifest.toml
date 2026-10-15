@@ -1246,3 +1246,12 @@
 [module."rdoxide_python::rdtautomerquery".sources]
 "Code/GraphMol/TautomerQuery/Wrap/rdTautomerQuery.cpp" = "ba05fe4f707ecf323f4e1933dc902515a17d6dbe"
 "Code/GraphMol/TautomerQuery/nbWrap/rdTautomerQuery.cpp" = "5028cfca9c88a09ef9172e46a23e9c729aee3da0"
+
+[module."rdoxide::graphmol::trajectory".sources]
+"Code/GraphMol/Trajectory/Snapshot.h" = "07b35b5b249bd5d0074b8afd889272bdbb2f94e8"
+"Code/GraphMol/Trajectory/Trajectory.h" = "623bc8d03ce8b772fb2f1e029baa07c1a210c4c7"
+"Code/GraphMol/Trajectory/Trajectory.cpp" = "08ab83e31271da8d41684fd92098c5095877aed3"
+
+[module."rdoxide_python::rdtrajectory".sources]
+"Code/GraphMol/Wrap/Trajectory.cpp" = "db03285f682c7909c95429ca151274331999ed4a"
+"Code/GraphMol/Wrap/rdTrajectory.cpp" = "d97272d4f0d1eddb5672a96e35c6d51d93ba4601"
