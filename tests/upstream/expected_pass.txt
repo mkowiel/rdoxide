@@ -405,6 +405,10 @@ Code/GraphMol/ReducedGraphs/Wrap/testReducedGraphs.py::TestCase::test2
 Code/GraphMol/ReducedGraphs/Wrap/testReducedGraphs.py::TestCase::test3
 Code/GraphMol/ReducedGraphs/Wrap/testReducedGraphs.py::TestCase::test4
 Code/GraphMol/ReducedGraphs/Wrap/testReducedGraphs.py::TestCase::testCanRetrieveProp
+Code/GraphMol/TautomerQuery/Wrap/rough_test.py::TautomerQueryTestCase::test_basic
+Code/GraphMol/TautomerQuery/Wrap/rough_test.py::TautomerQueryTestCase::test_parameter_searches
+Code/GraphMol/TautomerQuery/Wrap/rough_test.py::TautomerQueryTestCase::test_simple
+Code/GraphMol/TautomerQuery/Wrap/rough_test.py::TautomerQueryTestCase::test_types
 Code/GraphMol/Wrap/rough_test.py::TestCase::test0Except
 Code/GraphMol/Wrap/rough_test.py::TestCase::test10Iterators
 Code/GraphMol/Wrap/rough_test.py::TestCase::test11MolOps
