@@ -83,8 +83,9 @@ fn add_experimental_torsion_terms(
     exclude_torsions: bool,
 ) -> Result<()> {
     let mut done_bonds = vec![false; num_atoms * num_atoms];
-    let mut gaussian = GaussianTorsionAngleContribs::new(3);
-    let mut cosine = TorsionAngleContribs::new();
+    let dim = ff.dimension();
+    let mut gaussian = GaussianTorsionAngleContribs::new(dim);
+    let mut cosine = TorsionAngleContribs::new(dim);
     let mut non_empty = false;
     for (t, atoms) in details.exp_torsion_atoms.iter().enumerate() {
         let [i, j, k, l] = atoms.map(|a| a as usize);
@@ -418,6 +419,46 @@ pub fn construct_plain_3d_force_field(
     Ok(field)
 }
 
+/// The terms of the improper-torsion force field: inversion terms for the sp2
+/// centers and linear-angle constraints for sp centers.
+fn improper_groups(
+    field: &ForceField,
+    improper_atoms: &[ImproperAtoms],
+    angles: &[[i32; 4]],
+) -> Result<(
+    ContribGroup<InversionContrib>,
+    ContribGroup<AngleConstraintContrib>,
+)> {
+    let oob_force_scaling_factor = 10.0;
+    let mut inversions = ContribGroup::new();
+    for imp in improper_atoms {
+        let a = imp.atoms;
+        for n in [[0, 1, 2, 3], [0, 1, 3, 2], [2, 1, 3, 0]] {
+            inversions.push(InversionContrib::new(
+                n.map(|i| a[i] as usize),
+                imp.center_atomic_num,
+                imp.bound_to_sp2_o,
+                oob_force_scaling_factor,
+            ));
+        }
+    }
+    // sp centers need an angle of 180 degrees
+    let mut angle_contribs = ContribGroup::new();
+    for angle in angles.iter().filter(|a| a[3] != 0) {
+        angle_contribs.push(AngleConstraintContrib::new(
+            field,
+            angle[0] as usize,
+            angle[1] as usize,
+            angle[2] as usize,
+            false,
+            179.0,
+            180.0,
+            oob_force_scaling_factor,
+        )?);
+    }
+    Ok((inversions, angle_contribs))
+}
+
 /// A force field of only the improper torsions and linear-angle constraints.
 pub fn construct_3d_improper_force_field(
     mmat: &BoundsMatrix,
@@ -431,32 +472,34 @@ pub fn construct_3d_improper_force_field(
         return Err(RDKitError::precondition("bad positions"));
     }
     let mut field = new_field(positions, dim);
-    let oob_force_scaling_factor = 10.0;
-    let mut is_improper_constrained = vec![false; n];
-    add_improper_torsion_terms(
-        &mut field,
-        oob_force_scaling_factor,
-        improper_atoms,
-        &mut is_improper_constrained,
-    );
-    // sp centers need an angle of 180 degrees
-    let mut angle_contribs = ContribGroup::new();
-    for angle in angles.iter().filter(|a| a[3] != 0) {
-        angle_contribs.push(AngleConstraintContrib::new(
-            &field,
-            angle[0] as usize,
-            angle[1] as usize,
-            angle[2] as usize,
-            false,
-            179.0,
-            180.0,
-            oob_force_scaling_factor,
-        )?);
+    let (inversions, angle_contribs) = improper_groups(&field, improper_atoms, angles)?;
+    if !inversions.is_empty() {
+        field.push_contrib(Box::new(inversions));
     }
     if !angle_contribs.is_empty() {
         field.push_contrib(Box::new(angle_contribs));
     }
     Ok(field)
+}
+
+/// The energies of the linear-angle constraints and of the inversion terms of
+/// the improper-torsion force field at `positions`, term by term.
+pub fn improper_term_energies(
+    mmat: &BoundsMatrix,
+    positions: &[f64],
+    improper_atoms: &[ImproperAtoms],
+    angles: &[[i32; 4]],
+) -> Result<(Vec<f64>, Vec<f64>)> {
+    let n = mmat.num_rows();
+    if positions.len() != n * 3 {
+        return Err(RDKitError::precondition("bad positions"));
+    }
+    let field = new_field(positions, 3);
+    let (inversions, angle_contribs) = improper_groups(&field, improper_atoms, angles)?;
+    Ok((
+        angle_contribs.term_energies(positions),
+        inversions.term_energies(positions),
+    ))
 }
 
 fn add_angle_terms(ff: &mut ForceField, angles: &[[i32; 4]], force_const: f64) -> Result<()> {
@@ -548,7 +591,7 @@ fn add_chirality_terms(
 
 /// Planarity terms of the improper torsion centers.
 fn add_planarity_terms(ff: &mut ForceField, force_const: f64, improper_atoms: &[ImproperAtoms]) {
-    let mut planarity = PlanarityContribs::new();
+    let mut planarity = PlanarityContribs::new(ff.dimension());
     for imp in improper_atoms {
         let a = imp.atoms;
         for (i0, i2, i3) in [(0, 2, 3), (0, 3, 2), (2, 3, 0)] {

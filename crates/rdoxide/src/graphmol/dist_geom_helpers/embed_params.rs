@@ -110,3 +110,103 @@ impl Default for EmbedParameters {
         }
     }
 }
+
+impl EmbedParameters {
+    /// plain distance geometry
+    pub fn dg() -> Self {
+        Self::default()
+    }
+
+    /// distance geometry with basic knowledge terms
+    pub fn kdg() -> Self {
+        EmbedParameters {
+            use_basic_knowledge: true,
+            et_version: 1,
+            ..Self::default()
+        }
+    }
+
+    /// distance geometry with experimental torsion preferences (version 1)
+    pub fn etdg() -> Self {
+        EmbedParameters {
+            use_exp_torsion_angle_prefs: true,
+            et_version: 1,
+            ..Self::default()
+        }
+    }
+
+    pub fn etdg_v2() -> Self {
+        EmbedParameters {
+            use_exp_torsion_angle_prefs: true,
+            et_version: 2,
+            ..Self::default()
+        }
+    }
+
+    pub fn etkdg() -> Self {
+        EmbedParameters {
+            use_exp_torsion_angle_prefs: true,
+            use_basic_knowledge: true,
+            et_version: 1,
+            ..Self::default()
+        }
+    }
+
+    pub fn etkdg_v2() -> Self {
+        EmbedParameters {
+            et_version: 2,
+            ..Self::etkdg()
+        }
+    }
+
+    pub fn etkdg_v3() -> Self {
+        EmbedParameters {
+            use_macrocycle_torsions: true,
+            use_macrocycle_14_config: true,
+            ..Self::etkdg_v2()
+        }
+    }
+
+    pub fn sr_etkdg_v3() -> Self {
+        EmbedParameters {
+            use_small_ring_torsions: true,
+            ..Self::etkdg_v2()
+        }
+    }
+
+    pub fn etkdg_v4() -> Self {
+        EmbedParameters {
+            et_version: 4,
+            use_small_ring_torsions: true,
+            use_macrocycle_torsions: true,
+            use_macrocycle_14_config: true,
+            use_legacy_implementation: false,
+            ..Self::etkdg()
+        }
+    }
+}
+
+/// The reasons an embedding attempt can fail (`EmbedFailureCauses`); the
+/// failure counters of [`EmbedParameters`] are indexed by them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(usize)]
+pub enum EmbedFailureCause {
+    InitialCoords = 0,
+    FirstMinimization = 1,
+    CheckTetrahedralCenters = 2,
+    CheckChiralCenters = 3,
+    MinimizeFourthDimension = 4,
+    EtkMinimization = 5,
+    FinalChiralBounds = 6,
+    FinalCenterInVolume = 7,
+    LinearDoubleBond = 8,
+    BadDoubleBondStereo = 9,
+    CheckChiralCenters2 = 10,
+    ExceededTimeout = 11,
+    Minimization = 12,
+    KtermViolation = 13,
+    Clash = 14,
+}
+
+/// the number of failure causes (`END_OF_ENUM`)
+pub const NUM_EMBED_FAILURE_CAUSES: usize = 15;

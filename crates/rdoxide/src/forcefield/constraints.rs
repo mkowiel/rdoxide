@@ -35,8 +35,20 @@ fn range_check(lo: f64, x: f64, hi: f64, name: &str, file: &str, line: u32) -> R
 
 // ----------------------------------------------------------------- distance
 
+/// The distance over all the dimensions of the points.
+fn distance(pos: &[f64], dim: usize, i: usize, j: usize) -> f64 {
+    (0..dim)
+        .map(|k| {
+            let d = pos[dim * i + k] - pos[dim * j + k];
+            d * d
+        })
+        .sum::<f64>()
+        .sqrt()
+}
+
 #[derive(Debug, Clone)]
 pub struct DistanceConstraintContrib {
+    dim: usize,
     end1: usize,
     end2: usize,
     min_len: f64,
@@ -61,12 +73,14 @@ impl DistanceConstraintContrib {
         if max_len < min_len {
             return Err(RDKitError::precondition("bad bounds"));
         }
+        let dim = field.dimension();
         if relative {
-            let dist = (point3(field.positions(), idx1) - point3(field.positions(), idx2)).length();
+            let dist = distance(field.positions(), dim, idx1, idx2);
             min_len = (dist + min_len).max(0.0);
             max_len = (dist + max_len).max(0.0);
         }
         Ok(DistanceConstraintContrib {
+            dim,
             end1: idx1,
             end2: idx2,
             min_len,
@@ -78,7 +92,7 @@ impl DistanceConstraintContrib {
 
 impl ForceFieldContrib for DistanceConstraintContrib {
     fn energy(&self, pos: &[f64]) -> f64 {
-        let dist = (point3(pos, self.end1) - point3(pos, self.end2)).length();
+        let dist = distance(pos, self.dim, self.end1, self.end2);
         let mut term = 0.0;
         if dist < self.min_len {
             term = self.min_len - dist;
@@ -89,7 +103,7 @@ impl ForceFieldContrib for DistanceConstraintContrib {
     }
 
     fn add_grad(&self, pos: &[f64], grad: &mut [f64]) {
-        let dist = (point3(pos, self.end1) - point3(pos, self.end2)).length();
+        let dist = distance(pos, self.dim, self.end1, self.end2);
         let mut pre_factor = if dist < self.min_len {
             dist - self.min_len
         } else if dist > self.max_len {
@@ -98,11 +112,12 @@ impl ForceFieldContrib for DistanceConstraintContrib {
             return;
         };
         pre_factor *= self.force_constant;
-        for i in 0..3 {
-            let d_grad =
-                pre_factor * (pos[3 * self.end1 + i] - pos[3 * self.end2 + i]) / dist.max(1.0e-8);
-            grad[3 * self.end1 + i] += d_grad;
-            grad[3 * self.end2 + i] -= d_grad;
+        for i in 0..self.dim {
+            let d_grad = pre_factor
+                * (pos[self.dim * self.end1 + i] - pos[self.dim * self.end2 + i])
+                / dist.max(1.0e-8);
+            grad[self.dim * self.end1 + i] += d_grad;
+            grad[self.dim * self.end2 + i] -= d_grad;
         }
     }
 
@@ -115,6 +130,7 @@ impl ForceFieldContrib for DistanceConstraintContrib {
 
 #[derive(Debug, Clone)]
 pub struct AngleConstraintContrib {
+    dim: usize,
     at1: usize,
     at2: usize,
     at3: usize,
@@ -124,9 +140,16 @@ pub struct AngleConstraintContrib {
 }
 
 /// the angle (degrees) at the middle point
-fn angle_deg(pos: &[f64], at1: usize, at2: usize, at3: usize) -> (f64, [Point3D; 2], [f64; 2]) {
-    let p2 = point3(pos, at2);
-    let r = [point3(pos, at1) - p2, point3(pos, at3) - p2];
+fn angle_deg(
+    pos: &[f64],
+    dim: usize,
+    at1: usize,
+    at2: usize,
+    at3: usize,
+) -> (f64, [Point3D; 2], [f64; 2]) {
+    let point = |i: usize| Point3D::new(pos[dim * i], pos[dim * i + 1], pos[dim * i + 2]);
+    let p2 = point(at2);
+    let r = [point(at1) - p2, point(at3) - p2];
     let len_sq = [r[0].length_sq().max(1.0e-5), r[1].length_sq().max(1.0e-5)];
     let cos_theta = (r[0].dot_product(&r[1]) / (len_sq[0] * len_sq[1]).sqrt()).clamp(-1.0, 1.0);
     (RAD2DEG * cos_theta.acos(), r, len_sq)
@@ -155,13 +178,14 @@ impl AngleConstraintContrib {
             ));
         }
         if relative {
-            let (angle, ..) = angle_deg(field.positions(), idx1, idx2, idx3);
+            let (angle, ..) = angle_deg(field.positions(), field.dimension(), idx1, idx2, idx3);
             min_angle_deg += angle;
             max_angle_deg += angle;
         }
         range_check(0.0, min_angle_deg, 180.0, "minAngleDeg", file, 87)?;
         range_check(0.0, max_angle_deg, 180.0, "maxAngleDeg", file, 88)?;
         Ok(AngleConstraintContrib {
+            dim: field.dimension(),
             at1: idx1,
             at2: idx2,
             at3: idx3,
@@ -184,13 +208,13 @@ impl AngleConstraintContrib {
 
 impl ForceFieldContrib for AngleConstraintContrib {
     fn energy(&self, pos: &[f64]) -> f64 {
-        let (angle, ..) = angle_deg(pos, self.at1, self.at2, self.at3);
+        let (angle, ..) = angle_deg(pos, self.dim, self.at1, self.at2, self.at3);
         let term = self.angle_term(angle);
         self.force_constant * term * term
     }
 
     fn add_grad(&self, pos: &[f64], grad: &mut [f64]) {
-        let (angle, r, len_sq) = angle_deg(pos, self.at1, self.at2, self.at3);
+        let (angle, r, len_sq) = angle_deg(pos, self.dim, self.at1, self.at2, self.at3);
         let term = self.angle_term(angle);
         let de_dtheta = 2.0 * RAD2DEG * self.force_constant * term;
         let rp = r[1].cross_product(&r[0]);
@@ -200,9 +224,9 @@ impl ForceFieldContrib for AngleConstraintContrib {
         let dedp2 = r[1].cross_product(&rp) * t[1];
         let dedp1 = -dedp0 - dedp2;
         for (idx, d) in [(self.at1, dedp0), (self.at2, dedp1), (self.at3, dedp2)] {
-            grad[3 * idx] += d.x;
-            grad[3 * idx + 1] += d.y;
-            grad[3 * idx + 2] += d.z;
+            grad[self.dim * idx] += d.x;
+            grad[self.dim * idx + 1] += d.y;
+            grad[self.dim * idx + 2] += d.z;
         }
     }
 

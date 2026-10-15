@@ -65,6 +65,13 @@ impl<T> ContribGroup<T> {
     }
 }
 
+impl<T: ForceFieldContrib> ContribGroup<T> {
+    /// The energy of each term.
+    pub fn term_energies(&self, pos: &[f64]) -> Vec<f64> {
+        self.terms.iter().map(|t| t.energy(pos)).collect()
+    }
+}
+
 impl<T: ForceFieldContrib + Clone + 'static> ForceFieldContrib for ContribGroup<T> {
     fn energy(&self, pos: &[f64]) -> f64 {
         let mut accum = 0.0;

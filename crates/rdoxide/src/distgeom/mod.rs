@@ -15,7 +15,7 @@ pub use contribs::{
 };
 pub use etkdg_ff::{
     ChargeProducts, add_torsion_terms, construct_3d_force_field, construct_3d_improper_force_field,
-    construct_all_in_one_force_field, construct_plain_3d_force_field,
+    construct_all_in_one_force_field, construct_plain_3d_force_field, improper_term_energies,
 };
 pub use triangle_smooth::triangle_smooth_bounds;
 pub use utils::{
