@@ -44,6 +44,6 @@ listed changes, `stamp`.
 
 ## License
 
-Original rdoxide code is MIT; code, data and Python modules derived from RDKit
-remain under RDKit's BSD 3-Clause license. See [NOTICE](NOTICE),
+rdoxide is released under the BSD 3-Clause License; code, data and Python modules
+derived from RDKit remain under RDKit's BSD 3-Clause license. See [NOTICE](NOTICE),
 [LICENSE](LICENSE) and [LICENSES/](LICENSES/).
