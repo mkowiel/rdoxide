@@ -5,8 +5,8 @@
 
 use std::f64::consts::PI;
 
+use super::ForceFieldContrib;
 use super::mmff::terms::{add_torsion_grad, calc_torsion_cos_phi};
-use super::{ForceFieldContrib, point3};
 use crate::geometry::Point3D;
 
 const TWO_PI: f64 = 2.0 * PI;
@@ -14,6 +14,10 @@ const TWO_PI: f64 = 2.0 * PI;
 /// The number of points in the energy and gradient lookup tables of Gaussian
 /// torsion terms (angles from 0 to pi).
 pub const LOOKUP_GRID_SIZE: usize = 180;
+
+fn point(pos: &[f64], dim: usize, idx: usize) -> Point3D {
+    Point3D::new(pos[dim * idx], pos[dim * idx + 1], pos[dim * idx + 2])
+}
 
 fn is_double_zero(x: f64) -> bool {
     x < 1.0e-10 && x > -1.0e-10
@@ -147,7 +151,7 @@ impl ForceFieldContrib for GaussianTorsionAngleContribs {
     fn energy(&self, pos: &[f64]) -> f64 {
         let mut accum = 0.0;
         for t in &self.terms {
-            let p = t.at.map(|a| point3(pos, a));
+            let p = t.at.map(|a| point(pos, self.dim, a));
             let cos_phi = calc_torsion_cos_phi(&p[0], &p[1], &p[2], &p[3]);
             accum += interpolate(&t.energies, cos_phi.acos()) * t.scaling;
         }
@@ -155,9 +159,8 @@ impl ForceFieldContrib for GaussianTorsionAngleContribs {
     }
 
     fn add_grad(&self, pos: &[f64], grad: &mut [f64]) {
-        debug_assert_eq!(self.dim, 3);
         for t in &self.terms {
-            let p = t.at.map(|a| point3(pos, a));
+            let p = t.at.map(|a| point(pos, self.dim, a));
             let r = [p[0] - p[1], p[2] - p[1], p[1] - p[2], p[3] - p[2]];
             let mut tv = [r[0].cross_product(&r[1]), r[2].cross_product(&r[3])];
             let d = [tv[0].length(), tv[1].length()];
@@ -172,7 +175,7 @@ impl ForceFieldContrib for GaussianTorsionAngleContribs {
             let safe_sin_phi = sin_phi.max(1e-8);
             let de_dphi = interpolate(&t.gradients, phi) * t.scaling;
             let sin_term = -de_dphi / safe_sin_phi;
-            add_torsion_grad(grad, t.at, &r, &tv, &d, cos_phi, sin_term);
+            add_torsion_grad(grad, t.at, &r, &tv, &d, cos_phi, sin_term, self.dim);
         }
     }
 
@@ -218,14 +221,18 @@ struct CosineTerm {
 }
 
 /// Experimental torsion terms: sums of up to six cosines.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct TorsionAngleContribs {
+    dim: usize,
     terms: Vec<CosineTerm>,
 }
 
 impl TorsionAngleContribs {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(dim: usize) -> Self {
+        TorsionAngleContribs {
+            dim,
+            terms: Vec::new(),
+        }
     }
 
     pub fn add_contrib(&mut self, at: [usize; 4], force_constants: [f64; 6], signs: [i32; 6]) {
@@ -250,7 +257,7 @@ impl ForceFieldContrib for TorsionAngleContribs {
     fn energy(&self, pos: &[f64]) -> f64 {
         let mut accum = 0.0;
         for t in &self.terms {
-            let p = t.at.map(|a| point3(pos, a));
+            let p = t.at.map(|a| point(pos, self.dim, a));
             accum += calc_cosine_torsion_energy(
                 &t.force_constants,
                 &t.signs,
@@ -262,7 +269,7 @@ impl ForceFieldContrib for TorsionAngleContribs {
 
     fn add_grad(&self, pos: &[f64], grad: &mut [f64]) {
         for t in &self.terms {
-            let p = t.at.map(|a| point3(pos, a));
+            let p = t.at.map(|a| point(pos, self.dim, a));
             let r = [p[0] - p[1], p[2] - p[1], p[1] - p[2], p[3] - p[2]];
             let mut tv = [r[0].cross_product(&r[1]), r[2].cross_product(&r[3])];
             let d = [tv[0].length(), tv[1].length()];
@@ -305,7 +312,7 @@ impl ForceFieldContrib for TorsionAngleContribs {
                 } else {
                     1.0 / sin_phi
                 };
-            add_torsion_grad(grad, t.at, &r, &tv, &d, cos_phi, sin_term);
+            add_torsion_grad(grad, t.at, &r, &tv, &d, cos_phi, sin_term, self.dim);
         }
     }
 
@@ -336,14 +343,18 @@ struct PlanarityTerm {
 }
 
 /// Penalizes the out-of-plane angle of the fourth atom of each term.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct PlanarityContribs {
+    dim: usize,
     terms: Vec<PlanarityTerm>,
 }
 
 impl PlanarityContribs {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(dim: usize) -> Self {
+        PlanarityContribs {
+            dim,
+            terms: Vec::new(),
+        }
     }
 
     pub fn add_contrib(&mut self, at: [usize; 4], force_constant: f64) {
@@ -363,7 +374,7 @@ impl ForceFieldContrib for PlanarityContribs {
     fn energy(&self, pos: &[f64]) -> f64 {
         let mut total = 0.0;
         for t in &self.terms {
-            let p = t.at.map(|a| point3(pos, a));
+            let p = t.at.map(|a| point(pos, self.dim, a));
             let chi = calc_oop_chi(&p[0], &p[1], &p[2], &p[3]);
             total += 0.5 * t.force_constant * chi * chi;
         }
@@ -372,7 +383,7 @@ impl ForceFieldContrib for PlanarityContribs {
 
     fn add_grad(&self, pos: &[f64], grad: &mut [f64]) {
         for t in &self.terms {
-            let p = t.at.map(|a| point3(pos, a));
+            let p = t.at.map(|a| point(pos, self.dim, a));
             let mut r_ji = p[0] - p[1];
             let mut r_jk = p[2] - p[1];
             let mut r_jl = p[3] - p[1];
@@ -426,10 +437,10 @@ impl ForceFieldContrib for PlanarityContribs {
                 (t3.z / term1 - r_jl.z * sin_chi / cos_chi) / d_jl,
             ];
             for i in 0..3 {
-                grad[3 * t.at[0] + i] += de_dchi * tg1[i];
-                grad[3 * t.at[1] + i] += -de_dchi * (tg1[i] + tg3[i] + tg4[i]);
-                grad[3 * t.at[2] + i] += de_dchi * tg3[i];
-                grad[3 * t.at[3] + i] += de_dchi * tg4[i];
+                grad[self.dim * t.at[0] + i] += de_dchi * tg1[i];
+                grad[self.dim * t.at[1] + i] += -de_dchi * (tg1[i] + tg3[i] + tg4[i]);
+                grad[self.dim * t.at[2] + i] += de_dchi * tg3[i];
+                grad[self.dim * t.at[3] + i] += de_dchi * tg4[i];
             }
         }
     }
@@ -468,7 +479,7 @@ mod tests {
 
     #[test]
     fn cosine_torsion_gradient_matches_energy() {
-        let mut c = TorsionAngleContribs::new();
+        let mut c = TorsionAngleContribs::new(3);
         // the fifth and sixth terms share a constant in upstream's gradient,
         // so only the first four terms can be compared with finite differences
         c.add_contrib(
@@ -499,7 +510,7 @@ mod tests {
 
     #[test]
     fn planarity_gradient_matches_energy() {
-        let mut c = PlanarityContribs::new();
+        let mut c = PlanarityContribs::new(3);
         c.add_contrib([0, 1, 2, 3], 0.01);
         check(&c, &POS, 1e-5);
     }

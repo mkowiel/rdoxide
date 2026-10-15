@@ -23,6 +23,12 @@ fn dist(pos: &[f64], i: usize, j: usize) -> f64 {
     (point3(pos, i) - point3(pos, j)).length()
 }
 
+fn add3_dim(grad: &mut [f64], dim: usize, idx: usize, v: [f64; 3]) {
+    for (k, x) in v.iter().enumerate() {
+        grad[dim * idx + k] += x;
+    }
+}
+
 fn add3(grad: &mut [f64], idx: usize, v: [f64; 3]) {
     for (k, x) in v.iter().enumerate() {
         grad[3 * idx + k] += x;
@@ -515,6 +521,7 @@ pub(crate) fn add_torsion_grad(
     d: &[f64; 2],
     cos_phi: f64,
     s: f64,
+    dim: usize,
 ) {
     let dc = [
         1.0 / d[0] * (tv[1].x - cos_phi * tv[0].x),
@@ -524,8 +531,9 @@ pub(crate) fn add_torsion_grad(
         1.0 / d[1] * (tv[0].y - cos_phi * tv[1].y),
         1.0 / d[1] * (tv[0].z - cos_phi * tv[1].z),
     ];
-    add3(
+    add3_dim(
         grad,
+        dim,
         at[0],
         [
             s * (dc[2] * r[1].y - dc[1] * r[1].z),
@@ -533,8 +541,9 @@ pub(crate) fn add_torsion_grad(
             s * (dc[1] * r[1].x - dc[0] * r[1].y),
         ],
     );
-    add3(
+    add3_dim(
         grad,
+        dim,
         at[1],
         [
             s * (dc[1] * (r[1].z - r[0].z)
@@ -551,8 +560,9 @@ pub(crate) fn add_torsion_grad(
                 + dc[4] * r[3].x),
         ],
     );
-    add3(
+    add3_dim(
         grad,
+        dim,
         at[2],
         [
             s * (dc[1] * r[0].z
@@ -569,8 +579,9 @@ pub(crate) fn add_torsion_grad(
                 + dc[4] * (r[2].x - r[3].x)),
         ],
     );
-    add3(
+    add3_dim(
         grad,
+        dim,
         at[3],
         [
             s * (dc[4] * r[2].z - dc[5] * r[2].y),
@@ -652,7 +663,7 @@ impl ForceFieldContrib for TorsionAngleContrib {
                 } else {
                     1.0 / sin_phi
                 });
-            add_torsion_grad(grad, t.at, r, tv, d, cos_phi, sin_term);
+            add_torsion_grad(grad, t.at, r, tv, d, cos_phi, sin_term, 3);
         }
     }
 
