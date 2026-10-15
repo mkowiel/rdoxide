@@ -101,3 +101,62 @@ pub fn uff_optimize_molecule_confs(
     let ff = uff::construct_force_field(mol, vdw_thresh, -1, ignore_interfrag_interactions)?;
     optimize_molecule_confs(mol, &ff, num_threads, max_iters)
 }
+
+/// `ForceFieldsHelper::createEmptyForceFieldForMol`: a force field with the
+/// points of a conformer and no terms.
+pub fn create_empty_force_field_for_mol(mol: &ROMol, conf_id: i32) -> Result<ForceField> {
+    let mut field = ForceField::new(3);
+    for p in mol.conformer(conf_id)?.positions() {
+        field.push_point(&[p.x, p.y, p.z]);
+    }
+    Ok(field)
+}
+
+/// `MMFF::MMFFOptimizeMolecule`: (-1 if parameters were missing, 0 if the
+/// optimization converged, 1 if more iterations are required; the energy).
+/// The atoms are typed with the given variant.
+pub fn mmff_optimize_molecule(
+    mol: &mut ROMol,
+    max_iters: u32,
+    mmff_variant: &str,
+    non_bonded_thresh: f64,
+    conf_id: i32,
+    ignore_interfrag_interactions: bool,
+) -> Result<(i32, f64)> {
+    let props = mmff::MmffMolProperties::new(mol, mmff_variant)?;
+    if !props.is_valid() {
+        return Ok((-1, -1.0));
+    }
+    let mut ff = mmff::construct_force_field_with_props(
+        mol,
+        &props,
+        non_bonded_thresh,
+        conf_id,
+        ignore_interfrag_interactions,
+    )?;
+    optimize_conformer(mol, &mut ff, conf_id, max_iters)
+}
+
+/// `MMFF::MMFFOptimizeMoleculeConfs`: (-1, -1) for every conformer when
+/// parameters are missing.
+pub fn mmff_optimize_molecule_confs(
+    mol: &mut ROMol,
+    num_threads: i32,
+    max_iters: u32,
+    mmff_variant: &str,
+    non_bonded_thresh: f64,
+    ignore_interfrag_interactions: bool,
+) -> Result<Vec<(i32, f64)>> {
+    let props = mmff::MmffMolProperties::new(mol, mmff_variant)?;
+    if !props.is_valid() {
+        return Ok(vec![(-1, -1.0); mol.conformers().len()]);
+    }
+    let ff = mmff::construct_force_field_with_props(
+        mol,
+        &props,
+        non_bonded_thresh,
+        -1,
+        ignore_interfrag_interactions,
+    )?;
+    optimize_molecule_confs(mol, &ff, num_threads, max_iters)
+}

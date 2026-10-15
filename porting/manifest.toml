@@ -1052,6 +1052,7 @@
 "Code/ForceField/MMFF/Nonbonded.cpp" = "88bbdb692d43afa15f2d1d79bfb775b11ef09ca2"
 
 [module."rdoxide::graphmol::forcefield_helpers::mmff::builder".sources]
+"Code/GraphMol/ForceFieldHelpers/MMFF/MMFF.h" = "b9e22879bb05ee1394abb968c0013774cc28c83c"
 "Code/GraphMol/ForceFieldHelpers/MMFF/Builder.h" = "76dccb06dd9d1f63bad056cb4f8bedcab06e82bd"
 "Code/GraphMol/ForceFieldHelpers/MMFF/Builder.cpp" = "632d04c4cd62d588d74f36567a4471b04483f2ff"
 

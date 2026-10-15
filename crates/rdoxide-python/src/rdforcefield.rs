@@ -14,8 +14,13 @@ use rdoxide::forcefield::constraints::{
     AngleConstraintContrib, DistanceConstraintContrib, PositionConstraintContrib,
     TorsionConstraintContrib,
 };
+use rdoxide::graphmol::forcefield_helpers::mmff::{
+    DielectricModel, MmffMolProperties, construct_force_field_with_props, sanitize_mmff_mol,
+};
 use rdoxide::graphmol::forcefield_helpers::{
-    flat_positions, optimize_molecule, uff, uff_optimize_molecule, uff_optimize_molecule_confs,
+    create_empty_force_field_for_mol, flat_positions, mmff_optimize_molecule,
+    mmff_optimize_molecule_confs, optimize_molecule, optimize_molecule_confs, uff,
+    uff_optimize_molecule, uff_optimize_molecule_confs,
 };
 
 use crate::errors::IntoPyResult;
@@ -666,10 +671,597 @@ fn py_uff_vdw_params(py: Python<'_>, mol: &PyMol, idx1: u32, idx2: u32) -> PyRes
     opt_tuple(py, p.map(|(x, d)| [x, d]).as_ref().map(|a| a.as_slice()))
 }
 
+// ------------------------------------------------------------------ MMFF
+
+/// MMFF molecular properties
+#[pyclass(name = "MMFFMolProperties", module = "rdkit.ForceField.rdForceField")]
+pub struct PyMmffMolProperties {
+    props: MmffMolProperties,
+}
+
+fn mmff_atom_index(mol: &PyMol, indices: &[u32]) -> PyResult<()> {
+    for &i in indices {
+        if i >= mol.mol.num_atoms() {
+            return Err(PyValueError::new_err("atom index out of range"));
+        }
+    }
+    Ok(())
+}
+
+#[pymethods]
+impl PyMmffMolProperties {
+    /// Retrieves MMFF atom type for atom with index idx
+    #[pyo3(name = "GetMMFFAtomType", signature = (idx))]
+    fn atom_type(&self, idx: u32) -> PyResult<u32> {
+        self.check_index(idx)?;
+        Ok(u32::from(self.props.atom_type(idx)))
+    }
+
+    /// Retrieves MMFF formal charge for atom with index idx
+    #[pyo3(name = "GetMMFFFormalCharge", signature = (idx))]
+    fn formal_charge(&self, idx: u32) -> PyResult<f64> {
+        self.check_index(idx)?;
+        Ok(self.props.formal_charge(idx))
+    }
+
+    /// Retrieves MMFF partial charge for atom with index idx
+    #[pyo3(name = "GetMMFFPartialCharge", signature = (idx))]
+    fn partial_charge(&self, idx: u32) -> PyResult<f64> {
+        self.check_index(idx)?;
+        Ok(self.props.partial_charge(idx))
+    }
+
+    /// Retrieves MMFF bond stretch parameters for atoms with indexes idx1, idx2
+    /// as a (bondType, kb, r0) tuple, or None if no parameters could be found
+    #[pyo3(name = "GetMMFFBondStretchParams", signature = (mol, idx1, idx2))]
+    fn bond_stretch_params(
+        &self,
+        py: Python<'_>,
+        mol: &PyMol,
+        idx1: u32,
+        idx2: u32,
+    ) -> PyResult<Py<PyAny>> {
+        mmff_atom_index(mol, &[idx1, idx2])?;
+        let p = self.props.bond_stretch_params(&mol.mol, idx1, idx2).py()?;
+        tuple_or_none(py, p.map(|p| (p.bond_type, vec![p.params.kb, p.params.r0])))
+    }
+
+    /// Retrieves MMFF angle bend parameters for atoms with indexes idx1, idx2,
+    /// idx3 as a (angleType, ka, theta0) tuple, or None if no parameters could
+    /// be found
+    #[pyo3(name = "GetMMFFAngleBendParams", signature = (mol, idx1, idx2, idx3))]
+    fn angle_bend_params(
+        &self,
+        py: Python<'_>,
+        mol: &PyMol,
+        idx1: u32,
+        idx2: u32,
+        idx3: u32,
+    ) -> PyResult<Py<PyAny>> {
+        mmff_atom_index(mol, &[idx1, idx2, idx3])?;
+        let p = self
+            .props
+            .angle_bend_params(&mol.mol, idx1, idx2, idx3)
+            .py()?;
+        tuple_or_none(
+            py,
+            p.map(|p| (p.angle_type, vec![p.params.ka, p.params.theta0])),
+        )
+    }
+
+    /// Retrieves MMFF stretch-bend parameters for atoms with indexes idx1,
+    /// idx2, idx3 as a (stretchBendType, kbaIJK, kbaKJI) tuple, or None if no
+    /// parameters could be found
+    #[pyo3(name = "GetMMFFStretchBendParams", signature = (mol, idx1, idx2, idx3))]
+    fn stretch_bend_params(
+        &self,
+        py: Python<'_>,
+        mol: &PyMol,
+        idx1: u32,
+        idx2: u32,
+        idx3: u32,
+    ) -> PyResult<Py<PyAny>> {
+        mmff_atom_index(mol, &[idx1, idx2, idx3])?;
+        let p = self
+            .props
+            .stretch_bend_params(&mol.mol, idx1, idx2, idx3)
+            .py()?;
+        tuple_or_none(
+            py,
+            p.map(|p| {
+                (
+                    p.stretch_bend_type,
+                    vec![p.params.kba_ijk, p.params.kba_kji],
+                )
+            }),
+        )
+    }
+
+    /// Retrieves MMFF torsion parameters for atoms with indexes idx1, idx2,
+    /// idx3, idx4 as a (torsionType, V1, V2, V3) tuple, or None if no
+    /// parameters could be found
+    #[pyo3(name = "GetMMFFTorsionParams", signature = (mol, idx1, idx2, idx3, idx4))]
+    fn torsion_params(
+        &self,
+        py: Python<'_>,
+        mol: &PyMol,
+        idx1: u32,
+        idx2: u32,
+        idx3: u32,
+        idx4: u32,
+    ) -> PyResult<Py<PyAny>> {
+        mmff_atom_index(mol, &[idx1, idx2, idx3, idx4])?;
+        let p = self
+            .props
+            .torsion_params(&mol.mol, idx1, idx2, idx3, idx4)
+            .py()?;
+        tuple_or_none(
+            py,
+            p.map(|p| (p.torsion_type, vec![p.params.v1, p.params.v2, p.params.v3])),
+        )
+    }
+
+    /// Retrieves MMFF out-of-plane bending force constant for atoms with
+    /// indexes idx1, idx2, idx3, idx4 as a koop float value
+    #[pyo3(name = "GetMMFFOopBendParams", signature = (mol, idx1, idx2, idx3, idx4))]
+    fn oop_bend_params(
+        &self,
+        mol: &PyMol,
+        idx1: u32,
+        idx2: u32,
+        idx3: u32,
+        idx4: u32,
+    ) -> PyResult<Option<f64>> {
+        mmff_atom_index(mol, &[idx1, idx2, idx3, idx4])?;
+        Ok(self
+            .props
+            .oop_bend_params(&mol.mol, idx1, idx2, idx3, idx4)
+            .map(|p| p.koop))
+    }
+
+    /// Retrieves MMFF van der Waals parameters for atoms with indexes idx1,
+    /// idx2 as a (R_ij_starUnscaled, epsilonUnscaled, R_ij_star, epsilon)
+    /// tuple, or None if no parameters could be found
+    #[pyo3(name = "GetMMFFVdWParams", signature = (idx1, idx2))]
+    fn vdw_params(&self, py: Python<'_>, idx1: u32, idx2: u32) -> PyResult<Py<PyAny>> {
+        self.check_index(idx1)?;
+        self.check_index(idx2)?;
+        let p = self.props.vdw_params(idx1, idx2);
+        opt_tuple(
+            py,
+            p.map(|p| {
+                [
+                    p.r_ij_star_unscaled,
+                    p.epsilon_unscaled,
+                    p.r_ij_star,
+                    p.epsilon,
+                ]
+            })
+            .as_ref()
+            .map(|a| a.as_slice()),
+        )
+    }
+
+    /// Sets the DielModel MMFF property (1: constant; 2: distance-dependent;
+    /// defaults to constant)
+    #[pyo3(name = "SetMMFFDielectricModel", signature = (dielModel = 1))]
+    #[allow(non_snake_case)]
+    fn set_dielectric_model(&mut self, dielModel: u8) -> PyResult<()> {
+        self.props.set_dielectric_model(match dielModel {
+            1 => DielectricModel::Constant,
+            2 => DielectricModel::Distance,
+            _ => return Err(PyValueError::new_err("bad dielectric model")),
+        });
+        Ok(())
+    }
+
+    /// Returns the currently configured MMFF dielectric model (1: constant;
+    /// 2: distance-dependent).
+    #[pyo3(name = "GetMMFFDielectricModel")]
+    fn dielectric_model(&self) -> u8 {
+        self.props.dielectric_model() as u8
+    }
+
+    /// Sets the DielConst MMFF property (defaults to 1.0)
+    #[pyo3(name = "SetMMFFDielectricConstant", signature = (dielConst = 1.0))]
+    #[allow(non_snake_case)]
+    fn set_dielectric_constant(&mut self, dielConst: f64) -> PyResult<()> {
+        self.props.set_dielectric_constant(dielConst).py()
+    }
+
+    /// Returns the currently configured MMFF dielectric constant.
+    #[pyo3(name = "GetMMFFDielectricConstant")]
+    fn dielectric_constant(&self) -> f64 {
+        self.props.dielectric_constant()
+    }
+
+    /// Sets the bond term to be included in the MMFF equation (defaults to True)
+    #[pyo3(name = "SetMMFFBondTerm", signature = (state = true))]
+    fn set_bond_term(&mut self, state: bool) {
+        self.props.set_bond_term(state);
+    }
+
+    /// Returns whether the bond term is included in the MMFF equation.
+    #[pyo3(name = "GetMMFFBondTerm")]
+    fn bond_term(&self) -> bool {
+        self.props.bond_term()
+    }
+
+    /// Sets the angle term to be included in the MMFF equation (defaults to True)
+    #[pyo3(name = "SetMMFFAngleTerm", signature = (state = true))]
+    fn set_angle_term(&mut self, state: bool) {
+        self.props.set_angle_term(state);
+    }
+
+    /// Returns whether the angle term is included in the MMFF equation.
+    #[pyo3(name = "GetMMFFAngleTerm")]
+    fn angle_term(&self) -> bool {
+        self.props.angle_term()
+    }
+
+    /// Sets the stretch-bend term to be included in the MMFF equation (defaults
+    /// to True)
+    #[pyo3(name = "SetMMFFStretchBendTerm", signature = (state = true))]
+    fn set_stretch_bend_term(&mut self, state: bool) {
+        self.props.set_stretch_bend_term(state);
+    }
+
+    /// Returns whether the stretch-bend term is included in the MMFF equation.
+    #[pyo3(name = "GetMMFFStretchBendTerm")]
+    fn stretch_bend_term(&self) -> bool {
+        self.props.stretch_bend_term()
+    }
+
+    /// Sets the out-of-plane bend term to be included in the MMFF equation
+    /// (defaults to True)
+    #[pyo3(name = "SetMMFFOopTerm", signature = (state = true))]
+    fn set_oop_term(&mut self, state: bool) {
+        self.props.set_oop_term(state);
+    }
+
+    /// Returns whether the out-of-plane bend term is included in the MMFF
+    /// equation.
+    #[pyo3(name = "GetMMFFOopTerm")]
+    fn oop_term(&self) -> bool {
+        self.props.oop_term()
+    }
+
+    /// Sets the torsional term to be included in the MMFF equation (defaults
+    /// to True)
+    #[pyo3(name = "SetMMFFTorsionTerm", signature = (state = true))]
+    fn set_torsion_term(&mut self, state: bool) {
+        self.props.set_torsion_term(state);
+    }
+
+    /// Returns whether the torsional term is included in the MMFF equation.
+    #[pyo3(name = "GetMMFFTorsionTerm")]
+    fn torsion_term(&self) -> bool {
+        self.props.torsion_term()
+    }
+
+    /// Sets the Van der Waals term to be included in the MMFF equation
+    /// (defaults to True)
+    #[pyo3(name = "SetMMFFVdWTerm", signature = (state = true))]
+    fn set_vdw_term(&mut self, state: bool) {
+        self.props.set_vdw_term(state);
+    }
+
+    /// Returns whether the Van der Waals term is included in the MMFF equation.
+    #[pyo3(name = "GetMMFFVdWTerm")]
+    fn vdw_term(&self) -> bool {
+        self.props.vdw_term()
+    }
+
+    /// Sets the electrostatic term to be included in the MMFF equation
+    /// (defaults to True)
+    #[pyo3(name = "SetMMFFEleTerm", signature = (state = true))]
+    fn set_ele_term(&mut self, state: bool) {
+        self.props.set_ele_term(state);
+    }
+
+    /// Returns whether the electrostatic term is included in the MMFF equation.
+    #[pyo3(name = "GetMMFFEleTerm")]
+    fn ele_term(&self) -> bool {
+        self.props.ele_term()
+    }
+
+    /// Sets the MMFF variant to be used ("MMFF94" or "MMFF94s"; defaults to
+    /// "MMFF94")
+    #[pyo3(name = "SetMMFFVariant", signature = (mmffVariant = "MMFF94"))]
+    #[allow(non_snake_case)]
+    fn set_variant(&mut self, mmffVariant: &str) -> PyResult<()> {
+        self.props.set_variant(mmffVariant).py()
+    }
+
+    /// Returns the currently configured MMFF variant ("MMFF94" or "MMFF94s").
+    #[pyo3(name = "GetMMFFVariant")]
+    fn variant(&self) -> &'static str {
+        self.props.variant()
+    }
+
+    /// Sets the MMFF verbosity (0: none; 1: low; 2: high; defaults to 0)
+    #[pyo3(name = "SetMMFFVerbosity", signature = (verbosity = 0))]
+    fn set_verbosity(&mut self, verbosity: u8) {
+        self.props.set_verbosity(verbosity);
+    }
+}
+
+impl PyMmffMolProperties {
+    fn check_index(&self, idx: u32) -> PyResult<()> {
+        if (idx as usize) < self.props.num_atoms() {
+            Ok(())
+        } else {
+            Err(PyValueError::new_err("atom index out of range"))
+        }
+    }
+}
+
+fn tuple_or_none(py: Python<'_>, v: Option<(u32, Vec<f64>)>) -> PyResult<Py<PyAny>> {
+    Ok(match v {
+        Some((kind, values)) => {
+            let mut items: Vec<Py<PyAny>> = vec![kind.into_pyobject(py)?.into_any().unbind()];
+            for x in values {
+                items.push(x.into_pyobject(py)?.into_any().unbind());
+            }
+            PyTuple::new(py, items)?.into_any().unbind()
+        }
+        None => py.None(),
+    })
+}
+
+/// uses MMFF to optimize a molecule's structure
+///
+///  ARGUMENTS:
+///
+///     - mol : the molecule of interest
+///     - mmffVariant : "MMFF94" or "MMFF94s"
+///     - maxIters : the maximum number of iterations (defaults to 200)
+///     - nonBondedThresh : used to exclude long-range non-bonded
+///                  interactions (defaults to 100.0)
+///     - confId : indicates which conformer to optimize
+///     - ignoreInterfragInteractions : if true, nonbonded terms between
+///                  fragments will not be added to the forcefield
+///
+///  RETURNS: 0 if the optimization converged, -1 if the forcefield could
+///           not be set up, 1 if more iterations are required.
+#[pyfunction]
+#[pyo3(name = "MMFFOptimizeMolecule", signature = (mol, mmffVariant = "MMFF94", maxIters = 200, nonBondedThresh = 100.0, confId = -1, ignoreInterfragInteractions = true))]
+#[allow(non_snake_case)]
+fn py_mmff_optimize_molecule(
+    py: Python<'_>,
+    mol: &Bound<'_, PyMol>,
+    mmffVariant: &str,
+    maxIters: u32,
+    nonBondedThresh: f64,
+    confId: i32,
+    ignoreInterfragInteractions: bool,
+) -> PyResult<i32> {
+    let mut mol = mol.borrow_mut();
+    let mol = &mut mol.mol;
+    py.detach(|| {
+        mmff_optimize_molecule(
+            mol,
+            maxIters,
+            mmffVariant,
+            nonBondedThresh,
+            confId,
+            ignoreInterfragInteractions,
+        )
+    })
+    .py()
+    .map(|(res, _)| res)
+}
+
+/// sanitizes a molecule according to MMFF requirements.
+///
+///     - mol : the molecule of interest.
+#[pyfunction]
+#[pyo3(name = "MMFFSanitizeMolecule", signature = (mol))]
+fn py_mmff_sanitize_molecule(mol: &Bound<'_, PyMol>) -> u32 {
+    sanitize_mmff_mol(&mut mol.borrow_mut().mol)
+}
+
+/// returns a PyMMFFMolProperties object for a
+///   molecule, which is required by MMFFGetMoleculeForceField()
+///   and can be used to get/set MMFF properties
+///
+///   ARGUMENTS:
+///
+///     - mol : the molecule of interest
+///     - mmffVariant : "MMFF94" or "MMFF94s"
+///                   (defaults to "MMFF94")
+///     - mmffVerbosity : 0: none; 1: low; 2: high (defaults to 0).
+#[pyfunction]
+#[pyo3(name = "MMFFGetMoleculeProperties", signature = (mol, mmffVariant = "MMFF94", mmffVerbosity = 0))]
+#[allow(non_snake_case)]
+fn py_mmff_get_molecule_properties(
+    mol: &Bound<'_, PyMol>,
+    mmffVariant: &str,
+    mmffVerbosity: u8,
+) -> PyResult<Option<PyMmffMolProperties>> {
+    let mut props = MmffMolProperties::new(&mut mol.borrow_mut().mol, mmffVariant).py()?;
+    props.set_verbosity(mmffVerbosity);
+    Ok(props.is_valid().then_some(PyMmffMolProperties { props }))
+}
+
+/// returns a MMFF force field for a molecule
+///
+///  ARGUMENTS:
+///
+///     - mol : the molecule of interest
+///     - pyMMFFMolProperties : PyMMFFMolProperties object as returned
+///                   by MMFFGetMoleculeProperties()
+///     - nonBondedThresh : used to exclude long-range non-bonded
+///                   interactions (defaults to 100.0)
+///     - confId : indicates which conformer to optimize
+///     - ignoreInterfragInteractions : if true, nonbonded terms between
+///                   fragments will not be added to the forcefield
+#[pyfunction]
+#[pyo3(name = "MMFFGetMoleculeForceField", signature = (mol, pyMMFFMolProperties, nonBondedThresh = 100.0, confId = -1, ignoreInterfragInteractions = true))]
+#[allow(non_snake_case)]
+fn py_mmff_get_molecule_force_field(
+    mol: &Bound<'_, PyMol>,
+    pyMMFFMolProperties: Option<PyRef<'_, PyMmffMolProperties>>,
+    nonBondedThresh: f64,
+    confId: i32,
+    ignoreInterfragInteractions: bool,
+) -> PyResult<Option<PyForceField>> {
+    let Some(props) = pyMMFFMolProperties else {
+        return Ok(None);
+    };
+    let field = construct_force_field_with_props(
+        &mol.borrow().mol,
+        &props.props,
+        nonBondedThresh,
+        confId,
+        ignoreInterfragInteractions,
+    )
+    .py()?;
+    Ok(Some(PyForceField {
+        field,
+        link: Some((mol.clone().unbind(), confId)),
+        extra_points: 0,
+    }))
+}
+
+/// Get An empty Force Field, with only the positions of the atoms but no
+/// Contributions.
+///
+///   ARGUMENTS :
+///
+///       - mol : the molecule of interest
+///       - confId: the conformer which positions should be added to the force field.
+#[pyfunction]
+#[pyo3(name = "CreateEmptyForceFieldForMol", signature = (mol, confId = -1))]
+#[allow(non_snake_case)]
+fn py_create_empty_force_field_for_mol(
+    mol: &Bound<'_, PyMol>,
+    confId: i32,
+) -> PyResult<PyForceField> {
+    let field = create_empty_force_field_for_mol(&mol.borrow().mol, confId).py()?;
+    Ok(PyForceField {
+        field,
+        link: Some((mol.clone().unbind(), confId)),
+        extra_points: 0,
+    })
+}
+
+/// checks if MMFF parameters are available for all of a molecule's atoms
+///
+///  ARGUMENTS:
+///
+///     - mol : the molecule of interest
+#[pyfunction]
+#[pyo3(name = "MMFFHasAllMoleculeParams", signature = (mol))]
+fn py_mmff_has_all_molecule_params(mol: &PyMol) -> PyResult<bool> {
+    let mut copy = mol.mol.clone();
+    Ok(MmffMolProperties::new(&mut copy, "MMFF94").py()?.is_valid())
+}
+
+/// uses MMFF to optimize all of a molecule's conformations
+///
+///  ARGUMENTS:
+///
+///     - mol : the molecule of interest
+///     - numThreads : the number of threads to use, only has an effect if the RDKit
+///                    was built with thread support (defaults to 1)
+///                    If set to zero, the max supported by the system will be used.
+///     - maxIters : the maximum number of iterations (defaults to 200)
+///     - mmffVariant : "MMFF94" or "MMFF94s"
+///     - nonBondedThresh : used to exclude long-range non-bonded
+///                   interactions (defaults to 100.0)
+///     - ignoreInterfragInteractions : if true, nonbonded terms between
+///                   fragments will not be added to the forcefield.
+///
+/// RETURNS: a list of (not_converged, energy) 2-tuples.
+///     If not_converged is 0 the optimization converged for that conformer.
+#[pyfunction]
+#[pyo3(name = "MMFFOptimizeMoleculeConfs", signature = (mol, numThreads = 1, maxIters = 200, mmffVariant = "MMFF94", nonBondedThresh = 100.0, ignoreInterfragInteractions = true))]
+#[allow(non_snake_case)]
+fn py_mmff_optimize_molecule_confs(
+    py: Python<'_>,
+    mol: &Bound<'_, PyMol>,
+    numThreads: i32,
+    maxIters: u32,
+    mmffVariant: &str,
+    nonBondedThresh: f64,
+    ignoreInterfragInteractions: bool,
+) -> PyResult<Vec<(i32, f64)>> {
+    let mut mol = mol.borrow_mut();
+    let mol = &mut mol.mol;
+    py.detach(|| {
+        mmff_optimize_molecule_confs(
+            mol,
+            numThreads,
+            maxIters,
+            mmffVariant,
+            nonBondedThresh,
+            ignoreInterfragInteractions,
+        )
+    })
+    .py()
+}
+
+/// uses the supplied force field to optimize a molecule's structure
+///
+///  ARGUMENTS:
+///
+///     - ff : the force field
+///     - maxIters : the maximum number of iterations (defaults to 200)
+///
+///  RETURNS: 0 if the optimization converged, 1 if more iterations are required.
+#[pyfunction]
+#[pyo3(name = "OptimizeMolecule", signature = (ff, maxIters = 200))]
+#[allow(non_snake_case)]
+fn py_optimize_molecule(
+    py: Python<'_>,
+    ff: &Bound<'_, PyForceField>,
+    maxIters: u32,
+) -> PyResult<i32> {
+    let mut ff = ff.borrow_mut();
+    ff.pull(py)?;
+    let field = &mut ff.field;
+    let res = py.detach(|| optimize_molecule(field, maxIters)).py()?;
+    ff.push(py)?;
+    Ok(res.0)
+}
+
+/// uses the supplied force field to optimize all of a molecule's conformations
+///
+///  ARGUMENTS:
+///
+///     - mol : the molecule of interest
+///     - ff : the force field
+///     - numThreads : the number of threads to use, only has an effect if the RDKit
+///                    was built with thread support (defaults to 1)
+///                    If set to zero, the max supported by the system will be used.
+///     - maxIters : the maximum number of iterations (defaults to 200)
+///
+///  RETURNS: a list of (not_converged, energy) 2-tuples.
+///      If not_converged is 0 the optimization converged for that conformer.
+#[pyfunction]
+#[pyo3(name = "OptimizeMoleculeConfs", signature = (mol, ff, numThreads = 1, maxIters = 200))]
+#[allow(non_snake_case)]
+fn py_optimize_molecule_confs(
+    py: Python<'_>,
+    mol: &Bound<'_, PyMol>,
+    ff: &Bound<'_, PyForceField>,
+    numThreads: i32,
+    maxIters: u32,
+) -> PyResult<Vec<(i32, f64)>> {
+    let ff = ff.borrow();
+    let mut mol = mol.borrow_mut();
+    let mol = &mut mol.mol;
+    let field = &ff.field;
+    py.detach(|| optimize_molecule_confs(mol, field, numThreads, maxIters))
+        .py()
+}
+
 /// `rdkit.ForceField.rdForceField`
 pub fn init_force_field(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("__doc__", "Exposes the ForceField class")?;
     m.add_class::<PyForceField>()?;
+    m.add_class::<PyMmffMolProperties>()?;
     Ok(())
 }
 
@@ -688,7 +1280,14 @@ pub fn init_helpers(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_uff_torsion_params, m)?)?;
     m.add_function(wrap_pyfunction!(py_uff_inversion_params, m)?)?;
     m.add_function(wrap_pyfunction!(py_uff_vdw_params, m)?)?;
-    // referenced so that optimize_molecule stays linked for MMFF later
-    let _ = optimize_molecule;
+    m.add_function(wrap_pyfunction!(py_mmff_optimize_molecule, m)?)?;
+    m.add_function(wrap_pyfunction!(py_mmff_sanitize_molecule, m)?)?;
+    m.add_function(wrap_pyfunction!(py_mmff_get_molecule_properties, m)?)?;
+    m.add_function(wrap_pyfunction!(py_mmff_get_molecule_force_field, m)?)?;
+    m.add_function(wrap_pyfunction!(py_create_empty_force_field_for_mol, m)?)?;
+    m.add_function(wrap_pyfunction!(py_mmff_has_all_molecule_params, m)?)?;
+    m.add_function(wrap_pyfunction!(py_mmff_optimize_molecule_confs, m)?)?;
+    m.add_function(wrap_pyfunction!(py_optimize_molecule, m)?)?;
+    m.add_function(wrap_pyfunction!(py_optimize_molecule_confs, m)?)?;
     Ok(())
 }

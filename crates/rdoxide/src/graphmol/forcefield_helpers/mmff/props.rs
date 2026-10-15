@@ -70,6 +70,7 @@ pub struct MmffMolProperties {
     pub(super) ele_term: bool,
     pub(super) diel_const: f64,
     pub(super) diel_model: DielectricModel,
+    pub(super) verbosity: u8,
     pub(super) atoms: Vec<MmffAtomProperties>,
 }
 
@@ -90,6 +91,7 @@ impl MmffMolProperties {
             ele_term: true,
             diel_const: 1.0,
             diel_model: DielectricModel::Constant,
+            verbosity: 0,
             atoms: vec![MmffAtomProperties::default(); mol.num_atoms() as usize],
         };
         if needs_hs(mol)? {
@@ -216,6 +218,20 @@ impl MmffMolProperties {
 
     pub fn dielectric_model(&self) -> DielectricModel {
         self.diel_model
+    }
+
+    /// Stored for API compatibility; the per-term listings of upstream are
+    /// not produced.
+    pub fn set_verbosity(&mut self, verbosity: u8) {
+        self.verbosity = verbosity;
+    }
+
+    pub fn verbosity(&self) -> u8 {
+        self.verbosity
+    }
+
+    pub fn num_atoms(&self) -> usize {
+        self.atoms.len()
     }
 
     pub fn is_valid(&self) -> bool {
