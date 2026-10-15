@@ -57,6 +57,11 @@ impl PTree {
         self.children.iter().map(|(_, c)| c)
     }
 
+    /// The members as (key, child) pairs.
+    pub fn members(&self) -> impl Iterator<Item = (&str, &PTree)> {
+        self.children.iter().map(|(k, c)| (k.as_str(), c))
+    }
+
     pub fn value(&self) -> &str {
         &self.data
     }

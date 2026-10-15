@@ -155,6 +155,7 @@ Code/GraphMol/DistGeomHelpers/Wrap/testDistGeom.py::TestCase::test9EmbedParams
 Code/GraphMol/DistGeomHelpers/Wrap/testDistGeom.py::TestCase::testCoordMap
 Code/GraphMol/DistGeomHelpers/Wrap/testDistGeom.py::TestCase::testETKDGIsDeterministic
 Code/GraphMol/DistGeomHelpers/Wrap/testDistGeom.py::TestCase::testETKDGv3amide
+Code/GraphMol/DistGeomHelpers/Wrap/testDistGeom.py::TestCase::testEmbedParamsToJSON
 Code/GraphMol/DistGeomHelpers/Wrap/testDistGeom.py::TestCase::testGetMolBoundsMatrixParams
 Code/GraphMol/DistGeomHelpers/Wrap/testDistGeom.py::TestCase::testGetTorsionBonds
 Code/GraphMol/DistGeomHelpers/Wrap/testDistGeom.py::TestCase::testGithub1763

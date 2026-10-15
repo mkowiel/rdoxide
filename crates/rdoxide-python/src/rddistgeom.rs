@@ -1,7 +1,5 @@
 //! `rdkit.Chem.rdDistGeom` (upstream `DistGeomHelpers/Wrap/rdDistGeom.cpp`):
 //! embedding molecules in 3D with distance geometry and ETKDG.
-//!
-//! Not ported yet: `EmbedParametersToJSON`.
 
 use std::sync::Arc;
 
@@ -11,7 +9,8 @@ use pyo3::types::{PyDict, PyList, PyTuple};
 use rdoxide::distgeom::{BoundsMatrix, triangle_smooth_bounds};
 use rdoxide::graphmol::dist_geom_helpers::{
     CoordMap, EmbedFF, EmbedParameters, InitialEmbeddingMode, TopolBoundsOptions,
-    TopolBoundsOutput, embed_molecule, embed_multiple_confs, init_bounds_mat, set_topol_bounds,
+    TopolBoundsOutput, embed_molecule, embed_multiple_confs, embed_parameters_to_json,
+    init_bounds_mat, set_topol_bounds,
 };
 use rdoxide::graphmol::forcefield_helpers::crystal_ff::{
     CrystalFFDetails, TorsionAngleRef, TorsionOptions, get_experimental_torsions_with_bonds,
@@ -784,6 +783,22 @@ fn py_get_experimental_torsions<'py>(
     torsion_dicts(py, &bonds)
 }
 
+/// Returns the embedding parameters as a JSON string
+///
+///  ARGUMENTS:
+///
+///     - embedParameters : the EmbedParameters object
+///
+///  RETURNS:
+///
+///    The Params object as json string
+#[pyfunction]
+#[pyo3(name = "EmbedParametersToJSON", signature = (embedParameters))]
+#[allow(non_snake_case)]
+fn py_embed_parameters_to_json(embedParameters: &PyEmbedParameters) -> String {
+    embed_parameters_to_json(&embedParameters.params)
+}
+
 /// The failure causes in the order they are checked.
 #[pyfunction]
 #[pyo3(name = "OrderedEmbedFailureCauses", signature = (legacyImplementation = true))]
@@ -880,6 +895,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
         wrap_pyfunction!(py_get_molecule_bounds_matrix, m)?,
         wrap_pyfunction!(py_get_experimental_torsions, m)?,
         wrap_pyfunction!(py_ordered_embed_failure_causes, m)?,
+        wrap_pyfunction!(py_embed_parameters_to_json, m)?,
         wrap_pyfunction!(py_etkdg, m)?,
         wrap_pyfunction!(py_etkdg_v2, m)?,
         wrap_pyfunction!(py_sr_etkdg_v3, m)?,

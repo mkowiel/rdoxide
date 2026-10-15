@@ -1129,6 +1129,7 @@
 "Code/GraphMol/DistGeomHelpers/ZMatrixBuilder.h" = "c154ad4842012a80062fc61a46d42523e866825f"
 "Code/GraphMol/DistGeomHelpers/Embedder.cpp" = "3b38593df33fa90b63b4b92b532a585658e4287d"
 "Code/GraphMol/DistGeomHelpers/Embedder.h" = "94c3f05f5ba2d39569ace94265b9f2fb96413c0e"
+"Code/GraphMol/DistGeomHelpers/EmbedderUtils.cpp" = "61e5f7a87e887a372a8a784aeb720489cae22f80"
 
 [module."rdoxide::forcefield::crystal_ff".sources]
 "Code/GraphMol/ForceFieldHelpers/CrystalFF/TorsionAngleContribs.h" = "7435e6bcc18938427e5ee8146682a945f6206d8f"
