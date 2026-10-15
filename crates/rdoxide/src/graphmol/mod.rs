@@ -46,6 +46,7 @@ pub mod queries;
 pub mod query_ops;
 pub mod reduced_graphs;
 pub mod resonance;
+pub mod rgroup_decomposition;
 pub mod ring_info;
 pub mod romol;
 pub mod smiles_parse;

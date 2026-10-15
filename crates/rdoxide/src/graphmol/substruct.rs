@@ -706,7 +706,7 @@ fn ez_to_cis_trans(s: BondStereo) -> BondStereo {
 }
 
 /// `MolMatchFinalCheckFunctor`
-struct FinalCheck<'a> {
+pub(crate) struct FinalCheck<'a> {
     query: &'a ROMol,
     mol: &'a ROMol,
     ps: &'a SubstructMatchParameters,
@@ -715,7 +715,7 @@ struct FinalCheck<'a> {
 }
 
 impl<'a> FinalCheck<'a> {
-    fn new(query: &'a ROMol, mol: &'a ROMol, ps: &'a SubstructMatchParameters) -> Self {
+    pub(crate) fn new(query: &'a ROMol, mol: &'a ROMol, ps: &'a SubstructMatchParameters) -> Self {
         let mut mol_stereo_groups = BTreeMap::new();
         if ps.use_enhanced_stereo {
             for (gi, sg) in mol.stereo_groups().iter().enumerate() {
@@ -736,7 +736,7 @@ impl<'a> FinalCheck<'a> {
         }
     }
 
-    fn check(&mut self, q_c: &[u32], m_c: &[u32]) -> Result<bool> {
+    pub(crate) fn check(&mut self, q_c: &[u32], m_c: &[u32]) -> Result<bool> {
         let nq = self.query.num_atoms() as usize;
         if let Some(FinalMatchCheck(f)) = &self.ps.extra_final_check {
             if !f(self.mol, &m_c[..nq]) {
@@ -1085,6 +1085,24 @@ fn check_params(ps: &SubstructMatchParameters) -> Result<()> {
         ));
     }
     Ok(())
+}
+
+/// `bondCompat(queryBond, molBond, params)` for callers outside the matcher.
+pub(crate) fn bond_compat(
+    query: &ROMol,
+    query_bond: u32,
+    mol: &ROMol,
+    mol_bond: u32,
+    ps: &SubstructMatchParameters,
+) -> Result<bool> {
+    let rec = RecursionSets::new();
+    Ctx {
+        query,
+        mol,
+        ps,
+        rec: &rec,
+    }
+    .bond_compat(query_bond, mol_bond)
 }
 
 /// `SubstructMatch(mol, query, params)`
