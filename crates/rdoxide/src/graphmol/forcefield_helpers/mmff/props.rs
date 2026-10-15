@@ -2,11 +2,15 @@
 //! `MMFFMolProperties` of `ForceFieldHelpers/MMFF/AtomTyper.cpp`).
 
 use super::heavy::HeavyAtomTyper;
-use super::rings::RingMembershipSize;
-use crate::error::Result;
+use super::rings::{
+    RingMembershipSize, is_angle_in_ring_of_size_3_or_4, is_torsion_in_ring_of_size_4_or_5,
+};
+use crate::error::{RDKitError, Result};
+use crate::forcefield::mmff::params::{MmffParams, Prop};
 use crate::graphmol::aromaticity::set_mmff_aromaticity;
-use crate::graphmol::mol_ops::add_hs::needs_hs;
+use crate::graphmol::bond::BondType;
 use crate::graphmol::kekulize::kekulize;
+use crate::graphmol::mol_ops::add_hs::needs_hs;
 use crate::graphmol::mol_ops::sanitize_flags::*;
 use crate::graphmol::mol_ops::sanitize_mol;
 use crate::graphmol::romol::{ROMol, RWMol};
@@ -138,6 +142,112 @@ impl MmffMolProperties {
         self.atoms[idx as usize].partial_charge
     }
 
+    pub(super) fn params(&self) -> &'static MmffParams {
+        MmffParams::get(self.mmffs)
+    }
+
+    pub(super) fn prop(&self, idx: u32) -> &'static Prop {
+        self.params()
+            .prop(u32::from(self.atom_type(idx)))
+            .expect("MMFF atom types always have properties")
+    }
+
+    pub(super) fn require_valid(&self) -> Result<()> {
+        if self.valid {
+            Ok(())
+        } else {
+            Err(RDKitError::precondition(
+                "missing atom types - invalid force-field",
+            ))
+        }
+    }
+
+    /// The MMFF bond type: 1 for a single bond between two atoms that both
+    /// have the `sbmb` flag or are both aromatic, else 0.
+    pub fn bond_type(&self, mol: &ROMol, bond: u32) -> Result<u32> {
+        self.require_valid()?;
+        let bond = mol.bond(bond);
+        let (p1, p2) = (
+            self.prop(bond.begin_atom_idx()),
+            self.prop(bond.end_atom_idx()),
+        );
+        Ok(u32::from(
+            bond.bond_type() == BondType::Single
+                && ((p1.sbmb != 0 && p2.sbmb != 0) || (p1.arom != 0 && p2.arom != 0)),
+        ))
+    }
+
+    fn bond_type_between(&self, mol: &ROMol, a: u32, b: u32) -> Result<u32> {
+        match mol.bond_idx_between(a, b) {
+            Some(bond) => self.bond_type(mol, bond),
+            None => Err(RDKitError::precondition("invalid bond")),
+        }
+    }
+
+    /// The MMFF angle type of the angle idx1-idx2-idx3:
+    /// 0 normal, 1/2 one/two bonds of type 1, 3/4 in a 3-/4-membered ring,
+    /// 5/6 and 7/8 in a 3-/4-membered ring with a bond type sum of 1/2.
+    pub fn angle_type(&self, mol: &ROMol, idx1: u32, idx2: u32, idx3: u32) -> Result<u32> {
+        self.require_valid()?;
+        let bond_type_sum =
+            self.bond_type_between(mol, idx1, idx2)? + self.bond_type_between(mol, idx2, idx3)?;
+        let mut angle_type = bond_type_sum;
+        let size = is_angle_in_ring_of_size_3_or_4(mol, idx1, idx2, idx3);
+        if size != 0 {
+            angle_type = size;
+            if bond_type_sum != 0 {
+                angle_type += bond_type_sum + size - 2;
+            }
+        }
+        Ok(angle_type)
+    }
+
+    /// The principal and the secondary torsion type of idx1-idx2-idx3-idx4;
+    /// the secondary one is used when no parameters exist for the principal.
+    pub fn torsion_type(
+        &self,
+        mol: &ROMol,
+        idx1: u32,
+        idx2: u32,
+        idx3: u32,
+        idx4: u32,
+    ) -> Result<(u32, u32)> {
+        self.require_valid()?;
+        let bond_jk = mol
+            .bond_idx_between(idx2, idx3)
+            .ok_or_else(|| RDKitError::precondition("invalid bond"))?;
+        let bond_type_ij = self.bond_type_between(mol, idx1, idx2)?;
+        let bond_type_jk = self.bond_type(mol, bond_jk)?;
+        let bond_type_kl = self.bond_type_between(mol, idx3, idx4)?;
+        let mut torsion_type = bond_type_jk;
+        let mut second_torsion_type = 0;
+        // MMFF.IV asks for less, but CYGUAN01 only passes with this condition
+        if bond_type_jk == 0
+            && mol.bond(bond_jk).bond_type() == BondType::Single
+            && (bond_type_ij == 1 || bond_type_kl == 1)
+        {
+            torsion_type = 2;
+        }
+        let size = is_torsion_in_ring_of_size_4_or_5(mol, idx1, idx2, idx3, idx4);
+        // the check for bonds I-K and J-L keeps two fused 3-membered rings
+        // from getting type 4
+        if size == 4
+            && !(mol.bond_idx_between(idx1, idx3).is_some()
+                || mol.bond_idx_between(idx2, idx4).is_some())
+        {
+            second_torsion_type = torsion_type;
+            torsion_type = 4;
+        } else if size == 5
+            && [idx1, idx2, idx3, idx4]
+                .iter()
+                .any(|&i| self.atom_type(i) == 1)
+        {
+            second_torsion_type = torsion_type;
+            torsion_type = 5;
+        }
+        Ok((torsion_type, second_torsion_type))
+    }
+
     /// The type of a hydrogen atom, which follows from its (typed) neighbor.
     fn hydrogen_type(&self, mol: &ROMol, idx: u32) -> u32 {
         let mut atom_type = 0;
@@ -168,7 +278,6 @@ impl MmffMolProperties {
     /// acids, enolic or phenolic hydrogens and hydrogens on oxygens bonded to
     /// sulfur are told apart from alcohols and generic hydroxyl hydrogens.
     fn hydroxyl_hydrogen_type(&self, mol: &ROMol, oxygen: u32) -> u32 {
-        use crate::graphmol::bond::BondType;
         match self.atom_type(oxygen) {
             49 => return 50, // HO+
             51 => return 52, // HO=+
@@ -213,5 +322,40 @@ impl MmffMolProperties {
         } else {
             21 // HO, HOR
         }
+    }
+}
+
+/// The MMFF stretch-bend type from the angle type and the types of the two
+/// bonds of the angle.
+pub fn stretch_bend_type(angle_type: u32, bond_type1: u32, bond_type2: u32) -> u32 {
+    let first_or_equal = bond_type1 != 0 || bond_type1 == bond_type2;
+    match angle_type {
+        1 => {
+            if first_or_equal {
+                1
+            } else {
+                2
+            }
+        }
+        2 => 3,
+        4 => 4,
+        3 => 5,
+        5 => {
+            if first_or_equal {
+                6
+            } else {
+                7
+            }
+        }
+        6 => 8,
+        7 => {
+            if first_or_equal {
+                9
+            } else {
+                10
+            }
+        }
+        8 => 11,
+        _ => 0,
     }
 }

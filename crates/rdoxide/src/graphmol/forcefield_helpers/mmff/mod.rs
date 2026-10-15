@@ -1,11 +1,15 @@
 //! MMFF atom typing and force-field construction (upstream
 //! `ForceFieldHelpers/MMFF`).
 
+mod empirical;
 mod heavy;
 mod props;
 mod rings;
 
-pub use props::{DielectricModel, MmffAtomProperties, MmffMolProperties, sanitize_mmff_mol};
+pub use empirical::angle_bend_empirical_rule_params;
+pub use props::{
+    DielectricModel, MmffAtomProperties, MmffMolProperties, sanitize_mmff_mol, stretch_bend_type,
+};
 
 pub use rings::{
     are_atoms_in_same_aromatic_ring, are_atoms_in_same_ring_of_size,
