@@ -33,6 +33,64 @@ impl Clone for Box<dyn ForceFieldContrib> {
     }
 }
 
+/// Several terms of one kind that are summed together first, like the
+/// `...Contribs` collections of upstream (the floating-point sum of a
+/// collection is added to the total as one value).
+#[derive(Debug, Clone)]
+pub struct ContribGroup<T> {
+    terms: Vec<T>,
+}
+
+impl<T> Default for ContribGroup<T> {
+    fn default() -> Self {
+        ContribGroup { terms: Vec::new() }
+    }
+}
+
+impl<T> ContribGroup<T> {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn push(&mut self, term: T) {
+        self.terms.push(term);
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.terms.is_empty()
+    }
+
+    pub fn len(&self) -> usize {
+        self.terms.len()
+    }
+}
+
+impl<T: ForceFieldContrib + Clone + 'static> ForceFieldContrib for ContribGroup<T> {
+    fn energy(&self, pos: &[f64]) -> f64 {
+        let mut accum = 0.0;
+        for t in &self.terms {
+            accum += t.energy(pos);
+        }
+        accum
+    }
+
+    fn add_grad(&self, pos: &[f64], grad: &mut [f64]) {
+        for t in &self.terms {
+            t.add_grad(pos, grad);
+        }
+    }
+
+    fn box_clone(&self) -> Box<dyn ForceFieldContrib> {
+        Box::new(self.clone())
+    }
+
+    fn scale_torsion_force_constant(&mut self, count: u32) {
+        for t in &mut self.terms {
+            t.scale_torsion_force_constant(count);
+        }
+    }
+}
+
 /// `ForceFields::ForceField`
 #[derive(Clone)]
 pub struct ForceField {
