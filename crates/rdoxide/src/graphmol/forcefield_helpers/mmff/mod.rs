@@ -2,7 +2,10 @@
 //! `ForceFieldHelpers/MMFF`).
 
 mod heavy;
+mod props;
 mod rings;
+
+pub use props::{DielectricModel, MmffAtomProperties, MmffMolProperties, sanitize_mmff_mol};
 
 pub use rings::{
     are_atoms_in_same_aromatic_ring, are_atoms_in_same_ring_of_size,
