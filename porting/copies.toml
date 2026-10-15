@@ -334,3 +334,27 @@ to = "python/rdkit/Chem/ChemicalForceFields.py"
 [[copy]]
 from = "rdkit/ForceField/__init__.py"
 to = "python/rdkit/ForceField/__init__.py"
+
+[[copy]]
+from = "Code/GraphMol/ForceFieldHelpers/MMFF/test_data/small1.mol"
+to = "tests/data/molfiles/mmff_small1.mol"
+
+[[copy]]
+from = "Code/GraphMol/ForceFieldHelpers/MMFF/test_data/small2.mol"
+to = "tests/data/molfiles/mmff_small2.mol"
+
+[[copy]]
+from = "Code/GraphMol/ForceFieldHelpers/MMFF/test_data/benzene.mol"
+to = "tests/data/molfiles/mmff_benzene.mol"
+
+[[copy]]
+from = "Code/GraphMol/ForceFieldHelpers/MMFF/test_data/toluene.mol"
+to = "tests/data/molfiles/mmff_toluene.mol"
+
+[[copy]]
+from = "Code/GraphMol/ForceFieldHelpers/MMFF/test_data/complex1.mol"
+to = "tests/data/molfiles/mmff_complex1.mol"
+
+[[copy]]
+from = "Code/GraphMol/ForceFieldHelpers/MMFF/test_data/Issue239.mol"
+to = "tests/data/molfiles/mmff_Issue239.mol"

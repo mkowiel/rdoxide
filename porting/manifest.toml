@@ -1037,6 +1037,24 @@
 "Code/GraphMol/ForceFieldHelpers/MMFF/AtomTyper.h" = "94aa69ee78637e4c3b2b655225b1b0c281c45d4b"
 "Code/GraphMol/ForceFieldHelpers/MMFF/AtomTyper.cpp" = "d3bfffa11fafc5fc3c61e87a5d4fb5fe3120a8ee"
 
+[module."rdoxide::forcefield::mmff::terms".sources]
+"Code/ForceField/MMFF/BondStretch.h" = "1f8ac17f76e6ea00559ef4f0e2572fca171974f6"
+"Code/ForceField/MMFF/BondStretch.cpp" = "f4e5a8c9933da49b227151278a0661743bedf946"
+"Code/ForceField/MMFF/AngleBend.h" = "38c5fbf14a33f3c2edfb898f50b197b0a3e04a34"
+"Code/ForceField/MMFF/AngleBend.cpp" = "214ad74a75fb0ff6192efbd0842206bac6147b60"
+"Code/ForceField/MMFF/StretchBend.h" = "765fabde67b21bdf1da94bd5d83e15009ad5422e"
+"Code/ForceField/MMFF/StretchBend.cpp" = "4e69902b0db00c482af9cf5d380575bc6b3b465c"
+"Code/ForceField/MMFF/OopBend.h" = "12d705fea0e6fa275d12406b98d22afb523e93b7"
+"Code/ForceField/MMFF/OopBend.cpp" = "da3ddbb2e1684da9469577c3c44eb9b94d54781a"
+"Code/ForceField/MMFF/TorsionAngle.h" = "0ffe698337ee0417a0bc2dae75385c8f876cf018"
+"Code/ForceField/MMFF/TorsionAngle.cpp" = "c5456bee223f297aa364e4356e9cc86c27d661b4"
+"Code/ForceField/MMFF/Nonbonded.h" = "20b6cfde650bda0ba0250efcba8552bae44dd00d"
+"Code/ForceField/MMFF/Nonbonded.cpp" = "88bbdb692d43afa15f2d1d79bfb775b11ef09ca2"
+
+[module."rdoxide::graphmol::forcefield_helpers::mmff::builder".sources]
+"Code/GraphMol/ForceFieldHelpers/MMFF/Builder.h" = "76dccb06dd9d1f63bad056cb4f8bedcab06e82bd"
+"Code/GraphMol/ForceFieldHelpers/MMFF/Builder.cpp" = "632d04c4cd62d588d74f36567a4471b04483f2ff"
+
 [module."rdoxide::forcefield::uff".sources]
 "Code/ForceField/UFF/Params.h" = "fa7b927ff24eedc6790d1bbfb864f6a4b9548f29"
 "Code/ForceField/UFF/Params.cpp" = "108b951a63bbdbd761e1b383152ebf848b0eba8a"

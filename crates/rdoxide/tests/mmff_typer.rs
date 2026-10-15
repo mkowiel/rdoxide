@@ -88,3 +88,47 @@ fn parameters_of_ethanol() {
     // out-of-plane terms need a planar center
     assert!(props.oop_bend_params(&mol, 0, 1, 2, 3).is_none());
 }
+
+mod force_field {
+    use std::path::PathBuf;
+
+    use rdoxide::graphmol::file_parsers::mol_file_parser::{
+        MolFileParserParams, mol_from_mol_block,
+    };
+    use rdoxide::graphmol::forcefield_helpers::mmff::construct_force_field;
+    use rdoxide::graphmol::mol_ops::{sanitize_flags::SANITIZE_ALL, sanitize_mol};
+
+    fn minimized_energy_drop(name: &str, max_its: u32) -> (i32, f64, f64) {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/data/molfiles")
+            .join(name);
+        let block = std::fs::read_to_string(path).unwrap();
+        let params = MolFileParserParams {
+            remove_hs: false,
+            ..MolFileParserParams::default()
+        };
+        let mut mol = mol_from_mol_block(&block, &params).unwrap().unwrap();
+        sanitize_mol(&mut mol, SANITIZE_ALL).unwrap();
+        let mut field = construct_force_field(&mut mol, 100.0, -1, true).unwrap();
+        let before = field.calc_energy();
+        let needs_more = field.minimize(max_its, 1e-6, 1e-3).unwrap();
+        let after = field.calc_energy();
+        (needs_more, before, after)
+    }
+
+    #[test]
+    fn minimization_converges() {
+        // the molecules of upstream's testMMFFHelpers
+        for (name, its) in [
+            ("mmff_small1.mol", 200),
+            ("mmff_small2.mol", 100),
+            ("mmff_benzene.mol", 200),
+            ("mmff_toluene.mol", 200),
+            ("mmff_complex1.mol", 200),
+        ] {
+            let (needs_more, before, after) = minimized_energy_drop(name, its);
+            assert_eq!(needs_more, 0, "{name}");
+            assert!(after <= before + 1e-9, "{name}: {before} -> {after}");
+        }
+    }
+}
