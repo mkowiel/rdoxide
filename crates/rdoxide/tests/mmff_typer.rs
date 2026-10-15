@@ -1,0 +1,90 @@
+//! MMFF atom types and charges of small molecules (the types follow the
+//! MMFF94 symbolic type definitions).
+
+use rdoxide::graphmol::RWMol;
+use rdoxide::graphmol::forcefield_helpers::mmff::MmffMolProperties;
+use rdoxide::graphmol::mol_ops::add_hs::{AddHsParameters, add_hs};
+use rdoxide::graphmol::smiles_parse::{SmilesParserParams, mol_from_smiles};
+
+fn typed(smiles: &str) -> (RWMol, MmffMolProperties) {
+    let mut mol = mol_from_smiles(smiles, &SmilesParserParams::default())
+        .unwrap()
+        .unwrap();
+    add_hs(&mut mol, &AddHsParameters::default(), None).unwrap();
+    let props = MmffMolProperties::new(&mut mol, "MMFF94").unwrap();
+    (mol, props)
+}
+
+fn types(smiles: &str) -> Vec<u8> {
+    let (mol, props) = typed(smiles);
+    assert!(props.is_valid(), "{smiles}");
+    (0..mol.num_atoms()).map(|i| props.atom_type(i)).collect()
+}
+
+#[test]
+fn alcohol_and_water() {
+    assert_eq!(types("CCO"), [1, 1, 6, 5, 5, 5, 5, 5, 21]);
+    assert_eq!(types("O"), [70, 31, 31]);
+}
+
+#[test]
+fn carbonyl_compounds() {
+    // CR, C=O, O=C, OC=O; HC x3, HOCO
+    assert_eq!(types("CC(=O)O"), [1, 3, 7, 6, 5, 5, 5, 24]);
+    // acetate: CO2M, O2CM x2
+    assert_eq!(types("CC(=O)[O-]"), [1, 41, 32, 32, 5, 5, 5]);
+}
+
+#[test]
+fn aromatic_rings() {
+    assert_eq!(
+        types("c1ccccc1"),
+        [37, 37, 37, 37, 37, 37, 5, 5, 5, 5, 5, 5]
+    );
+    // NPYD
+    assert_eq!(types("c1ccncc1")[3], 38);
+    // pyrrole: C5B x2, C5A x2 around NPYL, and HPYL on the nitrogen
+    let t = types("c1cc[nH]c1");
+    assert_eq!(&t[..5], &[64, 64, 63, 39, 63][..]);
+    assert_eq!(t[8], 23);
+}
+
+#[test]
+fn charges_sum_to_the_net_charge() {
+    for (smiles, net) in [
+        ("CCO", 0.0),
+        ("CC(=O)[O-]", -1.0),
+        ("C[NH3+]", 1.0),
+        ("c1ccc(cc1)C(=O)NC", 0.0),
+        ("CS(=O)(=O)N", 0.0),
+    ] {
+        let (mol, props) = typed(smiles);
+        assert!(props.is_valid(), "{smiles}");
+        let sum: f64 = (0..mol.num_atoms()).map(|i| props.partial_charge(i)).sum();
+        assert!((sum - net).abs() < 1e-9, "{smiles}: {sum}");
+    }
+}
+
+#[test]
+fn formal_charges() {
+    let (_, props) = typed("CC(=O)[O-]");
+    assert_eq!(props.formal_charge(2), -0.5);
+    assert_eq!(props.formal_charge(3), -0.5);
+    let (_, props) = typed("C[NH3+]");
+    assert_eq!(props.atom_type(1), 34);
+    assert_eq!(props.formal_charge(1), 1.0);
+}
+
+#[test]
+fn parameters_of_ethanol() {
+    let (mol, props) = typed("CCO");
+    let b = props.bond_stretch_params(&mol, 0, 1).unwrap().unwrap();
+    assert_eq!((b.bond_type, b.params.kb, b.params.r0), (0, 4.258, 1.508));
+    let a = props.angle_bend_params(&mol, 0, 1, 2).unwrap().unwrap();
+    assert_eq!(a.angle_type, 0);
+    assert!(a.params.ka > 0.0);
+    assert!(props.stretch_bend_params(&mol, 0, 1, 2).unwrap().is_some());
+    assert!(props.torsion_params(&mol, 3, 0, 1, 2).unwrap().is_some());
+    // out-of-plane terms need a planar center
+    assert!(props.oop_bend_params(&mol, 0, 1, 2, 3).is_none());
+}

@@ -177,10 +177,8 @@ pub fn angle_bend_empirical_rule_params(
                         theta0 = 180.0;
                     }
                 }
-                3 => {
-                    if central.val == 3 && central.mltb == 0 {
-                        theta0 = if atomic_num[1] == 7 { 107.0 } else { 92.0 };
-                    }
+                3 if central.val == 3 && central.mltb == 0 => {
+                    theta0 = if atomic_num[1] == 7 { 107.0 } else { 92.0 };
                 }
                 _ => {}
             }

@@ -1033,6 +1033,10 @@
 "Code/ForceField/MMFF/Params.h" = "0c1b26d17b46ca137766e8c97c96f67f37acd6cb"
 "Code/ForceField/MMFF/Params.cpp" = "59ae6638b2fd5f32d2cd7cc769de840d0901e2d1"
 
+[module."rdoxide::graphmol::forcefield_helpers::mmff".sources]
+"Code/GraphMol/ForceFieldHelpers/MMFF/AtomTyper.h" = "94aa69ee78637e4c3b2b655225b1b0c281c45d4b"
+"Code/GraphMol/ForceFieldHelpers/MMFF/AtomTyper.cpp" = "d3bfffa11fafc5fc3c61e87a5d4fb5fe3120a8ee"
+
 [module."rdoxide::forcefield::uff".sources]
 "Code/ForceField/UFF/Params.h" = "fa7b927ff24eedc6790d1bbfb864f6a4b9548f29"
 "Code/ForceField/UFF/Params.cpp" = "108b951a63bbdbd761e1b383152ebf848b0eba8a"

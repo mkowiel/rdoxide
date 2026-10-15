@@ -196,18 +196,6 @@ impl RingMembershipSize {
             .is_some_and(|m| m.in_aromatic_ring)
     }
 
-    pub fn are_atoms_in_same_aromatic_ring(&self, idx1: u32, idx2: u32) -> bool {
-        self.by_size
-            .values()
-            .any(|members| match (members.get(&idx1), members.get(&idx2)) {
-                (Some(a), Some(b)) => a
-                    .rings
-                    .intersection(&b.rings)
-                    .any(|r| r & IS_AROMATIC_BIT != 0),
-                _ => false,
-            })
-    }
-
     pub fn are_atoms_in_same_ring_of_size(&self, size: usize, atoms: &[u32]) -> bool {
         let Some(members) = self.by_size.get(&size) else {
             return false;

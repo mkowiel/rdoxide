@@ -4,10 +4,12 @@
 mod charges;
 mod empirical;
 mod heavy;
+mod param_getters;
 mod props;
 mod rings;
 
 pub use empirical::angle_bend_empirical_rule_params;
+pub use param_getters::{AngleBendParams, BondStretchParams, StretchBendParams, TorsionParams};
 pub use props::{
     DielectricModel, MmffAtomProperties, MmffMolProperties, sanitize_mmff_mol, stretch_bend_type,
 };

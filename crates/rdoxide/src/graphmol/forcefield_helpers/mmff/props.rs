@@ -129,6 +129,95 @@ impl MmffMolProperties {
         }
     }
 
+    pub fn set_bond_term(&mut self, state: bool) {
+        self.bond_term = state;
+    }
+
+    pub fn bond_term(&self) -> bool {
+        self.bond_term
+    }
+
+    pub fn set_angle_term(&mut self, state: bool) {
+        self.angle_term = state;
+    }
+
+    pub fn angle_term(&self) -> bool {
+        self.angle_term
+    }
+
+    pub fn set_stretch_bend_term(&mut self, state: bool) {
+        self.stretch_bend_term = state;
+    }
+
+    pub fn stretch_bend_term(&self) -> bool {
+        self.stretch_bend_term
+    }
+
+    pub fn set_oop_term(&mut self, state: bool) {
+        self.oop_term = state;
+    }
+
+    pub fn oop_term(&self) -> bool {
+        self.oop_term
+    }
+
+    pub fn set_torsion_term(&mut self, state: bool) {
+        self.torsion_term = state;
+    }
+
+    pub fn torsion_term(&self) -> bool {
+        self.torsion_term
+    }
+
+    pub fn set_vdw_term(&mut self, state: bool) {
+        self.vdw_term = state;
+    }
+
+    pub fn vdw_term(&self) -> bool {
+        self.vdw_term
+    }
+
+    pub fn set_ele_term(&mut self, state: bool) {
+        self.ele_term = state;
+    }
+
+    pub fn ele_term(&self) -> bool {
+        self.ele_term
+    }
+
+    /// `setMMFFVariant`: "MMFF94" or "MMFF94s".
+    pub fn set_variant(&mut self, variant: &str) -> Result<()> {
+        if variant != "MMFF94" && variant != "MMFF94s" {
+            return Err(RDKitError::precondition("bad MMFF variant"));
+        }
+        self.mmffs = variant == "MMFF94s";
+        Ok(())
+    }
+
+    pub fn variant(&self) -> &'static str {
+        if self.mmffs { "MMFF94s" } else { "MMFF94" }
+    }
+
+    pub fn set_dielectric_constant(&mut self, diel_const: f64) -> Result<()> {
+        if diel_const <= 0.0 {
+            return Err(RDKitError::precondition("bad dielectric constant"));
+        }
+        self.diel_const = diel_const;
+        Ok(())
+    }
+
+    pub fn dielectric_constant(&self) -> f64 {
+        self.diel_const
+    }
+
+    pub fn set_dielectric_model(&mut self, model: DielectricModel) {
+        self.diel_model = model;
+    }
+
+    pub fn dielectric_model(&self) -> DielectricModel {
+        self.diel_model
+    }
+
     pub fn is_valid(&self) -> bool {
         self.valid
     }
