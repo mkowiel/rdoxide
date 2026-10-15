@@ -116,6 +116,9 @@ impl MmffMolProperties {
                 props.set_atom_type(i, atom_type);
             }
         }
+        if props.valid {
+            props.compute_charges(mol)?;
+        }
         Ok(props)
     }
 

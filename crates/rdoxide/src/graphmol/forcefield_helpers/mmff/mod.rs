@@ -1,6 +1,7 @@
 //! MMFF atom typing and force-field construction (upstream
 //! `ForceFieldHelpers/MMFF`).
 
+mod charges;
 mod empirical;
 mod heavy;
 mod props;
