@@ -182,10 +182,39 @@ const NULL_NODE: u32 = u32::MAX;
 
 // ================================================================== VF2
 
+/// What VF2 needs from a graph: adjacency lists of (neighbor, edge id) in the
+/// order of the upstream `boost::adjacency_list`.
+pub(crate) trait Vf2Graph {
+    fn num_nodes(&self) -> u32;
+    fn adjacency(&self, node: u32) -> &[(u32, u32)];
+
+    fn degree(&self, node: u32) -> u32 {
+        self.adjacency(node).len() as u32
+    }
+
+    /// The first edge from `a` to `b` (`boost::edge`).
+    fn edge_between(&self, a: u32, b: u32) -> Option<u32> {
+        self.adjacency(a)
+            .iter()
+            .find(|&&(n, _)| n == b)
+            .map(|&(_, e)| e)
+    }
+}
+
+impl Vf2Graph for ROMol {
+    fn num_nodes(&self) -> u32 {
+        self.num_atoms()
+    }
+
+    fn adjacency(&self, node: u32) -> &[(u32, u32)] {
+        &self.adj[node as usize]
+    }
+}
+
 /// The VF2 sub-state (`boost::detail::VF2SubState`, no node sorting).
-struct Vf2<'a, VC, EC, MC> {
-    g1: &'a ROMol,
-    g2: &'a ROMol,
+struct Vf2<'a, G, VC, EC, MC> {
+    g1: &'a G,
+    g2: &'a G,
     vc: VC,
     ec: EC,
     mc: MC,
@@ -207,7 +236,7 @@ struct Pair {
     nbr: Option<(u32, usize)>,
 }
 
-impl<VC, EC, MC> Vf2<'_, VC, EC, MC>
+impl<G: Vf2Graph, VC, EC, MC> Vf2<'_, G, VC, EC, MC>
 where
     VC: FnMut(u32, u32) -> Result<bool>,
     EC: FnMut(u32, u32) -> Result<bool>,
@@ -241,7 +270,9 @@ where
             if pair.nbr.is_none() {
                 let mapped = self
                     .g1
-                    .atom_neighbors(pair.n1)
+                    .adjacency(pair.n1)
+                    .iter()
+                    .map(|&(n, _)| n)
                     .find(|&n| self.core_1[n as usize] != NULL_NODE)
                     .expect("terminal node has a mapped neighbor");
                 pair.nbr = Some((self.core_1[mapped as usize], 0));
@@ -253,7 +284,7 @@ where
             }
         }
         if let Some((v, ref mut pos)) = pair.nbr {
-            let adj = &self.g2.adj[v as usize];
+            let adj = self.g2.adjacency(v);
             while *pos < adj.len() && self.core_2[adj[*pos].0 as usize] != NULL_NODE {
                 *pos += 1;
             }
@@ -279,16 +310,16 @@ where
     }
 
     fn is_feasible_pair(&mut self, node1: u32, node2: u32) -> Result<bool> {
-        if self.g1.atom_degree(node1) > self.g2.atom_degree(node2) {
+        if self.g1.degree(node1) > self.g2.degree(node2) {
             return Ok(false);
         }
         if !(self.vc)(node1, node2)? {
             return Ok(false);
         }
-        for &(other1, e1) in &self.g1.adj[node1 as usize] {
+        for &(other1, e1) in self.g1.adjacency(node1) {
             let other2 = self.core_1[other1 as usize];
             if other2 != NULL_NODE {
-                match self.g2.bond_idx_between(node2, other2) {
+                match self.g2.edge_between(node2, other2) {
                     Some(e2) => {
                         if !(self.ec)(e1, e2)? {
                             return Ok(false);
@@ -314,13 +345,13 @@ where
         }
         self.core_1[node1 as usize] = node2;
         self.core_2[node2 as usize] = node1;
-        for &(o, _) in &self.g1.adj[node1 as usize] {
+        for &(o, _) in self.g1.adjacency(node1) {
             if self.term_1[o as usize] == 0 {
                 self.term_1[o as usize] = cl;
                 self.t1_len += 1;
             }
         }
-        for &(o, _) in &self.g2.adj[node2 as usize] {
+        for &(o, _) in self.g2.adjacency(node2) {
             if self.term_2[o as usize] == 0 {
                 self.term_2[o as usize] = cl;
                 self.t2_len += 1;
@@ -334,7 +365,7 @@ where
             self.term_1[node1 as usize] = 0;
             self.t1_len -= 1;
         }
-        for &(o, _) in &self.g1.adj[node1 as usize] {
+        for &(o, _) in self.g1.adjacency(node1) {
             if self.term_1[o as usize] == cl {
                 self.term_1[o as usize] = 0;
                 self.t1_len -= 1;
@@ -344,7 +375,7 @@ where
             self.term_2[node2 as usize] = 0;
             self.t2_len -= 1;
         }
-        for &(o, _) in &self.g2.adj[node2 as usize] {
+        for &(o, _) in self.g2.adjacency(node2) {
             if self.term_2[o as usize] == cl {
                 self.term_2[o as usize] = 0;
                 self.t2_len -= 1;
@@ -407,9 +438,9 @@ where
 }
 
 /// `boost::vf2_all(g1, g2, vc, ec, mc, F, max_results)`
-fn vf2_all<VC, EC, MC>(
-    g1: &ROMol,
-    g2: &ROMol,
+pub(crate) fn vf2_all<G, VC, EC, MC>(
+    g1: &G,
+    g2: &G,
     vc: VC,
     ec: EC,
     mc: MC,
@@ -417,11 +448,12 @@ fn vf2_all<VC, EC, MC>(
     count_only: bool,
 ) -> Result<Vec<Vec<(u32, u32)>>>
 where
+    G: Vf2Graph,
     VC: FnMut(u32, u32) -> Result<bool>,
     EC: FnMut(u32, u32) -> Result<bool>,
     MC: FnMut(&[u32], &[u32]) -> Result<bool>,
 {
-    let (n1, n2) = (g1.num_atoms(), g2.num_atoms());
+    let (n1, n2) = (g1.num_nodes(), g2.num_nodes());
     let mut s = Vf2 {
         g1,
         g2,
