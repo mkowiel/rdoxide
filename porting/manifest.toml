@@ -1177,3 +1177,7 @@
 "Code/GraphMol/FMCS/DuplicatedSeedCache.h" = "6bee1a09a03c9998e1918ee84f5c4b260902dc7c"
 "Code/GraphMol/FMCS/Composition2N.h" = "fec6651a4f2780fa2bdcb1414a6e60c0cee916e0"
 "Code/GraphMol/FMCS/DebugTrace.h" = "2231799790ea330d043043e20c9d669628b59274"
+
+[module."rdoxide_python::rdfmcs".sources]
+"Code/GraphMol/FMCS/Wrap/rdFMCS.cpp" = "40de4e77732aa3a2e896a949e3d4395c2cca48bd"
+"Code/GraphMol/FMCS/nbWrap/rdFMCS.cpp" = "0b208c4b855e44e4e261348702558eb65547f4f2"
