@@ -280,7 +280,7 @@ mod tests {
         assert_eq!(format_g17(5.0), "5");
         assert_eq!(format_g17(0.001), "0.001");
         assert_eq!(format_g17(-1.0), "-1");
-        assert_eq!(format_g17(0.98025420400136154), "0.98025420400136154");
+        assert_eq!(format_g17(0.980_254_204_001_361_5), "0.98025420400136154");
         assert_eq!(format_g17(1e-5), "1.0000000000000001e-05");
         assert_eq!(format_g17(1e20), "1e+20");
         assert_eq!(format_g17(123456.0), "123456");
