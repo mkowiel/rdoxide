@@ -37,6 +37,7 @@ mod rddepictor;
 mod rddeterminebonds;
 mod rdenumeratestereoisomers;
 mod rdfingerprintgenerator;
+mod rdforcefield;
 mod rdinfotheory;
 mod rdmetricmatrixcalc;
 mod rdmhfpfingerprint;
@@ -134,6 +135,18 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
     add_submodule(m, "rdDepictor", "rdkit.Chem.rdDepictor", rddepictor::init)?;
     add_submodule(m, "rdqueries", "rdkit.Chem.rdqueries", rdqueries::init)?;
     add_submodule(m, "rdMolAlign", "rdkit.Chem.rdMolAlign", rdmolalign::init)?;
+    add_submodule(
+        m,
+        "rdForceField",
+        "rdkit.ForceField.rdForceField",
+        rdforcefield::init_force_field,
+    )?;
+    add_submodule(
+        m,
+        "rdForceFieldHelpers",
+        "rdkit.Chem.rdForceFieldHelpers",
+        rdforcefield::init_helpers,
+    )?;
     add_submodule(
         m,
         "rdChemicalFeatures",

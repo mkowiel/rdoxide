@@ -326,3 +326,11 @@ to = "python/rdkit/Chem/EnumerateStereoisomers.py"
 [[copy]]
 from = "rdkit/Chem/MolStandardize/__init__.py"
 to = "python/rdkit/Chem/MolStandardize/__init__.py"
+
+[[copy]]
+from = "rdkit/Chem/ChemicalForceFields.py"
+to = "python/rdkit/Chem/ChemicalForceFields.py"
+
+[[copy]]
+from = "rdkit/ForceField/__init__.py"
+to = "python/rdkit/ForceField/__init__.py"
