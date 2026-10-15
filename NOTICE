@@ -67,3 +67,9 @@ Abbreviation tables
   superatom table of Open Babel (https://github.com/openbabel/superatoms), originally
   from the OSRA project (http://cactus.nci.nih.gov/osra/). Only short label/SMILES
   pairs are carried over; no Open Babel code is used.
+
+MMFF94 parameters
+  The tables in crates/rdoxide/data/mmff/ are extracted from RDKit's
+  Code/ForceField/MMFF/Params.cpp, which carries the parameter files of the Merck
+  Molecular Force Field: Copyright (c) Merck and Co., Inc., 1994-1999. All Rights
+  Reserved. The copyright notice is kept in the header of each table.

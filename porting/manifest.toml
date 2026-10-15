@@ -1029,6 +1029,10 @@
 "Code/ForceField/ForceField.cpp" = "f909b646d3bcc9da27b1f8d1046dc088f2132805"
 "Code/ForceField/Contrib.h" = "df29d020546897614e3e61d04b98907403e3723c"
 
+[module."rdoxide::forcefield::mmff::params".sources]
+"Code/ForceField/MMFF/Params.h" = "0c1b26d17b46ca137766e8c97c96f67f37acd6cb"
+"Code/ForceField/MMFF/Params.cpp" = "59ae6638b2fd5f32d2cd7cc769de840d0901e2d1"
+
 [module."rdoxide::forcefield::uff".sources]
 "Code/ForceField/UFF/Params.h" = "fa7b927ff24eedc6790d1bbfb864f6a4b9548f29"
 "Code/ForceField/UFF/Params.cpp" = "108b951a63bbdbd761e1b383152ebf848b0eba8a"

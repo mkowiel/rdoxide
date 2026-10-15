@@ -234,6 +234,52 @@ def regen_uff_params() -> None:
     print(f"uff_params.tsv: {text.count(chr(10))} lines")
 
 
+_MMFF_TABLES = [
+    "Def", "Prop", "PBCI", "Chg", "Bond", "Bndk", "HerschbachLaurie",
+    "CovRadPauEle", "Stbn", "Dfsb", "Oop", "sOop", "Tor", "sTor", "VdW",
+]
+
+
+def _c_string_literals(text: str) -> str:
+    """The decoded concatenation of the C string literals in `text`."""
+    literals = re.findall(r'"((?:[^"\\]|\\.)*)"', text)
+    return "".join(literals).replace("\\t", "\t").replace("\\n", "\n")
+
+
+def _literal_run(text: str, start: int, separators: str = r"\s*") -> str:
+    """The run of adjacent C string literals beginning at `start`; a `;` or
+    `}` inside a literal does not end it."""
+    literal = r'"(?:[^"\\]|\\.)*"'
+    m = re.compile(rf"{separators}(?:{literal}{separators})+").match(text, start)
+    assert m, "no string literal at the given position"
+    return m.group(0)
+
+
+def regen_mmff_params() -> None:
+    """The default MMFF parameter tables (concatenated C string literals
+    upstream) as `crates/rdoxide/data/mmff/*.tsv`."""
+    src = (UPSTREAM_DIR / "Code/ForceField/MMFF/Params.cpp").read_text()
+    outdir = DATA / "mmff"
+    outdir.mkdir(exist_ok=True)
+    header = (
+        "# Extracted from RDKit Code/ForceField/MMFF/Params.cpp (defaultMMFF{name})\n"
+        "# by tools/sync_upstream.py.\n"
+        "# Copyright (C) RDKit contributors (BSD-3-Clause).\n"
+        "# DO NOT EDIT - regenerate with `python3 tools/sync_upstream.py regen`.\n"
+    )
+    tables = {}
+    for name in _MMFF_TABLES:
+        start = src.index(f"const std::string defaultMMFF{name} =")
+        tables[name] = _c_string_literals(_literal_run(src, src.index("=", start) + 1))
+    # the angle table is an array of strings ending with "EOS"
+    start = src.index("const std::string defaultMMFFAngleData[] = {")
+    run = _literal_run(src, src.index("{", start) + 1, separators=r"[\s,]*")
+    tables["Angle"] = _c_string_literals(run).removesuffix("EOS")
+    for name, text in tables.items():
+        (outdir / f"{name}.tsv").write_text(header.format(name=name) + text)
+        print(f"mmff/{name}.tsv: {text.count(chr(10))} lines")
+
+
 def regen_common_properties() -> None:
     """Generate rdgeneral/common_properties.rs from Code/RDGeneral/types.h."""
     src = (UPSTREAM_DIR / "Code/RDGeneral/types.h").read_text()
@@ -299,6 +345,7 @@ def cmd_regen(_args) -> None:
     regen_atomic_data()
     regen_molstandardize()
     regen_uff_params()
+    regen_mmff_params()
     regen_common_properties()
     regen_copies()
 
