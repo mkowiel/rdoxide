@@ -949,3 +949,67 @@
 [module."rdoxide::graphmol::functional_group_hierarchy".sources]
 "Code/GraphMol/FilterCatalog/FunctionalGroupHierarchy.h" = "9157d1bb6ba6644c014ef601f013a67bb9282760"
 "Code/GraphMol/FilterCatalog/FunctionalGroupHierarchy.cpp" = "6b64ee67f1d382505a5db21ac4f9e92131951b8b"
+
+# MolStandardize (stage 20)
+[module."rdoxide::graphmol::mol_standardize".sources]
+"Code/GraphMol/MolStandardize/MolStandardize.h" = "fb523bc70b940bac834b43b6cd178a2b248b662b"
+"Code/GraphMol/MolStandardize/MolStandardize.cpp" = "d98ac6f872e5637ebebb7add54af5fac07455304"
+
+[module."rdoxide::graphmol::mol_standardize::catalogs".sources]
+"Code/GraphMol/MolStandardize/AcidBaseCatalog/AcidBaseCatalogParams.cpp" = "601116b873a183f0a0c4c527f304030a3b548531"
+"Code/GraphMol/MolStandardize/AcidBaseCatalog/AcidBaseCatalogUtils.cpp" = "c43b85c6f122d8cbb7bf5c3b644c4dbd33b67da4"
+"Code/GraphMol/MolStandardize/AcidBaseCatalog/acid_base_pairs.in" = "b325921e2252640e15944418b0bcb6281ff3df34"
+"Code/GraphMol/MolStandardize/FragmentCatalog/FragmentCatalogParams.cpp" = "1dbc4684eddeb6323e240cdf8c827043f21fe19d"
+"Code/GraphMol/MolStandardize/FragmentCatalog/FragmentCatalogUtils.cpp" = "dfa3ef70f39aada6ba9af21abcc4686ff9e937f0"
+"Code/GraphMol/MolStandardize/FragmentCatalog/fragmentPatterns.in" = "86c80c839632a3b54789657593e65308f182a4ae"
+"Code/GraphMol/MolStandardize/TransformCatalog/TransformCatalogParams.cpp" = "efcb3b296c7265486826de545eb5812e8c9ac268"
+"Code/GraphMol/MolStandardize/TransformCatalog/TransformCatalogUtils.cpp" = "dc2b2d2e680a26934efa816ead032767587fcd8f"
+"Code/GraphMol/MolStandardize/TransformCatalog/normalizations.in" = "7d6da0c34460a0ecf3f8865e7c2acb3a183d495d"
+"Code/GraphMol/MolStandardize/TautomerCatalog/TautomerCatalogParams.h" = "c7f658d93d6daabee86266e0964e7b3788c9883b"
+"Code/GraphMol/MolStandardize/TautomerCatalog/TautomerCatalogParams.cpp" = "07a280facb946e7b1bafe5e84b7d6ca3ffc6cf2d"
+"Code/GraphMol/MolStandardize/TautomerCatalog/TautomerCatalogUtils.cpp" = "1d0de27703cc08329a1ea4aca10dee341e5a920e"
+"Code/GraphMol/MolStandardize/TautomerCatalog/tautomerTransforms.in" = "4ea7850b3058f0e1fd2b604fe8e85ebf45a5e60b"
+"Code/GraphMol/MolStandardize/TautomerCatalog/tautomerTransforms.v1.in" = "aa6e428fef7165101181c947d5add151ff2d8a95"
+
+[module."rdoxide::graphmol::mol_standardize::fragment".sources]
+"Code/GraphMol/MolStandardize/Fragment.h" = "e7d465df9b00ceebe3d6b039dc45a6bed56aafe2"
+"Code/GraphMol/MolStandardize/Fragment.cpp" = "9f363e1305b821bf47c06d349ac8ffe8bd730397"
+
+[module."rdoxide::graphmol::mol_standardize::normalize".sources]
+"Code/GraphMol/MolStandardize/Normalize.h" = "96b2433cb88173f47d933c5787bff3fda74a0e47"
+"Code/GraphMol/MolStandardize/Normalize.cpp" = "48082acd5dfe9871f555198decc7b9403156c4a8"
+
+[module."rdoxide::graphmol::mol_standardize::charge".sources]
+"Code/GraphMol/MolStandardize/Charge.h" = "88d1603caa9e4dae37ece1f821ab98f8dd3eee83"
+"Code/GraphMol/MolStandardize/Charge.cpp" = "a5e5aab5a3f2463582cb27a437079c7a141576cd"
+
+[module."rdoxide::graphmol::mol_standardize::metal".sources]
+"Code/GraphMol/MolStandardize/Metal.h" = "b86aaa0cbb2780155380dfe72d4693ac02e74c8b"
+"Code/GraphMol/MolStandardize/Metal.cpp" = "202410ae964226543d16159c18d7fb23c8e18451"
+
+[module."rdoxide::graphmol::mol_standardize::validate".sources]
+"Code/GraphMol/MolStandardize/Validate.h" = "c4e27d39197eff31f1ce80ead6b8944d213ac585"
+"Code/GraphMol/MolStandardize/Validate.cpp" = "2cd24cdd7da4964722de705e6153a676d380b20f"
+
+[module."rdoxide::graphmol::mol_standardize::tautomer".sources]
+"Code/GraphMol/MolStandardize/Tautomer.h" = "6ed1c686d18e1d7ab2e52dd142a787e85ca8fd0c"
+"Code/GraphMol/MolStandardize/Tautomer.cpp" = "de74b9d578f7f931d29717343528279a34d8134f"
+
+[module."rdoxide::graphmol::mol_standardize::pipeline".sources]
+"Code/GraphMol/MolStandardize/Pipeline.h" = "96e6baf40c2557839294a85b64f65cb581824600"
+"Code/GraphMol/MolStandardize/Pipeline.cpp" = "c120ce724cd2f03888af544b3a6970747ae93074"
+
+[module."rdoxide_python::rdmolstandardize".sources]
+"Code/GraphMol/MolStandardize/nbWrap/rdMolStandardize.cpp" = "7efd0a9c129ba2707723fee0ac4bfedf375c14b8"
+"Code/GraphMol/MolStandardize/nbWrap/Validate.cpp" = "200489e4824f012e642b441f3cebfe5ce7979717"
+"Code/GraphMol/MolStandardize/nbWrap/Charge.cpp" = "bdf9ad17b592adab90a188aa4f5f52b6d396e882"
+"Code/GraphMol/MolStandardize/nbWrap/Metal.cpp" = "beea028ba943889331a0233743e10a3c201a110f"
+"Code/GraphMol/MolStandardize/nbWrap/Fragment.cpp" = "a3cbd569018e6e5016a5d62e8e5fd88e4b6a3b12"
+"Code/GraphMol/MolStandardize/nbWrap/Normalize.cpp" = "c15739ddbf01248b33c8c420ee649c2d838f708d"
+"Code/GraphMol/MolStandardize/Wrap/rdMolStandardize.cpp" = "f4159fe4c27445b54f57cf8447f5ce8720b43c57"
+
+[module."rdoxide_python::rdmolstandardize_tautomer".sources]
+"Code/GraphMol/MolStandardize/nbWrap/Tautomer.cpp" = "a648d49f460ea8cbaa3d8a683f21a15fb6129e1d"
+
+[module."rdoxide_python::rdmolstandardize_pipeline".sources]
+"Code/GraphMol/MolStandardize/nbWrap/Pipeline.cpp" = "f5ec5774092f731a5026b717dbade86bdbea788f"
