@@ -19,6 +19,7 @@ pub mod determine_bonds;
 pub mod dist_geom_helpers;
 pub mod enumerate_stereoisomers;
 pub mod file_parsers;
+pub mod filter_catalog;
 pub mod find_rings;
 pub mod fingerprints;
 pub mod fmcs;
