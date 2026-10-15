@@ -11,6 +11,8 @@ pub mod dense;
 pub mod eigen_3x3;
 pub mod full_piv_lu;
 pub mod jacobi_svd;
+pub mod power_eigen;
+pub mod symm_matrix;
 
 use crate::{RDKitError, Result};
 
