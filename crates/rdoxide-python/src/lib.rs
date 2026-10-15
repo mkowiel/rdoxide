@@ -39,6 +39,7 @@ mod rddistgeom;
 mod rddistgeom_dg;
 mod rdenumeratestereoisomers;
 mod rdfingerprintgenerator;
+mod rdfmcs;
 mod rdforcefield;
 mod rdinfotheory;
 mod rdmetricmatrixcalc;
@@ -138,6 +139,7 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
     add_submodule(m, "rdqueries", "rdkit.Chem.rdqueries", rdqueries::init)?;
     add_submodule(m, "rdMolAlign", "rdkit.Chem.rdMolAlign", rdmolalign::init)?;
     add_submodule(m, "rdDistGeom", "rdkit.Chem.rdDistGeom", rddistgeom::init)?;
+    add_submodule(m, "rdFMCS", "rdkit.Chem.rdFMCS", rdfmcs::init)?;
     add_submodule(
         m,
         "DistGeom",

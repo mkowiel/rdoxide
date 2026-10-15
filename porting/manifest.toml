@@ -1157,3 +1157,27 @@
 
 [module."rdoxide_python::rddistgeom_dg".sources]
 "Code/DistGeom/Wrap/DistGeom.cpp" = "62ac36f6a5e4ec247200dc87757e9aa505260dfc"
+
+[module."rdoxide::graphmol::fmcs".sources]
+"Code/GraphMol/FMCS/FMCS.h" = "30cfd00d65976051fa48850bbba26c258acd2793"
+"Code/GraphMol/FMCS/FMCS.cpp" = "edc9d1943b38f23715611807c8f1dca4ed82dc59"
+"Code/GraphMol/FMCS/Graph.h" = "a773115113dbc7093e1380667ceab866b17c59b1"
+"Code/GraphMol/FMCS/Seed.h" = "cbd042c669f4828804dce9283ad07c0975e45f58"
+"Code/GraphMol/FMCS/Seed.cpp" = "eedb2bb5ca4270531d5de453a9e942a783b7de01"
+"Code/GraphMol/FMCS/SeedSet.h" = "a2166f5b958f7224883219d72c4d506a5eea02d5"
+"Code/GraphMol/FMCS/Target.h" = "debb659328ef9f5b017f4daaa618ec2807dd9449"
+"Code/GraphMol/FMCS/TargetMatch.h" = "f8afa12afb797db154ce0b03ba4f5de9bc027991"
+"Code/GraphMol/FMCS/TargetMatch.cpp" = "43dca6b875867d029f96a782bbf027d2dd0af62d"
+"Code/GraphMol/FMCS/MatchTable.h" = "74ae300918b19866ead4a4f7d9bd12504c29792e"
+"Code/GraphMol/FMCS/MaximumCommonSubgraph.h" = "4c77b3833c517ec39df8c8a4cfd1d870227da9d4"
+"Code/GraphMol/FMCS/MaximumCommonSubgraph.cpp" = "e1e06cc72ed3fdd288cb3d73bd4f7315da87d135"
+"Code/GraphMol/FMCS/SubstructMatchCustom.h" = "4432c36af74f79337ea17b7d7573c272b215e9f9"
+"Code/GraphMol/FMCS/SubstructMatchCustom.cpp" = "efe1f4c1712d11b638f4c1ff01583a53311e4d6c"
+"Code/GraphMol/FMCS/SubstructureCache.h" = "1b1e13b1acdecad5158fdcb7410a78a7923237a9"
+"Code/GraphMol/FMCS/DuplicatedSeedCache.h" = "6bee1a09a03c9998e1918ee84f5c4b260902dc7c"
+"Code/GraphMol/FMCS/Composition2N.h" = "fec6651a4f2780fa2bdcb1414a6e60c0cee916e0"
+"Code/GraphMol/FMCS/DebugTrace.h" = "2231799790ea330d043043e20c9d669628b59274"
+
+[module."rdoxide_python::rdfmcs".sources]
+"Code/GraphMol/FMCS/Wrap/rdFMCS.cpp" = "40de4e77732aa3a2e896a949e3d4395c2cca48bd"
+"Code/GraphMol/FMCS/nbWrap/rdFMCS.cpp" = "0b208c4b855e44e4e261348702558eb65547f4f2"
