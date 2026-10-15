@@ -3,7 +3,7 @@
 
 use std::collections::BTreeMap;
 
-use pyo3::exceptions::{PyAttributeError, PyValueError};
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple};
 use rdoxide::graphmol::chem_transforms::{
@@ -97,9 +97,7 @@ impl PyMolzipParams {
         Ok(())
     }
 
-    /// Only the documented attributes can be set (upstream's `safeSetattr`);
-    /// other attributes of the class (the methods) are shadowed on the
-    /// instance, as `object.__setattr__` does.
+    /// Only the documented attributes can be set (upstream's `safeSetattr`).
     fn __setattr__(slf: &Bound<'_, Self>, name: &str, value: &Bound<'_, PyAny>) -> PyResult<()> {
         let py = slf.py();
         let mut this = slf.borrow_mut();
@@ -123,16 +121,9 @@ impl PyMolzipParams {
             "enforceValenceRules" => this.params.enforce_valence_rules = value.is_truthy()?,
             "generateCoordinates" => this.params.generate_coordinates = value.is_truthy()?,
             "alignCoordinates" => this.params.align_coordinates = value.is_truthy()?,
-            _ if py.get_type::<Self>().hasattr(name)? => {
-                drop(this);
-                py.import("builtins")?
-                    .getattr("object")?
-                    .call_method1("__setattr__", (slf, name, value))?;
-            }
             _ => {
-                return Err(PyAttributeError::new_err(format!(
-                    "Cannot set unknown attribute '{name}'"
-                )));
+                drop(this);
+                crate::pyconv::set_declared_attribute(slf.as_any(), name, value)?;
             }
         }
         Ok(())

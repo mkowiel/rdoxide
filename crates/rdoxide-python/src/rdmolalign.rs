@@ -2,7 +2,7 @@
 //! alignment of molecules and conformers. The O3A functions need MMFF and
 //! Crippen parameters and are not provided.
 
-use pyo3::exceptions::{PyAttributeError, PyValueError};
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
 use rdoxide::geometry::Transform3D;
@@ -254,17 +254,7 @@ impl PyBestAlignmentParams {
 
     /// Only the documented attributes can be set (upstream's `safeSetattr`).
     fn __setattr__(slf: &Bound<'_, Self>, name: &str, value: &Bound<'_, PyAny>) -> PyResult<()> {
-        let py = slf.py();
-        if py.get_type::<Self>().hasattr(name)? {
-            py.import("builtins")?
-                .getattr("object")?
-                .call_method1("__setattr__", (slf, name, value))?;
-            Ok(())
-        } else {
-            Err(PyAttributeError::new_err(format!(
-                "Cannot set unknown attribute '{name}'"
-            )))
-        }
+        crate::pyconv::set_declared_attribute(slf.as_any(), name, value)
     }
 }
 
