@@ -57,3 +57,31 @@ fn keto_enol_match() {
             .unwrap()
     );
 }
+
+#[test]
+fn library_search_with_tautomer_query() {
+    use rdoxide::graphmol::substruct_library::{
+        MolHolder, PatternHolder, SubstructLibrary, shared,
+    };
+    for patterns in [
+        PatternHolder::new(2048),
+        PatternHolder::new_tautomeric(2048),
+    ] {
+        let lib = SubstructLibrary::new(shared(MolHolder::default()), Some(shared(patterns)), None);
+        for smi in ["O=C1CCCC(CC)C1", "OC1=CCCC(CC)C1", "CCCCC", "c1ccccc1"] {
+            lib.add_mol(&mol(smi)).unwrap();
+        }
+        let query = TautomerQuery::from_mol(&mol("O=C1CCCCC1"), "").unwrap();
+        let params = SubstructMatchParameters::default();
+        let mut hits = lib
+            .get_tautomer_matches(&query, 0, lib.len(), &params, 1, -1)
+            .unwrap();
+        hits.sort_unstable();
+        assert_eq!(hits, [0, 1]);
+        assert_eq!(
+            lib.count_tautomer_matches(&query, 0, lib.len(), &params, 2)
+                .unwrap(),
+            2
+        );
+    }
+}

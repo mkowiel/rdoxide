@@ -27,7 +27,7 @@ const NO_SERIALIZATION: &str = "Boost SERIALIZATION is not enabled";
     skip_from_py_object
 )]
 pub struct PyTautomerQuery {
-    query: TautomerQuery,
+    pub(crate) query: TautomerQuery,
 }
 
 fn py_mol(py: Python<'_>, mol: &ROMol) -> PyResult<Py<PyMol>> {

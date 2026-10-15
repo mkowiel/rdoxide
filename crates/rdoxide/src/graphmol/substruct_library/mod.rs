@@ -7,8 +7,7 @@
 //! spread over worker threads and return the same indices for any thread
 //! count.
 //!
-//! Not ported: searches with `MolBundle`, `TautomerQuery` and
-//! `ExtendedQueryMol` queries, and boost-serialization pickles; libraries
+//! Not ported: searches with `MolBundle` and `ExtendedQueryMol` queries, and boost-serialization pickles; libraries
 //! serialize to this crate's own format ([`SubstructLibrary::to_bytes`]).
 
 mod holders;
@@ -22,6 +21,8 @@ pub use holders::{KeyFromPropHolder, MolHolder, PatternHolder};
 use crate::error::{RDKitError, Result};
 use crate::graphmol::romol::ROMol;
 use crate::graphmol::substruct::SubstructMatchParameters;
+use crate::graphmol::tautomer_query::TautomerQuery;
+use crate::rd_log_warning;
 use crate::rdgeneral::threads::par_map;
 
 /// A holder shared between a library and the code that built it, so that
@@ -152,16 +153,99 @@ impl SubstructLibrary {
         num_threads: i32,
         max_results: i32,
     ) -> Result<Vec<u32>> {
+        self.search(
+            query,
+            None,
+            start_idx,
+            end_idx,
+            params,
+            num_threads,
+            max_results,
+        )
+    }
+
+    /// `getMatches` for a tautomer query. The pattern fingerprints are only
+    /// used when they are tautomeric ones.
+    pub fn get_tautomer_matches(
+        &self,
+        query: &TautomerQuery,
+        start_idx: u32,
+        end_idx: u32,
+        params: &SubstructMatchParameters,
+        num_threads: i32,
+        max_results: i32,
+    ) -> Result<Vec<u32>> {
+        self.search(
+            query.template_molecule(),
+            Some(query),
+            start_idx,
+            end_idx,
+            params,
+            num_threads,
+            max_results,
+        )
+    }
+
+    /// `countMatches` for a tautomer query.
+    pub fn count_tautomer_matches(
+        &self,
+        query: &TautomerQuery,
+        start_idx: u32,
+        end_idx: u32,
+        params: &SubstructMatchParameters,
+        num_threads: i32,
+    ) -> Result<u32> {
+        Ok(self
+            .get_tautomer_matches(query, start_idx, end_idx, params, num_threads, -1)?
+            .len() as u32)
+    }
+
+    /// `hasMatch` for a tautomer query.
+    pub fn has_tautomer_match(
+        &self,
+        query: &TautomerQuery,
+        start_idx: u32,
+        end_idx: u32,
+        params: &SubstructMatchParameters,
+        num_threads: i32,
+    ) -> Result<bool> {
+        Ok(!self
+            .get_tautomer_matches(query, start_idx, end_idx, params, num_threads, 1)?
+            .is_empty())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn search(
+        &self,
+        query: &ROMol,
+        tautomer: Option<&TautomerQuery>,
+        start_idx: u32,
+        end_idx: u32,
+        params: &SubstructMatchParameters,
+        num_threads: i32,
+        max_results: i32,
+    ) -> Result<Vec<u32>> {
         let mols = read(&self.mols);
         let fps = self.fps.as_ref().map(read);
-        let query_bits = fps
-            .as_ref()
-            .map(|f| f.make_fingerprint(query))
-            .transpose()?;
+        let (fps_ref, query_bits) = match (&fps, tautomer) {
+            (Some(f), Some(tq)) if f.is_tautomeric() => (
+                Some(&**f),
+                Some(tq.pattern_fingerprint_template(f.num_bits())?),
+            ),
+            (Some(_), Some(_)) => {
+                rd_log_warning!(
+                    "Pattern fingerprints for tautomersearch aren't tautomer fingerprints, ignoring..."
+                );
+                (None, None)
+            }
+            (Some(f), None) => (Some(&**f), Some(f.make_fingerprint(query)?)),
+            (None, _) => (None, None),
+        };
         let search = search::Search {
             mols: &mols,
-            fps: fps.as_deref(),
+            fps: fps_ref,
             query,
+            tautomer,
             query_bits,
             // only whether there is a match matters
             params: SubstructMatchParameters {
