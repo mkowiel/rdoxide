@@ -1020,3 +1020,27 @@
 
 [module."rdoxide_python::rdresonance".sources]
 "Code/GraphMol/Wrap/ResonanceMolSupplier.cpp" = "f8a3b44dfaaafc2cb95497d403c2c196f061b27a"
+
+[module."rdoxide::numerics::bfgs".sources]
+"Code/Numerics/Optimizer/BFGSOpt.h" = "16adc668e2df45aca62c5590b4514b30509a765a"
+
+[module."rdoxide::forcefield".sources]
+"Code/ForceField/ForceField.h" = "61e7453f5aaa75adcfe2de636d31fa0b59085354"
+"Code/ForceField/ForceField.cpp" = "f909b646d3bcc9da27b1f8d1046dc088f2132805"
+"Code/ForceField/Contrib.h" = "df29d020546897614e3e61d04b98907403e3723c"
+
+[module."rdoxide::forcefield::uff".sources]
+"Code/ForceField/UFF/Params.h" = "fa7b927ff24eedc6790d1bbfb864f6a4b9548f29"
+"Code/ForceField/UFF/Params.cpp" = "108b951a63bbdbd761e1b383152ebf848b0eba8a"
+"Code/ForceField/UFF/BondStretch.h" = "66a1535cdfe26760e34ff54dafe99d12bbec0709"
+"Code/ForceField/UFF/BondStretch.cpp" = "07debd80b2c3a9d66a7fdd023ed1a3f7503ffb7d"
+"Code/ForceField/UFF/AngleBend.h" = "83a2c84ec520a99d5f8514b51d896fbdafcedc62"
+"Code/ForceField/UFF/AngleBend.cpp" = "372011308c88db8ec4dafbce08e0a83f02d31fb9"
+"Code/ForceField/UFF/TorsionAngle.h" = "35f70f2d478f39596545d9f52d8b3ac641a57b64"
+"Code/ForceField/UFF/TorsionAngle.cpp" = "a0539611662203ef43db480a5d15354bfa0aa1b9"
+"Code/ForceField/UFF/Inversion.h" = "f895f26d4eb9683573305582ce82ae187d88eefb"
+"Code/ForceField/UFF/Inversion.cpp" = "0afa2ceb67085363e7d8307ed7c645d7b6c3ac35"
+"Code/ForceField/UFF/Nonbonded.h" = "c5147aa195b79dbba2681265c675c77578b8d73f"
+"Code/ForceField/UFF/Nonbonded.cpp" = "f43c9f38b24185d0b49eab80cf9d569b50790cab"
+"Code/ForceField/UFF/Utils.h" = "bc4a1b6078d671ea526428606fe02ffd48ae4645"
+"Code/ForceField/UFF/Utils.cpp" = "f9cf385281f2b6cd8a63e33d8418ed6651cd696b"

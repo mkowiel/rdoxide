@@ -763,3 +763,109 @@ impl ForceFieldContrib for VdwContrib {
         Box::new(self.clone())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::forcefield::ForceField;
+
+    fn params(label: &str) -> AtomicParams {
+        *ParamCollection::default_params().get(label).unwrap()
+    }
+
+    /// the analytic gradient of `contrib` against central differences
+    fn check_gradient(contrib: &dyn ForceFieldContrib, pos: &[f64]) {
+        let mut grad = vec![0.0; pos.len()];
+        contrib.add_grad(pos, &mut grad);
+        for i in 0..pos.len() {
+            let h = 1e-6;
+            let (mut plus, mut minus) = (pos.to_vec(), pos.to_vec());
+            plus[i] += h;
+            minus[i] -= h;
+            let numeric = (contrib.energy(&plus) - contrib.energy(&minus)) / (2.0 * h);
+            assert!(
+                (numeric - grad[i]).abs() < 1e-5 * (1.0 + numeric.abs()),
+                "component {i}: analytic {} numeric {numeric}",
+                grad[i]
+            );
+        }
+    }
+
+    const POS: [f64; 12] = [0.1, 0.2, 0.0, 1.5, 0.3, 0.2, 2.1, 1.6, -0.1, 3.4, 1.9, 0.9];
+
+    #[test]
+    fn parameters_load() {
+        let p = ParamCollection::default_params();
+        assert_eq!(p.len(), 127);
+        let c3 = p.get("C_3").unwrap();
+        assert_eq!(c3.r1, 0.757);
+        assert!((c3.theta0 - 109.47 * DEG2RAD).abs() < 1e-12);
+        assert!(p.get("not an atom").is_none());
+    }
+
+    #[test]
+    fn bond_gradient() {
+        let c3 = params("C_3");
+        let b = BondStretchContrib::new(0, 1, 1.0, &c3, &c3);
+        check_gradient(&b, &POS);
+        // the rest length of a C-C single bond
+        assert!((calc_bond_rest_length(1.0, &c3, &c3) - 1.514).abs() < 1e-3);
+    }
+
+    #[test]
+    fn angle_gradients() {
+        let c3 = params("C_3");
+        for order in [0, 1, 2, 3, 4, 30, 35, 40, 45] {
+            let a = AngleBendContrib::new(0, 1, 2, 1.0, 1.0, &c3, &c3, &c3, order);
+            check_gradient(&a, &POS);
+        }
+    }
+
+    #[test]
+    fn torsion_gradients() {
+        use TorsionHybridization::{Sp2, Sp3};
+        let (c3, c2) = (params("C_3"), params("C_2"));
+        let t = TorsionAngleContrib::new([0, 1, 2, 3], 1.0, 6, 6, Sp3, Sp3, &c3, &c3, false);
+        check_gradient(&t, &POS);
+        let t = TorsionAngleContrib::new([0, 1, 2, 3], 2.0, 6, 6, Sp2, Sp2, &c2, &c2, false);
+        check_gradient(&t, &POS);
+        let t = TorsionAngleContrib::new([0, 1, 2, 3], 1.0, 6, 6, Sp3, Sp2, &c3, &c2, false);
+        check_gradient(&t, &POS);
+    }
+
+    #[test]
+    fn inversion_gradient() {
+        for (num, o) in [(6, false), (6, true), (15, false)] {
+            let inv = InversionContrib::new([0, 1, 2, 3], num, o, 1.0);
+            check_gradient(&inv, &POS);
+        }
+    }
+
+    #[test]
+    fn vdw_gradient() {
+        let c3 = params("C_3");
+        let v = VdwContrib::new(0, 3, &c3, &c3, 10.0);
+        check_gradient(&v, &POS);
+    }
+
+    #[test]
+    fn minimizing_a_bond_reaches_its_rest_length() {
+        let c3 = params("C_3");
+        let mut ff = ForceField::new(3);
+        ff.push_point(&[0.0, 0.0, 0.0]);
+        ff.push_point(&[2.0, 0.0, 0.0]);
+        ff.push_contrib(Box::new(BondStretchContrib::new(0, 1, 1.0, &c3, &c3)));
+        assert_eq!(ff.minimize(200, 1e-6, 1e-6).unwrap(), 0);
+        let d = ff.distance(0, 1, None).unwrap();
+        assert!(
+            (d - calc_bond_rest_length(1.0, &c3, &c3)).abs() < 1e-3,
+            "{d}"
+        );
+        // fixed points do not move
+        let mut ff2 = ff.clone();
+        ff2.set_positions(&[0.0, 0.0, 0.0, 3.0, 0.0, 0.0]).unwrap();
+        ff2.fixed_points_mut().push(1);
+        ff2.minimize(200, 1e-6, 1e-6).unwrap();
+        assert_eq!(ff2.positions()[3], 3.0);
+    }
+}
