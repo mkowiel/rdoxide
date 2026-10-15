@@ -5,6 +5,7 @@ mod bounds_builder;
 mod details;
 mod embed_params;
 mod internal_coordinates;
+mod z_matrix_builder;
 
 pub use bounds_builder::{
     AngleList, BondList, TopolBoundsOptions, TopolBoundsOutput, check_and_set_bounds,
@@ -17,3 +18,4 @@ pub use details::{
 };
 pub use embed_params::{EmbedFF, EmbedParameters, InitialEmbeddingMode};
 pub use internal_coordinates::InternalCoordinates;
+pub use z_matrix_builder::{correct_chiral_centers, set_molecule_dfs, set_molecule_dfs_from};

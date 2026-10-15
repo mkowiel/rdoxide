@@ -1125,6 +1125,7 @@
 "Code/GraphMol/DistGeomHelpers/BoundsMatrixBuilder.h" = "7af1e7100bc1ac8c33779d8e7640b5490034f40e"
 "Code/GraphMol/DistGeomHelpers/BoundsMatrixBuilder.cpp" = "d5e7463faa8dbef1937d4c3b3b91733703d53401"
 "Code/GraphMol/DistGeomHelpers/BoundsMatrixBuilderDetails.h" = "85c802c6175dfb4d7edb0e930a2dd03101995ddc"
+"Code/GraphMol/DistGeomHelpers/ZMatrixBuilder.cpp" = "421198bde10181fab2757beb689a12831f1e3733"
 "Code/GraphMol/DistGeomHelpers/ZMatrixBuilder.h" = "c154ad4842012a80062fc61a46d42523e866825f"
 "Code/GraphMol/DistGeomHelpers/Embedder.h" = "94c3f05f5ba2d39569ace94265b9f2fb96413c0e"
 
