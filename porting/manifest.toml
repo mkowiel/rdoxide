@@ -1150,3 +1150,9 @@
 "Code/GraphMol/ForceFieldHelpers/CrystalFF/torsionData/gaussTorsionPreferences_v4.h" = "76734d03349477438f6bea95f3fb0c4030098383"
 "Code/GraphMol/ForceFieldHelpers/CrystalFF/torsionData/gaussTorsionPreferences_v4_smallrings.h" = "c78f76ceb5be1764da1affabbd6207f038d7eba9"
 "Code/GraphMol/ForceFieldHelpers/CrystalFF/torsionData/gaussTorsionPreferences_v4_macrocycles.h" = "2791d706b660ed89411a38fdae6ab739130569a5"
+
+[module."rdoxide_python::rddistgeom".sources]
+"Code/GraphMol/DistGeomHelpers/Wrap/rdDistGeom.cpp" = "45a9e6d784fb3a22b5e5a7177b4628c4fe591e94"
+
+[module."rdoxide_python::rddistgeom_dg".sources]
+"Code/DistGeom/Wrap/DistGeom.cpp" = "62ac36f6a5e4ec247200dc87757e9aa505260dfc"
