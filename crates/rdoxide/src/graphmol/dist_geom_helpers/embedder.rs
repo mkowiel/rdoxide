@@ -433,7 +433,8 @@ fn final_chiral_checks(positions: &[f64], eargs: &EmbedArgs, failures: &Failures
     check_final_center_in_volume(positions, eargs, failures)
 }
 
-fn seed_rng(seed: i32) -> Result<MinStdRand> {
+/// A generator seeded with `seed`, or from the global generator for -1.
+pub fn seed_rng(seed: i32) -> Result<MinStdRand> {
     if seed < -1 {
         return Err(RDKitError::invariant(
             "random seed must either be positive, zero, or negative one",

@@ -7,6 +7,7 @@ mod embed_checks;
 mod embed_params;
 mod embed_setup;
 mod embedder;
+mod embedder_utils;
 mod internal_coordinates;
 mod z_matrix_builder;
 
@@ -23,6 +24,7 @@ pub use embed_params::{
     EmbedFF, EmbedFailureCause, EmbedParameters, InitialEmbeddingMode, NUM_EMBED_FAILURE_CAUSES,
 };
 pub use embed_setup::CoordMap;
-pub use embedder::{embed_molecule, embed_multiple_confs};
+pub use embedder::{embed_molecule, embed_multiple_confs, seed_rng};
+pub use embedder_utils::{embed_parameters_to_json, update_embed_parameters_from_json};
 pub use internal_coordinates::InternalCoordinates;
 pub use z_matrix_builder::{correct_chiral_centers, set_molecule_dfs, set_molecule_dfs_from};

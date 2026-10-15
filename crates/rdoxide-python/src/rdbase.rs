@@ -230,7 +230,12 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("boostVersion", "")?;
     m.add(
         "rdkitBuild",
-        format!("rdoxide-{}", rdoxide::rdgeneral::RDOXIDE_VERSION),
+        // upstream: "<system>|<processor>|<compiler>|<build type>"; tests read the compiler field
+        format!(
+            "{}|{}|rustc|Release",
+            std::env::consts::OS,
+            std::env::consts::ARCH
+        ),
     )?;
     m.add("rdoxideVersion", rdoxide::rdgeneral::RDOXIDE_VERSION)?;
     // PyO3 behaves like nanobind (TypeError on bad arguments, builtin

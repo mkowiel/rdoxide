@@ -20,3 +20,4 @@ Code/DataManip/**/Wrap/test*.py
 Code/GraphMol/MolHash/Wrap/testMolHash.py
 Code/ForceField/Wrap/test*.py
 Code/GraphMol/ForceFieldHelpers/Wrap/testHelpers.py
+Code/GraphMol/DistGeomHelpers/Wrap/testDistGeom.py
