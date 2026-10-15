@@ -12,6 +12,7 @@
 pub mod chemical_features;
 pub mod data_manip;
 pub mod datastructs;
+pub mod distgeom;
 pub mod error;
 pub mod external;
 pub mod forcefield;
