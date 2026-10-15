@@ -16,6 +16,7 @@ pub mod debug;
 pub mod depictor;
 pub mod descriptors;
 pub mod determine_bonds;
+pub mod dist_geom_helpers;
 pub mod enumerate_stereoisomers;
 pub mod file_parsers;
 pub mod find_rings;

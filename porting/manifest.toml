@@ -1109,9 +1109,21 @@
 "Code/DistGeom/FourthDimContribs.h" = "ca11de4221c9a21cf45c9c9b56cd63faa8e146d0"
 "Code/DistGeom/DistGeomUtils.h" = "6664142274ac87ada04587bd7ec9afdd87a5c254"
 "Code/DistGeom/DistGeomUtils.cpp" = "051e13638b9816edd028dbe5177560764be0a246"
+"Code/DistGeom/ZMatrix.h" = "5beb5ea7e597cc612d8905cf973f6f5e06dfb2ed"
+"Code/DistGeom/ZMatrixUtils.h" = "0b1510d6743aff006c4d638f0c7c7b361f02d7e9"
 
 [module."rdoxide::numerics::power_eigen".sources]
 "Code/Numerics/EigenSolvers/PowerEigenSolver.h" = "fddd84a8c48cc38f3eab1e5a46294f160e4590e8"
 "Code/Numerics/EigenSolvers/PowerEigenSolver.cpp" = "de392953dfd70543acaa27d419486d1cf6a695d4"
 "Code/Numerics/SymmMatrix.h" = "2895eebfec8ea6443196872d9f7d397ff2fc4fa7"
 
+
+[module."rdoxide::geometry::utils".sources]
+"Code/Geometry/Utils.h" = "dc6d92d2fe681d091ca84ac095ef1f5434de8456"
+
+[module."rdoxide::graphmol::dist_geom_helpers".sources]
+"Code/GraphMol/DistGeomHelpers/BoundsMatrixBuilder.h" = "7af1e7100bc1ac8c33779d8e7640b5490034f40e"
+"Code/GraphMol/DistGeomHelpers/BoundsMatrixBuilder.cpp" = "d5e7463faa8dbef1937d4c3b3b91733703d53401"
+"Code/GraphMol/DistGeomHelpers/BoundsMatrixBuilderDetails.h" = "85c802c6175dfb4d7edb0e930a2dd03101995ddc"
+"Code/GraphMol/DistGeomHelpers/ZMatrixBuilder.h" = "c154ad4842012a80062fc61a46d42523e866825f"
+"Code/GraphMol/DistGeomHelpers/Embedder.h" = "94c3f05f5ba2d39569ace94265b9f2fb96413c0e"
