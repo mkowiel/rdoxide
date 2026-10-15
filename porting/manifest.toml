@@ -1242,3 +1242,7 @@
 [module."rdoxide::graphmol::tautomer_query".sources]
 "Code/GraphMol/TautomerQuery/TautomerQuery.cpp" = "fe003547d57285221a23290f3618919aff1f0a15"
 "Code/GraphMol/TautomerQuery/TautomerQuery.h" = "e82839b75c0fd38e71efb95a422b8f91fd59d2b5"
+
+[module."rdoxide_python::rdtautomerquery".sources]
+"Code/GraphMol/TautomerQuery/Wrap/rdTautomerQuery.cpp" = "ba05fe4f707ecf323f4e1933dc902515a17d6dbe"
+"Code/GraphMol/TautomerQuery/nbWrap/rdTautomerQuery.cpp" = "5028cfca9c88a09ef9172e46a23e9c729aee3da0"

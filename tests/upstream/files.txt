@@ -24,3 +24,4 @@ Code/GraphMol/DistGeomHelpers/Wrap/testDistGeom.py
 Code/GraphMol/FMCS/Wrap/testFMCS.py
 Code/GraphMol/FilterCatalog/Wrap/rough_test.py
 Code/GraphMol/RGroupDecomposition/Wrap/test_rgroups.py
+Code/GraphMol/TautomerQuery/Wrap/rough_test.py
