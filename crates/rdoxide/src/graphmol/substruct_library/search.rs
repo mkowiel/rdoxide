@@ -16,6 +16,7 @@ use crate::graphmol::find_rings::{SymmetrizeSSSRAlgorithm, symmetrize_sssr};
 use crate::graphmol::queries::QueryKind;
 use crate::graphmol::romol::ROMol;
 use crate::graphmol::substruct::{SubstructMatchParameters, substruct_match};
+use crate::graphmol::tautomer_query::TautomerQuery;
 use crate::rdgeneral::threads::{num_threads_to_use, par_map};
 
 /// True if the query depends on ring information that a trusted-SMILES
@@ -39,7 +40,10 @@ pub(super) fn query_needs_rings(query: &ROMol) -> bool {
 pub(super) struct Search<'a> {
     pub mols: &'a MolHolder,
     pub fps: Option<&'a PatternHolder>,
+    /// The query molecule (the template molecule of a tautomer query).
     pub query: &'a ROMol,
+    /// Set when the query is a tautomer query.
+    pub tautomer: Option<&'a TautomerQuery>,
     /// The query's pattern fingerprint (`None` when there is nothing to filter
     /// with).
     pub query_bits: Option<ExplicitBitVect>,
@@ -76,7 +80,10 @@ impl Search<'_> {
         } else {
             mol
         };
-        Ok(!substruct_match(&mol, self.query, &self.params)?.is_empty())
+        Ok(match self.tautomer {
+            Some(tq) => !tq.substruct_of(&mol, &self.params)?.0.is_empty(),
+            None => !substruct_match(&mol, self.query, &self.params)?.is_empty(),
+        })
     }
 
     /// `SubSearcher`: screens positions `start, start + step, ...` below `end`;

@@ -1,7 +1,7 @@
 //! `rdkit.Chem.rdSubstructLibrary` (upstream
 //! `GraphMol/SubstructLibrary/Wrap/SubstructLibraryWrap.cpp`).
 //!
-//! Not supported: `MolBundle`, `TautomerQuery` and `ExtendedQueryMol`
+//! Not supported: `MolBundle` and `ExtendedQueryMol`
 //! queries; libraries pickle to this port's own (text) format.
 
 use std::collections::HashMap;
@@ -456,6 +456,24 @@ fn parse_search_args(
     })
 }
 
+/// A query of the `GetMatches` family.
+enum Query {
+    Mol(Box<rdoxide::graphmol::ROMol>),
+    Tautomer(rdoxide::graphmol::tautomer_query::TautomerQuery),
+}
+
+fn query_of(query: &Bound<'_, PyAny>) -> PyResult<Query> {
+    if let Ok(m) = query.extract::<PyRef<'_, PyMol>>() {
+        return Ok(Query::Mol(Box::new(m.mol.clone())));
+    }
+    if let Ok(t) = query.extract::<PyRef<'_, crate::rdtautomerquery::PyTautomerQuery>>() {
+        return Ok(Query::Tautomer(t.query.clone()));
+    }
+    Err(PyTypeError::new_err(
+        "query must be a Mol or a TautomerQuery",
+    ))
+}
+
 /// SubstructLibrary: This provides a simple API for substructure searching large datasets
 /// The SubstructLibrary takes full advantage of available threads during the search operation.
 #[pyclass(name = "SubstructLibrary", module = "rdkit.Chem.rdSubstructLibrary")]
@@ -561,15 +579,29 @@ impl PySubstructLibrary {
     fn get_matches(
         &self,
         py: Python<'_>,
-        query: PyRef<'_, PyMol>,
+        query: &Bound<'_, PyAny>,
         args: &Bound<'_, PyTuple>,
         kwargs: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Vec<u32>> {
         let a = parse_search_args(args, kwargs, Some(1000))?;
         let (start, end) = self.range(a.range);
-        let (lib, query) = (self.lib.clone(), query.mol.clone());
-        py.detach(|| lib.get_matches(&query, start, end, &a.params, a.num_threads, a.max_results))
-            .py()
+        let lib = self.lib.clone();
+        match query_of(query)? {
+            Query::Mol(query) => py.detach(|| {
+                lib.get_matches(&query, start, end, &a.params, a.num_threads, a.max_results)
+            }),
+            Query::Tautomer(query) => py.detach(|| {
+                lib.get_tautomer_matches(
+                    &query,
+                    start,
+                    end,
+                    &a.params,
+                    a.num_threads,
+                    a.max_results,
+                )
+            }),
+        }
+        .py()
     }
 
     /// Return the number of matches for the query
@@ -577,15 +609,22 @@ impl PySubstructLibrary {
     fn count_matches(
         &self,
         py: Python<'_>,
-        query: PyRef<'_, PyMol>,
+        query: &Bound<'_, PyAny>,
         args: &Bound<'_, PyTuple>,
         kwargs: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<u32> {
         let a = parse_search_args(args, kwargs, None)?;
         let (start, end) = self.range(a.range);
-        let (lib, query) = (self.lib.clone(), query.mol.clone());
-        py.detach(|| lib.count_matches(&query, start, end, &a.params, a.num_threads))
-            .py()
+        let lib = self.lib.clone();
+        match query_of(query)? {
+            Query::Mol(query) => {
+                py.detach(|| lib.count_matches(&query, start, end, &a.params, a.num_threads))
+            }
+            Query::Tautomer(query) => py.detach(|| {
+                lib.count_tautomer_matches(&query, start, end, &a.params, a.num_threads)
+            }),
+        }
+        .py()
     }
 
     /// Return True if any molecule in the library matches the query
@@ -593,15 +632,22 @@ impl PySubstructLibrary {
     fn has_match(
         &self,
         py: Python<'_>,
-        query: PyRef<'_, PyMol>,
+        query: &Bound<'_, PyAny>,
         args: &Bound<'_, PyTuple>,
         kwargs: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<bool> {
         let a = parse_search_args(args, kwargs, None)?;
         let (start, end) = self.range(a.range);
-        let (lib, query) = (self.lib.clone(), query.mol.clone());
-        py.detach(|| lib.has_match(&query, start, end, &a.params, a.num_threads))
-            .py()
+        let lib = self.lib.clone();
+        match query_of(query)? {
+            Query::Mol(query) => {
+                py.detach(|| lib.has_match(&query, start, end, &a.params, a.num_threads))
+            }
+            Query::Tautomer(query) => {
+                py.detach(|| lib.has_tautomer_match(&query, start, end, &a.params, a.num_threads))
+            }
+        }
+        .py()
     }
 
     /// Returns a particular molecule in the molecule holder

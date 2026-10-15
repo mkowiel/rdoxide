@@ -41,3 +41,28 @@ def test_serialization_is_unavailable():
         q.ToBinary()
     with pytest.raises(RuntimeError):
         rdTautomerQuery.TautomerQuery("pickle")
+
+
+def _library(holder_cls):
+    from rdkit.Chem import rdSubstructLibrary
+    mols = rdSubstructLibrary.MolHolder()
+    lib = rdSubstructLibrary.SubstructLibrary(mols, holder_cls())
+    for smi in ["O=C1CCCC(CC)C1", "OC1=CCCC(CC)C1", "CCCCC", "c1ccccc1"]:
+        lib.AddMol(Chem.MolFromSmiles(smi))
+    return lib
+
+
+def test_substruct_library_tautomer_search():
+    from rdkit.Chem import rdSubstructLibrary
+    query = rdTautomerQuery.TautomerQuery(Chem.MolFromSmiles("O=C1CCCCC1"))
+    for holder in (rdSubstructLibrary.PatternHolder, rdSubstructLibrary.TautomerPatternHolder):
+        lib = _library(holder)
+        assert sorted(lib.GetMatches(query)) == [0, 1]
+        assert lib.CountMatches(query) == 2
+        assert lib.HasMatch(query)
+        assert not lib.HasMatch(rdTautomerQuery.TautomerQuery(Chem.MolFromSmiles("CC(=O)N")))
+    # a plain query only finds the keto form
+    plain = _library(rdSubstructLibrary.PatternHolder).GetMatches(Chem.MolFromSmiles("O=C1CCCCC1"))
+    assert list(plain) == [0]
+    with pytest.raises(TypeError):
+        _library(rdSubstructLibrary.PatternHolder).GetMatches("O=C")
