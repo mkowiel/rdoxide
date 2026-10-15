@@ -6,6 +6,7 @@
 //! and out. Upstream caches pairwise distances between calls; the values are
 //! the same as computing them on demand, so the cache is not kept.
 
+pub mod constraints;
 pub mod uff;
 
 use crate::error::{RDKitError, Result};
@@ -101,6 +102,22 @@ impl ForceField {
         for c in &mut self.contribs[first..] {
             c.scale_torsion_force_constant(count);
         }
+    }
+
+    /// Appends a point and returns its index.
+    pub fn add_point(&mut self, coords: &[f64]) -> usize {
+        self.push_point(coords);
+        self.num_points() - 1
+    }
+
+    /// Replaces the first `pos.len()` coordinates (the points that are not
+    /// extra points).
+    pub fn set_leading_positions(&mut self, pos: &[f64]) -> Result<()> {
+        if pos.len() > self.positions.len() {
+            return Err(RDKitError::invariant("size mismatch"));
+        }
+        self.positions[..pos.len()].copy_from_slice(pos);
+        Ok(())
     }
 
     pub fn fixed_points(&self) -> &[usize] {

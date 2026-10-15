@@ -6,10 +6,14 @@
 //! are pointers into the conformer, so the force field sees later coordinate
 //! changes and `Minimize` moves the atoms of the molecule.
 
-use pyo3::exceptions::PyValueError;
+use pyo3::exceptions::{PyIndexError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyTuple;
 use rdoxide::forcefield::ForceField;
+use rdoxide::forcefield::constraints::{
+    AngleConstraintContrib, DistanceConstraintContrib, PositionConstraintContrib,
+    TorsionConstraintContrib,
+};
 use rdoxide::graphmol::forcefield_helpers::{
     flat_positions, optimize_molecule, uff, uff_optimize_molecule, uff_optimize_molecule_confs,
 };
@@ -23,6 +27,8 @@ pub struct PyForceField {
     field: ForceField,
     /// the molecule and conformer the points come from
     link: Option<(Py<PyMol>, i32)>,
+    /// the number of extra points after the points of the molecule
+    extra_points: usize,
 }
 
 impl PyForceField {
@@ -32,7 +38,7 @@ impl PyForceField {
             let mol = mol.borrow(py);
             let conf = mol.mol.conformer(*conf_id).py()?;
             self.field
-                .set_positions(&flat_positions(conf.positions()))
+                .set_leading_positions(&flat_positions(conf.positions()))
                 .py()?;
         }
         Ok(())
@@ -51,6 +57,82 @@ impl PyForceField {
                 *p = rdoxide::geometry::Point3D::new(c[0], c[1], c[2]);
             }
         }
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn distance_constraint(
+        &mut self,
+        py: Python<'_>,
+        idx1: usize,
+        idx2: usize,
+        relative: bool,
+        min_len: f64,
+        max_len: f64,
+        k: f64,
+    ) -> PyResult<()> {
+        self.pull(py)?;
+        let c =
+            DistanceConstraintContrib::new(&self.field, idx1, idx2, relative, min_len, max_len, k)
+                .py()?;
+        self.field.push_contrib(Box::new(c));
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn angle_constraint(
+        &mut self,
+        py: Python<'_>,
+        idx1: usize,
+        idx2: usize,
+        idx3: usize,
+        relative: bool,
+        min_deg: f64,
+        max_deg: f64,
+        k: f64,
+    ) -> PyResult<()> {
+        self.pull(py)?;
+        let c = AngleConstraintContrib::new(
+            &self.field,
+            idx1,
+            idx2,
+            idx3,
+            relative,
+            min_deg,
+            max_deg,
+            k,
+        )
+        .py()?;
+        self.field.push_contrib(Box::new(c));
+        Ok(())
+    }
+
+    fn torsion_constraint(
+        &mut self,
+        py: Python<'_>,
+        idx: [usize; 4],
+        relative: bool,
+        min_deg: f64,
+        max_deg: f64,
+        k: f64,
+    ) -> PyResult<()> {
+        self.pull(py)?;
+        let c =
+            TorsionConstraintContrib::new(&self.field, idx, relative, min_deg, max_deg, k).py()?;
+        self.field.push_contrib(Box::new(c));
+        Ok(())
+    }
+
+    fn position_constraint(
+        &mut self,
+        py: Python<'_>,
+        idx: usize,
+        max_displ: f64,
+        k: f64,
+    ) -> PyResult<()> {
+        self.pull(py)?;
+        let c = PositionConstraintContrib::new(&self.field, idx, max_displ, k).py()?;
+        self.field.push_contrib(Box::new(c));
         Ok(())
     }
 
@@ -155,6 +237,227 @@ impl PyForceField {
     #[pyo3(name = "Initialize")]
     fn initialize(&mut self, py: Python<'_>) -> PyResult<()> {
         self.pull(py)
+    }
+
+    /// Adds an extra point, this can be useful for adding constraints.
+    #[pyo3(name = "AddExtraPoint", signature = (x, y, z, fixed = true))]
+    fn add_extra_point(
+        &mut self,
+        py: Python<'_>,
+        x: f64,
+        y: f64,
+        z: f64,
+        fixed: bool,
+    ) -> PyResult<usize> {
+        self.pull(py)?;
+        let idx = self.field.add_point(&[x, y, z]);
+        self.extra_points += 1;
+        if fixed {
+            self.field.fixed_points_mut().push(idx);
+        }
+        // like upstream, the number of points rather than the index
+        Ok(idx + 1)
+    }
+
+    /// returns the location of an extra point as a tuple
+    #[pyo3(name = "GetExtraPointPos", signature = (idx))]
+    fn get_extra_point_pos<'py>(
+        &self,
+        py: Python<'py>,
+        idx: usize,
+    ) -> PyResult<Bound<'py, PyTuple>> {
+        if idx >= self.extra_points {
+            return Err(PyIndexError::new_err(format!("{idx}")));
+        }
+        let first = self.field.num_points() - self.extra_points;
+        let p = &self.field.positions()[3 * (first + idx)..3 * (first + idx) + 3];
+        PyTuple::new(py, p.to_vec())
+    }
+
+    /// Adds a distance constraint to the UFF force field (deprecated, use
+    /// UFFAddDistanceConstraint instead).
+    #[pyo3(name = "AddDistanceConstraint", signature = (idx1, idx2, minLen, maxLen, forceConstant))]
+    #[allow(non_snake_case)]
+    fn add_distance_constraint(
+        &mut self,
+        py: Python<'_>,
+        idx1: usize,
+        idx2: usize,
+        minLen: f64,
+        maxLen: f64,
+        forceConstant: f64,
+    ) -> PyResult<()> {
+        self.distance_constraint(py, idx1, idx2, false, minLen, maxLen, forceConstant)
+    }
+
+    /// Adds a distance constraint to the UFF force field; if relative == True,
+    /// then minLen and maxLen are intended as relative to the current distance.
+    #[pyo3(name = "UFFAddDistanceConstraint", signature = (idx1, idx2, relative, minLen, maxLen, forceConstant))]
+    #[allow(non_snake_case)]
+    fn uff_add_distance_constraint(
+        &mut self,
+        py: Python<'_>,
+        idx1: usize,
+        idx2: usize,
+        relative: bool,
+        minLen: f64,
+        maxLen: f64,
+        forceConstant: f64,
+    ) -> PyResult<()> {
+        self.distance_constraint(py, idx1, idx2, relative, minLen, maxLen, forceConstant)
+    }
+
+    /// Adds a distance constraint to the MMFF force field; if relative == True,
+    /// then minLen and maxLen are intended as relative to the current distance.
+    #[pyo3(name = "MMFFAddDistanceConstraint", signature = (idx1, idx2, relative, minLen, maxLen, forceConstant))]
+    #[allow(non_snake_case)]
+    fn mmff_add_distance_constraint(
+        &mut self,
+        py: Python<'_>,
+        idx1: usize,
+        idx2: usize,
+        relative: bool,
+        minLen: f64,
+        maxLen: f64,
+        forceConstant: f64,
+    ) -> PyResult<()> {
+        self.distance_constraint(py, idx1, idx2, relative, minLen, maxLen, forceConstant)
+    }
+
+    /// Adds an angle constraint to the UFF force field; if relative == True,
+    /// then minAngleDeg and maxAngleDeg are intended as relative to the current
+    /// angle.
+    #[pyo3(name = "UFFAddAngleConstraint", signature = (idx1, idx2, idx3, relative, minAngleDeg, maxAngleDeg, forceConstant))]
+    #[allow(non_snake_case)]
+    fn uff_add_angle_constraint(
+        &mut self,
+        py: Python<'_>,
+        idx1: usize,
+        idx2: usize,
+        idx3: usize,
+        relative: bool,
+        minAngleDeg: f64,
+        maxAngleDeg: f64,
+        forceConstant: f64,
+    ) -> PyResult<()> {
+        self.angle_constraint(
+            py,
+            idx1,
+            idx2,
+            idx3,
+            relative,
+            minAngleDeg,
+            maxAngleDeg,
+            forceConstant,
+        )
+    }
+
+    /// Adds an angle constraint to the MMFF force field; if relative == True,
+    /// then minAngleDeg and maxAngleDeg are intended as relative to the current
+    /// angle.
+    #[pyo3(name = "MMFFAddAngleConstraint", signature = (idx1, idx2, idx3, relative, minAngleDeg, maxAngleDeg, forceConstant))]
+    #[allow(non_snake_case)]
+    fn mmff_add_angle_constraint(
+        &mut self,
+        py: Python<'_>,
+        idx1: usize,
+        idx2: usize,
+        idx3: usize,
+        relative: bool,
+        minAngleDeg: f64,
+        maxAngleDeg: f64,
+        forceConstant: f64,
+    ) -> PyResult<()> {
+        self.angle_constraint(
+            py,
+            idx1,
+            idx2,
+            idx3,
+            relative,
+            minAngleDeg,
+            maxAngleDeg,
+            forceConstant,
+        )
+    }
+
+    /// Adds a dihedral angle constraint to the UFF force field; if relative ==
+    /// True, then minDihedralDeg and maxDihedralDeg are intended as relative to
+    /// the current dihedral angle.
+    #[pyo3(name = "UFFAddTorsionConstraint", signature = (idx1, idx2, idx3, idx4, relative, minDihedralDeg, maxDihedralDeg, forceConstant))]
+    #[allow(non_snake_case)]
+    fn uff_add_torsion_constraint(
+        &mut self,
+        py: Python<'_>,
+        idx1: usize,
+        idx2: usize,
+        idx3: usize,
+        idx4: usize,
+        relative: bool,
+        minDihedralDeg: f64,
+        maxDihedralDeg: f64,
+        forceConstant: f64,
+    ) -> PyResult<()> {
+        self.torsion_constraint(
+            py,
+            [idx1, idx2, idx3, idx4],
+            relative,
+            minDihedralDeg,
+            maxDihedralDeg,
+            forceConstant,
+        )
+    }
+
+    /// Adds a dihedral angle constraint to the MMFF force field; if relative ==
+    /// True, then minDihedralDeg and maxDihedralDeg are intended as relative to
+    /// the current dihedral angle.
+    #[pyo3(name = "MMFFAddTorsionConstraint", signature = (idx1, idx2, idx3, idx4, relative, minDihedralDeg, maxDihedralDeg, forceConstant))]
+    #[allow(non_snake_case)]
+    fn mmff_add_torsion_constraint(
+        &mut self,
+        py: Python<'_>,
+        idx1: usize,
+        idx2: usize,
+        idx3: usize,
+        idx4: usize,
+        relative: bool,
+        minDihedralDeg: f64,
+        maxDihedralDeg: f64,
+        forceConstant: f64,
+    ) -> PyResult<()> {
+        self.torsion_constraint(
+            py,
+            [idx1, idx2, idx3, idx4],
+            relative,
+            minDihedralDeg,
+            maxDihedralDeg,
+            forceConstant,
+        )
+    }
+
+    /// Adds a position constraint to the UFF force field.
+    #[pyo3(name = "UFFAddPositionConstraint", signature = (idx, maxDispl, forceConstant))]
+    #[allow(non_snake_case)]
+    fn uff_add_position_constraint(
+        &mut self,
+        py: Python<'_>,
+        idx: usize,
+        maxDispl: f64,
+        forceConstant: f64,
+    ) -> PyResult<()> {
+        self.position_constraint(py, idx, maxDispl, forceConstant)
+    }
+
+    /// Adds a position constraint to the MMFF force field.
+    #[pyo3(name = "MMFFAddPositionConstraint", signature = (idx, maxDispl, forceConstant))]
+    #[allow(non_snake_case)]
+    fn mmff_add_position_constraint(
+        &mut self,
+        py: Python<'_>,
+        idx: usize,
+        maxDispl: f64,
+        forceConstant: f64,
+    ) -> PyResult<()> {
+        self.position_constraint(py, idx, maxDispl, forceConstant)
     }
 
     /// Adds a fixed point to the force field.
@@ -284,6 +587,7 @@ fn py_uff_get_molecule_force_field(
     Ok(PyForceField {
         field,
         link: Some((mol.clone().unbind(), confId)),
+        extra_points: 0,
     })
 }
 

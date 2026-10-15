@@ -55,7 +55,11 @@ Code/DataStructs/Wrap/testSparseIntVect.py::TestCase::test6BulkDice
 Code/DataStructs/Wrap/testSparseIntVect.py::TestCase::test6BulkTversky
 Code/DataStructs/Wrap/testSparseIntVect.py::TestCase::test7ToList
 Code/DataStructs/Wrap/testSparseIntVect.py::TestCase::testPickle1
+Code/ForceField/Wrap/testConstraints.py::TestCase::testUFFAngleConstraints
+Code/ForceField/Wrap/testConstraints.py::TestCase::testUFFDistanceConstraints
 Code/ForceField/Wrap/testConstraints.py::TestCase::testUFFFixedAtoms
+Code/ForceField/Wrap/testConstraints.py::TestCase::testUFFPositionConstraints
+Code/ForceField/Wrap/testConstraints.py::TestCase::testUFFTorsionConstraints
 Code/Geometry/Wrap/testGeometry.py::TestCase::test10Dihedrals
 Code/Geometry/Wrap/testGeometry.py::TestCase::test11UniformGridIndices
 Code/Geometry/Wrap/testGeometry.py::TestCase::test12UniformRealGridIndices

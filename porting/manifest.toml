@@ -1059,3 +1059,13 @@
 "Code/ForceField/Wrap/ForceField.cpp" = "665f8d820ba207a50868c1f77638ad6da2ed8aec"
 "Code/ForceField/Wrap/PyForceField.h" = "55cc4eb9c5a8cd6124f92af2b471a635f29ce51f"
 "Code/GraphMol/ForceFieldHelpers/Wrap/rdForceFields.cpp" = "0a17ff9109cc6bc06b9b49e0f5b422ac8921b643"
+
+[module."rdoxide::forcefield::constraints".sources]
+"Code/ForceField/DistanceConstraint.h" = "b6af0261d6f48dc347eb660449c5092cf8ce1def"
+"Code/ForceField/DistanceConstraint.cpp" = "60aaac54c696eaf5b24c1cf1495cddc16d498afe"
+"Code/ForceField/AngleConstraint.h" = "e95e2969eac0c7726ec33f1eb32b4dc87e6660a8"
+"Code/ForceField/AngleConstraint.cpp" = "0ee3466f1f3fd25f308073e9e76035042f65f82d"
+"Code/ForceField/TorsionConstraint.h" = "9c2ec66ef7bc55797782c642c4e55178aae11361"
+"Code/ForceField/TorsionConstraint.cpp" = "07721542f647c67588721cd9b5aee30014bb0853"
+"Code/ForceField/PositionConstraint.h" = "2b4892c065aa3fac16056454de31d875d771f743"
+"Code/ForceField/PositionConstraint.cpp" = "01469342409d82be166cbb8b4e6030e0b28049f2"
