@@ -283,6 +283,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     )?;
     m.add_class::<PyPeriodicTable>()?;
     crate::substruct::init(m)?;
+    crate::rdresonance::init(m)?;
     m.add_function(wrap_pyfunction!(get_periodic_table, m)?)?;
 
     crate::rdchem_stereo_info::add_chem(m)?;

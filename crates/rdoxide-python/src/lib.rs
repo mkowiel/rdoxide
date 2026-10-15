@@ -90,6 +90,7 @@ mod rdmoltransforms;
 mod rdpartialcharges;
 mod rdqueries;
 mod rdreducedgraphs;
+mod rdresonance;
 mod rdsimdivpickers;
 mod rdsubstructlibrary;
 mod ringinfo;

@@ -1013,3 +1013,10 @@
 
 [module."rdoxide_python::rdmolstandardize_pipeline".sources]
 "Code/GraphMol/MolStandardize/nbWrap/Pipeline.cpp" = "f5ec5774092f731a5026b717dbade86bdbea788f"
+
+[module."rdoxide::graphmol::resonance".sources]
+"Code/GraphMol/Resonance.h" = "417ad5fda4bdb46af2d868e2d75b6c9bd36c364f"
+"Code/GraphMol/Resonance.cpp" = "d3da2d34d7fa27f159b56dd60290fe1ef72e5299"
+
+[module."rdoxide_python::rdresonance".sources]
+"Code/GraphMol/Wrap/ResonanceMolSupplier.cpp" = "f8a3b44dfaaafc2cb95497d403c2c196f061b27a"
