@@ -1,7 +1,7 @@
 //! `rdkit.Chem.MolStandardize.rdMolStandardize` (upstream
 //! `GraphMol/MolStandardize/nbWrap/rdMolStandardize.cpp`).
 
-use pyo3::exceptions::{PyAttributeError, PyRuntimeError, PyTypeError, PyValueError};
+use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple};
 use rdoxide::graphmol::mol_standardize as ms;
@@ -99,16 +99,7 @@ impl PyCleanupParameters {
 
     /// Only the documented attributes can be set (upstream's `safeSetattr`).
     fn __setattr__(slf: &Bound<'_, Self>, name: &str, value: &Bound<'_, PyAny>) -> PyResult<()> {
-        let py = slf.py();
-        if !py.get_type::<Self>().hasattr(name)? {
-            return Err(PyAttributeError::new_err(format!(
-                "Cannot set unknown attribute '{name}'"
-            )));
-        }
-        py.import("builtins")?
-            .getattr("object")?
-            .call_method1("__setattr__", (slf, name, value))?;
-        Ok(())
+        crate::pyconv::set_declared_attribute(slf.as_any(), name, value)
     }
 }
 

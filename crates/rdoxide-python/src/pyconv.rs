@@ -78,3 +78,28 @@ pub fn float64_values(
         .collect();
     Ok((values, shape))
 }
+
+/// Sets the declared attribute `name` of `obj` through its data descriptor on
+/// the class, and rejects every other name as upstream's `safeSetattr` does.
+///
+/// A `__setattr__` of a `#[pyclass]` cannot delegate to `object.__setattr__`:
+/// before Python 3.13 that call refuses types whose `tp_setattro` is not
+/// the inherited one ("can't apply this __setattr__").
+pub fn set_declared_attribute(
+    obj: &Bound<'_, PyAny>,
+    name: &str,
+    value: &Bound<'_, PyAny>,
+) -> PyResult<()> {
+    let descriptor = obj
+        .get_type()
+        .getattr(name)
+        .map_err(|_| PyAttributeError::new_err(format!("Cannot set unknown attribute '{name}'")))?;
+    if !descriptor.hasattr("__set__")? {
+        return Err(PyAttributeError::new_err(format!(
+            "attribute '{name}' of '{}' object is read-only",
+            obj.get_type().name()?
+        )));
+    }
+    descriptor.call_method1("__set__", (obj, value))?;
+    Ok(())
+}
