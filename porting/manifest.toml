@@ -1213,3 +1213,28 @@
 "Code/GraphMol/FilterCatalog/Wrap/FilterCatalog.cpp" = "d3bd52c261962da51dbb9c49e727f68c069e316d"
 "Code/GraphMol/FilterCatalog/nbWrap/FilterCatalog.cpp" = "8865ed057f19b2a36480a47c7c59310903d2ee1f"
 "Code/GraphMol/FilterCatalog/Wrap/rdfiltercatalog.cpp" = "3cabfa74ce358752eaa9990f12a2922f4901c12e"
+
+[module."rdoxide::graphmol::rgroup_decomposition".sources]
+"Code/GraphMol/RGroupDecomposition/RGroupCore.cpp" = "b49eb9b65e31fe20d2d4f9ff31fd0d1670e8973c"
+"Code/GraphMol/RGroupDecomposition/RGroupCore.h" = "40c141c97f8be60f55497e96c1044c41e53fcdf8"
+"Code/GraphMol/RGroupDecomposition/RGroupData.cpp" = "1a6ce59b8d6f0922109133298a5b7a3fcfce3e67"
+"Code/GraphMol/RGroupDecomposition/RGroupData.h" = "6acda91796de0ec1ae1e7f5da973e69f6d374dc1"
+"Code/GraphMol/RGroupDecomposition/RGroupDecomp.cpp" = "be9cfc8ee9db0347af55cdfe24287fae502dda5e"
+"Code/GraphMol/RGroupDecomposition/RGroupDecomp.h" = "d91110d53e2100210d2c0709ae4a2dd29e2434d5"
+"Code/GraphMol/RGroupDecomposition/RGroupDecompData.cpp" = "07cb27db8c1968c6d3d2861239af66fe76e8c417"
+"Code/GraphMol/RGroupDecomposition/RGroupDecompData.h" = "42f3ef123b27ca3f97586caafc0a7e5607b618ec"
+"Code/GraphMol/RGroupDecomposition/RGroupDecompJSONParsers.cpp" = "143cdb1dc6be965303c0551959da1780d14e8c45"
+"Code/GraphMol/RGroupDecomposition/RGroupDecompJSONParsers.h" = "23b102b572a9bebb6c2fd25d357094f4ab793cd4"
+"Code/GraphMol/RGroupDecomposition/RGroupDecompParams.cpp" = "dd34be285964498bfdeb7f887a7845abaddc5d93"
+"Code/GraphMol/RGroupDecomposition/RGroupDecompParams.h" = "f0237ddb2c93b39731d388d9cf3746dae27791b0"
+"Code/GraphMol/RGroupDecomposition/RGroupFingerprintScore.cpp" = "8b4d226e750904524cbe8a188d3eb78e367f6100"
+"Code/GraphMol/RGroupDecomposition/RGroupFingerprintScore.h" = "102bbb8103d331eea9ce92b1790600382b04e161"
+"Code/GraphMol/RGroupDecomposition/RGroupMatch.h" = "3819f1eab7fa5c68cb4b407a9fdc45923424ee83"
+"Code/GraphMol/RGroupDecomposition/RGroupScore.cpp" = "74c21a9778890625b956337481fb4fd89aa6ca9a"
+"Code/GraphMol/RGroupDecomposition/RGroupScore.h" = "087c844ae25ad87c50f5d29d5e1e0eda517f5e74"
+"Code/GraphMol/RGroupDecomposition/RGroupUtils.cpp" = "99d4e081ca2b92c86e832d9fc1d046b8806aad16"
+"Code/GraphMol/RGroupDecomposition/RGroupUtils.h" = "7d19c6fa17b1dbe3eaa853938d7a847d07aeb4ec"
+
+[module."rdoxide_python::rdrgroupdecomposition".sources]
+"Code/GraphMol/RGroupDecomposition/Wrap/rdRGroupComposition.cpp" = "bb89a8cc3df5afaf466b12599139fc101050dccf"
+"Code/GraphMol/RGroupDecomposition/nbWrap/rdRGroupComposition.cpp" = "cad80a0741cbb5ede58fd534f2fe6dc3515e6bc3"

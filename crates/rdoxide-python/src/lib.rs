@@ -96,6 +96,7 @@ mod rdpartialcharges;
 mod rdqueries;
 mod rdreducedgraphs;
 mod rdresonance;
+mod rdrgroupdecomposition;
 mod rdsimdivpickers;
 mod rdsubstructlibrary;
 mod ringinfo;
@@ -141,6 +142,12 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
     add_submodule(m, "rdMolAlign", "rdkit.Chem.rdMolAlign", rdmolalign::init)?;
     add_submodule(m, "rdDistGeom", "rdkit.Chem.rdDistGeom", rddistgeom::init)?;
     add_submodule(m, "rdFMCS", "rdkit.Chem.rdFMCS", rdfmcs::init)?;
+    add_submodule(
+        m,
+        "rdRGroupDecomposition",
+        "rdkit.Chem.rdRGroupDecomposition",
+        rdrgroupdecomposition::init,
+    )?;
     add_submodule(
         m,
         "rdfiltercatalog",
