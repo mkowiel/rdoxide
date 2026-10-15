@@ -505,6 +505,81 @@ pub fn calc_torsion_energy(v1: f64, v2: f64, v3: f64, cos_phi: f64) -> f64 {
     0.5 * (v1 * (1.0 + cos_phi) + v2 * (1.0 - cos2_phi) + v3 * (1.0 + cos3_phi))
 }
 
+/// Adds the gradient of a torsion angle, given the pieces of its dihedral and
+/// `sin_term = -dE/dPhi / sin(phi)`, to the four atoms `at`.
+pub(crate) fn add_torsion_grad(
+    grad: &mut [f64],
+    at: [usize; 4],
+    r: &[Point3D; 4],
+    tv: &[Point3D; 2],
+    d: &[f64; 2],
+    cos_phi: f64,
+    s: f64,
+) {
+    let dc = [
+        1.0 / d[0] * (tv[1].x - cos_phi * tv[0].x),
+        1.0 / d[0] * (tv[1].y - cos_phi * tv[0].y),
+        1.0 / d[0] * (tv[1].z - cos_phi * tv[0].z),
+        1.0 / d[1] * (tv[0].x - cos_phi * tv[1].x),
+        1.0 / d[1] * (tv[0].y - cos_phi * tv[1].y),
+        1.0 / d[1] * (tv[0].z - cos_phi * tv[1].z),
+    ];
+    add3(
+        grad,
+        at[0],
+        [
+            s * (dc[2] * r[1].y - dc[1] * r[1].z),
+            s * (dc[0] * r[1].z - dc[2] * r[1].x),
+            s * (dc[1] * r[1].x - dc[0] * r[1].y),
+        ],
+    );
+    add3(
+        grad,
+        at[1],
+        [
+            s * (dc[1] * (r[1].z - r[0].z)
+                + dc[2] * (r[0].y - r[1].y)
+                + dc[4] * (-r[3].z)
+                + dc[5] * r[3].y),
+            s * (dc[0] * (r[0].z - r[1].z)
+                + dc[2] * (r[1].x - r[0].x)
+                + dc[3] * r[3].z
+                + dc[5] * (-r[3].x)),
+            s * (dc[0] * (r[1].y - r[0].y)
+                + dc[1] * (r[0].x - r[1].x)
+                + dc[3] * (-r[3].y)
+                + dc[4] * r[3].x),
+        ],
+    );
+    add3(
+        grad,
+        at[2],
+        [
+            s * (dc[1] * r[0].z
+                + dc[2] * (-r[0].y)
+                + dc[4] * (r[3].z - r[2].z)
+                + dc[5] * (r[2].y - r[3].y)),
+            s * (dc[0] * (-r[0].z)
+                + dc[2] * r[0].x
+                + dc[3] * (r[2].z - r[3].z)
+                + dc[5] * (r[3].x - r[2].x)),
+            s * (dc[0] * r[0].y
+                + dc[1] * (-r[0].x)
+                + dc[3] * (r[3].y - r[2].y)
+                + dc[4] * (r[2].x - r[3].x)),
+        ],
+    );
+    add3(
+        grad,
+        at[3],
+        [
+            s * (dc[4] * r[2].z - dc[5] * r[2].y),
+            s * (dc[5] * r[2].x - dc[3] * r[2].z),
+            s * (dc[3] * r[2].y - dc[4] * r[2].x),
+        ],
+    );
+}
+
 #[derive(Debug, Clone)]
 struct TorsionTerm {
     at: [usize; 4],
@@ -577,69 +652,7 @@ impl ForceFieldContrib for TorsionAngleContrib {
                 } else {
                     1.0 / sin_phi
                 });
-            let dc = [
-                1.0 / d[0] * (tv[1].x - cos_phi * tv[0].x),
-                1.0 / d[0] * (tv[1].y - cos_phi * tv[0].y),
-                1.0 / d[0] * (tv[1].z - cos_phi * tv[0].z),
-                1.0 / d[1] * (tv[0].x - cos_phi * tv[1].x),
-                1.0 / d[1] * (tv[0].y - cos_phi * tv[1].y),
-                1.0 / d[1] * (tv[0].z - cos_phi * tv[1].z),
-            ];
-            let s = sin_term;
-            add3(
-                grad,
-                t.at[0],
-                [
-                    s * (dc[2] * r[1].y - dc[1] * r[1].z),
-                    s * (dc[0] * r[1].z - dc[2] * r[1].x),
-                    s * (dc[1] * r[1].x - dc[0] * r[1].y),
-                ],
-            );
-            add3(
-                grad,
-                t.at[1],
-                [
-                    s * (dc[1] * (r[1].z - r[0].z)
-                        + dc[2] * (r[0].y - r[1].y)
-                        + dc[4] * (-r[3].z)
-                        + dc[5] * r[3].y),
-                    s * (dc[0] * (r[0].z - r[1].z)
-                        + dc[2] * (r[1].x - r[0].x)
-                        + dc[3] * r[3].z
-                        + dc[5] * (-r[3].x)),
-                    s * (dc[0] * (r[1].y - r[0].y)
-                        + dc[1] * (r[0].x - r[1].x)
-                        + dc[3] * (-r[3].y)
-                        + dc[4] * r[3].x),
-                ],
-            );
-            add3(
-                grad,
-                t.at[2],
-                [
-                    s * (dc[1] * r[0].z
-                        + dc[2] * (-r[0].y)
-                        + dc[4] * (r[3].z - r[2].z)
-                        + dc[5] * (r[2].y - r[3].y)),
-                    s * (dc[0] * (-r[0].z)
-                        + dc[2] * r[0].x
-                        + dc[3] * (r[2].z - r[3].z)
-                        + dc[5] * (r[3].x - r[2].x)),
-                    s * (dc[0] * r[0].y
-                        + dc[1] * (-r[0].x)
-                        + dc[3] * (r[3].y - r[2].y)
-                        + dc[4] * (r[2].x - r[3].x)),
-                ],
-            );
-            add3(
-                grad,
-                t.at[3],
-                [
-                    s * (dc[4] * r[2].z - dc[5] * r[2].y),
-                    s * (dc[5] * r[2].x - dc[3] * r[2].z),
-                    s * (dc[3] * r[2].y - dc[4] * r[2].x),
-                ],
-            );
+            add_torsion_grad(grad, t.at, r, tv, d, cos_phi, sin_term);
         }
     }
 

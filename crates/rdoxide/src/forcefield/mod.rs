@@ -7,6 +7,7 @@
 //! the same as computing them on demand, so the cache is not kept.
 
 pub mod constraints;
+pub mod crystal_ff;
 pub mod mmff;
 pub mod uff;
 
