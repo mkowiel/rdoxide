@@ -656,3 +656,249 @@ fn molecule_notes_and_radicals() {
     let (dm, _) = build_hl("[CH2]C[O]", &off, DrawMolHighlights::default());
     assert!(dm.radicals.is_empty());
 }
+
+fn from_block(block: &str) -> RWMol {
+    use rdoxide::graphmol::file_parsers::{MolFileParserParams, mol_from_mol_block};
+    mol_from_mol_block(block, &MolFileParserParams::default())
+        .unwrap()
+        .unwrap()
+}
+
+fn run(m: &RWMol, o: &MolDrawOptions) -> (DrawMol, DrawTextFT) {
+    let mut t = text();
+    let mut dm = DrawMol::new(
+        m,
+        "",
+        300,
+        300,
+        o,
+        &mut t,
+        DrawMolHighlights::default(),
+        true,
+        -1,
+        false,
+    )
+    .unwrap();
+    dm.extract_all(1.0, &mut t).unwrap();
+    dm.calculate_scale(&mut t);
+    dm.finish_create_draw_objects(&mut t).unwrap();
+    (dm, t)
+}
+
+const SRU_BLOCK: &str = "
+  test
+
+  4  3  0  0  0  0  0  0  0  0999 V2000
+    0.0000    0.0000    0.0000 C   0  0
+    1.5000    0.0000    0.0000 C   0  0
+    3.0000    0.0000    0.0000 C   0  0
+    4.5000    0.0000    0.0000 C   0  0
+  1  2  1  0
+  2  3  1  0
+  3  4  1  0
+M  STY  1   1 SRU
+M  SAL   1  2   2   3
+M  SBL   1  2   1   3
+M  SDI   1  4    1.0000   -0.5000    1.0000    0.5000
+M  SDI   1  4    3.5000   -0.5000    3.5000    0.5000
+M  SCN  1   1 HT
+M  SLB  1   1   1
+M  SMT   1 n
+M  END
+";
+
+#[test]
+fn sgroup_brackets_and_labels() {
+    let mut o = MolDrawOptions::default();
+    o.prepare_mols_before_drawing = false;
+    let (dm, _) = run(&from_block(SRU_BLOCK), &o);
+    // two brackets of 4 points each
+    let brackets: Vec<_> = dm
+        .post_shapes
+        .iter()
+        .filter(|s| s.points.len() == 4)
+        .collect();
+    assert_eq!(brackets.len(), 2);
+    let texts: Vec<_> = dm.annotations.iter().map(|a| a.text.as_str()).collect();
+    assert!(texts.contains(&"n"), "{texts:?}");
+    assert!(texts.contains(&"HT"), "{texts:?}");
+    // the brackets are vertical lines to either side of the middle bonds
+    let xs: Vec<f64> = brackets.iter().map(|b| b.points[1].x).collect();
+    assert!(xs[0] < xs[1]);
+    // no annotations when they aren't wanted
+    let mut t = text();
+    let mut dm = DrawMol::new(
+        &from_block(SRU_BLOCK),
+        "",
+        300,
+        300,
+        &o,
+        &mut t,
+        DrawMolHighlights::default(),
+        false,
+        -1,
+        false,
+    )
+    .unwrap();
+    dm.extract_all(1.0, &mut t).unwrap();
+    assert!(dm.annotations.is_empty());
+    assert_eq!(dm.post_shapes.len(), 2);
+}
+
+#[test]
+fn data_sgroup_labels() {
+    use rdoxide::graphmol::mol_draw2d::draw_mol_sgroups::get_sgroup_data_labels;
+    let block = "
+  test
+
+  2  1  0  0  0  0  0  0  0  0999 V2000
+    0.0000    0.0000    0.0000 C   0  0
+    1.5000    0.0000    0.0000 O   0  0
+  1  2  1  0
+M  STY  1   1 DAT
+M  SAL   1  1   2
+M  SDT   1 FIELD                         F
+M  SDD   1     0.0000    0.0000    DR    ALL  0       0
+M  SED   1 some data
+M  END
+";
+    let m = from_block(block);
+    let labels = get_sgroup_data_labels(&m, 0.0).unwrap();
+    assert_eq!(labels.len(), 1);
+    assert_eq!(labels[0].text, "some data");
+    assert_eq!(labels[0].atom_idx, 1);
+    // no coordinates given relative to the atom: placed by the drawing code
+    assert!(!labels[0].positioned);
+    assert!(get_sgroup_data_labels(&smi("CC"), 0.0).unwrap().is_empty());
+    let mut o = MolDrawOptions::default();
+    o.prepare_mols_before_drawing = false;
+    let (dm, _) = run(&m, &o);
+    assert!(dm.annotations.iter().any(|a| a.text == "some data"));
+}
+
+#[test]
+fn link_nodes() {
+    use rdoxide::rdgeneral::RDProps;
+    let mut m = smi("CCC");
+    m.set_prop(
+        rdoxide::rdgeneral::common_properties::molFileLinkNodes,
+        "1 3 2 2 1 2 3",
+        false,
+    )
+    .unwrap();
+    let mut o = MolDrawOptions::default();
+    o.prepare_mols_before_drawing = true;
+    let (dm, _) = run(&m, &o);
+    // a bracket across each of the two bonds, and the repeat label
+    assert_eq!(dm.post_shapes.len(), 2);
+    assert!(dm.annotations.iter().any(|a| a.text == "(1-3)"));
+}
+
+#[test]
+fn variable_attachment_and_close_contacts() {
+    let block = "
+  test
+
+  4  3  0  0  0  0  0  0  0  0999 V2000
+    0.0000    0.0000    0.0000 C   0  0
+    1.5000    0.0000    0.0000 C   0  0
+    1.5300    0.0000    0.0000 C   0  0
+    3.0000    0.0000    0.0000 C   0  0
+  1  2  1  0
+  2  3  1  0
+  3  4  1  0
+M  END
+";
+    let mut o = MolDrawOptions::default();
+    o.prepare_mols_before_drawing = false;
+    let (dm, _) = run(&from_block(block), &o);
+    // atoms 1 and 2 nearly coincide: a red box marks the first of them (the
+    // other is skipped once flagged, as upstream)
+    let boxes: Vec<_> = dm
+        .post_shapes
+        .iter()
+        .filter(|s| s.points.len() == 5)
+        .collect();
+    assert_eq!(boxes.len(), 1);
+    assert_eq!(boxes[0].atom1, 1);
+    assert_eq!(
+        boxes[0].line_colour,
+        rdoxide::graphmol::mol_draw2d::helpers::DrawColour::new(1.0, 0.0, 0.0)
+    );
+    let mut off = o.clone();
+    off.flag_close_contacts_dist = -1;
+    let (dm, _) = run(&from_block(block), &off);
+    assert!(dm.post_shapes.is_empty());
+
+    // variable attachment points: a bond to a dummy with endpoints 2 and 3
+    use rdoxide::rdgeneral::RDProps;
+    let mut m = smi("*C(C)C");
+    m.bond_mut(0)
+        .set_prop("_MolFileBondEndPts", "(2 2 3)", false)
+        .unwrap();
+    m.bond_mut(0)
+        .set_prop("_MolFileBondAttach", "ANY", false)
+        .unwrap();
+    let mut o = MolDrawOptions::default();
+    o.prepare_mols_before_drawing = false;
+    let mut t = text();
+    let mut dm = DrawMol::new(
+        &m,
+        "",
+        300,
+        300,
+        &o,
+        &mut t,
+        DrawMolHighlights::default(),
+        true,
+        -1,
+        false,
+    )
+    .unwrap();
+    dm.extract_all(1.0, &mut t).unwrap();
+    // an ellipse for each end point and a fat line for the bond between them
+    assert_eq!(dm.pre_shapes.len(), 3);
+    // the dummy's * label is removed
+    assert!(dm.atom_labels[0].is_none());
+    // bad indices are rejected
+    m.bond_mut(0)
+        .set_prop("_MolFileBondEndPts", "(1 9)", false)
+        .unwrap();
+    let mut dm = DrawMol::new(
+        &m,
+        "",
+        300,
+        300,
+        &o,
+        &mut t,
+        DrawMolHighlights::default(),
+        true,
+        -1,
+        false,
+    )
+    .unwrap();
+    assert!(dm.extract_all(1.0, &mut t).is_err());
+}
+
+#[test]
+fn clashing_labels_are_reoriented() {
+    // two unbonded atoms whose labels extend towards each other: N (E) and
+    // O (W)
+    let block = "
+  test
+
+  2  0  0  0  0  0  0  0  0  0999 V2000
+    0.0000    0.0000    0.0000 N   0  0
+    0.9000    0.5000    0.0000 O   0  0
+M  END
+";
+    let mut o = MolDrawOptions::default();
+    o.prepare_mols_before_drawing = false;
+    let (dm, _) = run(&from_block(block), &o);
+    let orig = [dm.atom_syms[0].1, dm.atom_syms[1].1];
+    let now = [
+        dm.atom_labels[0].as_ref().unwrap().orient,
+        dm.atom_labels[1].as_ref().unwrap().orient,
+    ];
+    assert_ne!(orig, now);
+}
