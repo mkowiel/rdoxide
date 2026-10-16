@@ -112,6 +112,7 @@ mod rdreducedgraphs;
 mod rdresonance;
 mod rdrgroupdecomposition;
 mod rdscaffoldnetwork;
+mod rdshapehelpers;
 mod rdsimdivpickers;
 mod rdsubstructlibrary;
 mod rdsynthonspacesearch;
@@ -308,6 +309,12 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
         "rdSubstructLibrary",
         "rdoxide.Chem.rdSubstructLibrary",
         rdsubstructlibrary::init,
+    )?;
+    add_submodule(
+        m,
+        "rdShapeHelpers",
+        "rdoxide.Chem.rdShapeHelpers",
+        rdshapehelpers::init,
     )?;
     add_submodule(
         m,

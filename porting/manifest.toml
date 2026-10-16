@@ -1504,3 +1504,12 @@
 
 [module."rdoxide_python::rdmolfiles_tdtwriter".sources]
 "Code/GraphMol/Wrap/TDTWriter.cpp" = "e6993728c1e515dca5c1677aeecdd3ec097d48e4"
+
+[module."rdoxide::graphmol::shape_helpers".sources]
+"Code/GraphMol/ShapeHelpers/ShapeEncoder.cpp" = "f59d4ab30e19874af3e8b3dfeccef8e5afafda86"
+"Code/GraphMol/ShapeHelpers/ShapeEncoder.h" = "29e4319375295284255e6e1e482f838a8f12ebc6"
+"Code/GraphMol/ShapeHelpers/ShapeUtils.cpp" = "7034c27c7bdbcf07fc1a4925e24adaf5975af4d1"
+"Code/GraphMol/ShapeHelpers/ShapeUtils.h" = "381aaa44eb77a7f2d53fcd1dce1181a8cc525016"
+
+[module."rdoxide_python::rdshapehelpers".sources]
+"Code/GraphMol/ShapeHelpers/Wrap/rdShapeHelpers.cpp" = "778ed7396798ea377d1e7049e19ad619f9bf81da"

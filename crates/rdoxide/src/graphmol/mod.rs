@@ -61,6 +61,7 @@ pub mod rgroup_decomposition;
 pub mod ring_info;
 pub mod romol;
 pub mod scaffold_network;
+pub mod shape_helpers;
 pub mod smiles_parse;
 pub mod stereo_group;
 pub mod subgraphs;
