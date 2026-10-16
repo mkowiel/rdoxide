@@ -68,6 +68,7 @@ pub mod subset;
 pub mod substance_group;
 pub mod substruct;
 pub mod substruct_library;
+pub mod synthon_space_search;
 pub mod tautomer_query;
 pub mod trajectory;
 pub mod wedge_bonds;

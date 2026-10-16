@@ -240,7 +240,7 @@ impl PyShapeInputOptions {
 )]
 #[derive(Clone, Default)]
 pub struct PyShapeOverlayOptions {
-    opts: ShapeOverlayOptions,
+    pub(crate) opts: ShapeOverlayOptions,
 }
 
 #[pymethods]
@@ -363,7 +363,7 @@ impl PyShapeOverlayOptions {
 /// ShapeInput object
 #[pyclass(name = "ShapeInput", module = "rdkit.Chem.rdGaussianShape")]
 pub struct PyShapeInput {
-    shape: ShapeInput,
+    pub(crate) shape: ShapeInput,
 }
 
 fn input_opts(o: Option<PyRef<'_, PyShapeInputOptions>>) -> ShapeInputOptions {

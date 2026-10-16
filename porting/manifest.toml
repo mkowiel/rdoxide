@@ -1459,3 +1459,27 @@
 [module."rdoxide_python::rdrascalmces".sources]
 "Code/GraphMol/RascalMCES/Wrap/rdRascalMCES.cpp" = "6cb471f107d3ca1012edeb49cf62ee4e0245f703"
 "Code/GraphMol/RascalMCES/nbWrap/rdRascalMCES.cpp" = "86e3c789d6fd84c8eee47eadc7882328fcafda48"
+
+[module."rdoxide::graphmol::synthon_space_search".sources]
+"Code/GraphMol/SynthonSpaceSearch/SearchResults.cpp" = "eb6ff1b6f8694eed83fde5636c9e29b097a198cd"
+"Code/GraphMol/SynthonSpaceSearch/SearchResults.h" = "2689e8a7a4d1f3a14ebc151121c9975ca6d565de"
+"Code/GraphMol/SynthonSpaceSearch/Synthon.cpp" = "0ef4d0df7988e341d3840772486f4c7a420a46ec"
+"Code/GraphMol/SynthonSpaceSearch/Synthon.h" = "b711af42ac9a2d1cd74e1e37befac53a850d5482"
+"Code/GraphMol/SynthonSpaceSearch/SynthonSet.cpp" = "ac18968a2b519183f4cb254fd4f907f57ea9aa53"
+"Code/GraphMol/SynthonSpaceSearch/SynthonSet.h" = "447ecbc176799e72828d361cb0439370a5a06623"
+"Code/GraphMol/SynthonSpaceSearch/SynthonSpace.cpp" = "1c1b23896a70857667d8f106be20212519a1a365"
+"Code/GraphMol/SynthonSpaceSearch/SynthonSpace.h" = "c1e0aa240f8c4810975b44fc11eedda3c17a0be7"
+"Code/GraphMol/SynthonSpaceSearch/SynthonSpaceHitSet.cpp" = "adcd3f888f47e908b9f1711ff2ec7ab9981da23e"
+"Code/GraphMol/SynthonSpaceSearch/SynthonSpaceHitSet.h" = "13f332d1e9d2b48ac137932ae27408fa15eeec2b"
+"Code/GraphMol/SynthonSpaceSearch/SynthonSpaceSearchHelpers.h" = "8b1b9416d0167fc6770cf12ff4da635ad825154c"
+"Code/GraphMol/SynthonSpaceSearch/SynthonSpaceSearch_details.cpp" = "711664698ae9e5b261f4cfb852b7c18b1c1d1bc7"
+"Code/GraphMol/SynthonSpaceSearch/SynthonSpaceSearch_details.h" = "4fecd8c399df3730c40b3ebcbcbc74e9af5c7fb2"
+"Code/GraphMol/SynthonSpaceSearch/SynthonSpaceSearcher.cpp" = "2bd43bb8431e2e95d469f6df8bb2560f4c7b4df6"
+"Code/GraphMol/SynthonSpaceSearch/SynthonSpaceSearcher.h" = "d5578b114c8cf5c56be3a6d16fc327ae90ecf671"
+"Code/GraphMol/SynthonSpaceSearch/SynthonSpaceSubstructureSearcher.cpp" = "af48b6a79bb955308086fb833e09a2649376cdee"
+"Code/GraphMol/SynthonSpaceSearch/SynthonSpaceSubstructureSearcher.h" = "9aa19003ea31831e54e6f1e9c7f267f3588a0847"
+"Code/GraphMol/SynthonSpaceSearch/substructure_search_catch_tests.cpp" = "1a71dc83d2592ced96b873f2346dab116afcd270"
+
+[module."rdoxide_python::rdsynthonspacesearch".sources]
+"Code/GraphMol/SynthonSpaceSearch/Wrap/rdSynthonSpaceSearch.cpp" = "38d375c344b711b0e74809822ea4125213097a7e"
+"Code/GraphMol/SynthonSpaceSearch/nbWrap/rdSynthonSpaceSearch.cpp" = "bd4db49367926a6051390e91829b027be73c8f58"

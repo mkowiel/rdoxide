@@ -17,7 +17,7 @@ use crate::mol::PyMol;
 )]
 #[derive(Clone, Default)]
 pub struct PyStereoEnumerationOptions {
-    opts: StereoEnumerationOptions,
+    pub(crate) opts: StereoEnumerationOptions,
 }
 
 #[pymethods]
