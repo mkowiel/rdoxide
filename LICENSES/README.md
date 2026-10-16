@@ -11,6 +11,8 @@
 | `RDKit-PBF-InstituteOfCancerResearch-BSD-3-Clause.txt` | Code translated from `Code/GraphMol/Descriptors/PBF.cpp` (plane of best fit; Nicholas Firth, Institute of Cancer Research): `crates/rdoxide/src/graphmol/descriptors/pbf.rs`. Source: the file header. |
 | `Boost-BSL-1.0.txt` | `crates/rdoxide/src/rdgeneral/json.rs` (`number` module): the digit bookkeeping and `dec_to_float` of Boost.JSON 1.85's `basic_parser_impl.hpp` (Copyright (c) 2019 Vinnie Falco, (c) 2020 Krystian Stasiowski), reproduced so that doubles read from MolJSON are bit-identical to what RDKit reads. Boost Software License 1.0. |
 | `SciPy-BSD-3-Clause.txt` | `crates/rdoxide/src/graphmol/rascal_mces/lap.rs`, a translation of `lap_a_la_scipy.cpp` (Crouse's shortest augmenting path rectangular assignment algorithm as implemented by PM Larsen in SciPy; Copyright (c) 2001-2002 Enthought, Inc., 2003-2023 SciPy Developers), used by the RASCAL tier 2 similarity. BSD 3-Clause. |
+| `Roboto-Apache-2.0.txt` | `crates/rdoxide/data/fonts/Roboto-Regular.ttf`, the Roboto Regular font (developed by Google) extracted from RDKit's `roboto_regular.h`; used to lay out and outline text in the molecule drawing code (`graphmol/mol_draw2d`). Apache License 2.0. |
+| `Telex-OFL-1.1.txt` | `crates/rdoxide/data/fonts/Telex-Regular.ttf`, the Telex Regular font (Copyright 2011 The Telex Project Authors) shipped with RDKit as its default drawing font. SIL Open Font License 1.1. |
 
 When porting a component that carries its own license (anything under
 upstream `External/`, fonts in `Data/Fonts`, ...), copy its license file here,

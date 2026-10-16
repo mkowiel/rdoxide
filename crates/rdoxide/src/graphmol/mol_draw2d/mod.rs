@@ -1,0 +1,10 @@
+//! 2D molecule drawing (`Code/GraphMol/MolDraw2D` of RDKit).
+//!
+//! This is the drawing foundation: options and colours, the geometry helpers,
+//! the TrueType reader that stands in for FreeType, and text layout.
+
+pub mod details;
+pub mod draw_text;
+pub mod font;
+pub mod helpers;
+pub mod string_rect;

@@ -26,7 +26,7 @@ Licensing summary
   (Code/GraphMol/atomic_data.cpp) and remain under the RDKit BSD license.
 
 The combined work is therefore distributed under "BSD-3-Clause AND MIT AND
-Apache-2.0 WITH LLVM-exception AND MPL-2.0 AND BSL-1.0" (MIT applies only to the
+Apache-2.0 WITH LLVM-exception AND MPL-2.0 AND BSL-1.0 AND OFL-1.1" (MIT applies only to the
 files derived from linchemin and xyz2mol, MPL-2.0 only to the files translated
 from Eigen, BSL-1.0 only to the number reader translated from Boost.JSON).
 Redistributions (source or binary) must retain this NOTICE file and the
@@ -55,6 +55,8 @@ LICENSES/SciPy-BSD-3-Clause.txt                           SciPy (linear assignme
 LICENSES/RingDecomposerLib-BSD-3-Clause.txt              RingDecomposerLib (ring families, SSSR),
                                                          Copyright (c) 2016 University of Hamburg,
                                                          ZBH - Center for Bioinformatics
+LICENSES/Roboto-Apache-2.0.txt                            Roboto Regular font (crates/rdoxide/data/fonts/Roboto-Regular.ttf), Google
+LICENSES/Telex-OFL-1.1.txt                                Telex Regular font (crates/rdoxide/data/fonts/Telex-Regular.ttf), SIL OFL 1.1
 
 libc++ (LLVM Project)
   Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.

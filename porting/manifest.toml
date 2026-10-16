@@ -1575,3 +1575,25 @@
 
 [module."rdoxide_python::rdslnparse".sources]
 "Code/GraphMol/SLNParse/Wrap/rdSLNParse.cpp" = "115f754e719a0bc2c4e5eff3779095c85727333b"
+
+[module."rdoxide::graphmol::mol_draw2d::helpers".sources]
+"Code/GraphMol/MolDraw2D/MolDraw2DHelpers.h" = "c4771237b110915eb79ea7be08799968a47deb06"
+
+[module."rdoxide::graphmol::mol_draw2d::string_rect".sources]
+"Code/GraphMol/MolDraw2D/StringRect.h" = "73c84abc9eb12127feac44603bdc578a38d6d435"
+
+[module."rdoxide::graphmol::mol_draw2d::details".sources]
+"Code/GraphMol/MolDraw2D/MolDraw2DDetails.cpp" = "64ac37afcface38aafb19b55cf099e68764a9f80"
+"Code/GraphMol/MolDraw2D/MolDraw2DDetails.h" = "738a5fe018c8db40aceae33a0bc2559b6abb7b44"
+
+[module."rdoxide::graphmol::mol_draw2d::draw_text".sources]
+"Code/GraphMol/MolDraw2D/DrawText.cpp" = "33f51bfac701808d8bb122123a0c2dd4ba866033"
+"Code/GraphMol/MolDraw2D/DrawText.h" = "04164798da9be062621b01e77aec46f7a545227f"
+"Code/GraphMol/MolDraw2D/DrawTextFT.cpp" = "007bbe35864e1e15ae3c365ed04c12cec19683e4"
+"Code/GraphMol/MolDraw2D/DrawTextFT.h" = "06d4c812b6cde60dc912fc0561ddda1b17392bc1"
+"Code/GraphMol/MolDraw2D/DrawTextFTSVG.cpp" = "442676858aba55ff65bceb6f6d35b14276b33d77"
+"Code/GraphMol/MolDraw2D/DrawTextFTSVG.h" = "6ad6ccb0c3ced9855f67abf42f75cd564510ff42"
+
+[module."rdoxide::graphmol::mol_draw2d::font".sources]
+"Code/GraphMol/MolDraw2D/Fonts/roboto_regular.h" = "4f9da4d0c5ae88b63ace5a411041017aae4ec81e"
+"Data/Fonts/Telex-Regular.ttf" = "a3948a1e59eeaf8bcdd6df12def637a6edbe9fa1"
