@@ -178,3 +178,28 @@ def test_native_text():
     txt = d.GetDrawingText()
     assert "fill:#0000FF' >N</text>" in txt
     assert "font-family:sans-serif" in txt
+
+
+def test_options_from_json():
+    o = rdMolDraw2D.MolDrawOptions()
+    rdMolDraw2D.UpdateMolDrawOptionsFromJSON(
+        o,
+        '{"addAtomIndices": 1, "padding": 0.2, "legendPosition": "Top", '
+        '"highlightColour": [0, 1, 0], "atomLabels": {"3": "x"}, '
+        '"atomColourPalette": "bw", "colourScheme": "dark", '
+        '"drawingExtentsInclude": {"BONDS": true, "RADICALS": true}}',
+    )
+    assert o.addAtomIndices and o.padding == 0.2
+    assert o.legendPosition == rdMolDraw2D.LegendPosition.Top
+    assert o.highlightColour == (0.0, 1.0, 0.0, 1.0)
+    assert dict(o.atomLabels.items()) == {3: "x"}
+    assert o.drawingExtentsInclude == 2 | 32
+    # the individual colours override the scheme; the palette was set after it
+    assert o.backgroundColour == (0.0, 0.0, 0.0, 1.0)
+    assert o.getAtomPalette() == {-1: (0.0, 0.0, 0.0, 1.0)}
+    d = rdMolDraw2D.MolDraw2DSVG(200, 200)
+    rdMolDraw2D.UpdateDrawerParamsFromJSON(d, '{"rotate": 90}')
+    assert d.drawOptions().rotate == 90
+    rdMolDraw2D.UpdateMolDrawOptionsFromJSON(o, "")
+    with pytest.raises(Exception):
+        rdMolDraw2D.UpdateMolDrawOptionsFromJSON(o, "{not json")

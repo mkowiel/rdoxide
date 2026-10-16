@@ -15,6 +15,7 @@ use rdoxide::graphmol::mol_draw2d::helpers::{
     DrawColour, LegendPosition, MolDrawOptions, MultiColourHighlightStyle, TextAlignType,
     avalon_palette, bw_palette, cdk_palette, default_palette,
 };
+use rdoxide::graphmol::mol_draw2d::options_json::update_mol_draw_options_from_json;
 use rdoxide::graphmol::mol_draw2d::utils::{
     mean_bond_length, prepare_mol_for_drawing, set_acs1996_options,
 };
@@ -1508,6 +1509,28 @@ fn set_monochrome_mode(
     }
 }
 
+/// Updates a MolDrawOptions object from a JSON string
+#[pyfunction]
+#[pyo3(name = "UpdateMolDrawOptionsFromJSON", signature = (opts, json))]
+fn update_mol_draw_options_from_json_py(
+    py: Python<'_>,
+    mut opts: PyRefMut<'_, PyMolDrawOptions>,
+    json: &str,
+) -> PyResult<()> {
+    opts.write(py, |o| update_mol_draw_options_from_json(o, json))?
+        .py()
+}
+
+/// Updates the drawing options of a MolDraw2D object from a JSON string
+#[pyfunction]
+#[pyo3(name = "UpdateDrawerParamsFromJSON", signature = (drawer, json))]
+fn update_drawer_params_from_json_py(
+    mut drawer: PyRefMut<'_, PyMolDraw2D>,
+    json: &str,
+) -> PyResult<()> {
+    update_mol_draw_options_from_json(drawer.d.draw_options_mut(), json).py()
+}
+
 pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add(
         "__doc__",
@@ -1553,6 +1576,8 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(set_acs1996_mode, m)?)?;
     m.add_function(wrap_pyfunction!(mean_bond_length_py, m)?)?;
     m.add_function(wrap_pyfunction!(set_dark_mode, m)?)?;
+    m.add_function(wrap_pyfunction!(update_mol_draw_options_from_json_py, m)?)?;
+    m.add_function(wrap_pyfunction!(update_drawer_params_from_json_py, m)?)?;
     m.add_function(wrap_pyfunction!(set_monochrome_mode, m)?)?;
     Ok(())
 }

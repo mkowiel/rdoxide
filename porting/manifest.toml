@@ -1668,3 +1668,6 @@
 
 [module."rdoxide_python::rdmoldraw2d".sources]
 "Code/GraphMol/MolDraw2D/Wrap/rdMolDraw2D.cpp" = "2a541dd86bdc20961fb02da629bc55deeb4d28ce"
+
+[module."rdoxide::graphmol::mol_draw2d::options_json".sources]
+"Code/GraphMol/MolDraw2D/MolDrawOptionsJSONParsers.cpp" = "24443633929cfe8db07999db5464b969c4cb40bd"
