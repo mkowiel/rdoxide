@@ -79,7 +79,20 @@ impl MolDraw2DSVG {
         panel_height: i32,
         options: MolDrawOptions,
     ) -> Result<Self> {
-        let mut text = Self::make_text_drawer(&options);
+        Self::with_text(width, height, panel_width, panel_height, options, false)
+    }
+
+    /// As [`MolDraw2DSVG::with_options`]; with `no_freetype` the text is
+    /// written as SVG `<text>` elements rather than as glyph outlines.
+    pub fn with_text(
+        width: i32,
+        height: i32,
+        panel_width: i32,
+        panel_height: i32,
+        options: MolDrawOptions,
+        no_freetype: bool,
+    ) -> Result<Self> {
+        let mut text = Self::make_text_drawer(&options, no_freetype);
         if options.base_font_size > 0.0 {
             text.set_base_font_size(options.base_font_size);
         }
@@ -115,9 +128,12 @@ impl MolDraw2DSVG {
 
     /// The text drawer for the font in the options; the built-in font is
     /// used if the file cannot be read.
-    fn make_text_drawer(options: &MolDrawOptions) -> DrawTextFT {
+    fn make_text_drawer(options: &MolDrawOptions, no_freetype: bool) -> DrawTextFT {
         let max = f64::from(options.max_font_size);
         let min = f64::from(options.min_font_size);
+        if no_freetype {
+            return DrawTextFT::new_native(max, min);
+        }
         DrawTextFT::new(max, min, &options.font_file)
             .or_else(|_| DrawTextFT::new(max, min, ""))
             .expect("the built-in font is always available")

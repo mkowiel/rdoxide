@@ -152,7 +152,7 @@ def test_helper_functions():
     m = Chem.MolFromSmiles("C[C@H](F)Cl")
     prepared = rdMolDraw2D.PrepareMolForDrawing(m)
     assert prepared.GetNumConformers() == 1 and m.GetNumConformers() == 0
-    with pytest.raises(ValueError):
+    with pytest.raises(RuntimeError):
         rdMolDraw2D.PrepareMolForDrawing(None)
     svg = rdMolDraw2D.MolToSVG(m, 200, 200, highlightAtoms=[0])
     assert "<ellipse" in svg and svg.startswith("<?xml")
@@ -168,5 +168,13 @@ def test_not_ported_yet():
     d = rdMolDraw2D.MolDraw2DSVG(100, 100)
     with pytest.raises(NotImplementedError):
         d.DrawReaction(None)
-    with pytest.raises(NotImplementedError):
-        rdMolDraw2D.MolDraw2DSVG(100, 100, noFreetype=True)
+
+
+def test_native_text():
+    m = Chem.MolFromSmiles("CCN")
+    d = rdMolDraw2D.MolDraw2DSVG(250, 200, -1, -1, True)
+    rdMolDraw2D.PrepareAndDrawMolecule(d, m)
+    d.FinishDrawing()
+    txt = d.GetDrawingText()
+    assert "fill:#0000FF' >N</text>" in txt
+    assert "font-family:sans-serif" in txt

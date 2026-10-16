@@ -1593,6 +1593,10 @@
 "Code/GraphMol/MolDraw2D/DrawTextFT.h" = "06d4c812b6cde60dc912fc0561ddda1b17392bc1"
 "Code/GraphMol/MolDraw2D/DrawTextFTSVG.cpp" = "442676858aba55ff65bceb6f6d35b14276b33d77"
 "Code/GraphMol/MolDraw2D/DrawTextFTSVG.h" = "6ad6ccb0c3ced9855f67abf42f75cd564510ff42"
+"Code/GraphMol/MolDraw2D/DrawTextSVG.cpp" = "eaa919a9c0fcc1d18a98f1299d7a51abdca6dafe"
+"Code/GraphMol/MolDraw2D/DrawTextSVG.h" = "c49c1584fe32deca3a7be2ca50c130469afb0eda"
+"Code/GraphMol/MolDraw2D/DrawTextNotFT.cpp" = "767d10183d1226551768a80500fa130d8b3eb28d"
+"Code/GraphMol/MolDraw2D/DrawTextNotFT.h" = "404d070f0ac6ec6ba724ac9fc7d2e41d7417574a"
 
 [module."rdoxide::graphmol::mol_draw2d::font".sources]
 "Code/GraphMol/MolDraw2D/Fonts/roboto_regular.h" = "4f9da4d0c5ae88b63ace5a411041017aae4ec81e"

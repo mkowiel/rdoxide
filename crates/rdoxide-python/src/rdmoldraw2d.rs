@@ -4,7 +4,9 @@
 
 use std::collections::BTreeMap;
 
-use pyo3::exceptions::{PyKeyError, PyNotImplementedError, PyTypeError, PyValueError};
+use pyo3::exceptions::{
+    PyKeyError, PyNotImplementedError, PyRuntimeError, PyTypeError, PyValueError,
+};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
 use rdoxide::graphmol::mol_draw2d::draw_mol::DrawMolHighlights;
@@ -1220,12 +1222,15 @@ impl PyMolDraw2DSVG {
         panelHeight: i32,
         noFreetype: bool,
     ) -> PyResult<PyClassInitializer<Self>> {
-        if noFreetype {
-            return Err(PyNotImplementedError::new_err(
-                "native SVG text (noFreetype=True) is not supported yet",
-            ));
-        }
-        let d = MolDraw2DSVG::new(width, height, panelWidth, panelHeight).py()?;
+        let d = MolDraw2DSVG::with_text(
+            width,
+            height,
+            panelWidth,
+            panelHeight,
+            MolDrawOptions::default(),
+            noFreetype,
+        )
+        .py()?;
         Ok(PyClassInitializer::from(PyMolDraw2D { d }).add_subclass(PyMolDraw2DSVG))
     }
 
@@ -1292,7 +1297,9 @@ fn prepare_mol_for_drawing_py(
     forceCoords: bool,
     wavyBonds: bool,
 ) -> PyResult<Py<PyMol>> {
-    let mol = mol.ok_or_else(|| PyValueError::new_err("molecule must not be None"))?;
+    let mol = mol.ok_or_else(|| {
+        PyRuntimeError::new_err("Pre-condition Violation\n\tmolecule must not be None")
+    })?;
     let mut copy: RWMol = mol.mol.clone();
     prepare_mol_for_drawing(
         &mut copy,
