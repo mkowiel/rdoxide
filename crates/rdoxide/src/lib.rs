@@ -9,6 +9,7 @@
 //! Greg Landrum, Rational Discovery LLC, Novartis and other RDKit
 //! contributors, used under the BSD 3-Clause license (see `LICENSES/`).
 
+pub mod catalogs;
 pub mod chemical_features;
 pub mod data_manip;
 pub mod datastructs;

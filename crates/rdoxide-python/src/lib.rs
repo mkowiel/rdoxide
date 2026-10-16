@@ -51,6 +51,7 @@ mod rdmetricmatrixcalc;
 mod rdmhfpfingerprint;
 mod rdmmpa;
 mod rdmolalign;
+mod rdmolcatalog;
 mod rdmolchemicalfeatures;
 mod rdmoldescriptors;
 mod rdmoldescriptors_3d;
@@ -190,6 +191,12 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
         "rdGeneralizedSubstruct",
         "rdkit.Chem.rdGeneralizedSubstruct",
         rdgeneralizedsubstruct::init,
+    )?;
+    add_submodule(
+        m,
+        "rdMolCatalog",
+        "rdkit.Chem.rdMolCatalog",
+        rdmolcatalog::init,
     )?;
     add_submodule(m, "rdFMCS", "rdkit.Chem.rdFMCS", rdfmcs::init)?;
     add_submodule(
