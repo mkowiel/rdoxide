@@ -529,3 +529,164 @@ pub fn compute_2d_coords(mol: &mut ROMol, params: &Compute2DCoordParameters) -> 
     }
     Ok(cid)
 }
+
+/// `DepictorLocal::copySign`: the sign test has a tolerance, unlike
+/// `f64::copysign`.
+fn copy_sign(to: f64, from: f64, tol: f64) -> f64 {
+    if from < -tol { -to.abs() } else { to.abs() }
+}
+
+#[derive(Default)]
+struct ThetaBin {
+    theta_avg: f64,
+    theta_values: Vec<f64>,
+}
+
+/// `straightenDepiction`: rotates the conformer so that most bonds lie at
+/// multiples of 30 degrees to the X axis.
+pub fn straighten_depiction(mol: &mut ROMol, conf_id: i32, minimize_rotation: bool) -> Result<()> {
+    use crate::geometry::transform3d::Transform3D;
+    use crate::graphmol::mol_transforms::transform_conformer;
+
+    const ALMOST_ZERO: f64 = 1.0e-5;
+    const INCR_DEG: f64 = 30.0;
+    const HALF_INCR_DEG: f64 = 0.5 * INCR_DEG;
+    const QUARTER_INCR_DEG: f64 = 0.25 * INCR_DEG;
+    if mol.num_bonds() == 0 {
+        return Ok(());
+    }
+    // bins in insertion order; libc++'s unordered_map iterates the
+    // (distinct-bucket) nodes newest-first, which we emulate below
+    let mut keys: Vec<i32> = Vec::new();
+    let mut bins: Vec<ThetaBin> = Vec::new();
+    {
+        let pos = mol.conformer(conf_id)?.positions();
+        for b in mol.bonds() {
+            let bv = pos[b.begin_atom_idx() as usize] - pos[b.end_atom_idx() as usize];
+            let x = if bv.x < 0.0 {
+                bv.x.min(-ALMOST_ZERO)
+            } else {
+                bv.x.max(ALMOST_ZERO)
+            };
+            let theta = (bv.y / x).atan().to_degrees();
+            let mut d_theta = (-theta) % INCR_DEG;
+            if d_theta.abs() > HALF_INCR_DEG {
+                d_theta -= copy_sign(INCR_DEG, d_theta, ALMOST_ZERO);
+            }
+            let key = (d_theta + copy_sign(0.5, d_theta, ALMOST_ZERO)) as i32;
+            let idx = keys.iter().position(|&k| k == key).unwrap_or_else(|| {
+                keys.push(key);
+                bins.push(ThetaBin::default());
+                bins.len() - 1
+            });
+            bins[idx].theta_avg += d_theta;
+            bins[idx].theta_values.push(theta);
+        }
+    }
+    bins.reverse();
+    let mut d_theta_smallest = f64::MAX;
+    for bin in &mut bins {
+        bin.theta_avg /= bin.theta_values.len() as f64;
+        if bin.theta_avg.abs() < d_theta_smallest.abs() {
+            d_theta_smallest = bin.theta_avg;
+        }
+    }
+    // std::max_element keeps the first of equivalent elements
+    let mut best = &bins[0];
+    for bin in &bins[1..] {
+        if best.theta_values.len() < bin.theta_values.len()
+            || (best.theta_values.len() == bin.theta_values.len()
+                && best.theta_avg.abs() > bin.theta_avg.abs())
+        {
+            best = bin;
+        }
+    }
+    let mut d_theta_min = best.theta_avg;
+    if !minimize_rotation {
+        let mut count60_vs30 = [0u32; 2];
+        for &theta in &best.theta_values {
+            let abs_theta = (theta + d_theta_min).abs();
+            if abs_theta < ALMOST_ZERO {
+                continue;
+            }
+            count60_vs30[((abs_theta + 0.5) / INCR_DEG) as usize % 2] += 1;
+        }
+        if count60_vs30[0] > count60_vs30[1] {
+            d_theta_min -= copy_sign(INCR_DEG, d_theta_min, ALMOST_ZERO);
+        }
+    } else if d_theta_smallest.abs() < ALMOST_ZERO
+        || (d_theta_smallest.abs() < d_theta_min.abs() && d_theta_min.abs() > QUARTER_INCR_DEG)
+    {
+        d_theta_min = d_theta_smallest;
+    }
+    if d_theta_min.abs() > ALMOST_ZERO {
+        let mut trans = Transform3D::identity();
+        trans.set_rotation(d_theta_min.to_radians(), &Point3D::new(0.0, 0.0, 1.0));
+        transform_conformer(mol.conformer_mut(conf_id)?, &trans);
+    }
+    Ok(())
+}
+
+/// `normalizeDepiction`: centres the conformer (optionally aligning its
+/// principal axes) and scales it to the standard bond length. Returns the
+/// scale factor applied, or -1 if none could be determined.
+pub fn normalize_depiction(
+    mol: &mut ROMol,
+    conf_id: i32,
+    canonicalize: i32,
+    mut scale_factor: f64,
+) -> Result<f64> {
+    use crate::geometry::transform3d::Transform3D;
+    use crate::graphmol::mol_transforms::{
+        compute_canonical_transform, compute_centroid, get_bond_length, transform_conformer,
+    };
+
+    const SCALE_FACTOR_THRESHOLD: f64 = 1.0e-5;
+    if mol.num_bonds() == 0 {
+        return Ok(-1.0);
+    }
+    let conf = mol.conformer(conf_id)?;
+    if scale_factor < 0.0 {
+        const RDKIT_BOND_LEN: f64 = 1.5;
+        let mut most_common = -1;
+        let mut max_count = 0u32;
+        let mut binned: std::collections::HashMap<i32, u32> = std::collections::HashMap::new();
+        for b in mol.bonds() {
+            let len =
+                (get_bond_length(conf, b.begin_atom_idx(), b.end_atom_idx())? * 10.0 + 0.5) as i32;
+            let count = binned.entry(len).or_insert(0);
+            *count += 1;
+            if *count > max_count {
+                max_count = *count;
+                most_common = len;
+            }
+        }
+        if most_common > 0 {
+            scale_factor = RDKIT_BOND_LEN / (f64::from(most_common) * 0.1);
+        }
+    }
+    let ctd = compute_centroid(mol, conf, true, None)?;
+    let mut canon_trans = if canonicalize != 0 {
+        let (mut t, _) = compute_canonical_transform(mol, conf, Some(ctd), false, true)?;
+        if canonicalize < 0 {
+            let mut rotate90 = Transform3D::identity();
+            rotate90.set_rotation_cs(0.0, 1.0, &Point3D::new(0.0, 0.0, 1.0));
+            t.mul_assign(&rotate90);
+        }
+        t
+    } else {
+        let mut t = Transform3D::identity();
+        t.set_translation(&-ctd);
+        t
+    };
+    let sane = scale_factor > SCALE_FACTOR_THRESHOLD;
+    if sane && (scale_factor - 1.0).abs() > SCALE_FACTOR_THRESHOLD {
+        let mut trans = Transform3D::identity();
+        trans.set_val(0, 0, scale_factor);
+        trans.set_val(1, 1, scale_factor);
+        trans.mul_assign(&canon_trans);
+        canon_trans = trans;
+    }
+    transform_conformer(mol.conformer_mut(conf_id)?, &canon_trans);
+    Ok(if sane { scale_factor } else { -1.0 })
+}
