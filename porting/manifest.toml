@@ -1661,3 +1661,6 @@
 [module."rdoxide::graphmol::mol_draw2d::mol_draw2d_svg".sources]
 "Code/GraphMol/MolDraw2D/MolDraw2DSVG.cpp" = "1ca04e58c96fbb58a46433764fa137ad362f4f8e"
 "Code/GraphMol/MolDraw2D/MolDraw2DSVG.h" = "dcefaea3e1ee7c0ebd0021eb87160c893131c32f"
+
+[module."rdoxide_python::rdmoldraw2d".sources]
+"Code/GraphMol/MolDraw2D/Wrap/rdMolDraw2D.cpp" = "2a541dd86bdc20961fb02da629bc55deeb4d28ce"

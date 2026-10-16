@@ -18,8 +18,10 @@ use super::draw_shape::ShapeCanvas;
 use super::draw_text::{DrawTextFT, atom_label_to_pieces};
 use super::helpers::{DrawColour, MolDrawOptions, OrientType, TextAlignType};
 use super::svg_canvas::SvgCanvas;
+use super::utils::{mean_bond_length, prepare_mol_for_drawing, set_acs1996_options};
 use crate::geometry::Point2D;
 use crate::graphmol::ROMol;
+use crate::graphmol::depictor::{Compute2DCoordParameters, compute_2d_coords};
 use crate::graphmol::find_rings::{SymmetrizeSSSRAlgorithm, symmetrize_sssr};
 use crate::{RDKitError, Result};
 
@@ -612,6 +614,61 @@ impl MolDraw2DSVG {
             ..Default::default()
         };
         self.draw_molecule_with(mol, legend, hl, conf_id)
+    }
+
+    /// `MolDraw2DUtils::prepareAndDrawMolecule`: prepares a copy of the
+    /// molecule for drawing and draws that.
+    #[allow(clippy::too_many_arguments)]
+    pub fn prepare_and_draw_molecule(
+        &mut self,
+        mol: &ROMol,
+        legend: &str,
+        highlights: DrawMolHighlights,
+        conf_id: i32,
+        kekulize: bool,
+        add_chiral_hs: bool,
+        wedge_bonds: bool,
+        force_coords: bool,
+        wavy_bonds: bool,
+    ) -> Result<()> {
+        let mut copy = mol.clone();
+        prepare_mol_for_drawing(
+            &mut copy,
+            kekulize,
+            add_chiral_hs,
+            wedge_bonds,
+            force_coords,
+            wavy_bonds,
+        )?;
+        // having done the prepare, we don't want to do it again
+        let old_prep = self.canvas.options.prepare_mols_before_drawing;
+        self.canvas.options.prepare_mols_before_drawing = false;
+        let res = self.draw_molecule_with(&copy, legend, highlights, conf_id);
+        self.canvas.options.prepare_mols_before_drawing = old_prep;
+        res
+    }
+
+    /// `MolDraw2DUtils::drawMolACS1996`: draws a molecule following the ACS
+    /// 1996 guidelines, which also sets the drawing options for them.
+    pub fn draw_mol_acs1996(
+        &mut self,
+        mol: &ROMol,
+        legend: &str,
+        highlights: DrawMolHighlights,
+        conf_id: i32,
+    ) -> Result<()> {
+        let mut copy = mol.clone();
+        if copy.num_conformers() == 0 {
+            // compute 2D coordinates in a standard orientation
+            let params = Compute2DCoordParameters {
+                canon_orient: true,
+                ..Default::default()
+            };
+            compute_2d_coords(&mut copy, &params)?;
+        }
+        let mean_len = mean_bond_length(&copy, conf_id)?;
+        set_acs1996_options(&mut self.canvas.options, mean_len)?;
+        self.draw_molecule_with(&copy, legend, highlights, conf_id)
     }
 
     /// Draws several molecules in a grid of panels. The canvas must have a
