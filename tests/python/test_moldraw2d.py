@@ -203,3 +203,11 @@ def test_options_from_json():
     rdMolDraw2D.UpdateMolDrawOptionsFromJSON(o, "")
     with pytest.raises(Exception):
         rdMolDraw2D.UpdateMolDrawOptionsFromJSON(o, "{not json")
+
+
+def test_set_own_draw_options():
+    d = rdMolDraw2D.MolDraw2DSVG(100, 100)
+    o = d.drawOptions()
+    o.padding = 0.2
+    d.SetDrawOptions(d.drawOptions())
+    assert d.drawOptions().padding == 0.2

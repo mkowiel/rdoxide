@@ -408,6 +408,7 @@ Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testGithub1829
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testGithub4838
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testGithub5298
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testIsotopeLabels
+Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testLegendPosition
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testMolSize
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testNewDrawingModes
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testPrepareAndDrawMolecule
@@ -1057,6 +1058,15 @@ rdkit/Chem/AtomPairs/UnitTestDescriptors.py::TestCase::testGetTopologicalTorsion
 rdkit/Chem/AtomPairs/UnitTestDescriptors.py::TestCase::testGithub334
 rdkit/Chem/AtomPairs/UnitTestDescriptors.py::TestCase::testPairsRegression
 rdkit/Chem/AtomPairs/UnitTestDescriptors.py::TestCase::testTorsionsRegression
+rdkit/Chem/Draw/UnitTestDraw.py::TestCase::testDrawMorgan
+rdkit/Chem/Draw/UnitTestDraw.py::TestCase::testDrawRDKit
+rdkit/Chem/Draw/UnitTestDraw.py::TestCase::testGithub3762
+rdkit/Chem/Draw/UnitTestDraw.py::TestCase::testGithub5863
+rdkit/Chem/Draw/UnitTestDraw.py::TestCase::testGridSVG
+rdkit/Chem/Draw/UnitTestDraw.py::TestCase::testMolToSVG
+rdkit/Chem/Draw/UnitTestDraw.py::TestCase::testMolsMatrixToGridImage
+rdkit/Chem/Draw/UnitTestDraw.py::TestCase::testMolsMatrixToLinear
+rdkit/Chem/Draw/UnitTestDraw.py::TestCase::test_interactive
 rdkit/Chem/EState/UnitTestEState.py::TestCase::test_GetPrincipleQuantumNumber
 rdkit/Chem/EState/UnitTestEState.py::TestCase::test_aromatics
 rdkit/Chem/EState/UnitTestEState.py::TestCase::test_cacheEstate
