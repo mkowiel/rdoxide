@@ -4,6 +4,7 @@
 //! the TrueType reader that stands in for FreeType, and text layout.
 
 pub mod details;
+pub mod draw_annotation;
 pub mod draw_shape;
 pub mod draw_text;
 pub mod font;

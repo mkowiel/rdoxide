@@ -1601,3 +1601,9 @@
 [module."rdoxide::graphmol::mol_draw2d::draw_shape".sources]
 "Code/GraphMol/MolDraw2D/DrawShape.cpp" = "fdedbb6812023e819c31b8e857c506dc85099b27"
 "Code/GraphMol/MolDraw2D/DrawShape.h" = "a84bb2e91077eadd3e4838291c12065f7b8f6871"
+
+[module."rdoxide::graphmol::mol_draw2d::draw_annotation".sources]
+"Code/GraphMol/MolDraw2D/DrawAnnotation.cpp" = "c2be4edb08080f52869de5e52e2b03808684b464"
+"Code/GraphMol/MolDraw2D/DrawAnnotation.h" = "03582eb3c14eeb850818c1f9ef2f14f0d7e6f3de"
+"Code/GraphMol/MolDraw2D/AtomSymbol.cpp" = "9bb0cf48d9a134c9bde43c38aeffeb73a7d58593"
+"Code/GraphMol/MolDraw2D/AtomSymbol.h" = "c111b2dd7bdaba75d16d2def500fcd879f3acce2"
