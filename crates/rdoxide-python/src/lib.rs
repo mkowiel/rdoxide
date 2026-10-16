@@ -67,6 +67,7 @@ mod rdmoldescriptors_usr;
 mod rdmolenumerator;
 mod rdmolfiles;
 mod rdmolfiles_fwdsdsupplier;
+mod rdmolfiles_marvin;
 mod rdmolfiles_molblock;
 mod rdmolfiles_molwrite;
 mod rdmolfiles_mtsupplier;
