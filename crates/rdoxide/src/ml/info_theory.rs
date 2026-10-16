@@ -40,6 +40,7 @@ macro_rules! impl_count {
 
 impl_count!(f32, 0.0, |a, b| a + b);
 impl_count!(f64, 0.0, |a, b| a + b);
+impl_count!(u16, 0, |a, b| a.wrapping_add(b));
 impl_count!(i32, 0, |a, b| a.wrapping_add(b));
 impl_count!(i64, 0, |a, b| a.wrapping_add(b));
 

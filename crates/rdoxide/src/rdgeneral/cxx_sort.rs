@@ -375,6 +375,69 @@ fn sift_up<T: Clone, F: FnMut(&T, &T) -> bool>(
     }
 }
 
+/// `std::priority_queue` as implemented by libc++: the order in which
+/// elements that compare equal come out depends on the heap algorithms.
+/// `less` is the `Compare` of the queue, so the top is the element that no
+/// other element is "greater" than by it.
+pub struct LibcxxPriorityQueue<T, F> {
+    heap: Vec<T>,
+    less: F,
+}
+
+impl<T: std::fmt::Debug, F> std::fmt::Debug for LibcxxPriorityQueue<T, F> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LibcxxPriorityQueue")
+            .field("heap", &self.heap)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<T: Clone, F: FnMut(&T, &T) -> bool> LibcxxPriorityQueue<T, F> {
+    pub fn new(less: F) -> Self {
+        LibcxxPriorityQueue {
+            heap: Vec::new(),
+            less,
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.heap.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.heap.is_empty()
+    }
+
+    pub fn top(&self) -> Option<&T> {
+        self.heap.first()
+    }
+
+    /// `push`: `push_back` and `push_heap`
+    pub fn push(&mut self, value: T) {
+        self.heap.push(value);
+        let len = self.heap.len();
+        sift_up(&mut self.heap, 0, len, &mut self.less, len);
+    }
+
+    /// `pop`: `pop_heap` and `pop_back`
+    pub fn pop(&mut self) {
+        let len = self.heap.len();
+        if len > 1 {
+            let top = self.heap[0].clone();
+            let hole = floyd_sift_down(&mut self.heap, 0, &mut self.less, len);
+            let last = len - 1;
+            if hole == last {
+                self.heap[hole] = top;
+            } else {
+                self.heap[hole] = self.heap[last].clone();
+                self.heap[last] = top;
+                sift_up(&mut self.heap, 0, hole + 1, &mut self.less, hole + 1);
+            }
+        }
+        self.heap.pop();
+    }
+}
+
 /// `__partial_sort(first, last, last)`: heap sort.
 fn heap_sort<T: Clone, F: FnMut(&T, &T) -> bool>(
     v: &mut [T],
