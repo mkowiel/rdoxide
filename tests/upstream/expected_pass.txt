@@ -620,6 +620,7 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::testMolFragmentSmarts
 Code/GraphMol/Wrap/rough_test.py::TestCase::testMolHasQuery
 Code/GraphMol/Wrap/rough_test.py::TestCase::testMolToV2KMolBlock
 Code/GraphMol/Wrap/rough_test.py::TestCase::testMolzip
+Code/GraphMol/Wrap/rough_test.py::TestCase::testMrvHandling
 Code/GraphMol/Wrap/rough_test.py::TestCase::testNeedsHs
 Code/GraphMol/Wrap/rough_test.py::TestCase::testNewFindMolChiralCenters
 Code/GraphMol/Wrap/rough_test.py::TestCase::testNoExceptionSmilesParserParams
@@ -885,6 +886,7 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::testMolFragmentSmarts
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testMolHasQuery
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testMolToV2KMolBlock
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testMolzip
+Code/GraphMol/nbWrap/rough_test.py::TestCase::testMrvHandling
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testNeedsHs
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testNewFindMolChiralCenters
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testNoExceptionSmilesParserParams

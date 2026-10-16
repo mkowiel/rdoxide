@@ -1,12 +1,13 @@
-//! `MolFromMrvFile` and `MolFromMrvBlock` (upstream `Wrap/rdmolfiles.cpp`).
+//! `MolFromMrvFile`, `MolFromMrvBlock`, `MolToMrvBlock` and `MolToMrvFile` (upstream `Wrap/rdmolfiles.cpp`).
 
 use pyo3::prelude::*;
 use rdoxide::RDKitError;
 use rdoxide::graphmol::file_parsers::marvin::{
-    MrvParserParams, mol_from_mrv_block, mol_from_mrv_file,
+    MrvParserParams, MrvWriterParams, mol_from_mrv_block, mol_from_mrv_file, mol_to_mrv_block,
+    mol_to_mrv_file,
 };
 
-use crate::errors::to_py;
+use crate::errors::{IntoPyResult, to_py};
 use crate::mol::PyMol;
 
 /// A missing file is an `IOError`; other `FileParseException`s are logged as
@@ -92,8 +93,83 @@ fn py_mol_from_mrv_block(
     finish(py.detach(|| mol_from_mrv_block(&text, &params).map(Some)))
 }
 
+/// Returns a Marvin (Mrv) Mol block for a molecule
+///   ARGUMENTS:
+///
+///     - mol: the molecule
+///     - includeStereo: (optional) toggles inclusion of stereochemical
+///       information in the output
+///     - confId: (optional) selects which conformation to output (-1 = default)
+///     - kekulize: (optional) triggers kekulization of the molecule before it's written.
+///     - prettyPrint: (optional) makes the output more human readable.
+///
+///   RETURNS:
+///
+///     a string
+#[pyfunction]
+#[pyo3(
+    name = "MolToMrvBlock",
+    signature = (mol, includeStereo = true, confId = -1, kekulize = true, prettyPrint = false)
+)]
+#[allow(non_snake_case)]
+fn py_mol_to_mrv_block(
+    py: Python<'_>,
+    mol: PyRef<'_, PyMol>,
+    includeStereo: bool,
+    confId: i32,
+    kekulize: bool,
+    prettyPrint: bool,
+) -> PyResult<String> {
+    let params = MrvWriterParams {
+        include_stereo: includeStereo,
+        kekulize,
+        pretty_print: prettyPrint,
+        ..Default::default()
+    };
+    let mol = &mol.mol;
+    py.detach(|| mol_to_mrv_block(mol, &params, confId)).py()
+}
+
+/// Writes a Marvin (MRV) file for a molecule
+///    ARGUMENTS:
+///
+///      - mol: the molecule
+///      - filename: the file to write to
+///      - includeStereo: (optional) toggles inclusion of stereochemical
+///        information in the output
+///      - confId: (optional) selects which conformation to output (-1 = default)
+///      - kekulize: (optional) triggers kekulization of the molecule before it's written.
+///      - prettyPrint: (optional) makes the output more human readable.
+#[pyfunction]
+#[pyo3(
+    name = "MolToMrvFile",
+    signature = (mol, filename, includeStereo = true, confId = -1, kekulize = true, prettyPrint = false)
+)]
+#[allow(non_snake_case)]
+fn py_mol_to_mrv_file(
+    py: Python<'_>,
+    mol: PyRef<'_, PyMol>,
+    filename: &str,
+    includeStereo: bool,
+    confId: i32,
+    kekulize: bool,
+    prettyPrint: bool,
+) -> PyResult<()> {
+    let params = MrvWriterParams {
+        include_stereo: includeStereo,
+        kekulize,
+        pretty_print: prettyPrint,
+        ..Default::default()
+    };
+    let mol = &mol.mol;
+    py.detach(|| mol_to_mrv_file(mol, filename, &params, confId))
+        .py()
+}
+
 pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_mol_from_mrv_file, m)?)?;
     m.add_function(wrap_pyfunction!(py_mol_from_mrv_block, m)?)?;
+    m.add_function(wrap_pyfunction!(py_mol_to_mrv_block, m)?)?;
+    m.add_function(wrap_pyfunction!(py_mol_to_mrv_file, m)?)?;
     Ok(())
 }

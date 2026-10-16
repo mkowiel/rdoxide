@@ -186,7 +186,7 @@ fn should_be_a_crossed_bond(mol: &ROMol, bond: u32) -> Result<bool> {
 }
 
 /// `BondGetDirCode`
-fn bond_get_dir_code(dir: BondDir) -> i32 {
+pub(crate) fn bond_get_dir_code(dir: BondDir) -> i32 {
     match dir {
         BondDir::None => 0,
         BondDir::BeginWedge => 1,
@@ -920,7 +920,11 @@ fn v3000_bond_line(
 }
 
 /// `Atropisomers::getAllAtomIdsForStereoGroup`
-fn all_atom_ids_for_stereo_group(mol: &ROMol, g: &StereoGroup, wedge: &WedgeBonds) -> Vec<u32> {
+pub(crate) fn all_atom_ids_for_stereo_group(
+    mol: &ROMol,
+    g: &StereoGroup,
+    wedge: &WedgeBonds,
+) -> Vec<u32> {
     let mut ids: Vec<u32> = g.atoms().to_vec();
     for &bond in g.bonds() {
         let b = mol.bond(bond);

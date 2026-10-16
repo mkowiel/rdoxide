@@ -2,7 +2,9 @@
 //! (parse results are compared to the `.expected.sdf` files).
 
 use rdoxide::graphmol::chirality::remove_non_explicit_3d_chirality;
-use rdoxide::graphmol::file_parsers::marvin::{MrvParserParams, mol_from_mrv_file};
+use rdoxide::graphmol::file_parsers::marvin::{
+    MrvParserParams, MrvWriterParams, mol_from_mrv_file, mol_to_mrv_block,
+};
 use rdoxide::graphmol::file_parsers::mol_file_writer::{MolWriterParams, mol_to_mol_block};
 use rdoxide::graphmol::wedge_bonds::reapply_mol_block_wedging;
 
@@ -290,7 +292,17 @@ fn check(file: &str, expected: bool, atoms: usize, bonds: usize, sanitize: bool,
         assert_eq!(want, block, "{file}: {expected_file}");
     } else {
         assert_ne!(want, block, "{file} should not match");
+        return;
     }
+
+    let mut wp = MrvWriterParams::default();
+    let mrv = mol_to_mrv_block(&mol, &wp, -1).unwrap_or_else(|_| {
+        wp.kekulize = false;
+        mol_to_mrv_block(&mol, &wp, -1).unwrap()
+    });
+    let expected_file = format!("{path}{}.expected.mrv", suffix(sanitize, reapply));
+    let want = std::fs::read_to_string(&expected_file).unwrap_or_default();
+    assert_eq!(want, mrv, "{file}: {expected_file}");
 }
 
 #[test]

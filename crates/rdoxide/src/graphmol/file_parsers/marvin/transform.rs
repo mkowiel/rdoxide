@@ -3,7 +3,12 @@
 //! groups are expanded, contracted superatoms are unfolded and multicenter
 //! groups are dropped.
 
-use super::defs::{AtomId, InAtomSet, MarvinMol, MarvinNode, NodeId, SgroupKind};
+use std::collections::BTreeMap;
+
+use super::defs::{
+    AtomId, BondId, InAtomSet, MarvinAtom, MarvinAttachmentPoint, MarvinMol, MarvinNode, NodeId,
+    SgroupKind,
+};
 use crate::{RDKitError, Result};
 
 fn file_parse(msg: impl Into<String>) -> RDKitError {
@@ -635,5 +640,520 @@ impl MarvinMol {
             .ok_or_else(|| RDKitError::invariant("superatom not found in its parent"))?;
         self.nodes[parent].children.remove(p);
         Ok(())
+    }
+}
+
+/// The counters of `cleanUpNumbering` (shared by the molecules of a
+/// reaction).
+#[derive(Debug, Default, Clone, Copy)]
+pub struct NumberingCounts {
+    pub mol: u32,
+    pub atom: u32,
+    pub bond: u32,
+    pub sgroup: u32,
+}
+
+impl MarvinMol {
+    /// `getMatchedOrphanBondIndex`
+    fn matched_orphan_bond_index(
+        &self,
+        atom_id: &str,
+        bonds_to_try: &mut [Option<BondId>],
+        orphaned: &[BondId],
+    ) -> i32 {
+        for i in 0..bonds_to_try.len() {
+            let Some(test) = bonds_to_try[i] else {
+                continue;
+            };
+            let refs = &self.bonds[test].atom_refs2;
+            let other = if refs[0] == atom_id {
+                refs[1].clone()
+            } else if refs[1] == atom_id {
+                refs[0].clone()
+            } else {
+                continue;
+            };
+            if let Some(p) = orphaned.iter().position(|&o| o == test) {
+                return p as i32;
+            }
+            bonds_to_try[i] = None;
+            let child = self.matched_orphan_bond_index(&other, bonds_to_try, orphaned);
+            if child >= 0 {
+                return child;
+            }
+        }
+        -1
+    }
+
+    /// `contractOneMultipleSgroup`: the replicates are removed and the
+    /// bonds that led to them are repaired.
+    fn contract_one_multiple(&mut self, node: NodeId) -> Result<()> {
+        let SgroupKind::Multiple {
+            is_expanded,
+            parent_atoms,
+            ..
+        } = self.nodes[node].kind.clone()
+        else {
+            unreachable!()
+        };
+        if !is_expanded {
+            return Ok(());
+        }
+        let actual = self.actual_parent(node);
+        let parent = self.nodes[node].parent.expect("a group has a parent");
+
+        let atoms_to_delete: Vec<AtomId> = self.nodes[node]
+            .atoms
+            .iter()
+            .copied()
+            .filter(|&a| {
+                !parent_atoms
+                    .iter()
+                    .any(|&p| self.atoms[p].id == self.atoms[a].id)
+            })
+            .collect();
+        let deleting = |m: &Self, id: &str| atoms_to_delete.iter().any(|&a| m.atoms[a].id == id);
+
+        let mut bonds_to_delete: Vec<BondId> = Vec::new();
+        let mut orphaned: Vec<BondId> = Vec::new();
+        for b in self.nodes[actual].bonds.clone() {
+            let first = deleting(self, &self.bonds[b].atom_refs2[0]);
+            let second = deleting(self, &self.bonds[b].atom_refs2[1]);
+            if first && second {
+                bonds_to_delete.push(b);
+            } else if first {
+                orphaned.push(b);
+                // the first atom is the one that stays
+                self.bonds[b].atom_refs2.swap(0, 1);
+                bonds_to_delete.push(b);
+            } else if second {
+                orphaned.push(b);
+                bonds_to_delete.push(b);
+            }
+        }
+        if !matches!(orphaned.len(), 0 | 2 | 4) {
+            return Err(file_parse(
+                "Error: there should be zero, two or four orphaned bonds while contracting a MultipleSgroup",
+            ));
+        }
+
+        let mut groups_to_delete = Vec::new();
+        for &child in &self.nodes[node].children {
+            if self.is_sgroup_in_set_of_atoms(child, &atoms_to_delete)? != InAtomSet::NotIn {
+                groups_to_delete.push(child);
+            }
+        }
+
+        while !orphaned.is_empty() {
+            let to_fix = orphaned.remove(0);
+            let matched: usize = if orphaned.len() == 3 {
+                if !bonds_to_delete.contains(&to_fix) {
+                    return Err(RDKitError::invariant(
+                        "orphaned bond not in the bonds to delete",
+                    ));
+                }
+                let mut to_try: Vec<Option<BondId>> = bonds_to_delete
+                    .iter()
+                    .copied()
+                    .filter(|&b| b != to_fix)
+                    .map(Some)
+                    .collect();
+                let start = self.bonds[to_fix].atom_refs2[1].clone();
+                let m = self.matched_orphan_bond_index(&start, &mut to_try, &orphaned);
+                if m < 0 {
+                    return Err(file_parse(
+                        "For a MultipleSgroup expansion, the matching orphaned bond was not found",
+                    ));
+                }
+                m as usize
+            } else if orphaned.len() == 1 {
+                0
+            } else {
+                return Err(file_parse(
+                    "For a MultipleSgroup contraction, the orphaned bonds must be 0,2 or 4",
+                ));
+            };
+            let kept_atom = self.bonds[orphaned[matched]].atom_refs2[0].clone();
+            self.bonds[to_fix].atom_refs2[1] = kept_atom;
+            let p = bonds_to_delete
+                .iter()
+                .position(|&b| b == to_fix)
+                .ok_or_else(|| RDKitError::invariant("orphaned bond not found"))?;
+            bonds_to_delete.remove(p);
+
+            // siblings (and this group) that use the matched bond use the
+            // repaired one
+            let matched_id = self.bonds[orphaned[matched]].id.clone();
+            for sibling in self.nodes[parent].children.clone() {
+                for k in 0..self.nodes[sibling].bonds.len() {
+                    if self.bonds[self.nodes[sibling].bonds[k]].id == matched_id {
+                        self.nodes[sibling].bonds[k] = to_fix;
+                    }
+                }
+            }
+            orphaned.remove(matched);
+        }
+
+        for child in groups_to_delete {
+            let id = self.nodes[child].id.clone();
+            let p = self.nodes[node]
+                .children
+                .iter()
+                .position(|&c| self.nodes[c].id == id)
+                .ok_or_else(|| RDKitError::invariant("sgroup not found in its parent"))?;
+            self.nodes[node].children.remove(p);
+        }
+
+        let chain = self.chain(parent, actual)?;
+        for atom in atoms_to_delete {
+            for &g in &chain {
+                let p = self.nodes[g]
+                    .atoms
+                    .iter()
+                    .position(|&a| a == atom)
+                    .ok_or_else(|| RDKitError::invariant("atom not found in a parent group"))?;
+                self.nodes[g].atoms.remove(p);
+            }
+            for sibling in self.nodes[parent].children.clone() {
+                let atoms = &mut self.nodes[sibling].atoms;
+                if let Some(p) = atoms.iter().position(|&a| a == atom) {
+                    atoms.remove(p);
+                }
+            }
+        }
+        for b in bonds_to_delete {
+            let p = self.nodes[actual]
+                .bonds
+                .iter()
+                .position(|&x| x == b)
+                .ok_or_else(|| RDKitError::invariant("bond not found in the parent"))?;
+            self.nodes[actual].bonds.remove(p);
+        }
+        if let SgroupKind::Multiple { is_expanded, .. } = &mut self.nodes[node].kind {
+            *is_expanded = false;
+        }
+        Ok(())
+    }
+
+    /// `convertToOneSuperAtom`: the atoms of an expanded superatom group
+    /// are replaced by a dummy atom in the parent and move into a
+    /// contracted superatom group, which is returned.
+    fn convert_to_one_superatom(&mut self, node: NodeId) -> Result<NodeId> {
+        let SgroupKind::SuperatomExpanded { title } = self.nodes[node].kind.clone() else {
+            unreachable!()
+        };
+        let parent = self.nodes[node].parent.expect("a group has a parent");
+        let actual = self.actual_parent(node);
+        let new_atom_name = format!("NA_{}", self.nodes[node].mol_id);
+        let coords_exist = self.has_2d_coords(node);
+
+        let sg_id = self.nodes[node].id.clone();
+        let sup = MarvinNode {
+            mol_id: self.nodes[node].mol_id.clone(),
+            id: sg_id.clone(),
+            coordinate_precision: 6,
+            atoms: self.nodes[node].atoms.clone(),
+            bonds: Vec::new(),
+            children: Vec::new(),
+            parent: Some(parent),
+            kind: SgroupKind::Superatom {
+                title,
+                attachment_points: Vec::new(),
+            },
+        };
+        let sup_id = self.nodes.len();
+        self.nodes.push(sup);
+        self.nodes[parent].children.push(sup_id);
+
+        self.atoms.push(MarvinAtom {
+            element_type: "R".into(),
+            id: new_atom_name.clone(),
+            sgroup_ref: sg_id.clone(),
+            sgroup_ref_is_superatom: true,
+            ..MarvinAtom::default()
+        });
+        let dummy = self.atoms.len() - 1;
+        let chain = self.chain(parent, actual)?;
+        for &g in &chain {
+            self.nodes[g].atoms.push(dummy);
+            if let SgroupKind::Multiple { parent_atoms, .. } = &mut self.nodes[g].kind {
+                parent_atoms.push(dummy);
+            }
+        }
+
+        let group_atoms = self.nodes[sup_id].atoms.clone();
+        let (mut gx, mut gy) = (0.0, 0.0);
+        for &a in &group_atoms {
+            self.atoms[a].sgroup_ref.clear();
+            for &g in &chain {
+                let p = self.nodes[g]
+                    .atoms
+                    .iter()
+                    .position(|&x| x == a)
+                    .ok_or_else(|| RDKitError::invariant("atom not found in a parent group"))?;
+                self.nodes[g].atoms.remove(p);
+                if let SgroupKind::Multiple { parent_atoms, .. } = &mut self.nodes[g].kind {
+                    let p = parent_atoms
+                        .iter()
+                        .position(|&x| x == a)
+                        .ok_or_else(|| RDKitError::invariant("atom not found in parent atoms"))?;
+                    parent_atoms.remove(p);
+                }
+            }
+            if coords_exist {
+                gx += self.atoms[a].x2;
+                gy += self.atoms[a].y2;
+            }
+        }
+
+        // the bonds of the group
+        let mut added = 0u32;
+        let (mut cx, mut cy) = (0.0, 0.0);
+        let mut points = Vec::new();
+        let mut inner_bonds = Vec::new();
+        for b in self.nodes[actual].bonds.clone() {
+            let in_group = |m: &Self, id: &str| group_atoms.iter().any(|&a| m.atoms[a].id == id);
+            let first = in_group(self, &self.bonds[b].atom_refs2[0]);
+            let second = in_group(self, &self.bonds[b].atom_refs2[1]);
+            if first && second {
+                inner_bonds.push(b);
+            } else if first || second {
+                let k = usize::from(!first);
+                let id = self.bonds[b].atom_refs2[k].clone();
+                let idx = self.atom_index(sup_id, &id);
+                let atom = self.nodes[sup_id].atoms[idx as usize];
+                self.bonds[b].atom_refs2[k] = new_atom_name.clone();
+                added += 1;
+                self.atoms[atom].sgroup_attachment_point = added.to_string();
+                points.push(MarvinAttachmentPoint {
+                    atom: self.atoms[atom].id.clone(),
+                    bond: self.bonds[b].id.clone(),
+                    order: added.to_string(),
+                });
+                if coords_exist {
+                    cx += self.atoms[atom].x2;
+                    cy += self.atoms[atom].y2;
+                }
+            }
+        }
+        // the bonds that moved into the group leave the parent
+        for &b in &inner_bonds {
+            let idx = self.bond_index(actual, &self.bonds[b].id);
+            if idx < 0 {
+                return Err(RDKitError::invariant("bond not found in the parent"));
+            }
+            self.nodes[actual].bonds.remove(idx as usize);
+        }
+        self.nodes[sup_id].bonds = inner_bonds;
+        if coords_exist {
+            let (x, y) = if points.is_empty() {
+                let n = group_atoms.len() as f64;
+                (gx / n, gy / n)
+            } else {
+                let n = points.len() as f64;
+                (cx / n, cy / n)
+            };
+            self.atoms[dummy].x2 = x;
+            self.atoms[dummy].y2 = y;
+        }
+        if let SgroupKind::Superatom {
+            attachment_points, ..
+        } = &mut self.nodes[sup_id].kind
+        {
+            *attachment_points = points;
+        }
+
+        // the children of the expanded group move to the new one
+        for child in self.nodes[node].children.clone() {
+            self.move_sgroup(child, sup_id, false)?;
+        }
+        self.nodes[node].children.clear();
+        let p = self.nodes[parent]
+            .children
+            .iter()
+            .position(|&c| self.nodes[c].id == sg_id)
+            .ok_or_else(|| RDKitError::invariant("superatom not found in its parent"))?;
+        self.nodes[parent].children.remove(p);
+
+        // siblings that contain all the atoms of the group get the dummy
+        for sibling in self.nodes[parent].children.clone() {
+            if sibling == sup_id {
+                continue;
+            }
+            let sibling_atoms = self.nodes[sibling].atoms.clone();
+            match self.is_sgroup_in_set_of_atoms(sup_id, &sibling_atoms)? {
+                InAtomSet::In => {
+                    self.nodes[sibling].atoms.push(dummy);
+                    for &a in &group_atoms {
+                        let id = self.atoms[a].id.clone();
+                        let idx = self.atom_index(sibling, &id);
+                        if idx < 0 {
+                            return Err(RDKitError::invariant("atom not found in the sibling"));
+                        }
+                        self.nodes[sibling].atoms.remove(idx as usize);
+                    }
+                }
+                InAtomSet::NotIn => {}
+                InAtomSet::BothInAndNotIn => {
+                    return Err(file_parse(
+                        "a subgroup contains some of the atoms of a superatomSgroup - this should not happen",
+                    ));
+                }
+            }
+        }
+        Ok(sup_id)
+    }
+
+    /// `processSgroupsFromRDKit`: arranges the groups the way Marvin
+    /// expects them (nested, superatoms contracted).
+    pub fn process_sgroups_from_rdkit(&mut self, node: NodeId) -> Result<()> {
+        if self.nodes[node].is_passive_role_for_contraction() {
+            return Ok(());
+        }
+        let mut to_process = node;
+        if let Some(parent) = self.nodes[node].parent {
+            // siblings whose atoms are all in this group become children
+            let mut done: Vec<String> = Vec::new();
+            loop {
+                let mut all_done = true;
+                for sibling in self.nodes[parent].children.clone() {
+                    if done.contains(&self.nodes[sibling].mol_id) {
+                        continue;
+                    }
+                    all_done = false;
+                    done.push(self.nodes[sibling].mol_id.clone());
+                    if sibling == node {
+                        continue;
+                    }
+                    let atoms = self.nodes[node].atoms.clone();
+                    if self.is_sgroup_in_set_of_atoms(sibling, &atoms)? != InAtomSet::In {
+                        continue;
+                    }
+                    self.move_sgroup(sibling, node, true)?;
+                    break;
+                }
+                if all_done {
+                    break;
+                }
+            }
+            match &self.nodes[node].kind {
+                SgroupKind::SuperatomExpanded { .. } => {
+                    to_process = self.convert_to_one_superatom(node)?;
+                }
+                SgroupKind::Multiple {
+                    is_expanded: true, ..
+                } => {
+                    if let Err(e) = self.contract_one_multiple(node) {
+                        let RDKitError::FileParse(m) = e else {
+                            return Err(e);
+                        };
+                        crate::rd_log_error!("{m}\nThe multiple sgroup will be ignored");
+                        let id = self.nodes[node].id.clone();
+                        let p = self.nodes[parent]
+                            .children
+                            .iter()
+                            .position(|&c| self.nodes[c].id == id)
+                            .ok_or_else(|| {
+                                RDKitError::invariant("sgroup not found in its parent")
+                            })?;
+                        self.nodes[parent].children.remove(p);
+                        return Ok(());
+                    }
+                }
+                _ => {}
+            }
+        }
+        let mut done: Vec<String> = Vec::new();
+        while let Some(child) = self.nodes[to_process]
+            .children
+            .iter()
+            .copied()
+            .find(|&c| !done.contains(&self.nodes[c].mol_id))
+        {
+            done.push(self.nodes[child].mol_id.clone());
+            self.process_sgroups_from_rdkit(child)?;
+        }
+        Ok(())
+    }
+
+    /// `cleanUpNumbering`: gives the molecules, groups, atoms and bonds
+    /// consecutive ids.
+    pub fn clean_up_numbering(&mut self, counts: &mut NumberingCounts) {
+        let mut sg_map = BTreeMap::new();
+        let mut atom_map = BTreeMap::new();
+        let mut bond_map = BTreeMap::new();
+        self.clean_up_sg_numbering(super::defs::ROOT, counts, &mut sg_map);
+        self.clean_up_mols_atoms_bonds(
+            super::defs::ROOT,
+            counts,
+            &sg_map,
+            &mut atom_map,
+            &mut bond_map,
+        );
+    }
+
+    fn clean_up_sg_numbering(
+        &mut self,
+        node: NodeId,
+        counts: &mut NumberingCounts,
+        sg_map: &mut BTreeMap<String, String>,
+    ) {
+        for child in self.nodes[node].children.clone() {
+            counts.sgroup += 1;
+            let new_id = format!("sg{}", counts.sgroup);
+            sg_map.insert(self.nodes[child].id.clone(), new_id.clone());
+            self.nodes[child].id = new_id;
+            self.clean_up_sg_numbering(child, counts, sg_map);
+        }
+    }
+
+    fn clean_up_mols_atoms_bonds(
+        &mut self,
+        node: NodeId,
+        counts: &mut NumberingCounts,
+        sg_map: &BTreeMap<String, String>,
+        atom_map: &mut BTreeMap<String, String>,
+        bond_map: &mut BTreeMap<String, String>,
+    ) {
+        counts.mol += 1;
+        self.nodes[node].mol_id = format!("m{}", counts.mol);
+        if self.nodes[node].has_atom_bond_blocks() {
+            for a in self.nodes[node].atoms.clone() {
+                counts.atom += 1;
+                let new_id = format!("a{}", counts.atom);
+                atom_map.insert(self.atoms[a].id.clone(), new_id.clone());
+                self.atoms[a].id = new_id;
+                if !self.atoms[a].sgroup_ref.is_empty() {
+                    self.atoms[a].sgroup_ref = sg_map
+                        .get(&self.atoms[a].sgroup_ref)
+                        .cloned()
+                        .unwrap_or_default();
+                }
+            }
+            for b in self.nodes[node].bonds.clone() {
+                counts.bond += 1;
+                let new_id = format!("b{}", counts.bond);
+                bond_map.insert(self.bonds[b].id.clone(), new_id.clone());
+                self.bonds[b].id = new_id;
+                for k in 0..2 {
+                    self.bonds[b].atom_refs2[k] = atom_map
+                        .get(&self.bonds[b].atom_refs2[k])
+                        .cloned()
+                        .unwrap_or_default();
+                }
+            }
+        }
+        for child in self.nodes[node].children.clone() {
+            self.clean_up_mols_atoms_bonds(child, counts, sg_map, atom_map, bond_map);
+        }
+        if let SgroupKind::Superatom {
+            attachment_points, ..
+        } = &mut self.nodes[node].kind
+        {
+            for p in attachment_points {
+                p.atom = atom_map.get(&p.atom).cloned().unwrap_or_default();
+                p.bond = bond_map.get(&p.bond).cloned().unwrap_or_default();
+            }
+        }
     }
 }

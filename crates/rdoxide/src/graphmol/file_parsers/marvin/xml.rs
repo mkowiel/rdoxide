@@ -288,6 +288,122 @@ pub fn read_xml(text: &str) -> Result<XmlTree> {
     Ok(tree)
 }
 
+impl XmlTree {
+    /// `put("<xmlattr>.name", value)`: sets an attribute, replacing a
+    /// previous value.
+    pub fn put_attr(&mut self, name: &str, value: impl Into<String>) {
+        let value = value.into();
+        let attrs = match self.children.iter().position(|(k, _)| k == "<xmlattr>") {
+            Some(p) => &mut self.children[p].1,
+            None => {
+                self.children
+                    .insert(0, ("<xmlattr>".into(), XmlTree::default()));
+                &mut self.children[0].1
+            }
+        };
+        match attrs.children.iter_mut().find(|(k, _)| k == name) {
+            Some((_, v)) => v.data = value,
+            None => attrs.children.push((
+                name.to_string(),
+                XmlTree {
+                    data: value,
+                    children: Vec::new(),
+                },
+            )),
+        }
+    }
+
+    /// `add_child(name, tree)`
+    pub fn add_child(&mut self, name: &str, tree: XmlTree) {
+        self.children.push((name.to_string(), tree));
+    }
+
+    /// `put_child(name, tree)`: replaces the first child of that name.
+    pub fn put_child(&mut self, name: &str, tree: XmlTree) {
+        match self.children.iter_mut().find(|(k, _)| k == name) {
+            Some((_, v)) => *v = tree,
+            None => self.add_child(name, tree),
+        }
+    }
+
+    /// A node holding only the given text.
+    pub fn with_data(data: impl Into<String>) -> XmlTree {
+        XmlTree {
+            data: data.into(),
+            children: Vec::new(),
+        }
+    }
+}
+
+fn escape(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            '"' => out.push_str("&quot;"),
+            '\'' => out.push_str("&apos;"),
+            c => out.push(c),
+        }
+    }
+    out
+}
+
+fn write_element(out: &mut String, name: &str, tree: &XmlTree, indent: usize, pretty: bool) {
+    let pad = |out: &mut String, n: usize| {
+        if pretty {
+            out.push_str(&"\t".repeat(n));
+        }
+    };
+    pad(out, indent);
+    out.push('<');
+    out.push_str(name);
+    if let Some((_, attrs)) = tree.children.iter().find(|(k, _)| k == "<xmlattr>") {
+        for (k, v) in &attrs.children {
+            out.push_str(&format!(" {k}=\"{}\"", escape(&v.data)));
+        }
+    }
+    let kids: Vec<&(String, XmlTree)> = tree
+        .children
+        .iter()
+        .filter(|(k, _)| k != "<xmlattr>")
+        .collect();
+    if kids.is_empty() && tree.data.is_empty() {
+        out.push_str("/>");
+    } else if kids.is_empty() {
+        out.push('>');
+        out.push_str(&escape(&tree.data));
+        out.push_str(&format!("</{name}>"));
+    } else {
+        out.push('>');
+        if pretty {
+            out.push('\n');
+        }
+        for (k, v) in kids {
+            write_element(out, k, v, indent + 1, pretty);
+        }
+        pad(out, indent);
+        out.push_str(&format!("</{name}>"));
+    }
+    if pretty {
+        out.push('\n');
+    }
+}
+
+/// `write_xml`: the declaration and the elements below `root`.
+pub fn write_xml(root: &XmlTree, pretty: bool) -> String {
+    let mut out = if pretty {
+        "<?xml version=\"1.0\" encoding=\"windows-1252\"?>\n".to_string()
+    } else {
+        "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n".to_string()
+    };
+    for (k, v) in &root.children {
+        write_element(&mut out, k, v, 0, pretty);
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
