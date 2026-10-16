@@ -3,8 +3,10 @@
 #![allow(missing_debug_implementations)]
 
 pub mod details;
+pub mod fingerprint;
 pub mod hit_set;
 pub mod params;
+pub mod rascal;
 pub mod search_results;
 pub mod searcher;
 pub mod space;

@@ -51,3 +51,20 @@ def test_enumerated_file(tmp_path):
 def test_formatted_integer_string():
     assert rdSynthonSpaceSearch.FormattedIntegerString(1234567) == "1 234 567"
     assert rdSynthonSpaceSearch.FormattedIntegerString(12) == "12"
+
+
+def test_rascal_and_fingerprint_search():
+    from rdkit.Chem import rdFingerprintGenerator, rdRascalMCES
+
+    space = rdSynthonSpaceSearch.SynthonSpace()
+    space.ReadTextFile(str(DATA / "amide_space.txt"))
+    params = rdSynthonSpaceSearch.SynthonSpaceSearchParams()
+    params.maxHits = -1
+    q = Chem.MolFromSmiles("c1ccccc1C(=O)N1CCCC1")
+    res = space.RascalSearch(q, rdRascalMCES.RascalOptions(), params)
+    assert res.GetHitMolecules()
+    fpgen = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=2048)
+    params.similarityCutoff = 0.3
+    res = space.FingerprintSearch(q, fpgen, params)
+    assert all(float(m.GetProp("Similarity")) >= 0.3 for m in res.GetHitMolecules())
+    assert space.GetSynthonFingerprintType() == fpgen.GetInfoString()
