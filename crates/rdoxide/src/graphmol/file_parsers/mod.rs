@@ -11,6 +11,7 @@ pub mod multithreaded_supplier;
 pub mod pdb_parser;
 pub mod pdb_writer;
 pub mod proximity_bonds;
+pub mod scsr;
 pub mod sd_mol_supplier;
 pub mod sd_writer;
 pub mod sequence_parser;

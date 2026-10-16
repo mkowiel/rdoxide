@@ -793,6 +793,9 @@ Code/GraphMol/Wrap/testMultithreadedMolSupplier.py::TestCase::testMultiSDMolSupp
 Code/GraphMol/Wrap/testMultithreadedMolSupplier.py::TestCase::testMultiSDMolSupplierThrow
 Code/GraphMol/Wrap/testMultithreadedMolSupplier.py::TestCase::testMultiSmiMolSupplier
 Code/GraphMol/Wrap/testMultithreadedMolSupplier.py::TestCase::testMultiSmiMolSupplierThrow
+Code/GraphMol/Wrap/testSCSR.py::TestCase::testSCSR
+Code/GraphMol/Wrap/testSCSR.py::TestCase::testSCSRRna
+Code/GraphMol/Wrap/testSCSR.py::TestCase::testThreeLetterCodes
 Code/GraphMol/Wrap/testSGroups.py::TestCase::testAttachPoints
 Code/GraphMol/Wrap/testSGroups.py::TestCase::testBasics
 Code/GraphMol/Wrap/testSGroups.py::TestCase::testBasics3000
