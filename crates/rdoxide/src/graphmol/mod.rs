@@ -64,6 +64,7 @@ pub mod scaffold_network;
 pub mod shape_helpers;
 pub mod smiles_parse;
 pub mod stereo_group;
+pub mod struct_checker;
 pub mod subgraphs;
 pub mod subset;
 pub mod substance_group;

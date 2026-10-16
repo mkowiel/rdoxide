@@ -1513,3 +1513,45 @@
 
 [module."rdoxide_python::rdshapehelpers".sources]
 "Code/GraphMol/ShapeHelpers/Wrap/rdShapeHelpers.cpp" = "778ed7396798ea377d1e7049e19ad619f9bf81da"
+
+[module."rdoxide::graphmol::struct_checker".sources]
+"Code/GraphMol/StructChecker/StructChecker.cpp" = "026dd914799baab35288f4e89758fbcc67265cdd"
+"Code/GraphMol/StructChecker/StructChecker.h" = "006ef80187da2eb1e6189104a8f3f1db80377799"
+"Code/GraphMol/StructChecker/StructureFlags.cpp" = "b76174405f8b9d14c8a2aabca536243574e2ee52"
+
+[module."rdoxide::graphmol::struct_checker::options".sources]
+"Code/GraphMol/StructChecker/StructCheckerOptions.cpp" = "5676a546a866946b439ecbc0efdff4bae0de8c96"
+"Code/GraphMol/StructChecker/StructCheckerOptions.h" = "e1c40ec265a9ad56df7045c5980a6f921159090c"
+
+[module."rdoxide::graphmol::struct_checker::aa_data".sources]
+"Code/GraphMol/StructChecker/AugmentedAtomData.cpp" = "6581ab6445e0fc664338b2d3c16da7863a6d3dee"
+
+[module."rdoxide::graphmol::struct_checker::atom_symbol".sources]
+"Code/GraphMol/StructChecker/AtomSymbolMatch.cpp" = "f972e58c71af405a47675f36581e5911a1db8334"
+
+[module."rdoxide::graphmol::struct_checker::pattern".sources]
+"Code/GraphMol/StructChecker/Pattern.cpp" = "839fbd3c031658ffb664106bc0e8eb21b8dfa5a4"
+"Code/GraphMol/StructChecker/Pattern.h" = "2210474c9e62e5af6a3c1072045dd7b694443030"
+
+[module."rdoxide::graphmol::struct_checker::stereo".sources]
+"Code/GraphMol/StructChecker/Stereo.cpp" = "b5a73bf40f4421409629e6795fa84e8deb039f0f"
+"Code/GraphMol/StructChecker/Stereo.h" = "11e46b3b29c92d934dce7f8794c674076aed146c"
+
+[module."rdoxide::graphmol::struct_checker::recharge".sources]
+"Code/GraphMol/StructChecker/ReCharge.cpp" = "bfc7dea0b7b09c40d0b9f9d379acc665cbb635f6"
+"Code/GraphMol/StructChecker/ReCharge.h" = "d6b0281384f17e6867d7eebb2d1a4d780454a85e"
+
+[module."rdoxide::graphmol::struct_checker::strip_small_fragments".sources]
+"Code/GraphMol/StructChecker/StripSmallFragments.cpp" = "756025aad0dd034bf0c1a4e43f5d56608b3d0c31"
+"Code/GraphMol/StructChecker/StripSmallFragments.h" = "1af8849452c61bea07cf9030e06b6e193a87dff8"
+
+[module."rdoxide::graphmol::struct_checker::tautomer".sources]
+"Code/GraphMol/StructChecker/Tautomer.cpp" = "e483e11945191c722e59b6a36c7b3dc292f1680b"
+"Code/GraphMol/StructChecker/Tautomer.h" = "ff510ddd0964111ac7635c490bbd6d273a86c50b"
+
+[module."rdoxide::graphmol::struct_checker::utilities".sources]
+"Code/GraphMol/StructChecker/Utilites.cpp" = "c47331944972ebd82ec2d98c2cab742203aa61f7"
+"Code/GraphMol/StructChecker/Utilites.h" = "7d63718ebb479f8a94ba3a97e3912a9ee3b8bc43"
+
+[module."rdoxide_python::rdstructchecker".sources]
+"Code/GraphMol/StructChecker/Wrap/structchecker.cpp" = "b7617378144ca10c37b475aeafa34c8fdd1e87bd"
