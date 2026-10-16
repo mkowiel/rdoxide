@@ -46,8 +46,23 @@ def test_unknown_option_rejected():
         E.StereoEnumerationOptions().bogus = 1
 
 
-def test_try_embedding_not_supported():
+def test_try_embedding():
+    # upstream catch_tests "Embedding"
+    mol = Chem.MolFromSmiles("BrC=CC1OC(C2)(F)C2(Cl)C1")
     opts = E.StereoEnumerationOptions()
     opts.tryEmbedding = True
-    with pytest.raises(ValueError):
-        E.StereoisomerEnumerator(Chem.MolFromSmiles("CC(F)Cl"), opts)
+    enum = E.StereoisomerEnumerator(mol, opts)
+    got = set()
+    while (iso := enum.next()) is not None:
+        got.add(Chem.MolToSmiles(iso))
+        assert iso.GetNumConformers() == 1
+    assert got == {
+        "F[C@@]12C[C@]1(Cl)C[C@@H](/C=C/Br)O2",
+        "F[C@@]12C[C@]1(Cl)C[C@@H](/C=C\\Br)O2",
+        "F[C@@]12C[C@]1(Cl)C[C@H](/C=C/Br)O2",
+        "F[C@@]12C[C@]1(Cl)C[C@H](/C=C\\Br)O2",
+        "F[C@]12C[C@@]1(Cl)C[C@@H](/C=C/Br)O2",
+        "F[C@]12C[C@@]1(Cl)C[C@@H](/C=C\\Br)O2",
+        "F[C@]12C[C@@]1(Cl)C[C@H](/C=C/Br)O2",
+        "F[C@]12C[C@@]1(Cl)C[C@H](/C=C\\Br)O2",
+    }

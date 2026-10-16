@@ -13,6 +13,7 @@
 mod alignment;
 mod options;
 mod overlay;
+mod serialize;
 mod shape_input;
 
 pub use alignment::{SingleConformerAlignment, calc_color_vol_and_grads, calc_shape_vol_and_grads};
@@ -21,6 +22,7 @@ pub use overlay::{
     AllConformerScores, align_molecule, align_molecule_to_shape, align_shape, score_molecule,
     score_molecule_all_conformers, score_molecule_to_shape, score_shape,
 };
+pub use serialize::{Tokens, fmt_double};
 pub use shape_input::{
     CARBON_RAD, CustomFeature, DUMMY_RAD, KAPPA, ShapeInput, ShapeInputOptions, ShapePair,
     apply_transform_to_shape, compute_feature_pos, find_features, max_score, translate_shape,

@@ -3,12 +3,19 @@ module (not as part of upstream's `rdkit` package) and print JSON results."""
 
 import importlib.util
 import json
+import multiprocessing
 import sys
 import unittest
 
 
 def main(path: str, out: str) -> None:
     results = {}
+    # The test module is loaded under a private name, so child processes that
+    # target functions in it can only work if they are forked, not spawned.
+    try:
+        multiprocessing.set_start_method("fork", force=True)
+    except (ValueError, RuntimeError):
+        pass
     try:
         spec = importlib.util.spec_from_file_location("__upstream_test__", path)
         mod = importlib.util.module_from_spec(spec)

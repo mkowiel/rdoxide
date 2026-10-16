@@ -572,6 +572,50 @@ impl PySynthonSpace {
         })
     }
 
+    /// Perform a shape similarity search with the given query molecule
+    /// across the synthonspace library.  Duplicate SMILES strings produced
+    /// by different reactions will be returned.  Requires a query with at
+    /// least 1 3D conformer.  Only the first conformer will be used in the
+    /// search.  With startLine and finishLine the contents of
+    /// params.possibleHitsFile, which is assumed to have been written by an
+    /// earlier search, between those lines are extracted that are indeed
+    /// hits.
+    #[pyo3(
+        name = "ShapeSearch",
+        signature = (query, params = None, startLine = None, finishLine = None)
+    )]
+    #[allow(non_snake_case)]
+    fn shape_search(
+        &self,
+        py: Python<'_>,
+        query: PyRef<'_, PyMol>,
+        params: Option<PyRef<'_, PySynthonSpaceSearchParams>>,
+        startLine: Option<u64>,
+        finishLine: Option<u64>,
+    ) -> PyResult<PySearchResults> {
+        let ps = search_params(params);
+        let mol: &ROMol = &query.mol;
+        let res = py.detach(|| match startLine.zip(finishLine) {
+            None => self.space.shape_search(mol, &ps),
+            Some((s, f)) => self.space.shape_search_lines(mol, &ps, s, f),
+        });
+        finish(res, "ShapeSearch")
+    }
+
+    /// Build shapes for the synthons.  The conformations are generated,
+    /// pruned with the given threshold, which is passed directly to
+    /// EmbedMultipleConfs.
+    #[pyo3(name = "BuildSynthonShapes", signature = (params = None))]
+    fn build_synthon_shapes(
+        &mut self,
+        py: Python<'_>,
+        params: Option<PyRef<'_, PyShapeBuildParams>>,
+    ) -> PyResult<()> {
+        let ps = params.map(|p| p.p.clone()).unwrap_or_default();
+        let space = &mut self.space;
+        py.detach(|| space.build_synthon_shapes(&ps)).py()
+    }
+
     /// Build the synthon fingerprints ready for similarity searching.  This
     /// is done automatically when the first similarity search is done.
     #[pyo3(
@@ -633,15 +677,12 @@ fn py_convert_text_to_db_file(
     py: Python<'_>,
     inFilename: &str,
     outFilename: &str,
-    fpGen: Option<Py<PyAny>>,
+    fpGen: Option<PyRef<'_, PyFPGen>>,
     py_shapeParams: Option<PyRef<'_, PyShapeBuildParams>>,
 ) -> PyResult<()> {
-    if fpGen.is_some() || py_shapeParams.is_some() {
-        return Err(pyo3::exceptions::PyNotImplementedError::new_err(
-            "fingerprints and shapes are not supported yet",
-        ));
-    }
-    py.detach(|| convert_text_to_db_file(inFilename, outFilename))
+    let shape_params = py_shapeParams.map(|p| p.p.clone());
+    let fp_gen = fpGen.as_ref().map(|g| &g.gen_);
+    py.detach(|| convert_text_to_db_file(inFilename, outFilename, fp_gen, shape_params.as_ref()))
         .py()
 }
 

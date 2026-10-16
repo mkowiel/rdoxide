@@ -22,6 +22,9 @@ use super::chirality::find_stereo::{
     NOATOM, StereoInfo, StereoSpecified, StereoType, find_potential_stereo,
 };
 use super::chirality::legacy::assign_stereochemistry;
+use super::conformer::Conformer;
+use super::dist_geom_helpers::{EmbedParameters, embed_molecule};
+use super::mol_ops::add_hs::{AddHsParameters, add_hs};
 use super::romol::ROMol;
 use super::smiles_parse::cx_write::{RestoreBondDirOption, cx_fields, mol_to_cx_smiles};
 use super::smiles_parse::write::SmilesWriteParams;
@@ -35,7 +38,7 @@ use crate::{RDKitError, Result};
 /// `StereoEnumerationOptions`
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StereoEnumerationOptions {
-    /// try to embed every isomer; not supported yet (needs distance geometry)
+    /// only return isomers that can be embedded (a conformer is added to them)
     pub try_embedding: bool,
     /// leave specified stereo elements alone unless they are in a relative
     /// stereo group
@@ -180,12 +183,6 @@ pub struct StereoisomerEnumerator {
 
 impl StereoisomerEnumerator {
     pub fn new(mol: &ROMol, options: StereoEnumerationOptions) -> Result<Self> {
-        if options.try_embedding {
-            return Err(RDKitError::Value(
-                "tryEmbedding is not supported yet: distance geometry is not ported to rdoxide"
-                    .into(),
-            ));
-        }
         let mut mol = mol.clone();
         if mol.num_conformers() > 0 {
             wedge_mol_bonds(&mut mol, None, &BondWedgingParameters::default())?;
@@ -338,8 +335,28 @@ impl StereoisomerEnumerator {
                     continue;
                 }
             }
+            if self.options.try_embedding && !embeddable(&mut isomer)? {
+                continue;
+            }
             return Ok(Some(isomer));
         }
         Ok(None)
     }
+}
+
+/// `StereoisomerEnumerator::embeddable`: embeds a copy with Hs and, if that
+/// works, gives the isomer a conformer with the heavy atom coordinates.
+fn embeddable(isomer: &mut ROMol) -> Result<bool> {
+    let mut with_hs = isomer.clone();
+    add_hs(&mut with_hs, &AddHsParameters::default(), None)?;
+    let cid = embed_molecule(&mut with_hs, &mut EmbedParameters::default())?;
+    if cid >= 0 {
+        let mut conf = Conformer::new(isomer.num_atoms() as usize);
+        let src = with_hs.conformer(-1)?;
+        for i in 0..isomer.num_atoms() {
+            conf.set_atom_pos(i, src.atom_pos(i)?)?;
+        }
+        isomer.add_conformer(conf, true)?;
+    }
+    Ok(cid >= 0)
 }
