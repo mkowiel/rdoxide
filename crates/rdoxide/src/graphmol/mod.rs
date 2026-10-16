@@ -39,6 +39,7 @@ pub mod mol_catalog;
 pub mod mol_chemical_features;
 pub mod mol_enumerator;
 pub mod mol_hash;
+pub mod mol_interaction_fields;
 pub mod mol_interchange;
 pub mod mol_ops;
 pub mod mol_processing;
