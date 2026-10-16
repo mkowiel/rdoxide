@@ -112,6 +112,7 @@ mod rdrgroupdecomposition;
 mod rdscaffoldnetwork;
 mod rdsimdivpickers;
 mod rdsubstructlibrary;
+mod rdsynthonspacesearch;
 mod rdtautomerquery;
 mod rdtrajectory;
 mod ringinfo;
@@ -312,6 +313,12 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
         "rdRascalMCES",
         "rdkit.Chem.rdRascalMCES",
         rdrascalmces::init,
+    )?;
+    add_submodule(
+        m,
+        "rdSynthonSpaceSearch",
+        "rdkit.Chem.rdSynthonSpaceSearch",
+        rdsynthonspacesearch::init,
     )?;
     add_submodule(m, "rdMIF", "rdkit.Chem.rdMIF", rdmif::init)?;
     add_submodule(m, "rdMolHash", "rdkit.Chem.rdMolHash", rdmolhash::init)?;
