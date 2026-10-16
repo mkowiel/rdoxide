@@ -417,6 +417,13 @@ Code/GraphMol/ReducedGraphs/Wrap/testReducedGraphs.py::TestCase::test2
 Code/GraphMol/ReducedGraphs/Wrap/testReducedGraphs.py::TestCase::test3
 Code/GraphMol/ReducedGraphs/Wrap/testReducedGraphs.py::TestCase::test4
 Code/GraphMol/ReducedGraphs/Wrap/testReducedGraphs.py::TestCase::testCanRetrieveProp
+Code/GraphMol/ScaffoldNetwork/Wrap/testScaffoldNetwork.py::TestScaffoldNetwork::test1Basics
+Code/GraphMol/ScaffoldNetwork/Wrap/testScaffoldNetwork.py::TestScaffoldNetwork::test2Basics
+Code/GraphMol/ScaffoldNetwork/Wrap/testScaffoldNetwork.py::TestScaffoldNetwork::test3Update
+Code/GraphMol/ScaffoldNetwork/Wrap/testScaffoldNetwork.py::TestScaffoldNetwork::test4Str
+Code/GraphMol/ScaffoldNetwork/Wrap/testScaffoldNetwork.py::TestScaffoldNetwork::test5FragmentationReactions
+Code/GraphMol/ScaffoldNetwork/Wrap/testScaffoldNetwork.py::TestScaffoldNetwork::test6Options
+Code/GraphMol/ScaffoldNetwork/Wrap/testScaffoldNetwork.py::TestScaffoldNetwork::test7Github3177
 Code/GraphMol/TautomerQuery/Wrap/rough_test.py::TautomerQueryTestCase::test_basic
 Code/GraphMol/TautomerQuery/Wrap/rough_test.py::TautomerQueryTestCase::test_parameter_searches
 Code/GraphMol/TautomerQuery/Wrap/rough_test.py::TautomerQueryTestCase::test_simple

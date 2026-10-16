@@ -101,6 +101,7 @@ mod rdqueries;
 mod rdreducedgraphs;
 mod rdresonance;
 mod rdrgroupdecomposition;
+mod rdscaffoldnetwork;
 mod rdsimdivpickers;
 mod rdsubstructlibrary;
 mod rdtautomerquery;
@@ -176,6 +177,12 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
         "rdMolEnumerator",
         "rdkit.Chem.rdMolEnumerator",
         rdmolenumerator::init,
+    )?;
+    add_submodule(
+        m,
+        "rdScaffoldNetwork",
+        "rdkit.Chem.Scaffolds.rdScaffoldNetwork",
+        rdscaffoldnetwork::init,
     )?;
     add_submodule(m, "rdFMCS", "rdkit.Chem.rdFMCS", rdfmcs::init)?;
     add_submodule(
