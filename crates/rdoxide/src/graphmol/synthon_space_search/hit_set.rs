@@ -5,7 +5,15 @@ use std::sync::Arc;
 
 use super::synthon::Synthon;
 use super::synthon_set::SynthonSet;
+use crate::datastructs::bit_vect::ExplicitBitVect;
 use crate::graphmol::romol::ROMol;
+
+/// The extra data of the hit sets of the fingerprint searcher.
+pub struct FpHitData<'a> {
+    pub synthon_fps: Vec<Vec<&'a ExplicitBitVect>>,
+    pub add_fp: Option<&'a ExplicitBitVect>,
+    pub subtract_fp: Option<&'a ExplicitBitVect>,
+}
 
 pub struct SynthonSpaceHitSet<'a> {
     pub reaction: &'a SynthonSet,
@@ -15,6 +23,7 @@ pub struct SynthonSpaceHitSet<'a> {
     pub num_hits: usize,
     /// The fragments this hitset is derived from.
     pub frags: Vec<Arc<ROMol>>,
+    pub fp: Option<FpHitData<'a>>,
 }
 
 impl<'a> SynthonSpaceHitSet<'a> {
@@ -43,6 +52,33 @@ impl<'a> SynthonSpaceHitSet<'a> {
             synthons_to_use,
             num_hits,
             frags: frag_set.to_vec(),
+            fp: None,
         }
+    }
+
+    /// A hit set that also holds the synthon fingerprints.
+    pub fn new_fp(
+        reaction: &'a SynthonSet,
+        pool: &'a [Synthon],
+        stu: &[Vec<usize>],
+        frag_set: &[Arc<ROMol>],
+    ) -> Self {
+        let mut hs = Self::new(reaction, pool, stu, frag_set);
+        let synthons = reaction.synthons();
+        let synthon_fps = stu
+            .iter()
+            .enumerate()
+            .map(|(i, sel)| {
+                sel.iter()
+                    .filter_map(|&j| pool[synthons[i][j].1].fp())
+                    .collect()
+            })
+            .collect();
+        hs.fp = Some(FpHitData {
+            synthon_fps,
+            add_fp: reaction.add_fp(),
+            subtract_fp: reaction.subtract_fp(),
+        });
+        hs
     }
 }

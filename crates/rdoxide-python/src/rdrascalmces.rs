@@ -95,7 +95,7 @@ impl PyRascalResult {
 )]
 #[derive(Clone, Default)]
 pub struct PyRascalOptions {
-    opts: RascalOptions,
+    pub(crate) opts: RascalOptions,
 }
 
 macro_rules! option_props {

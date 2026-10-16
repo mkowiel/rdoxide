@@ -9,6 +9,7 @@ use pyo3::types::PyList;
 use rdoxide::RDKitError;
 use rdoxide::graphmol::romol::ROMol;
 use rdoxide::graphmol::substruct::SubstructMatchParameters;
+use rdoxide::graphmol::synthon_space_search::searcher::SearchResultCallback;
 use rdoxide::graphmol::synthon_space_search::{
     SearchResults, ShapeBuildParams, SynthonSpace, SynthonSpaceSearchParams, UserConfGenerator,
     convert_text_to_db_file, formatted_integer_string,
@@ -17,8 +18,10 @@ use rdoxide::graphmol::synthon_space_search::{
 use crate::errors::IntoPyResult;
 use crate::mol::PyMol;
 use crate::rdenumeratestereoisomers::PyStereoEnumerationOptions;
+use crate::rdfingerprintgenerator::PyFPGen;
 use crate::rdgaussianshape::{PyShapeInput, PyShapeOverlayOptions};
 use crate::rdgeneralizedsubstruct::PyExtendedQueryMol;
+use crate::rdrascalmces::PyRascalOptions;
 use crate::substruct::PySubstructMatchParameters;
 
 /// Used to return results of SynthonSpace searches.
@@ -460,31 +463,166 @@ impl PySynthonSpace {
         let sm = match_params(substructMatchParams);
         let ps = search_params(params);
         let mol: &ROMol = &query.mol;
-        let py_err: Mutex<Option<PyErr>> = Mutex::new(None);
-        let res = py.detach(|| {
-            let mut cb = |mols: &mut Vec<ROMol>| -> rdoxide::Result<bool> {
-                Python::attach(|py| {
-                    let mut call = || -> PyResult<bool> {
-                        let list = PyList::empty(py);
-                        for m in mols.drain(..) {
-                            list.append(Py::new(py, PyMol { mol: m })?)?;
-                        }
-                        callback.call1(py, (list,))?.is_truthy(py)
-                    };
-                    call().map_err(|e| {
-                        *py_err.lock().unwrap() = Some(e);
-                        RDKitError::Runtime("callback failed".into())
-                    })
-                })
-            };
+        run_incremental(py, &callback, |cb| {
             self.space
-                .substructure_search_incremental(mol, &mut cb, &sm, &ps)
-        });
-        if let Some(e) = py_err.into_inner().unwrap() {
-            return Err(e);
-        }
-        res.py()
+                .substructure_search_incremental(mol, cb, &sm, &ps)
+        })
     }
+
+    /// Does a fingerprint search in the SynthonSpace using the
+    /// FingerprintGenerator passed in.  With startLine and finishLine the
+    /// contents of params.possibleHitsFile between those lines are
+    /// extracted that are indeed hits.
+    #[pyo3(
+        name = "FingerprintSearch",
+        signature = (query, fingerprintGenerator, params = None, startLine = None, finishLine = None)
+    )]
+    #[allow(non_snake_case)]
+    fn fingerprint_search(
+        &mut self,
+        py: Python<'_>,
+        query: PyRef<'_, PyMol>,
+        fingerprintGenerator: PyRef<'_, PyFPGen>,
+        params: Option<PyRef<'_, PySynthonSpaceSearchParams>>,
+        startLine: Option<u64>,
+        finishLine: Option<u64>,
+    ) -> PyResult<PySearchResults> {
+        let ps = search_params(params);
+        let mol: &ROMol = &query.mol;
+        let gen_ = &fingerprintGenerator.gen_;
+        let space = &mut self.space;
+        let res = py.detach(|| match startLine.zip(finishLine) {
+            None => space.fingerprint_search(mol, gen_, &ps),
+            Some((s, f)) => space.fingerprint_search_lines(mol, gen_, &ps, s, f),
+        });
+        finish(res, "FingerprintSearch")
+    }
+
+    /// Does a fingerprint search in the SynthonSpace using the
+    /// FingerprintGenerator passed in, returning results the callback.
+    #[pyo3(
+        name = "FingerprintSearchIncremental",
+        signature = (query, fingerprintGenerator, callback, params = None)
+    )]
+    #[allow(non_snake_case)]
+    fn fingerprint_search_incremental(
+        &mut self,
+        py: Python<'_>,
+        query: PyRef<'_, PyMol>,
+        fingerprintGenerator: PyRef<'_, PyFPGen>,
+        callback: Py<PyAny>,
+        params: Option<PyRef<'_, PySynthonSpaceSearchParams>>,
+    ) -> PyResult<()> {
+        let ps = search_params(params);
+        let mol: &ROMol = &query.mol;
+        let gen_ = &fingerprintGenerator.gen_;
+        let space = &mut self.space;
+        run_incremental(py, &callback, |cb| {
+            space.fingerprint_search_incremental(mol, gen_, cb, &ps)
+        })
+    }
+
+    /// Does a search using the Rascal similarity score.  The similarity
+    /// threshold used is provided by rascalOptions, and the one in params is
+    /// ignored.
+    #[pyo3(
+        name = "RascalSearch",
+        signature = (query, rascalOptions, params = None, startLine = None, finishLine = None)
+    )]
+    #[allow(non_snake_case)]
+    fn rascal_search(
+        &self,
+        py: Python<'_>,
+        query: PyRef<'_, PyMol>,
+        rascalOptions: PyRef<'_, PyRascalOptions>,
+        params: Option<PyRef<'_, PySynthonSpaceSearchParams>>,
+        startLine: Option<u64>,
+        finishLine: Option<u64>,
+    ) -> PyResult<PySearchResults> {
+        let ps = search_params(params);
+        let mol: &ROMol = &query.mol;
+        let opts = &rascalOptions.opts;
+        let res = py.detach(|| match startLine.zip(finishLine) {
+            None => self.space.rascal_search(mol, opts, &ps),
+            Some((s, f)) => self.space.rascal_search_lines(mol, opts, &ps, s, f),
+        });
+        finish(res, "RascalSearch")
+    }
+
+    /// Does a search using the Rascal similarity score, returning results
+    /// iteratively in the callback.
+    #[pyo3(
+        name = "RascalSearchIncremental",
+        signature = (query, rascalOptions, callback, params = None)
+    )]
+    #[allow(non_snake_case)]
+    fn rascal_search_incremental(
+        &self,
+        py: Python<'_>,
+        query: PyRef<'_, PyMol>,
+        rascalOptions: PyRef<'_, PyRascalOptions>,
+        callback: Py<PyAny>,
+        params: Option<PyRef<'_, PySynthonSpaceSearchParams>>,
+    ) -> PyResult<()> {
+        let ps = search_params(params);
+        let mol: &ROMol = &query.mol;
+        let opts = &rascalOptions.opts;
+        run_incremental(py, &callback, |cb| {
+            self.space.rascal_search_incremental(mol, opts, cb, &ps)
+        })
+    }
+
+    /// Build the synthon fingerprints ready for similarity searching.  This
+    /// is done automatically when the first similarity search is done.
+    #[pyo3(
+        name = "BuildSynthonFingerprints",
+        signature = (fingerprintGenerator, progressBarWidth = 0)
+    )]
+    #[allow(non_snake_case)]
+    fn build_synthon_fingerprints(
+        &mut self,
+        py: Python<'_>,
+        fingerprintGenerator: PyRef<'_, PyFPGen>,
+        progressBarWidth: u32,
+    ) -> PyResult<()> {
+        let _ = progressBarWidth;
+        let gen_ = &fingerprintGenerator.gen_;
+        let space = &mut self.space;
+        py.detach(|| space.build_synthon_fingerprints(gen_)).py()
+    }
+}
+
+/// Runs a search that reports to a Python callback in chunks; a truthy
+/// return value from the callback stops the search and an exception is
+/// propagated.
+fn run_incremental(
+    py: Python<'_>,
+    callback: &Py<PyAny>,
+    search: impl FnOnce(SearchResultCallback<'_>) -> rdoxide::Result<()> + Send,
+) -> PyResult<()> {
+    let py_err: Mutex<Option<PyErr>> = Mutex::new(None);
+    let res = py.detach(|| {
+        let mut cb = |mols: &mut Vec<ROMol>| -> rdoxide::Result<bool> {
+            Python::attach(|py| {
+                let mut call = || -> PyResult<bool> {
+                    let list = PyList::empty(py);
+                    for m in mols.drain(..) {
+                        list.append(Py::new(py, PyMol { mol: m })?)?;
+                    }
+                    callback.call1(py, (list,))?.is_truthy(py)
+                };
+                call().map_err(|e| {
+                    *py_err.lock().unwrap() = Some(e);
+                    RDKitError::Runtime("callback failed".into())
+                })
+            })
+        };
+        search(&mut cb)
+    });
+    if let Some(e) = py_err.into_inner().unwrap() {
+        return Err(e);
+    }
+    res.py()
 }
 
 /// Convert the text file into the binary DB file in our format.

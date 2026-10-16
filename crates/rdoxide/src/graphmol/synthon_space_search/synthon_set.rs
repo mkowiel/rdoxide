@@ -348,6 +348,94 @@ impl SynthonSet {
         }
     }
 
+    /// Sets the fingerprints of the synthons from their search molecules.
+    pub fn build_synthon_fingerprints(
+        &mut self,
+        pool: &mut [Synthon],
+        fp_fn: &dyn Fn(&ROMol) -> Result<ExplicitBitVect>,
+    ) -> Result<()> {
+        self.add_fp = None;
+        self.subtract_fp = None;
+        for set in &self.synthons {
+            for (_, idx) in set {
+                let fp = fp_fn(pool[*idx].search_mol())?;
+                pool[*idx].set_fp(fp);
+            }
+        }
+        Ok(())
+    }
+
+    /// The bits that products typically gain (joins) and lose (dummies)
+    /// compared with the OR of the synthon fingerprints.
+    pub fn build_add_and_subtract_fps(
+        &mut self,
+        pool: &[Synthon],
+        fp_fn: &dyn Fn(&ROMol) -> Result<ExplicitBitVect>,
+        num_bits: u32,
+    ) -> Result<()> {
+        if !self.has_fingerprints(pool) {
+            return Err(RDKitError::precondition("No fingerprints for synthons."));
+        }
+        self.add_fp = None;
+        self.subtract_fp = None;
+        let mut add_counts = vec![0i64; num_bits as usize];
+        let mut sub_counts = vec![0i64; num_bits as usize];
+        let mut synthon_nums: Vec<Vec<usize>> = Vec::new();
+        let mut num_synthons = Vec::new();
+        let mut tot_samples = 1usize;
+        // Sample the synthons evenly across their size ranges.
+        for set in &self.synthons {
+            let stride = (set.len() / 40).max(1);
+            let nums: Vec<usize> = (0..set.len()).step_by(stride).collect();
+            num_synthons.push(nums.len());
+            tot_samples *= nums.len();
+            synthon_nums.push(nums);
+        }
+        let mut stepper = Stepper::new(&num_synthons);
+        while !stepper.at_end() {
+            let these: Vec<usize> = stepper
+                .curr_state
+                .iter()
+                .enumerate()
+                .map(|(i, &s)| synthon_nums[i][s])
+                .collect();
+            if let Some(prod) = self.build_product(pool, &these) {
+                let prod_fp = fp_fn(&prod)?;
+                let fp_of = |i: usize| pool[self.synthons[i][these[i]].1].fp().unwrap();
+                let mut approx = fp_of(0).clone();
+                for j in 1..self.synthons.len() {
+                    approx = approx.or(fp_of(j));
+                }
+                let add = prod_fp.and(&approx.not());
+                for b in add.on_bits() {
+                    add_counts[b as usize] += 1;
+                }
+                let sub = approx.and(&prod_fp.not());
+                for b in sub.on_bits() {
+                    sub_counts[b as usize] += 1;
+                }
+            }
+            stepper.step();
+        }
+        // The fraction of products that must set a bit for it to be included.
+        let frac = 0.75;
+        let limit = (tot_samples as f64 * frac) as i64;
+        let mut add_fp = ExplicitBitVect::new(num_bits, false);
+        let mut sub_fp = ExplicitBitVect::new(num_bits, false);
+        for i in 0..num_bits as usize {
+            if add_counts[i] > limit {
+                add_fp.set_bit(i as u32)?;
+            }
+            if sub_counts[i] > limit {
+                sub_fp.set_bit(i as u32)?;
+            }
+        }
+        self.add_fp = Some(add_fp);
+        // the complement, so it can be used directly
+        self.subtract_fp = Some(sub_fp.not());
+        Ok(())
+    }
+
     pub fn build_product_name(&self, synth_nums: &[usize]) -> String {
         let names: Vec<&str> = synth_nums
             .iter()

@@ -3,10 +3,14 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 
+use super::fingerprint::get_fingerprint;
 use super::params::{CONNECTOR_SYMBOLS, MAX_CONNECTOR_NUM};
 use super::stream::{Reader, Writer};
 use super::synthon::Synthon;
 use super::synthon_set::SynthonSet;
+use crate::datastructs::bit_vect::BitVect;
+use crate::graphmol::fingerprints::FingerprintGenerator;
+use crate::graphmol::romol::ROMol;
 use crate::{RDKitError, Result};
 
 const VERSION_MAJOR: i32 = 3;
@@ -449,6 +453,34 @@ impl SynthonSpace {
             self.pool.len(),
             self.num_synthons_with_shapes()
         );
+        Ok(())
+    }
+
+    /// `buildSynthonFingerprints`: builds the fingerprints of the synthons
+    /// (and the add/subtract fingerprints of each reaction) unless the
+    /// space already has fingerprints of this type.
+    pub fn build_synthon_fingerprints(&mut self, fp_gen: &FingerprintGenerator) -> Result<()> {
+        let fp_type = fp_gen.info_string();
+        if fp_type == self.fp_type && self.has_fingerprints() {
+            return Ok(());
+        }
+        crate::rd_log_warning!("Building the fingerprints may take some time.");
+        self.fp_type = fp_type;
+        let fp_fn = |m: &ROMol| get_fingerprint(fp_gen, m);
+        let mut num_bits = 0;
+        for r in 0..self.reactions.len() {
+            let rxn = &mut self.reactions[r];
+            rxn.build_synthon_fingerprints(&mut self.pool, &fp_fn)?;
+            if num_bits == 0 {
+                num_bits = self.pool[rxn.synthons()[0][0].1]
+                    .fp()
+                    .map_or(0, |f| f.num_bits());
+            }
+            rxn.build_add_and_subtract_fps(&self.pool, &fp_fn, num_bits)?;
+        }
+        for rxn in &mut self.reactions {
+            rxn.initialize_search_orders(&self.pool);
+        }
         Ok(())
     }
 
