@@ -211,3 +211,30 @@ def test_set_own_draw_options():
     o.padding = 0.2
     d.SetDrawOptions(d.drawOptions())
     assert d.drawOptions().padding == 0.2
+
+
+def test_contours():
+    import numpy as np
+
+    d = rdMolDraw2D.MolDraw2DSVG(200, 200)
+    ps = rdMolDraw2D.ContourParams()
+    ps.fillGrid = True
+    assert ps.gridResolution == 0.15 and len(ps.colourMap) == 3
+    ps.contourColour = (1, 0, 0)
+    assert ps.contourColour == (1.0, 0.0, 0.0, 1.0)
+    rdMolDraw2D.ContourAndDrawGaussians(
+        d, [Point2D(0, 0), Point2D(1, 1)], [1.0, -0.5], [0.4, 0.4], nContours=4, params=ps
+    )
+    d.FinishDrawing()
+    assert "stroke:#FF0000" in d.GetDrawingText()
+    grid = np.zeros((5, 4))
+    grid[2, 2] = 1
+    d = rdMolDraw2D.MolDraw2DSVG(200, 200)
+    rdMolDraw2D.ContourAndDrawGrid(d, grid, [0, 1, 2, 3, 4], [0, 1, 2, 3], nContours=2)
+    assert "<path" in d.GetDrawingText()
+    with pytest.raises(ValueError):
+        rdMolDraw2D.ContourAndDrawGrid(d, grid, [0, 1, 2], [0, 1, 2, 3])
+    with pytest.raises(ValueError):
+        rdMolDraw2D.ContourAndDrawGrid(d, [[1.0]], [0], [0])
+    with pytest.raises(ValueError):
+        rdMolDraw2D.ContourAndDrawGaussians(d, [], [], [])

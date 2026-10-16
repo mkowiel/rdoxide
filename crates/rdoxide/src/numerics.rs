@@ -7,6 +7,7 @@
 
 pub mod alignment;
 pub mod bfgs;
+pub mod conrec;
 pub mod dense;
 pub mod eigen_3x3;
 pub mod full_piv_lu;

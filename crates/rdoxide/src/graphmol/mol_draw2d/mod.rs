@@ -3,6 +3,7 @@
 //! This is the drawing foundation: options and colours, the geometry helpers,
 //! the TrueType reader that stands in for FreeType, and text layout.
 
+pub mod contour;
 pub mod details;
 pub mod draw_annotation;
 pub mod draw_mol;
