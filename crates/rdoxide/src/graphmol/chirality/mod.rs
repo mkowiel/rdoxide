@@ -6,6 +6,7 @@ pub mod find_stereo;
 pub mod from_coords;
 pub mod legacy;
 pub mod nontetrahedral;
+pub mod perception;
 pub mod stereo_groups;
 
 use std::sync::atomic::{AtomicU8, Ordering};

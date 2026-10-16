@@ -1151,13 +1151,11 @@ pub fn assign_stereochemistry(
     if mol.needs_update_property_cache() {
         mol.update_property_cache(false)?;
     }
-    if !super::get_use_legacy_stereo_perception() {
-        return Err(RDKitError::invariant(
-            "the new stereo perception algorithm is not ported yet; \
-             use legacy stereo perception",
-        ));
+    if super::get_use_legacy_stereo_perception() {
+        legacy_stereo_perception(mol, clean_it, flag_possible_stereo_centers)?;
+    } else {
+        super::perception::stereo_perception(mol, clean_it, flag_possible_stereo_centers)?;
     }
-    legacy_stereo_perception(mol, clean_it, flag_possible_stereo_centers)?;
     mol.set_prop(cp::_StereochemDone, 1i32, true)?;
     Ok(())
 }
