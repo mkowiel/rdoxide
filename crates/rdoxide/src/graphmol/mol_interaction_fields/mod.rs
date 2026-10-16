@@ -10,6 +10,7 @@
 //! LICENSES/RDKit-BSD-3-Clause.txt).
 
 mod cube;
+mod hbond;
 
 use crate::geometry::Point3D;
 use crate::geometry::grid::UniformRealValueGrid3D;
@@ -23,6 +24,7 @@ use crate::{RDKitError, Result};
 pub use cube::{
     read_from_cube_file, read_from_cube_stream, write_to_cube_file, write_to_cube_stream,
 };
+pub use hbond::{HBond, Hydrophilic};
 
 pub(crate) const CUTOFF: f64 = 0.001;
 pub(crate) const MIN_CUTOFF_VAL: f64 = CUTOFF * CUTOFF;

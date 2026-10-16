@@ -6,8 +6,8 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple};
 use rdoxide::geometry::Point3D;
 use rdoxide::graphmol::mol_interaction_fields::{
-    Coulomb, CoulombDielectric, Descriptor, VdWaals, calculate_descriptors, construct_grid,
-    read_from_cube_file, write_to_cube_file,
+    Coulomb, CoulombDielectric, Descriptor, HBond, Hydrophilic, VdWaals, calculate_descriptors,
+    construct_grid, read_from_cube_file, write_to_cube_file,
 };
 
 use crate::errors::IntoPyResult;
@@ -363,6 +363,60 @@ fn py_construct_grid(
     })
 }
 
+/// Hydrogen bonding interaction between a molecule and a probe at a
+/// gridpoint (the probe is "OH", "O", "NH" or "N").
+#[pyclass(name = "HBond", module = "rdkit.Chem.rdMIF")]
+pub struct PyHBond {
+    d: HBond,
+}
+
+#[pymethods]
+impl PyHBond {
+    #[new]
+    #[pyo3(signature = (mol, confId = -1, probeAtomType = "OH", fixed = true, cutoff = 1.0))]
+    #[allow(non_snake_case)]
+    fn py_new(
+        mol: PyRef<'_, PyMol>,
+        confId: i32,
+        probeAtomType: &str,
+        fixed: bool,
+        cutoff: f64,
+    ) -> PyResult<Self> {
+        Ok(Self {
+            d: HBond::new(&mol.mol, confId, probeAtomType, fixed, cutoff).py()?,
+        })
+    }
+
+    #[pyo3(name = "__call__")]
+    fn call(&self, x: f64, y: f64, z: f64, threshold: f64) -> f64 {
+        self.d.value(x, y, z, threshold)
+    }
+}
+
+/// Hydrophilic field: the minimum of the hydrogen bond interactions with a
+/// water oxygen and a water hydrogen probe.
+#[pyclass(name = "Hydrophilic", module = "rdkit.Chem.rdMIF")]
+pub struct PyHydrophilic {
+    d: Hydrophilic,
+}
+
+#[pymethods]
+impl PyHydrophilic {
+    #[new]
+    #[pyo3(signature = (mol, confId = -1, fixed = true, cutoff = 1.0))]
+    #[allow(non_snake_case)]
+    fn py_new(mol: PyRef<'_, PyMol>, confId: i32, fixed: bool, cutoff: f64) -> PyResult<Self> {
+        Ok(Self {
+            d: Hydrophilic::new(&mol.mol, confId, fixed, cutoff).py()?,
+        })
+    }
+
+    #[pyo3(name = "__call__")]
+    fn call(&self, x: f64, y: f64, z: f64, threshold: f64) -> f64 {
+        self.d.value(x, y, z, threshold)
+    }
+}
+
 fn run<D: Descriptor>(
     py: Python<'_>,
     grid: &Bound<'_, PyUniformRealValueGrid3D>,
@@ -391,6 +445,10 @@ fn py_calculate_descriptors(
     } else if let Ok(d) = descriptor.extract::<PyRef<'_, PyMMFFVdWaals>>() {
         run(py, grid, &d.d, threshold)
     } else if let Ok(d) = descriptor.extract::<PyRef<'_, PyUFFVdWaals>>() {
+        run(py, grid, &d.d, threshold)
+    } else if let Ok(d) = descriptor.extract::<PyRef<'_, PyHBond>>() {
+        run(py, grid, &d.d, threshold)
+    } else if let Ok(d) = descriptor.extract::<PyRef<'_, PyHydrophilic>>() {
         run(py, grid, &d.d, threshold)
     } else {
         Err(pyo3::exceptions::PyTypeError::new_err(
@@ -433,6 +491,8 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyCoulombDielectric>()?;
     m.add_class::<PyMMFFVdWaals>()?;
     m.add_class::<PyUFFVdWaals>()?;
+    m.add_class::<PyHBond>()?;
+    m.add_class::<PyHydrophilic>()?;
     m.add_function(wrap_pyfunction!(py_construct_grid, m)?)?;
     m.add_function(wrap_pyfunction!(py_calculate_descriptors, m)?)?;
     m.add_function(wrap_pyfunction!(py_write_to_cube_file, m)?)?;
