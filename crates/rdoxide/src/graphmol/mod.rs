@@ -15,6 +15,7 @@ pub mod conformer;
 pub mod conjug_hybrid;
 pub mod debug;
 pub mod depictor;
+pub mod deprotect;
 pub mod descriptors;
 pub mod determine_bonds;
 pub mod dist_geom_helpers;

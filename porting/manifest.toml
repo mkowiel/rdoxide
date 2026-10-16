@@ -1310,3 +1310,11 @@
 [module."rdoxide_python::rdcip_labeler".sources]
 "Code/GraphMol/CIPLabeler/Wrap/rdCIPLabeler.cpp" = "04f15c0f497cb56da5fd33131ec8d4b3ecb90502"
 "Code/GraphMol/CIPLabeler/nbWrap/rdCIPLabeler.cpp" = "479f47e404e597866ffb66e3d83f78128e3db197"
+
+[module."rdoxide::graphmol::deprotect".sources]
+"Code/GraphMol/Deprotect/Deprotect.cpp" = "260b237239c4b8289b9d1664af745e4f69d4a790"
+"Code/GraphMol/Deprotect/Deprotect.h" = "7d97176a0a60b5d3665c722b49b81d435f51cafc"
+
+[module."rdoxide_python::rddeprotect".sources]
+"Code/GraphMol/Deprotect/Wrap/DeprotectWrap.cpp" = "8a8588139d97de57d1e3a6e2e4f9fcef8243123b"
+"Code/GraphMol/Deprotect/Wrap/rdDeprotect.cpp" = "60370f48c099e3dd3a9dc323d7274b3840af7aa2"
