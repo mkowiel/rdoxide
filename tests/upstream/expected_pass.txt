@@ -1050,6 +1050,12 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::test_github3553
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test_legacyStereochemGlobal
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test_picklingWithAddedAttribs
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testgithub4992
+Code/ML/InfoTheory/Wrap/testRanker.py::TestCase::test0GainFuns
+Code/ML/InfoTheory/Wrap/testRanker.py::TestCase::test1ranker
+Code/ML/InfoTheory/Wrap/testRanker.py::TestCase::test2ranker
+Code/ML/InfoTheory/Wrap/testRanker.py::TestCase::test3Issue140
+Code/ML/InfoTheory/Wrap/testRanker.py::TestCase::test4Issue237
+Code/ML/InfoTheory/Wrap/testRanker.py::TestCase::testGainFunDtypes
 Code/SimDivPickers/Wrap/testPickers.py::TestCase::test0MaxMin
 Code/SimDivPickers/Wrap/testPickers.py::TestCase::test1HierarchPick
 Code/SimDivPickers/Wrap/testPickers.py::TestCase::testBitVectorLeader1

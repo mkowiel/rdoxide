@@ -536,8 +536,15 @@
 [module."rdoxide::ml::info_theory".sources]
 "Code/ML/InfoTheory/InfoGainFuncs.h" = "fc72810a5bcb9cbed61f63246b80d9065359b0f3"
 
+[module."rdoxide::ml::info_bit_ranker".sources]
+"Code/ML/InfoTheory/InfoBitRanker.cpp" = "81037caa45399213eaf665a405d67268e88c5523"
+"Code/ML/InfoTheory/InfoBitRanker.h" = "df5f3e3a2dc04d091637a979d7331d703cd09223"
+"Code/ML/InfoTheory/CorrMatGenerator.h" = "19257316dff5a88aa96b8414f5e1bc904ecd9680"
+
 [module."rdoxide_python::rdinfotheory".sources]
 "Code/ML/InfoTheory/Wrap/rdInfoTheory.cpp" = "322bdfe23f255f17eddc63dde93cc263ecd5956f"
+"Code/ML/InfoTheory/Wrap/InfoBitRanker.cpp" = "45cd6bebea5bc4cee9916d258c6d0093a42a960f"
+"Code/ML/InfoTheory/Wrap/BitCorrMatGenerator.cpp" = "11381ff9618bd20b2faaf0e67fba1ac6e9faaa6f"
 
 [module."rdoxide::graphmol::chem_transforms".sources]
 "Code/GraphMol/ChemTransforms/ChemTransforms.cpp" = "6171788687c941a6d9f36aa79e397aa0475681f0"
