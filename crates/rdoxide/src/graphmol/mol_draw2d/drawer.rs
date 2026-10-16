@@ -4,8 +4,7 @@
 //! Upstream splits the drawer into an abstract `MolDraw2D` and one subclass
 //! per output format. Only SVG is ported, so the two are one type here:
 //! [`MolDraw2DSVG`] holds the drawer state and the [`SvgCanvas`] that writes
-//! the SVG. Reactions, multi-colour highlights and the comic style are not
-//! ported yet.
+//! the SVG.
 //!
 //! Copyright (C) 2015-2021 Greg Landrum and other RDKit contributors.
 //! Licensed under the BSD 3-Clause license (see LICENSES/RDKit-BSD-3-Clause.txt).
@@ -549,15 +548,6 @@ impl MolDraw2DSVG {
         }
     }
 
-    pub(super) fn check_supported(&self) -> Result<()> {
-        if self.canvas.options.comic_mode {
-            return Err(RDKitError::UnhandledFeature(
-                "comic mode is not supported yet".into(),
-            ));
-        }
-        Ok(())
-    }
-
     /// Draws a molecule with a legend and highlights. The molecule is copied,
     /// as it needs ring information.
     pub fn draw_molecule_with(
@@ -567,7 +557,6 @@ impl MolDraw2DSVG {
         highlights: DrawMolHighlights,
         conf_id: i32,
     ) -> Result<()> {
-        self.check_supported()?;
         self.setup_text_drawer();
         // we need ring info for drawing, so copy the molecule in order to
         // add it
@@ -618,7 +607,6 @@ impl MolDraw2DSVG {
         highlight_linewidth_multipliers: BTreeMap<i32, i32>,
         conf_id: i32,
     ) -> Result<()> {
-        self.check_supported()?;
         self.setup_text_drawer();
         let mch = McHighlights {
             style: self.canvas.options.multi_colour_highlight_style,
@@ -764,7 +752,6 @@ impl MolDraw2DSVG {
         if mols.is_empty() {
             return Ok(());
         }
-        self.check_supported()?;
         self.setup_text_drawer();
         let mut min_scale_mol = 0usize;
         let mut min_font_scale_mol = 0usize;
@@ -930,6 +917,15 @@ impl MolDraw2DSVG {
         col2: DrawColour,
         raw_coords: bool,
     ) -> Result<()> {
+        if self.canvas.options.comic_mode && !raw_coords {
+            // the wobble is worked out in molecule coordinates
+            self.canvas.fill_polys = false;
+            for (col, pts) in self.canvas.comic_line_paths(cds1, cds2, col1, col2, false) {
+                self.canvas.colour = col;
+                self.draw_polygon(&pts, false)?;
+            }
+            return Ok(());
+        }
         let (c1, c2) = (
             self.to_draw(cds1, raw_coords)?,
             self.to_draw(cds2, raw_coords)?,
@@ -952,6 +948,10 @@ impl MolDraw2DSVG {
         cds3: Point2D,
         raw_coords: bool,
     ) -> Result<()> {
+        if self.canvas.options.comic_mode {
+            let pts = self.canvas.comic_triangle(cds1, cds2, cds3, raw_coords);
+            return self.draw_polygon(&pts, raw_coords);
+        }
         self.draw_polygon(&[cds1, cds2, cds3], raw_coords)
     }
 

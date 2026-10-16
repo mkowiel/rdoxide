@@ -5,7 +5,9 @@
 //! Copyright (C) 2015-2021 Greg Landrum and other RDKit contributors.
 //! Licensed under the BSD 3-Clause license (see LICENSES/RDKit-BSD-3-Clause.txt).
 
-use super::details::{calc_arrow_head, format_double, get_wavy_line_segments};
+use super::details::{
+    calc_arrow_head, format_double, get_wavy_line_segments, handdrawn_line, handdrawn_line_default,
+};
 use super::draw_mol_render::MolCanvas;
 use super::draw_shape::ShapeCanvas;
 use super::helpers::{
@@ -49,6 +51,47 @@ impl SvgCanvas {
             active_atm_idx2: -1,
             active_bnd_idx: -1,
         }
+    }
+
+    /// The comic-style `drawLine`: a wobbly unfilled polygon per colour. The
+    /// coordinates are in the space the scale applies to, which is the
+    /// drawing space when `raw_coords` is set and the molecule space when not.
+    pub(super) fn comic_line_paths(
+        &self,
+        cds1: Point2D,
+        cds2: Point2D,
+        col1: DrawColour,
+        col2: DrawColour,
+        raw_coords: bool,
+    ) -> Vec<(DrawColour, Vec<Point2D>)> {
+        // if rawCoords, we need a much bigger deviation.
+        let dev = if raw_coords { 0.5 } else { 0.03 };
+        let scl = if raw_coords { 1.0 } else { self.scale };
+        if col1 == col2 {
+            let pts = handdrawn_line(cds1, cds2, scl, true, true, 4, dev, 0.5);
+            vec![(col1, pts)]
+        } else {
+            let mid = (cds1 + cds2) * 0.5;
+            let first = handdrawn_line(cds1, mid, scl, true, false, 4, dev, 0.5);
+            let second = handdrawn_line(mid, cds2, scl, false, true, 4, dev, 0.5);
+            vec![(col1, first), (col2, second)]
+        }
+    }
+
+    /// The comic-style `drawTriangle`: the outline as three wobbly lines.
+    pub(super) fn comic_triangle(
+        &self,
+        cds1: Point2D,
+        cds2: Point2D,
+        cds3: Point2D,
+        raw_coords: bool,
+    ) -> Vec<Point2D> {
+        let dev = if raw_coords { 0.5 } else { 0.03 };
+        let scl = if raw_coords { 1.0 } else { self.scale };
+        let mut pts = handdrawn_line(cds1, cds2, scl, false, false, 4, dev, 0.5);
+        pts.extend(handdrawn_line_default(cds2, cds3, self.scale));
+        pts.extend(handdrawn_line_default(cds3, cds1, self.scale));
+        pts
     }
 
     /// `getDrawLineWidth`: the line width in pixels, scaled if asked.
@@ -334,6 +377,14 @@ impl ShapeCanvas for SvgCanvas {
         col2: DrawColour,
         _raw_coords: bool,
     ) -> Result<()> {
+        if self.options.comic_mode {
+            self.fill_polys = false;
+            for (col, pts) in self.comic_line_paths(cds1, cds2, col1, col2, true) {
+                self.colour = col;
+                self.polygon(&pts)?;
+            }
+            return Ok(());
+        }
         if col1 == col2 {
             self.colour = col1;
             self.line(cds1, cds2)
@@ -357,6 +408,10 @@ impl ShapeCanvas for SvgCanvas {
         cds3: Point2D,
         _raw_coords: bool,
     ) -> Result<()> {
+        if self.options.comic_mode {
+            let pts = self.comic_triangle(cds1, cds2, cds3, true);
+            return self.polygon(&pts);
+        }
         self.polygon(&[cds1, cds2, cds3])
     }
 

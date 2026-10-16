@@ -5,10 +5,12 @@ use std::collections::BTreeMap;
 
 use rdoxide::geometry::Point2D;
 use rdoxide::graphmol::depictor::{Compute2DCoordParameters, compute_2d_coords};
+use rdoxide::graphmol::mol_draw2d::details::srand;
 use rdoxide::graphmol::mol_draw2d::draw_mol::DrawMolHighlights;
 use rdoxide::graphmol::mol_draw2d::drawer::{MolDraw2DSVG, MoleculeHighlights};
 use rdoxide::graphmol::mol_draw2d::helpers::{DrawColour, OrientType};
 use rdoxide::graphmol::smiles_parse::{SmilesParserParams, mol_from_smiles};
+use rdoxide::graphmol::wedge_bonds::mark_unspecified_stereo_as_unknown;
 use rdoxide::graphmol::{ROMol, RWMol};
 
 fn smi(s: &str) -> RWMol {
@@ -294,11 +296,76 @@ fn varied_molecules_draw() {
     }
 }
 
+fn svg_with(smiles: &str, set: impl Fn(&mut MolDraw2DSVG)) -> String {
+    let mut d = MolDraw2DSVG::new(250, 200, -1, -1).unwrap();
+    set(&mut d);
+    d.draw_molecule(&smi(smiles), "", -1).unwrap();
+    d.finish_drawing();
+    d.get_drawing_text()
+}
+
 #[test]
-fn unsupported_options_are_errors() {
-    let mut d = MolDraw2DSVG::new(100, 100, -1, -1).unwrap();
-    d.draw_options_mut().comic_mode = true;
-    assert!(d.draw_molecule(&smi("CC"), "", -1).is_err());
+fn comic_mode_wobbles_the_bonds() {
+    let plain = svg_with("CCO", |_| {});
+    let comic = |d: &mut MolDraw2DSVG| d.draw_options_mut().comic_mode = true;
+    srand(1);
+    let first = svg_with("CCO", comic);
+    srand(1);
+    let again = svg_with("CCO", comic);
+    assert_ne!(plain, first);
+    assert_eq!(first, again, "the wobble is a fixed sequence");
+    // each bond is now a polyline of several points instead of one line
+    let bond_path = first
+        .lines()
+        .find(|l| l.contains("class='bond-0"))
+        .expect("a bond");
+    assert!(bond_path.matches(" L ").count() >= 3, "{bond_path}");
+}
+
+#[test]
+fn comic_mode_draws_wedges_and_coloured_bonds() {
+    srand(1);
+    let svg = svg_with("C[C@H](F)Cl", |d| {
+        d.draw_options_mut().comic_mode = true;
+    });
+    assert!(svg.ends_with("</svg>\n"));
+    assert!(svg.contains("class='bond-"));
+}
+
+#[test]
+fn unspecified_stereo_can_be_drawn_as_unknown() {
+    let plain = svg_with("CC(F)(Cl)Br", |_| {});
+    let unknown = svg_with("CC(F)(Cl)Br", |d| {
+        d.draw_options_mut().unspecified_stereo_is_unknown = true;
+    });
+    assert_ne!(plain, unknown, "the centre gets a wavy bond");
+    // an assigned centre is not touched
+    let assigned = |d: &mut MolDraw2DSVG| d.draw_options_mut().unspecified_stereo_is_unknown = true;
+    assert_eq!(
+        svg_with("C[C@](F)(Cl)Br", |_| {}),
+        svg_with("C[C@](F)(Cl)Br", assigned)
+    );
+}
+
+#[test]
+fn mark_unspecified_stereo_flags_centres_and_double_bonds() {
+    let mut m = smi("CC(F)(Cl)Br");
+    compute_2d_coords(&mut m, &Compute2DCoordParameters::default()).unwrap();
+    mark_unspecified_stereo_as_unknown(&mut m, -1).unwrap();
+    assert!(
+        m.bonds()
+            .iter()
+            .any(|b| b.bond_dir() == rdoxide::graphmol::bond::BondDir::Unknown)
+    );
+    let mut m = smi("CC=CC");
+    compute_2d_coords(&mut m, &Compute2DCoordParameters::default()).unwrap();
+    mark_unspecified_stereo_as_unknown(&mut m, -1).unwrap();
+    assert_eq!(
+        m.bond(1).stereo(),
+        rdoxide::graphmol::bond::BondStereo::StereoAny
+    );
+    // no conformer, no marking
+    assert!(mark_unspecified_stereo_as_unknown(&mut smi("CC"), -1).is_err());
 }
 
 #[test]

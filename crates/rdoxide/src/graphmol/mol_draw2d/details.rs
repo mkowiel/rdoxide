@@ -1,13 +1,16 @@
 //! Geometry helpers of the 2D molecule drawing code
 //! (`MolDraw2DDetails.cpp` of RDKit 2026.09.1).
 //!
-//! The comic-mode `handdrawnLine` (driven by `std::rand`) and the
-//! substance-group data labels are ported together with the code that uses
-//! them.
+//! The comic-mode `handdrawnLine` is driven by a small linear congruential
+//! generator standing in for `std::rand`, which upstream never seeds, so the
+//! wobble is a fixed sequence on a given platform there and here, but not the
+//! same sequence. The substance-group data labels are ported together with
+//! the code that uses them.
 //!
 //! Copyright (C) 2015-2020 Greg Landrum. Licensed under the BSD 3-Clause
 //! license (see LICENSES/RDKit-BSD-3-Clause.txt).
 
+use std::cell::Cell;
 use std::f64::consts::PI;
 
 use super::string_rect::StringRect;
@@ -16,6 +19,83 @@ use crate::geometry::Point2D;
 
 fn scaled(p: Point2D, f: f64) -> Point2D {
     Point2D::new(p.x * f, p.y * f)
+}
+
+thread_local! {
+    static RAND_STATE: Cell<u32> = const { Cell::new(1) };
+}
+
+/// `std::srand`: restarts the sequence behind [`rand`].
+pub fn srand(seed: u32) {
+    RAND_STATE.with(|s| s.set(seed));
+}
+
+/// `std::rand` (the ANSI C sample generator): 0..=32767.
+fn rand() -> i32 {
+    RAND_STATE.with(|s| {
+        let next = s.get().wrapping_mul(1_103_515_245).wrapping_add(12_345);
+        s.set(next);
+        ((next / 65_536) % 32_768) as i32
+    })
+}
+
+/// `handdrawnLine`: the points of a wobbly line from `cds1` to `cds2`, as
+/// used by the comic style. There are several empirically determined
+/// constants.
+pub fn handdrawn_line(
+    mut cds1: Point2D,
+    mut cds2: Point2D,
+    scale: f64,
+    shift_begin: bool,
+    shift_end: bool,
+    mut n_steps: u32,
+    mut deviation: f64,
+    mut end_shift: f64,
+) -> Vec<Point2D> {
+    while end_shift / scale > 0.02 {
+        end_shift *= 0.75;
+    }
+    let jitter = || {
+        (if rand() % 10 >= 5 {
+            end_shift
+        } else {
+            -end_shift
+        }) / scale
+    };
+    if shift_begin {
+        cds1.x += jitter();
+        cds1.y += jitter();
+    }
+    if shift_end {
+        cds2.x += jitter();
+        cds2.y += jitter();
+    }
+
+    let mut step = scaled(cds2 - cds1, 1.0 / f64::from(n_steps));
+    // make sure we aren't adding loads of wiggles to short lines
+    while step.length() < 0.2 && n_steps > 2 {
+        n_steps -= 1;
+        step = scaled(cds2 - cds1, 1.0 / f64::from(n_steps));
+    }
+    // make sure the wiggles aren't too big
+    while deviation / step.length() > 0.15 || deviation * scale > 0.70 {
+        deviation *= 0.75;
+    }
+    let mut perp = Point2D::new(step.y, -step.x);
+    // a zero-length line has no direction to wobble in
+    let _ = perp.normalize();
+    let mut pts = vec![cds1];
+    for i in 1..n_steps {
+        let tgt = cds1 + scaled(step, f64::from(i));
+        pts.push(tgt + scaled(perp, deviation * f64::from(rand() % 20 - 10) / 10.0));
+    }
+    pts.push(cds2);
+    pts
+}
+
+/// `handdrawnLine` with the defaults of the header.
+pub fn handdrawn_line_default(cds1: Point2D, cds2: Point2D, scale: f64) -> Vec<Point2D> {
+    handdrawn_line(cds1, cds2, scale, false, false, 4, 0.03, 0.5)
 }
 
 /// Format used for coordinates in SVG output (`formatDouble`).

@@ -72,7 +72,6 @@ impl MolDraw2DSVG {
         highlight_colours: Option<&[DrawColour]>,
         conf_ids: Option<&[i32]>,
     ) -> Result<()> {
-        self.check_supported()?;
         // Copy the reaction because processing for drawing alters it.
         let mut nrxn = rxn.clone();
         let (comps, mut plus_width) = self.get_reaction_draw_mols(
