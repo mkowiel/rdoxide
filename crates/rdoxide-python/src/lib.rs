@@ -66,6 +66,7 @@ mod rdmoldescriptors_profiles;
 mod rdmoldescriptors_property;
 mod rdmoldescriptors_props;
 mod rdmoldescriptors_usr;
+mod rdmoldraw2d;
 mod rdmolenumerator;
 mod rdmolfiles;
 mod rdmolfiles_fwdsdsupplier;
@@ -164,6 +165,12 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
     add_submodule(m, "rdmolfiles", "rdoxide.Chem.rdmolfiles", rdmolfiles::init)?;
     add_submodule(m, "rdmolops", "rdoxide.Chem.rdmolops", rdmolops::init)?;
     add_submodule(m, "rdDepictor", "rdoxide.Chem.rdDepictor", rddepictor::init)?;
+    add_submodule(
+        m,
+        "rdMolDraw2D",
+        "rdoxide.Chem.Draw.rdMolDraw2D",
+        rdmoldraw2d::init,
+    )?;
     add_submodule(m, "rdqueries", "rdoxide.Chem.rdqueries", rdqueries::init)?;
     add_submodule(m, "rdMolAlign", "rdoxide.Chem.rdMolAlign", rdmolalign::init)?;
     add_submodule(m, "rdDistGeom", "rdoxide.Chem.rdDistGeom", rddistgeom::init)?;
