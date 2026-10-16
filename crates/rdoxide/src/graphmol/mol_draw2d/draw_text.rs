@@ -32,6 +32,27 @@ const SUPER_SCALE: f64 = 0.66;
 /// A good default base font size.
 pub const DEFAULT_FONT_SCALE: f64 = 0.6;
 
+/// Helvetica's character widths, from `sping/PDF/pdfmetrics.py`.
+const CHAR_WIDTHS: [i32; 255] = [
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    278, 278, 355, 556, 556, 889, 667, 222, 333, 333, 389, 584, 278, 333, 278, 278, 556, 556, 556,
+    556, 556, 556, 556, 556, 556, 556, 278, 278, 584, 584, 584, 556, 1015, 667, 667, 722, 722, 667,
+    611, 778, 722, 278, 500, 667, 556, 833, 722, 778, 667, 778, 722, 667, 611, 722, 667, 944, 667,
+    667, 611, 278, 278, 278, 469, 556, 222, 556, 556, 500, 556, 556, 278, 556, 556, 222, 222, 500,
+    222, 833, 556, 556, 556, 556, 333, 500, 278, 556, 500, 722, 500, 500, 500, 334, 260, 334, 584,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 333, 556, 556, 167, 556, 556, 556, 556, 191, 333, 556, 333, 333, 500, 500, 0, 556, 556,
+    556, 278, 0, 537, 350, 222, 333, 333, 556, 1000, 1000, 0, 611, 0, 333, 333, 333, 333, 333, 333,
+    333, 333, 0, 333, 333, 0, 333, 333, 333, 1000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    1000, 0, 370, 0, 0, 0, 0, 556, 778, 1000, 365, 0, 0, 0, 0, 0, 889, 0, 0, 0, 278, 0, 0, 222,
+    611, 944, 611, 0, 0, 834,
+];
+
+fn char_width(c: u8) -> f64 {
+    // characters above 127 are negative `char`s upstream: out of the table
+    f64::from(CHAR_WIDTHS.get(usize::from(c)).copied().unwrap_or(0))
+}
+
 /// The result of laying out a string: one rectangle, draw mode and
 /// character per glyph.
 #[derive(Clone, Debug, Default)]
@@ -137,6 +158,8 @@ pub struct DrawTextFT {
     max_font_size: f64,
     min_font_size: f64,
     base_font_size: f64,
+    /// Native SVG text (`DrawTextSVG`) instead of glyph outlines.
+    native: bool,
 }
 
 impl DrawTextFT {
@@ -151,7 +174,22 @@ impl DrawTextFT {
             max_font_size,
             min_font_size,
             base_font_size: DEFAULT_FONT_SCALE,
+            native: false,
         })
+    }
+
+    /// A text drawer that writes `<text>` elements with a generic sans-serif
+    /// font and lays strings out with Helvetica's character widths
+    /// (`DrawTextSVG`).
+    pub fn new_native(max_font_size: f64, min_font_size: f64) -> Self {
+        let mut t = Self::new(max_font_size, min_font_size, "")
+            .expect("the built-in font is always available");
+        t.native = true;
+        t
+    }
+
+    pub fn is_native(&self) -> bool {
+        self.native
     }
 
     fn load_font(font_file: &str) -> Result<TrueTypeFont> {
@@ -163,6 +201,9 @@ impl DrawTextFT {
     }
 
     pub fn set_font_file(&mut self, font_file: &str) -> Result<()> {
+        if self.native {
+            return Ok(());
+        }
         if font_file != self.font_file {
             self.font = Self::load_font(font_file)?;
             self.font_file = font_file.to_string();
@@ -267,6 +308,9 @@ impl DrawTextFT {
     /// The rectangles of the characters of an unsplit string (`getStringRects`
     /// of `DrawTextFT`).
     fn raw_string_rects(&self, text: &str) -> Result<StringLayout> {
+        if self.native {
+            return Ok(self.native_string_rects(text));
+        }
         let bytes = text.as_bytes();
         let mut layout = StringLayout::default();
         let mut draw_mode = TextDrawType::Normal;
@@ -326,6 +370,148 @@ impl DrawTextFT {
         Ok(layout)
     }
 
+    /// `DrawTextSVG::getStringRects`: rectangles from Helvetica's character
+    /// widths, with empirical heights and spacing.
+    fn native_string_rects(&self, text: &str) -> StringLayout {
+        let bytes = text.as_bytes();
+        let mut layout = StringLayout::default();
+        let act_font_size = self.font_size();
+        let mut draw_mode = TextDrawType::Normal;
+        let mut max_width = 0.0f64;
+        let mut i = 0;
+        while i < bytes.len() {
+            // set_string_draw_mode moves i along to the end of any markup
+            if bytes[i] == b'<' && set_string_draw_mode(bytes, &mut draw_mode, &mut i) {
+                i += 1;
+                continue;
+            }
+            layout.draw_modes.push(draw_mode);
+            layout.draw_chars.push(bytes[i]);
+            max_width = max_width.max(char_width(bytes[i]));
+            i += 1;
+        }
+        let mut running_x = 0.0;
+        for k in 0..layout.draw_chars.len() {
+            let c = layout.draw_chars[k];
+            let mut width = 0.6 * act_font_size * char_width(c) / max_width;
+            // Absent a proper set of font metrics this is something of an
+            // empirical bodge.
+            let mut height = match c {
+                b'+' => 0.6 * act_font_size,
+                b'-' => 0.4 * act_font_size,
+                _ => 0.8 * act_font_size,
+            };
+            let cscale = Self::select_scale_factor(c, layout.draw_modes[k]);
+            height *= cscale;
+            width *= cscale;
+            let mut offset = Point2D::new(width / 2.0, height / 2.0);
+            if c == b'+' || c == b'-' {
+                offset.y /= 2.0;
+            }
+            let g_centre = Point2D::new(width / 2.0, height / 2.0);
+            let mut rect = StringRect::new(offset, g_centre, width, height);
+            rect.trans.x += running_x;
+            layout.rects.push(rect);
+            // empirical spacing.
+            running_x += width
+                * if layout.draw_modes[k] == TextDrawType::Normal {
+                    1.15
+                } else {
+                    1.05
+                };
+        }
+        for r in &mut layout.rects {
+            r.g_centre.y = act_font_size - r.g_centre.y;
+            r.offset.y = act_font_size / 2.0;
+        }
+        Self::adjust_for_super_sub_script(&layout.draw_modes, &mut layout.rects);
+        layout
+    }
+
+    /// `DrawTextNotFT::alignString`.
+    fn native_align_string(
+        mut talign: TextAlignType,
+        draw_modes: &[TextDrawType],
+        rects: &mut [StringRect],
+    ) {
+        // The string comes in with the rects aligned with the first char with
+        // its left and bottom edges at 0.
+        if talign == TextAlignType::Middle
+            && draw_modes
+                .iter()
+                .filter(|&&m| m == TextDrawType::Normal)
+                .count()
+                == 1
+        {
+            talign = TextAlignType::Start;
+        }
+        let (align_trans, align_offset);
+        if talign == TextAlignType::Start || talign == TextAlignType::End {
+            let mut align_char = 0;
+            for (i, m) in draw_modes.iter().enumerate().take(rects.len()) {
+                if *m == TextDrawType::Normal {
+                    align_char = i;
+                    if talign == TextAlignType::Start {
+                        break;
+                    }
+                }
+            }
+            align_trans = rects[align_char].trans;
+            align_offset = rects[align_char].offset;
+        } else {
+            // centre on the middle of the Normal text; the super- or
+            // subscripts should be at the ends
+            let (mut x_min, mut x_max) = (f64::MAX, f64::MIN);
+            let mut offset = Point2D::new(0.0, 0.0);
+            let mut num_norm = 0;
+            for (i, r) in rects.iter().enumerate() {
+                if draw_modes[i] == TextDrawType::Normal {
+                    let [_, tr, _, bl] = r.calc_corners(0.0);
+                    x_min = x_min.min(bl.x).min(tr.x);
+                    x_max = x_max.max(bl.x).max(tr.x);
+                    offset += r.offset;
+                    num_norm += 1;
+                }
+            }
+            align_trans = Point2D::new((x_max - x_min) / 2.0, 0.0);
+            align_offset = Point2D::new(
+                offset.x / f64::from(num_norm),
+                offset.y / f64::from(num_norm),
+            );
+        }
+        for r in rects.iter_mut() {
+            r.trans -= align_trans;
+            r.offset = align_offset;
+        }
+    }
+
+    /// The SVG `<text>` element for a character (`DrawTextSVG::drawChar`).
+    fn native_char_svg(&self, c: u8, cds: Point2D, active_class: &str) -> Result<String> {
+        let escaped = match c {
+            b'&' => "&amp;".to_string(),
+            b'"' => "&quot;".to_string(),
+            b'\'' => "&apos;".to_string(),
+            b'<' => "&lt;".to_string(),
+            b'>' => "&gt;".to_string(),
+            _ => (c as char).to_string(),
+        };
+        let mut s = format!(
+            "<text x='{}' y='{}'",
+            format_double(cds.x),
+            format_double(cds.y)
+        );
+        if !active_class.is_empty() {
+            let _ = write!(s, " class='{active_class}'");
+        }
+        let _ = writeln!(
+            s,
+            " style='font-size:{}px;font-style:normal;font-weight:normal;fill-opacity:1;stroke:none;font-family:sans-serif;text-anchor:start;fill:{}' >{escaped}</text>",
+            self.font_size() as u32,
+            colour_to_svg(&self.colour)?
+        );
+        Ok(s)
+    }
+
     fn adjust_for_super_sub_script(draw_modes: &[TextDrawType], rects: &mut [StringRect]) {
         let mut last_char: Option<usize> = None;
         for i in 0..draw_modes.len() {
@@ -369,6 +555,9 @@ impl DrawTextFT {
         draw_modes: &[TextDrawType],
         rects: &mut [StringRect],
     ) {
+        if self.native {
+            return Self::native_align_string(talign, draw_modes, rects);
+        }
         if talign == TextAlignType::Middle
             && draw_modes
                 .iter()
@@ -711,7 +900,11 @@ impl DrawTextFT {
         let mut out = String::new();
         for (c, p, scale) in self.char_positions(cds, layout) {
             self.set_font_scale(scale, true);
-            let path = self.svg_path_for_char(c, p, active_class);
+            let path = if self.native {
+                self.native_char_svg(c, p, active_class)
+            } else {
+                self.svg_path_for_char(c, p, active_class)
+            };
             self.set_font_scale(full_scale, true);
             out.push_str(&path?);
         }

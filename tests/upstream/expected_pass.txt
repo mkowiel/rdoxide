@@ -393,6 +393,7 @@ Code/GraphMol/MolChemicalFeatures/Wrap/testChemicalFeatures.py::TestCase::testPa
 Code/GraphMol/MolChemicalFeatures/Wrap/testChemicalFeatures.py::TestCase::testStringParse
 Code/GraphMol/MolChemicalFeatures/Wrap/testChemicalFeatures.py::TestCase::testStringParse2
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::test1
+Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::test2
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testACS1996Mode
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testAlternativeFreetypeFont
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testAtomTagging
@@ -405,12 +406,16 @@ Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testExtraDrawingCommand
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testGetDrawCoords
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testGithub1829
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testGithub4838
+Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testGithub5298
+Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testIsotopeLabels
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testMolSize
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testNewDrawingModes
+Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testPrepareAndDrawMolecule
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testPrepareForDrawing
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testProtectedAttributes
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testQueryColour
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testRepeatedPrepareForDrawingCalls
+Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testSetDrawOptions
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testSetLineWidth
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testSetPalette
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testSettingOptions

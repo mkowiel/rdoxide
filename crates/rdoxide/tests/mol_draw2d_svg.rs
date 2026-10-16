@@ -309,3 +309,22 @@ fn mol_size() {
         .unwrap();
     assert!(w > 0 && h > 0);
 }
+
+#[test]
+fn native_text_writes_text_elements() {
+    let mut d = MolDraw2DSVG::with_text(
+        250,
+        200,
+        -1,
+        -1,
+        rdoxide::graphmol::mol_draw2d::helpers::MolDrawOptions::default(),
+        true,
+    )
+    .unwrap();
+    d.draw_molecule(&smi("CCN"), "", -1).unwrap();
+    d.finish_drawing();
+    let svg = d.get_drawing_text();
+    assert!(svg.contains("fill:#0000FF' >N</text>"), "{svg}");
+    assert!(svg.contains("font-family:sans-serif;text-anchor:start;"));
+    assert!(!svg.contains("class='atom-2' d='M"));
+}
