@@ -1645,3 +1645,19 @@
 "Code/GraphMol/MolDraw2D/DrawMol.h" = "91cef7ed260064d3482febcc6de918660ab33a72"
 "Code/GraphMol/MolDraw2D/MolDraw2DDetails.cpp" = "64ac37afcface38aafb19b55cf099e68764a9f80"
 "Code/GraphMol/MolDraw2D/MolDraw2DSGroupData.h" = "9624b31367d4299f7fb4a85b877f0b282cd81fb7"
+
+[module."rdoxide::graphmol::mol_draw2d::draw_mol_render".sources]
+"Code/GraphMol/MolDraw2D/DrawMol.cpp" = "f14287164ccbf3f4067d658229e65335159273ec"
+"Code/GraphMol/MolDraw2D/DrawMol.h" = "91cef7ed260064d3482febcc6de918660ab33a72"
+
+[module."rdoxide::graphmol::mol_draw2d::drawer".sources]
+"Code/GraphMol/MolDraw2D/MolDraw2D.cpp" = "3ff92976ac4a347440a36d6233cdd1055f3a2313"
+"Code/GraphMol/MolDraw2D/MolDraw2D.h" = "990e781e004d3d43394063abe950b9183398886e"
+
+[module."rdoxide::graphmol::mol_draw2d::svg_canvas".sources]
+"Code/GraphMol/MolDraw2D/MolDraw2DSVG.cpp" = "1ca04e58c96fbb58a46433764fa137ad362f4f8e"
+"Code/GraphMol/MolDraw2D/MolDraw2DSVG.h" = "dcefaea3e1ee7c0ebd0021eb87160c893131c32f"
+
+[module."rdoxide::graphmol::mol_draw2d::mol_draw2d_svg".sources]
+"Code/GraphMol/MolDraw2D/MolDraw2DSVG.cpp" = "1ca04e58c96fbb58a46433764fa137ad362f4f8e"
+"Code/GraphMol/MolDraw2D/MolDraw2DSVG.h" = "dcefaea3e1ee7c0ebd0021eb87160c893131c32f"
