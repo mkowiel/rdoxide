@@ -1555,3 +1555,23 @@
 
 [module."rdoxide_python::rdstructchecker".sources]
 "Code/GraphMol/StructChecker/Wrap/structchecker.cpp" = "b7617378144ca10c37b475aeafa34c8fdd1e87bd"
+
+[module."rdoxide::graphmol::sln_parse".sources]
+"Code/GraphMol/SLNParse/SLNParse.cpp" = "0ad8eed12f3adb90a6a44534e324588487efbad9"
+"Code/GraphMol/SLNParse/SLNParse.h" = "7c00cbd8d6698c02045e82473fe1e6d34b91a641"
+
+[module."rdoxide::graphmol::sln_parse::lexer".sources]
+"Code/GraphMol/SLNParse/sln.ll" = "fa6fb2f03bb8be750db299035f3384016432b273"
+
+[module."rdoxide::graphmol::sln_parse::parser".sources]
+"Code/GraphMol/SLNParse/sln.yy" = "0480e54ecaf214e180b8248adaaf11c5aaff699f"
+
+[module."rdoxide::graphmol::sln_parse::ops".sources]
+"Code/GraphMol/SLNParse/SLNParseOps.h" = "c89d9feb2e03b5fa6a8bd30cd65b19da3236f885"
+
+[module."rdoxide::graphmol::sln_parse::attribs".sources]
+"Code/GraphMol/SLNParse/SLNAttribs.cpp" = "5b3a28d2fe1f854ec63bcb5f05ed7b357f4971aa"
+"Code/GraphMol/SLNParse/SLNAttribs.h" = "74c719d5bc56988d1eacbdb031376daa18b28019"
+
+[module."rdoxide_python::rdslnparse".sources]
+"Code/GraphMol/SLNParse/Wrap/rdSLNParse.cpp" = "115f754e719a0bc2c4e5eff3779095c85727333b"

@@ -296,6 +296,10 @@ impl Atom {
     pub fn query(&self) -> Option<&crate::graphmol::queries::AtomQuery> {
         self.query.as_deref()
     }
+    /// Removes and returns the query.
+    pub(crate) fn take_query(&mut self) -> Option<crate::graphmol::queries::AtomQuery> {
+        self.query.take().map(|q| *q)
+    }
     /// `setQuery()`
     pub fn set_query(&mut self, q: Option<crate::graphmol::queries::AtomQuery>) {
         self.query = q.map(Box::new);

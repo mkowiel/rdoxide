@@ -413,6 +413,9 @@ pub enum AtomFn {
         lower_open: bool,
         upper_open: bool,
     },
+    /// `queryAtomAllBondProduct`: the product of the primes of the bond
+    /// types of all the bonds (including those to implicit Hs)
+    AllBondProduct,
     /// `RecursiveStructureQuery::getAtIdx`
     AtIdx,
     /// `nullDataFun`
@@ -528,6 +531,17 @@ impl QueryTarget for AtomFn {
                 lower_open,
                 upper_open,
             } => atom_ring_size_in_range(mol, idx, *lower, *upper, *lower_open, *upper_open)?,
+            AtomFn::AllBondProduct => {
+                let primes = crate::rdgeneral::utils::first_thousand_primes();
+                let mut prod = 1u32;
+                for b in mol.atom_bonds(idx) {
+                    prod = prod.wrapping_mul(primes[b.bond_type() as usize]);
+                }
+                for _ in 0..mol.total_num_hs(idx, false)? {
+                    prod = prod.wrapping_mul(primes[BondType::Single as usize]);
+                }
+                prod as i32
+            }
             AtomFn::AtIdx => idx as i32,
             AtomFn::Null => 1,
         })
