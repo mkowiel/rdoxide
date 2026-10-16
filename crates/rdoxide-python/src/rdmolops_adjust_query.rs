@@ -3,6 +3,10 @@
 
 use pyo3::prelude::*;
 use rdoxide::graphmol::adjust_query::{AdjustQueryParameters, adjust_query_properties};
+use rdoxide::graphmol::generic_groups::{
+    adjust_query_properties_with_generic_groups, convert_generic_queries_to_substance_groups,
+    set_generic_queries_from_properties,
+};
 
 use crate::enums::add_enum_exported;
 use crate::errors::{IntoPyResult, argument_error, boost_type_name, no_converter};
@@ -154,9 +158,55 @@ fn py_adjust_query_properties(
     Ok(PyMol { mol: adjusted })
 }
 
+/// Returns a new molecule where the query properties of atoms have been modified and generic group queries have been prepared.
+#[pyfunction]
+#[pyo3(name = "AdjustQueryPropertiesWithGenericGroups", signature = (mol, params = None))]
+fn py_adjust_query_properties_with_generic_groups(
+    py: Python<'_>,
+    mol: &Bound<'_, PyMol>,
+    params: Option<&Bound<'_, PyAdjustQueryParameters>>,
+) -> PyResult<PyMol> {
+    let params = params.map_or_else(AdjustQueryParameters::default, |p| {
+        p.borrow().params.clone()
+    });
+    let core = mol.borrow().mol.clone();
+    let adjusted = py
+        .detach(|| adjust_query_properties_with_generic_groups(&core, &params))
+        .py()?;
+    Ok(PyMol { mol: adjusted })
+}
+
+/// Sets the generic query tags of the atoms from their atom labels and/or SUP substance groups.
+#[pyfunction]
+#[pyo3(name = "SetGenericQueriesFromProperties", signature = (mol, useAtomLabels = true, useSGroups = true))]
+#[allow(non_snake_case)]
+fn py_set_generic_queries_from_properties(
+    mol: &Bound<'_, PyMol>,
+    useAtomLabels: bool,
+    useSGroups: bool,
+) {
+    set_generic_queries_from_properties(&mut mol.borrow_mut().mol, useAtomLabels, useSGroups);
+}
+
+/// Converts the generic query tags of the atoms into SUP substance groups.
+#[pyfunction]
+#[pyo3(name = "ConvertGenericQueriesToSubstanceGroups")]
+fn py_convert_generic_queries_to_substance_groups(mol: &Bound<'_, PyMol>) -> PyResult<()> {
+    convert_generic_queries_to_substance_groups(&mut mol.borrow_mut().mol).py()
+}
+
 pub fn add(m: &Bound<'_, PyModule>) -> PyResult<()> {
     add_enum_exported(m, "AdjustQueryWhichFlags", &WHICH_FLAGS, None)?;
     m.add_class::<PyAdjustQueryParameters>()?;
     m.add_function(wrap_pyfunction!(py_adjust_query_properties, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        py_adjust_query_properties_with_generic_groups,
+        m
+    )?)?;
+    m.add_function(wrap_pyfunction!(py_set_generic_queries_from_properties, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        py_convert_generic_queries_to_substance_groups,
+        m
+    )?)?;
     Ok(())
 }
