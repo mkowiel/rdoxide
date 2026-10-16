@@ -1619,3 +1619,11 @@
 [module."rdoxide::graphmol::file_parsers::mol_file_stereochem".sources]
 "Code/GraphMol/FileParsers/MolFileStereochem.cpp" = "b3d1160d4a0913a8b7cfe0f491e23ed68b35f87c"
 "Code/GraphMol/FileParsers/MolFileStereochem.h" = "87de1dc400a4144434727e95537b806eca746975"
+
+[module."rdoxide::graphmol::mol_draw2d::draw_mol".sources]
+"Code/GraphMol/MolDraw2D/DrawMol.cpp" = "f14287164ccbf3f4067d658229e65335159273ec"
+"Code/GraphMol/MolDraw2D/DrawMol.h" = "91cef7ed260064d3482febcc6de918660ab33a72"
+"Code/GraphMol/MolDraw2D/MolDraw2DDetails.h" = "738a5fe018c8db40aceae33a0bc2559b6abb7b44"
+
+[module."rdoxide::graphmol::mol_draw2d::draw_mol_legend".sources]
+"Code/GraphMol/MolDraw2D/DrawMol.cpp" = "f14287164ccbf3f4067d658229e65335159273ec"
