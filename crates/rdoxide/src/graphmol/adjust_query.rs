@@ -2,8 +2,8 @@
 //! substructure query (degree and ring queries, generic atoms and bonds,
 //! MDL five-ring aromaticity, ...).
 //!
-//! Ported from RDKit `Code/GraphMol/AdjustQuery.cpp` (2026.09.1). The JSON
-//! parameter format (`parseAdjustQueryParametersFromJSON`) is not ported.
+//! Ported from RDKit `Code/GraphMol/AdjustQuery.cpp` (2026.09.1), including
+//! the JSON parameter format (`parseAdjustQueryParametersFromJSON`).
 //!
 //! Copyright (C) 2015-2020 Greg Landrum and other RDKit contributors.
 //! Licensed under the BSD 3-Clause license (see LICENSES/RDKit-BSD-3-Clause.txt).
@@ -23,6 +23,7 @@ use crate::graphmol::query_ops::{atom_expand_query, query_atom_from_atom};
 use crate::graphmol::romol::{ROMol, RWMol};
 use crate::rdgeneral::RDProps;
 use crate::rdgeneral::common_properties as cp;
+use crate::rdgeneral::ptree::PTree;
 use crate::{RDKitError, Result, rd_log_warning};
 
 /// `MolOps::AdjustQueryWhichFlags`: which atoms/bonds an adjustment skips.
@@ -377,6 +378,78 @@ fn adjust_atoms(mol: &mut RWMol, params: &AdjustQueryParameters, orig_nums: &[u3
 fn expand(mol: &mut RWMol, idx: u32, query: AtomQuery) -> Result<()> {
     let atom = ensure_query_atom(mol, idx)?;
     atom_expand_query(atom, query, CompositeQueryType::And, true)
+}
+
+/// `parseWhichString`: the flags named in a `|`-separated string.
+fn parse_which_string(txt: &str) -> Result<u32> {
+    let mut res = ADJUST_IGNORENONE;
+    for token in txt.split('|').filter(|t| !t.is_empty()) {
+        res |= match token {
+            "IGNORENONE" => ADJUST_IGNORENONE,
+            "IGNORERINGS" => ADJUST_IGNORERINGS,
+            "IGNORECHAINS" => ADJUST_IGNORECHAINS,
+            "IGNOREDUMMIES" => ADJUST_IGNOREDUMMIES,
+            "IGNORENONDUMMIES" => ADJUST_IGNORENONDUMMIES,
+            "IGNOREALL" => ADJUST_IGNOREALL,
+            _ => {
+                return Err(RDKitError::Value(format!(
+                    "Unknown flag value: '{token}'. Flags ignored."
+                )));
+            }
+        };
+    }
+    Ok(res)
+}
+
+/// `parseAdjustQueryParametersFromJSON`: updates the parameters from a JSON
+/// object. Keys that are absent leave the parameter as it was.
+pub fn parse_adjust_query_parameters_from_json(
+    params: &mut AdjustQueryParameters,
+    json: &str,
+) -> Result<()> {
+    if json.is_empty() {
+        return Err(RDKitError::precondition("empty JSON provided"));
+    }
+    let pt = PTree::from_json(json)?;
+    macro_rules! bools {
+        ($($key:literal => $field:ident),* $(,)?) => {
+            $( params.$field = pt.get_bool($key, params.$field); )*
+        };
+    }
+    bools! {
+        "adjustDegree" => adjust_degree,
+        "adjustRingCount" => adjust_ring_count,
+        "makeDummiesQueries" => make_dummies_queries,
+        "aromatizeIfPossible" => aromatize_if_possible,
+        "makeBondsGeneric" => make_bonds_generic,
+        "makeAtomsGeneric" => make_atoms_generic,
+        "adjustHeavyDegree" => adjust_heavy_degree,
+        "adjustRingChain" => adjust_ring_chain,
+        "useStereoCareForBonds" => use_stereo_care_for_bonds,
+        "adjustConjugatedFiveRings" => adjust_conjugated_five_rings,
+        "setMDLFiveRingAromaticity" => set_mdl_five_ring_aromaticity,
+        "adjustSingleBondsToDegreeOneNeighbors" => adjust_single_bonds_to_degree_one_neighbors,
+        "adjustSingleBondsBetweenAromaticAtoms" => adjust_single_bonds_between_aromatic_atoms,
+    }
+    macro_rules! flags {
+        ($($key:literal => $field:ident),* $(,)?) => {
+            $(
+                let which = pt.get_str($key).unwrap_or("").to_uppercase();
+                if !which.is_empty() {
+                    params.$field = parse_which_string(&which)?;
+                }
+            )*
+        };
+    }
+    flags! {
+        "adjustDegreeFlags" => adjust_degree_flags,
+        "adjustHeavyDegreeFlags" => adjust_heavy_degree_flags,
+        "adjustRingCountFlags" => adjust_ring_count_flags,
+        "makeBondsGenericFlags" => make_bonds_generic_flags,
+        "makeAtomsGenericFlags" => make_atoms_generic_flags,
+        "adjustRingChainFlags" => adjust_ring_chain_flags,
+    }
+    Ok(())
 }
 
 /// `MolOps::adjustQueryProperties(mol, params)` in place.
