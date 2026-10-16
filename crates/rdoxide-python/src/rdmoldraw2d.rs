@@ -9,6 +9,9 @@ use pyo3::exceptions::{
 };
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
+use rdoxide::graphmol::mol_draw2d::contour::{
+    ContourParams, contour_and_draw_gaussians, contour_and_draw_grid,
+};
 use rdoxide::graphmol::mol_draw2d::draw_mol::DrawMolHighlights;
 use rdoxide::graphmol::mol_draw2d::drawer::{MolDraw2DSVG, MoleculeHighlights};
 use rdoxide::graphmol::mol_draw2d::helpers::{
@@ -1529,6 +1532,333 @@ fn update_drawer_params_from_json_py(
     update_mol_draw_options_from_json(drawer.d.draw_options_mut(), json).py()
 }
 
+// ----------------------------------------------------------------------
+// contouring
+// ----------------------------------------------------------------------
+
+/// Parameters for drawing contours
+#[pyclass(
+    name = "ContourParams",
+    module = "rdoxide.Chem.Draw.rdMolDraw2D",
+    skip_from_py_object
+)]
+#[derive(Debug, Clone, Default)]
+pub struct PyContourParams {
+    p: ContourParams,
+}
+
+macro_rules! contour_props {
+    ($( ($py:literal, $get:ident, $set:ident, $field:ident, $ty:ty) ),* $(,)?) => {
+        #[pymethods]
+        impl PyContourParams {
+            $(
+                #[getter($py)]
+                fn $get(&self) -> $ty {
+                    self.p.$field
+                }
+                #[setter($py)]
+                fn $set(&mut self, value: $ty) {
+                    self.p.$field = value;
+                }
+            )*
+        }
+    };
+}
+
+contour_props!(
+    ("setScale", get_set_scale, set_set_scale, set_scale, bool),
+    (
+        "dashNegative",
+        get_dash_negative,
+        set_dash_negative,
+        dash_negative,
+        bool
+    ),
+    ("fillGrid", get_fill_grid, set_fill_grid, fill_grid, bool),
+    (
+        "gridResolution",
+        get_grid_resolution,
+        set_grid_resolution,
+        grid_resolution,
+        f64
+    ),
+    (
+        "contourWidth",
+        get_contour_width,
+        set_contour_width,
+        contour_width,
+        f64
+    ),
+    (
+        "extraGridPadding",
+        get_extra_grid_padding,
+        set_extra_grid_padding,
+        extra_grid_padding,
+        f64
+    ),
+    (
+        "drawAsLines",
+        get_draw_as_lines,
+        set_draw_as_lines,
+        draw_as_lines,
+        bool
+    ),
+    (
+        "coordScaleForQuantization",
+        get_coord_scale,
+        set_coord_scale,
+        coord_scale_for_quantization,
+        f64
+    ),
+    (
+        "isovalScaleForQuantization",
+        get_isoval_scale,
+        set_isoval_scale,
+        isoval_scale_for_quantization,
+        f64
+    ),
+    (
+        "useFillThreshold",
+        get_use_fill_threshold,
+        set_use_fill_threshold,
+        use_fill_threshold,
+        bool
+    ),
+    (
+        "fillThreshold",
+        get_fill_threshold,
+        set_fill_threshold,
+        fill_threshold,
+        f64
+    ),
+    (
+        "fillThresholdIsFraction",
+        get_fill_threshold_is_fraction,
+        set_fill_threshold_is_fraction,
+        fill_threshold_is_fraction,
+        bool
+    ),
+);
+
+#[pymethods]
+#[allow(non_snake_case)]
+impl PyContourParams {
+    #[new]
+    fn new() -> Self {
+        PyContourParams::default()
+    }
+
+    /// the color map to use when filling the grid
+    #[getter(colourMap)]
+    fn get_colour_map<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
+        let items = self
+            .p
+            .colour_map
+            .iter()
+            .map(|c| colour_tuple(py, *c))
+            .collect::<PyResult<Vec<_>>>()?;
+        PyTuple::new(py, items)
+    }
+
+    #[setter(colourMap)]
+    fn set_colour_map(&mut self, colours: &Bound<'_, PyAny>) -> PyResult<()> {
+        self.p.colour_map = colours
+            .try_iter()?
+            .map(|c| py_colour(&c?))
+            .collect::<PyResult<_>>()?;
+        Ok(())
+    }
+
+    #[pyo3(signature = (colours))]
+    fn setColourMap(&mut self, colours: &Bound<'_, PyAny>) -> PyResult<()> {
+        self.set_colour_map(colours)
+    }
+
+    /// the color to use for drawing the contours
+    #[getter(contourColour)]
+    fn get_contour_colour<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
+        colour_tuple(py, self.p.contour_colour)
+    }
+
+    #[setter(contourColour)]
+    fn set_contour_colour(&mut self, tpl: &Bound<'_, PyAny>) -> PyResult<()> {
+        self.p.contour_colour = py_colour(tpl)?;
+        Ok(())
+    }
+
+    #[pyo3(signature = (colour))]
+    fn setContourColour(&mut self, colour: &Bound<'_, PyAny>) -> PyResult<()> {
+        self.set_contour_colour(colour)
+    }
+}
+
+fn float_list(obj: Option<&Bound<'_, PyAny>>, name: &str) -> PyResult<Vec<f64>> {
+    match given(obj)? {
+        Some(o) => o.try_iter()?.map(|v| v?.extract()).collect(),
+        None => Err(PyValueError::new_err(format!(
+            "{name} argument must be non-empty"
+        ))),
+    }
+}
+
+fn optional_mol<'a>(obj: Option<&'a Bound<'_, PyAny>>) -> PyResult<Option<PyRef<'a, PyMol>>> {
+    match obj {
+        Some(m) if !m.is_none() => Ok(Some(mol_arg(m)?)),
+        _ => Ok(None),
+    }
+}
+
+/// Generates and draws contours for a set of gaussians
+///
+///   - drawer: the MolDraw2D object to use
+///   - locs: locations of the gaussians
+///   - heights: the heights (or weights) of the gaussians
+///   - widths: the standard deviations of the gaussians
+///   - nContours: the number of contours to draw
+///   - levels: the contours to use
+///   - ps: additional parameters controlling the contouring.
+///   - mol: molecule used to help set scale.
+///
+///   The values are calculated on a grid with spacing params.gridResolution.
+///   If params.setScale  is set, the grid size will be calculated based on the
+///   locations of the gaussians and params.extraGridPadding. Otherwise the current
+///   size of the viewport will be used.
+///
+///   If the levels argument is empty, the contour levels will be determined
+///   automatically from the max and min values on the grid and levels will
+///   be updated to include the contour levels.
+///
+///   If params.fillGrid is set, the data on the grid will also be drawn using
+///   the color scheme in params.colourMap
+///
+///   If mol is not 0, uses the molecule to help set the scale, assuming that
+///   it will be drawn over the plot, so needs to fit on it.
+#[pyfunction]
+#[pyo3(name = "ContourAndDrawGaussians", signature = (drawer, locs, heights, widths, nContours = 10, levels = None, params = None, mol = None))]
+#[allow(non_snake_case)]
+fn contour_and_draw_gaussians_py(
+    mut drawer: PyRefMut<'_, PyMolDraw2D>,
+    locs: &Bound<'_, PyAny>,
+    heights: &Bound<'_, PyAny>,
+    widths: &Bound<'_, PyAny>,
+    nContours: usize,
+    levels: Option<&Bound<'_, PyAny>>,
+    params: Option<PyRef<'_, PyContourParams>>,
+    mol: Option<&Bound<'_, PyAny>>,
+) -> PyResult<()> {
+    let locs = match given(Some(locs))? {
+        Some(l) => l
+            .try_iter()?
+            .map(|p| Ok(p?.extract::<PyRef<'_, PyPoint2D>>()?.p))
+            .collect::<PyResult<Vec<_>>>()?,
+        None => return Err(PyValueError::new_err("locs argument must be non-empty")),
+    };
+    let heights = float_list(Some(heights), "heights")?;
+    let widths = float_list(Some(widths), "widths")?;
+    let mut levels = match given(levels)? {
+        Some(l) => float_list(Some(l), "levels")?,
+        None => Vec::new(),
+    };
+    let p = params.map_or_else(ContourParams::default, |p| p.p.clone());
+    let mol = optional_mol(mol)?;
+    contour_and_draw_gaussians(
+        &mut drawer.d,
+        &locs,
+        &heights,
+        &widths,
+        nContours,
+        &mut levels,
+        &p,
+        mol.as_ref().map(|m| &m.mol),
+    )
+    .py()
+}
+
+/// Generates and draws contours for data on a grid
+///
+///   - drawer: the MolDraw2D object to use
+///   - data: numpy array with the data to be contoured
+///   - xcoords: the x coordinates of the grid
+///   - ycoords: the y coordinates of the grid
+///   - nContours: the number of contours to draw
+///   - levels: the contours to use
+///   - ps: additional parameters controlling the contouring
+///   - mol: molecule used to help set scale.
+///
+///   The values are calculated on a grid with spacing params.gridResolution.
+///   If params.setScale  is set, the grid size will be calculated based on the
+///   locations of the gaussians and params.extraGridPadding. Otherwise the current
+///   size of the viewport will be used.
+///
+///   If the levels argument is empty, the contour levels will be determined
+///   automatically from the max and min values on the grid and levels will
+///   be updated to include the contour levels.
+///
+///   If params.fillGrid is set, the data on the grid will also be drawn using
+///   the color scheme in params.colourMap
+///
+///   If mol is not 0, uses the molecule to help set the scale, assuming that
+///   it will be drawn over the plot, so needs to fit on it.
+#[pyfunction]
+#[pyo3(name = "ContourAndDrawGrid", signature = (drawer, data, xcoords, ycoords, nContours = 10, levels = None, params = None, mol = None))]
+#[allow(non_snake_case)]
+fn contour_and_draw_grid_py(
+    py: Python<'_>,
+    mut drawer: PyRefMut<'_, PyMolDraw2D>,
+    data: &Bound<'_, PyAny>,
+    xcoords: &Bound<'_, PyAny>,
+    ycoords: &Bound<'_, PyAny>,
+    nContours: usize,
+    levels: Option<&Bound<'_, PyAny>>,
+    params: Option<PyRef<'_, PyContourParams>>,
+    mol: Option<&Bound<'_, PyAny>>,
+) -> PyResult<()> {
+    let np = py.import("numpy")?;
+    if !data.is_instance(&np.getattr("ndarray")?)? {
+        return Err(PyValueError::new_err("data argument must be a numpy array"));
+    }
+    let arr = np
+        .call_method1("ascontiguousarray", (data, "float64"))
+        .map_err(|_| PyValueError::new_err("could not convert data argument"))?;
+    let shape: Vec<usize> = arr.getattr("shape")?.extract()?;
+    let &[n_x, n_y] = shape.as_slice() else {
+        return Err(PyValueError::new_err("could not convert data argument"));
+    };
+    let values: Vec<f64> = arr
+        .call_method0("ravel")?
+        .call_method0("tolist")?
+        .extract()?;
+    let xs = float_list(Some(xcoords), "xcoords")?;
+    let ys = float_list(Some(ycoords), "ycoords")?;
+    let mut levels = match given(levels)? {
+        Some(l) => float_list(Some(l), "levels")?,
+        None => Vec::new(),
+    };
+    if n_x != xs.len() {
+        return Err(PyValueError::new_err(
+            "data array and xcoords sizes do not match.\nDid you forget to call np.transpose() on the array?",
+        ));
+    }
+    if n_y != ys.len() {
+        return Err(PyValueError::new_err(
+            "data array and ycoords sizes do not match",
+        ));
+    }
+    let p = params.map_or_else(ContourParams::default, |p| p.p.clone());
+    let mol = optional_mol(mol)?;
+    contour_and_draw_grid(
+        &mut drawer.d,
+        &values,
+        &xs,
+        &ys,
+        nContours,
+        &mut levels,
+        &p,
+        mol.as_ref().map(|m| &m.mol),
+    )
+    .py()
+}
+
 pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add(
         "__doc__",
@@ -1566,6 +1896,9 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyMolDrawOptions>()?;
     m.add_class::<PyMolDraw2D>()?;
     m.add_class::<PyMolDraw2DSVG>()?;
+    m.add_class::<PyContourParams>()?;
+    m.add_function(wrap_pyfunction!(contour_and_draw_gaussians_py, m)?)?;
+    m.add_function(wrap_pyfunction!(contour_and_draw_grid_py, m)?)?;
     m.add_function(wrap_pyfunction!(prepare_mol_for_drawing_py, m)?)?;
     m.add_function(wrap_pyfunction!(prepare_and_draw_molecule_py, m)?)?;
     m.add_function(wrap_pyfunction!(draw_molecule_acs1996_py, m)?)?;

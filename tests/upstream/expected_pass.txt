@@ -407,8 +407,10 @@ Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testGetDrawCoords
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testGithub1829
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testGithub4838
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testGithub5298
+Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testGridContours
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testIsotopeLabels
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testLegendPosition
+Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testMolContours
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testMolSize
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testNewDrawingModes
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testPrepareAndDrawMolecule
@@ -1067,6 +1069,7 @@ rdkit/Chem/Draw/UnitTestDraw.py::TestCase::testMolToSVG
 rdkit/Chem/Draw/UnitTestDraw.py::TestCase::testMolsMatrixToGridImage
 rdkit/Chem/Draw/UnitTestDraw.py::TestCase::testMolsMatrixToLinear
 rdkit/Chem/Draw/UnitTestDraw.py::TestCase::test_interactive
+rdkit/Chem/Draw/UnitTestSimilarityMaps.py::TestCase::testSimilarityMapsMolDraw2D
 rdkit/Chem/EState/UnitTestEState.py::TestCase::test_GetPrincipleQuantumNumber
 rdkit/Chem/EState/UnitTestEState.py::TestCase::test_aromatics
 rdkit/Chem/EState/UnitTestEState.py::TestCase::test_cacheEstate
