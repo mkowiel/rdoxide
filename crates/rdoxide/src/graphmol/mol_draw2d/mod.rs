@@ -10,6 +10,7 @@ pub mod draw_mol_bonds;
 pub mod draw_mol_highlights;
 pub mod draw_mol_legend;
 pub mod draw_mol_notes;
+pub mod draw_mol_sgroups;
 pub mod draw_mol_utils;
 pub mod draw_shape;
 pub mod draw_text;

@@ -323,11 +323,16 @@ impl DrawMol {
     }
 
     /// Extracts everything to be drawn. Present so far: atom coordinates, labels,
-    /// bonds, regions, highlights, attachments, notes and radicals.
+    /// bonds, regions, highlights, attachments, notes, radicals, S-groups and the rest.
     pub fn extract_all(&mut self, scale: f64, text: &mut DrawTextFT) -> Result<()> {
         self.extract_atom_coords()?;
         self.extract_atom_symbols(text)?;
+        // This removes the * symbol from the end of dative bonds showing a
+        // haptic bond, so it must be done before the bonds are extracted or
+        // they would be shortened for a * that isn't in the final picture.
+        self.extract_variable_bonds()?;
         self.extract_bonds()?;
+        self.resolve_atom_symbol_clashes(text)?;
         self.extract_regions()?;
         self.extract_highlights(scale)?;
         self.extract_attachments()?;
@@ -340,6 +345,9 @@ impl DrawMol {
         }
         self.extract_bond_notes(text)?;
         self.extract_radicals()?;
+        self.extract_sgroup_data(text)?;
+        self.extract_brackets(text)?;
+        self.extract_link_nodes(text)?;
         Ok(())
     }
 
@@ -878,6 +886,7 @@ impl DrawMol {
         self.change_to_draw_coords(text)?;
         // these need the drawing coordinates
         self.extract_mol_notes(text)?;
+        self.extract_close_contacts()?;
         self.drawing_initialised = true;
         Ok(())
     }
