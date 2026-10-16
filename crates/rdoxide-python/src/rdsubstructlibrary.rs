@@ -1,8 +1,7 @@
 //! `rdkit.Chem.rdSubstructLibrary` (upstream
 //! `GraphMol/SubstructLibrary/Wrap/SubstructLibraryWrap.cpp`).
 //!
-//! Not supported: `MolBundle` and `ExtendedQueryMol`
-//! queries; libraries pickle to this port's own (text) format.
+//! Libraries pickle to this port's own (text) format.
 
 use std::collections::HashMap;
 
@@ -460,6 +459,8 @@ fn parse_search_args(
 enum Query {
     Mol(Box<rdoxide::graphmol::ROMol>),
     Tautomer(rdoxide::graphmol::tautomer_query::TautomerQuery),
+    Bundle(rdoxide::graphmol::mol_bundle::MolBundle),
+    Extended(rdoxide::graphmol::generalized_substruct::ExtendedQueryMol),
 }
 
 fn query_of(query: &Bound<'_, PyAny>) -> PyResult<Query> {
@@ -469,8 +470,14 @@ fn query_of(query: &Bound<'_, PyAny>) -> PyResult<Query> {
     if let Ok(t) = query.extract::<PyRef<'_, crate::rdtautomerquery::PyTautomerQuery>>() {
         return Ok(Query::Tautomer(t.query.clone()));
     }
+    if let Ok(b) = query.extract::<PyRef<'_, crate::molbundle::PyMolBundle>>() {
+        return Ok(Query::Bundle(b.bundle.clone()));
+    }
+    if let Ok(x) = query.extract::<PyRef<'_, crate::rdgeneralizedsubstruct::PyExtendedQueryMol>>() {
+        return Ok(Query::Extended(x.query.clone()));
+    }
     Err(PyTypeError::new_err(
-        "query must be a Mol or a TautomerQuery",
+        "query must be a Mol, a TautomerQuery, a MolBundle or an ExtendedQueryMol",
     ))
 }
 
@@ -600,6 +607,12 @@ impl PySubstructLibrary {
                     a.max_results,
                 )
             }),
+            Query::Bundle(query) => py.detach(|| {
+                lib.get_bundle_matches(&query, start, end, &a.params, a.num_threads, a.max_results)
+            }),
+            Query::Extended(query) => py.detach(|| {
+                lib.get_xq_matches(&query, start, end, &a.params, a.num_threads, a.max_results)
+            }),
         }
         .py()
     }
@@ -623,6 +636,12 @@ impl PySubstructLibrary {
             Query::Tautomer(query) => py.detach(|| {
                 lib.count_tautomer_matches(&query, start, end, &a.params, a.num_threads)
             }),
+            Query::Bundle(query) => {
+                py.detach(|| lib.count_bundle_matches(&query, start, end, &a.params, a.num_threads))
+            }
+            Query::Extended(query) => {
+                py.detach(|| lib.count_xq_matches(&query, start, end, &a.params, a.num_threads))
+            }
         }
         .py()
     }
@@ -645,6 +664,12 @@ impl PySubstructLibrary {
             }
             Query::Tautomer(query) => {
                 py.detach(|| lib.has_tautomer_match(&query, start, end, &a.params, a.num_threads))
+            }
+            Query::Bundle(query) => {
+                py.detach(|| lib.has_bundle_match(&query, start, end, &a.params, a.num_threads))
+            }
+            Query::Extended(query) => {
+                py.detach(|| lib.has_xq_match(&query, start, end, &a.params, a.num_threads))
             }
         }
         .py()

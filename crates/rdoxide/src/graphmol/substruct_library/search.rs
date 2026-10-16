@@ -13,6 +13,7 @@ use super::holders::{MolHolder, PatternHolder};
 use crate::datastructs::ExplicitBitVect;
 use crate::error::{RDKitError, Result};
 use crate::graphmol::find_rings::{SymmetrizeSSSRAlgorithm, symmetrize_sssr};
+use crate::graphmol::generalized_substruct::{ExtendedQueryMol, has_substruct_match_xq};
 use crate::graphmol::queries::QueryKind;
 use crate::graphmol::romol::ROMol;
 use crate::graphmol::substruct::{SubstructMatchParameters, substruct_match};
@@ -36,14 +37,44 @@ pub(super) fn query_needs_rings(query: &ROMol) -> bool {
             .any(|b| b.query().is_some_and(|q| q.describe(0).contains("Ring")))
 }
 
+/// `query_needs_rings` for an extended query.
+pub(super) fn xq_needs_rings(xq: &ExtendedQueryMol) -> bool {
+    match xq {
+        ExtendedQueryMol::Mol(m) => query_needs_rings(m),
+        ExtendedQueryMol::Bundle(b) => b.mols().iter().any(|m| query_needs_rings(m)),
+        ExtendedQueryMol::Tautomer(tq) => query_needs_rings(tq.template_molecule()),
+        ExtendedQueryMol::TautomerBundle(v) => {
+            v.iter().any(|tq| query_needs_rings(tq.template_molecule()))
+        }
+    }
+}
+
+/// The kinds of query the library can be searched with.
+#[derive(Clone, Copy)]
+pub(super) enum QueryRef<'a> {
+    Mol(&'a ROMol),
+    Tautomer(&'a TautomerQuery),
+    Extended(&'a ExtendedQueryMol),
+}
+
+impl QueryRef<'_> {
+    pub(super) fn needs_rings(&self) -> bool {
+        match self {
+            QueryRef::Mol(q) => query_needs_rings(q),
+            QueryRef::Tautomer(tq) => query_needs_rings(tq.template_molecule()),
+            QueryRef::Extended(x) => xq_needs_rings(x),
+        }
+    }
+}
+
 /// Everything a worker needs; shared by reference between the workers.
 pub(super) struct Search<'a> {
     pub mols: &'a MolHolder,
     pub fps: Option<&'a PatternHolder>,
-    /// The query molecule (the template molecule of a tautomer query).
-    pub query: &'a ROMol,
-    /// Set when the query is a tautomer query.
-    pub tautomer: Option<&'a TautomerQuery>,
+    pub query: QueryRef<'a>,
+    /// Library positions to leave out (molecules an earlier query of a
+    /// bundle already matched).
+    pub skip: Option<&'a [bool]>,
     /// The query's pattern fingerprint (`None` when there is nothing to filter
     /// with).
     pub query_bits: Option<ExplicitBitVect>,
@@ -67,7 +98,7 @@ impl Search<'_> {
     }
 
     fn matches(&self, idx: u32) -> Result<bool> {
-        if !self.passes_filter(idx)? {
+        if self.skip.is_some_and(|s| s[idx as usize]) || !self.passes_filter(idx)? {
             return Ok(false);
         }
         let Some(mol) = self.mols.get_mol(idx)? else {
@@ -80,9 +111,10 @@ impl Search<'_> {
         } else {
             mol
         };
-        Ok(match self.tautomer {
-            Some(tq) => !tq.substruct_of(&mol, &self.params)?.0.is_empty(),
-            None => !substruct_match(&mol, self.query, &self.params)?.is_empty(),
+        Ok(match self.query {
+            QueryRef::Tautomer(tq) => !tq.substruct_of(&mol, &self.params)?.0.is_empty(),
+            QueryRef::Mol(q) => !substruct_match(&mol, q, &self.params)?.is_empty(),
+            QueryRef::Extended(x) => has_substruct_match_xq(&mol, x, &self.params)?,
         })
     }
 

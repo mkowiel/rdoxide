@@ -26,7 +26,7 @@ use crate::substruct::PySubstructMatchParameters;
     skip_from_py_object
 )]
 pub struct PyExtendedQueryMol {
-    query: ExtendedQueryMol,
+    pub(crate) query: ExtendedQueryMol,
 }
 
 #[pymethods]
