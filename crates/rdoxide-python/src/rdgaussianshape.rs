@@ -156,7 +156,7 @@ impl PyShapeInputOptions {
             }
             all.append(list)?;
         }
-        Ok(PyTuple::new(py, all)?)
+        PyTuple::new(py, all)
     }
     #[setter(customFeatures)]
     fn set_custom_features(&mut self, v: &Bound<'_, PyAny>) -> PyResult<()> {
