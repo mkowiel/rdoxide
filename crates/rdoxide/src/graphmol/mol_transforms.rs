@@ -49,6 +49,21 @@ pub fn transform_conformer(conf: &mut Conformer, trans: &Transform3D) {
     }
 }
 
+/// `transformMolSubstanceGroups`: applies `trans` to the brackets and
+/// cstate vectors of the substance groups.
+pub fn transform_mol_substance_groups(mol: &mut ROMol, trans: &Transform3D) {
+    for sg in mol.substance_groups_mut() {
+        for brk in sg.brackets_mut() {
+            for p in brk.iter_mut() {
+                *p = trans.transform_point(p);
+            }
+        }
+        for cs in sg.cstates_mut() {
+            cs.vector = trans.transform_point(&cs.vector);
+        }
+    }
+}
+
 /// `computeCentroid(conf, ignoreHs, weights)`
 pub fn compute_centroid(
     mol: &ROMol,
