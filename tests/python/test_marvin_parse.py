@@ -55,3 +55,26 @@ def test_substance_groups():
 @needs_data
 def test_bad_files_give_none():
     assert Chem.MolFromMrvFile(os.path.join(DATA, "MarvinBadX2.mrv")) is None
+
+
+def test_write_round_trip():
+    m = Chem.MolFromMrvBlock(SIMPLE)
+    block = Chem.MolToMrvBlock(m)
+    assert block.startswith('<?xml version="1.0" encoding="utf-8"?>')
+    assert 'role=' not in block
+    m2 = Chem.MolFromMrvBlock(block)
+    assert Chem.MolToSmiles(m2) == "C=O"
+    assert "\n\t<MDocument>" in Chem.MolToMrvBlock(m, prettyPrint=True)
+
+
+def test_write_file(tmp_path):
+    m = Chem.MolFromSmiles("CC(=O)O")
+    path = str(tmp_path / "a.mrv")
+    Chem.MolToMrvFile(m, path)
+    assert Chem.MolToSmiles(Chem.MolFromMrvFile(path)) == "CC(=O)O"
+
+
+def test_unlabelled_query_atoms_become_stars():
+    # (as upstream: only labelled queries such as Q or X are rejected)
+    m = Chem.MolFromSmarts("[C,N]C")
+    assert 'elementType="*"' in Chem.MolToMrvBlock(m)

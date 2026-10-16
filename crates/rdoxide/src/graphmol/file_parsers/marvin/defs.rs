@@ -301,7 +301,7 @@ pub struct MarvinNode {
 }
 
 impl MarvinNode {
-    fn new(kind: SgroupKind, parent: Option<NodeId>) -> Self {
+    pub fn new(kind: SgroupKind, parent: Option<NodeId>) -> Self {
         MarvinNode {
             mol_id: String::new(),
             id: String::new(),

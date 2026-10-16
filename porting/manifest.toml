@@ -1407,6 +1407,7 @@
 "Code/GraphMol/MolProcessing/nbWrap/rdMolProcessing.cpp" = "bd06d2f944863b59253d66a809a8b02e6dbcea62"
 
 [module."rdoxide::graphmol::file_parsers::marvin".sources]
+"Code/GraphMol/MarvinParse/MarvinWriter.cpp" = "1d3f42b4be095c595900f08c1a8b125dc59be8be"
 "Code/GraphMol/MarvinParse/MarvinParser.cpp" = "ac8d644b6e4ca3781a343936d198493312566bb1"
 "Code/GraphMol/MarvinParse/MarvinParser.h" = "136a4cce1d5fdd899d76493a654988d4be716bb6"
 "Code/GraphMol/MarvinParse/MarvinDefs.cpp" = "fc1aa1463d00f91c66ba0e2185b197f530423573"
