@@ -18,6 +18,11 @@ const DATA: &str = concat!(
 
 use ScsrBaseHbondOptions::{Auto, UseSapAll};
 
+/// The upstream test data is not present in every checkout.
+fn have_data() -> bool {
+    std::path::Path::new(DATA).is_dir()
+}
+
 /// file, expands, hydrogen bond option, atoms, bonds, groups, and the same
 /// without leaving groups, then the chirality of some atoms
 type Case = (
@@ -277,6 +282,9 @@ fn params(sanitize: bool, strict: bool) -> MolFileParserParams {
 
 #[test]
 fn macromolecule_files() {
+    if !have_data() {
+        return;
+    }
     for &(file, expands, hbonds, counts, chirality) in CASES {
         let path = format!("{DATA}{file}");
         let mut scsr = MolFromScsrParams {
@@ -331,6 +339,9 @@ fn label(sg: &SubstanceGroup) -> String {
 
 #[test]
 fn names_with_nested_parentheses() {
+    if !have_data() {
+        return;
+    }
     let scsr = MolFromScsrParams {
         scsr_base_hbond_options: Auto,
         ..Default::default()
@@ -354,6 +365,9 @@ fn names_with_nested_parentheses() {
 
 #[test]
 fn three_letter_codes() {
+    if !have_data() {
+        return;
+    }
     let path = format!("{DATA}PepTla.mol");
     let mut scsr = MolFromScsrParams {
         scsr_template_names: ScsrTemplateNames::AsEntered,
@@ -381,6 +395,9 @@ fn three_letter_codes() {
 
 #[test]
 fn triplet_from_a_block_and_a_file() {
+    if !have_data() {
+        return;
+    }
     let path = format!("{DATA}Triplet.mol");
     let block = std::fs::read_to_string(&path).unwrap();
     let scsr = MolFromScsrParams {
@@ -410,6 +427,9 @@ fn triplet_from_a_block_and_a_file() {
 
 #[test]
 fn double_stranded_rna() {
+    if !have_data() {
+        return;
+    }
     let block = std::fs::read_to_string(format!("{DATA}DnaTest.mol")).unwrap();
     let pp = params(false, false);
     let mut scsr = MolFromScsrParams {
