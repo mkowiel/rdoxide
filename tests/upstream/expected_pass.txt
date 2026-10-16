@@ -667,6 +667,9 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::testKekulizeIfPossible
 Code/GraphMol/Wrap/rough_test.py::TestCase::testLegacyRingFinding
 Code/GraphMol/Wrap/rough_test.py::TestCase::testMDLProps
 Code/GraphMol/Wrap/rough_test.py::TestCase::testMolBlockChirality
+Code/GraphMol/Wrap/rough_test.py::TestCase::testMolBundles1
+Code/GraphMol/Wrap/rough_test.py::TestCase::testMolBundles2
+Code/GraphMol/Wrap/rough_test.py::TestCase::testMolBundles3
 Code/GraphMol/Wrap/rough_test.py::TestCase::testMolFragmentSmarts
 Code/GraphMol/Wrap/rough_test.py::TestCase::testMolHasQuery
 Code/GraphMol/Wrap/rough_test.py::TestCase::testMolToV2KMolBlock
@@ -707,6 +710,8 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::testSubstructMatchAtomProperties
 Code/GraphMol/Wrap/rough_test.py::TestCase::testSubstructMatchBondProperties
 Code/GraphMol/Wrap/rough_test.py::TestCase::testSubstructMatchDMAP
 Code/GraphMol/Wrap/rough_test.py::TestCase::testSubstructParameters
+Code/GraphMol/Wrap/rough_test.py::TestCase::testSubstructParametersBundles
+Code/GraphMol/Wrap/rough_test.py::TestCase::testSubstructParametersBundles2
 Code/GraphMol/Wrap/rough_test.py::TestCase::testTranslateChiralFlag
 Code/GraphMol/Wrap/rough_test.py::TestCase::testUnfoldedRDKFingerprint
 Code/GraphMol/Wrap/rough_test.py::TestCase::testValidationMol
@@ -936,6 +941,9 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::testKekulizeIfPossible
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testLegacyRingFinding
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testMDLProps
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testMolBlockChirality
+Code/GraphMol/nbWrap/rough_test.py::TestCase::testMolBundles1
+Code/GraphMol/nbWrap/rough_test.py::TestCase::testMolBundles2
+Code/GraphMol/nbWrap/rough_test.py::TestCase::testMolBundles3
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testMolFragmentSmarts
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testMolHasQuery
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testMolToV2KMolBlock

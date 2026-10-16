@@ -17,6 +17,7 @@ use crate::atom::{AtomHandle, PyAtom};
 use crate::bond::{BondHandle, PyBond};
 use crate::errors::IntoPyResult;
 use crate::mol::PyMol;
+use crate::molbundle::PyMolBundle;
 
 /// Parameters controlling substructure matching
 #[pyclass(
@@ -395,11 +396,14 @@ impl<'py> Args<'_, 'py> {
     fn flag(&self, pos: usize, key: &str, default: bool) -> PyResult<bool> {
         self.get(pos, key)?.map_or(Ok(default), |v| v.is_truthy())
     }
-    fn query(&self) -> PyResult<Bound<'py, PyMol>> {
+    fn query(&self) -> PyResult<Molecules<'py>> {
         let q = self.get(0, "query")?.ok_or_else(|| {
             PyTypeError::new_err(format!("{}() missing required argument 'query'", self.name))
         })?;
-        Ok(q.cast::<PyMol>()?.clone())
+        if let Ok(b) = q.cast::<PyMolBundle>() {
+            return Ok(Molecules::Bundle(b.clone()));
+        }
+        Ok(Molecules::Mol(q.cast::<PyMol>()?.clone()))
     }
     fn params(&self) -> Option<Bound<'py, PySubstructMatchParameters>> {
         self.get(1, "params")
@@ -411,9 +415,58 @@ impl<'py> Args<'_, 'py> {
 
 /// What a method needs to run a search: either the user's parameters
 /// (possibly with Python callbacks) or plain core parameters.
+#[derive(Clone)]
 enum Params<'py> {
     User(Bound<'py, PySubstructMatchParameters>),
     Core(SubstructMatchParameters),
+}
+
+/// A molecule or a bundle of molecules, as the subject or query of a search.
+pub(crate) enum Molecules<'py> {
+    Mol(Bound<'py, PyMol>),
+    Bundle(Bound<'py, PyMolBundle>),
+}
+
+impl<'py> Molecules<'py> {
+    fn mols(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyMol>>> {
+        match self {
+            Molecules::Mol(m) => Ok(vec![m.clone()]),
+            Molecules::Bundle(b) => b
+                .borrow()
+                .bundle
+                .mols()
+                .iter()
+                .map(|m| {
+                    Bound::new(
+                        py,
+                        PyMol {
+                            mol: m.as_ref().clone(),
+                        },
+                    )
+                })
+                .collect(),
+        }
+    }
+}
+
+/// `SubstructMatch` for molecules and bundles: the first subject molecule and
+/// query molecule combination that matches gives the result.
+fn run_any(
+    py: Python<'_>,
+    subject: &Molecules<'_>,
+    query: &Molecules<'_>,
+    params: Params<'_>,
+) -> PyResult<Vec<MatchVect>> {
+    let queries = query.mols(py)?;
+    for mol in subject.mols(py)? {
+        for q in &queries {
+            let res = run(py, &mol, q, params.clone())?;
+            if !res.is_empty() {
+                return Ok(res);
+            }
+        }
+    }
+    Ok(Vec::new())
 }
 
 fn run(
@@ -442,6 +495,92 @@ fn match_tuple<'py>(py: Python<'py>, m: &MatchVect) -> PyResult<Bound<'py, PyTup
     PyTuple::new(py, m.iter().map(|&(_, a)| a))
 }
 
+pub(crate) fn has_substruct_match_impl<'py>(
+    subject: &Molecules<'py>,
+    args: &Bound<'py, PyTuple>,
+    kwargs: Option<&Bound<'py, PyDict>>,
+) -> PyResult<bool> {
+    let py = args.py();
+    let a = Args {
+        name: "HasSubstructMatch",
+        args,
+        kwargs,
+    };
+    let query = a.query()?;
+    let ps = match a.params() {
+        Some(p) => Params::User(p),
+        None => Params::Core(SubstructMatchParameters {
+            recursion_possible: a.flag(1, "recursionPossible", true)?,
+            use_chirality: a.flag(2, "useChirality", false)?,
+            use_query_query_matches: a.flag(3, "useQueryQueryMatches", false)?,
+            max_matches: 1,
+            ..SubstructMatchParameters::default()
+        }),
+    };
+    Ok(!run_any(py, subject, &query, ps)?.is_empty())
+}
+
+pub(crate) fn get_substruct_match_impl<'py>(
+    subject: &Molecules<'py>,
+    args: &Bound<'py, PyTuple>,
+    kwargs: Option<&Bound<'py, PyDict>>,
+) -> PyResult<Bound<'py, PyTuple>> {
+    let py = args.py();
+    let a = Args {
+        name: "GetSubstructMatch",
+        args,
+        kwargs,
+    };
+    let query = a.query()?;
+    let ps = match a.params() {
+        Some(p) => Params::User(p),
+        None => Params::Core(SubstructMatchParameters {
+            use_chirality: a.flag(1, "useChirality", false)?,
+            use_query_query_matches: a.flag(2, "useQueryQueryMatches", false)?,
+            max_matches: 1,
+            ..SubstructMatchParameters::default()
+        }),
+    };
+    let res = run_any(py, subject, &query, ps)?;
+    match res.first() {
+        Some(m) => match_tuple(py, m),
+        None => Ok(PyTuple::empty(py)),
+    }
+}
+
+pub(crate) fn get_substruct_matches_impl<'py>(
+    subject: &Molecules<'py>,
+    args: &Bound<'py, PyTuple>,
+    kwargs: Option<&Bound<'py, PyDict>>,
+) -> PyResult<Bound<'py, PyTuple>> {
+    let py = args.py();
+    let a = Args {
+        name: "GetSubstructMatches",
+        args,
+        kwargs,
+    };
+    let query = a.query()?;
+    let ps = match a.params() {
+        Some(p) => Params::User(p),
+        None => Params::Core(SubstructMatchParameters {
+            uniquify: a.flag(1, "uniquify", true)?,
+            use_chirality: a.flag(2, "useChirality", false)?,
+            use_query_query_matches: a.flag(3, "useQueryQueryMatches", false)?,
+            max_matches: match a.get(4, "maxMatches")? {
+                Some(v) => v.extract()?,
+                None => 1000,
+            },
+            ..SubstructMatchParameters::default()
+        }),
+    };
+    let res = run_any(py, subject, &query, ps)?;
+    let items = res
+        .iter()
+        .map(|m| match_tuple(py, m))
+        .collect::<PyResult<Vec<_>>>()?;
+    PyTuple::new(py, items)
+}
+
 #[pymethods]
 impl PyMol {
     /// Queries whether or not the molecule contains a particular substructure.
@@ -459,29 +598,12 @@ impl PyMol {
     ///
     /// Alternatively: HasSubstructMatch(query, params) with SubstructMatchParameters.
     #[pyo3(name = "HasSubstructMatch", signature = (*args, **kwargs))]
-    fn has_substruct_match(
-        slf: &Bound<'_, Self>,
-        args: &Bound<'_, PyTuple>,
-        kwargs: Option<&Bound<'_, PyDict>>,
+    fn has_substruct_match<'py>(
+        slf: &Bound<'py, Self>,
+        args: &Bound<'py, PyTuple>,
+        kwargs: Option<&Bound<'py, PyDict>>,
     ) -> PyResult<bool> {
-        let py = slf.py();
-        let a = Args {
-            name: "HasSubstructMatch",
-            args,
-            kwargs,
-        };
-        let query = a.query()?;
-        let ps = match a.params() {
-            Some(p) => Params::User(p),
-            None => Params::Core(SubstructMatchParameters {
-                recursion_possible: a.flag(1, "recursionPossible", true)?,
-                use_chirality: a.flag(2, "useChirality", false)?,
-                use_query_query_matches: a.flag(3, "useQueryQueryMatches", false)?,
-                max_matches: 1,
-                ..SubstructMatchParameters::default()
-            }),
-        };
-        Ok(!run(py, slf, &query, ps)?.is_empty())
+        has_substruct_match_impl(&Molecules::Mol(slf.clone()), args, kwargs)
     }
 
     /// Returns the indices of the molecule's atoms that match a substructure query.
@@ -508,27 +630,7 @@ impl PyMol {
         args: &Bound<'py, PyTuple>,
         kwargs: Option<&Bound<'py, PyDict>>,
     ) -> PyResult<Bound<'py, PyTuple>> {
-        let py = slf.py();
-        let a = Args {
-            name: "GetSubstructMatch",
-            args,
-            kwargs,
-        };
-        let query = a.query()?;
-        let ps = match a.params() {
-            Some(p) => Params::User(p),
-            None => Params::Core(SubstructMatchParameters {
-                use_chirality: a.flag(1, "useChirality", false)?,
-                use_query_query_matches: a.flag(2, "useQueryQueryMatches", false)?,
-                max_matches: 1,
-                ..SubstructMatchParameters::default()
-            }),
-        };
-        let res = run(py, slf, &query, ps)?;
-        match res.first() {
-            Some(m) => match_tuple(py, m),
-            None => Ok(PyTuple::empty(py)),
-        }
+        get_substruct_match_impl(&Molecules::Mol(slf.clone()), args, kwargs)
     }
 
     /// Returns tuples of the indices of the molecule's atoms that match a substructure query.
@@ -562,32 +664,7 @@ impl PyMol {
         args: &Bound<'py, PyTuple>,
         kwargs: Option<&Bound<'py, PyDict>>,
     ) -> PyResult<Bound<'py, PyTuple>> {
-        let py = slf.py();
-        let a = Args {
-            name: "GetSubstructMatches",
-            args,
-            kwargs,
-        };
-        let query = a.query()?;
-        let ps = match a.params() {
-            Some(p) => Params::User(p),
-            None => Params::Core(SubstructMatchParameters {
-                uniquify: a.flag(1, "uniquify", true)?,
-                use_chirality: a.flag(2, "useChirality", false)?,
-                use_query_query_matches: a.flag(3, "useQueryQueryMatches", false)?,
-                max_matches: match a.get(4, "maxMatches")? {
-                    Some(v) => v.extract()?,
-                    None => 1000,
-                },
-                ..SubstructMatchParameters::default()
-            }),
-        };
-        let res = run(py, slf, &query, ps)?;
-        let items = res
-            .iter()
-            .map(|m| match_tuple(py, m))
-            .collect::<PyResult<Vec<_>>>()?;
-        PyTuple::new(py, items)
+        get_substruct_matches_impl(&Molecules::Mol(slf.clone()), args, kwargs)
     }
 }
 
