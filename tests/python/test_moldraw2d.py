@@ -164,12 +164,6 @@ def test_helper_functions():
     assert rdMolDraw2D.MeanBondLength(prepared) > 0
 
 
-def test_not_ported_yet():
-    d = rdMolDraw2D.MolDraw2DSVG(100, 100)
-    with pytest.raises(NotImplementedError):
-        d.DrawReaction(None)
-
-
 def test_native_text():
     m = Chem.MolFromSmiles("CCN")
     d = rdMolDraw2D.MolDraw2DSVG(250, 200, -1, -1, True)
@@ -261,3 +255,26 @@ def test_lasso_highlights():
     d.FinishDrawing()
     svg = d.GetDrawingText()
     assert "stroke:#FF0000;stroke-width:2." in svg and "<ellipse" not in svg
+
+
+def test_draw_reaction():
+    from rdoxide.Chem import rdChemReactions
+
+    rxn = rdChemReactions.ReactionFromSmarts("[C:1](=[O:2])O.[N:3]>CC(=O)C>[C:1](=[O:2])[N:3]")
+    d = rdMolDraw2D.MolDraw2DSVG(800, 300)
+    d.DrawReaction(rxn)
+    d.FinishDrawing()
+    plain = d.GetDrawingText()
+    assert plain.count("<rect") == 1 and "class='bond-" in plain
+    d = rdMolDraw2D.MolDraw2DSVG(800, 300)
+    d.DrawReaction(rxn, highlightByReactant=True, highlightColorsReactants=[(1.0, 0.0, 0.0), (0.0, 0.0, 1.0)])
+    d.FinishDrawing()
+    assert d.GetDrawingText() != plain and "fill:#FF0000" in d.GetDrawingText()
+    # a canvas that sizes itself
+    d = rdMolDraw2D.MolDraw2DSVG(-1, -1)
+    d.DrawReaction(rxn)
+    assert d.Width() > 0 and d.Height() > 0
+    # an empty reaction still has an arrow
+    d = rdMolDraw2D.MolDraw2DSVG(300, 200)
+    d.DrawReaction(rdChemReactions.ChemicalReaction())
+    assert "<path" in d.GetDrawingText()

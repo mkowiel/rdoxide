@@ -74,7 +74,7 @@ use crate::substruct::PySubstructMatchParameters;
     skip_from_py_object
 )]
 pub struct PyChemicalReaction {
-    rxn: ChemicalReaction,
+    pub(crate) rxn: ChemicalReaction,
     /// The object handed out by `GetSubstructParams`; it stays live, so edits
     /// to it must reach `rxn` before the reaction is used.
     params: Option<Py<PySubstructMatchParameters>>,
