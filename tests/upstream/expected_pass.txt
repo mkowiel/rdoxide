@@ -472,6 +472,7 @@ Code/GraphMol/ScaffoldNetwork/Wrap/testScaffoldNetwork.py::TestScaffoldNetwork::
 Code/GraphMol/ScaffoldNetwork/Wrap/testScaffoldNetwork.py::TestScaffoldNetwork::test5FragmentationReactions
 Code/GraphMol/ScaffoldNetwork/Wrap/testScaffoldNetwork.py::TestScaffoldNetwork::test6Options
 Code/GraphMol/ScaffoldNetwork/Wrap/testScaffoldNetwork.py::TestScaffoldNetwork::test7Github3177
+Code/GraphMol/ShapeHelpers/Wrap/testShapeHelpers.py::TestCase::test1Shape
 Code/GraphMol/SubstructLibrary/Wrap/rough_test.py::TestCase::test0SubstructLibrary
 Code/GraphMol/SubstructLibrary/Wrap/rough_test.py::TestCase::test1SubstructLibrary
 Code/GraphMol/SubstructLibrary/Wrap/rough_test.py::TestCase::testBinaryCache

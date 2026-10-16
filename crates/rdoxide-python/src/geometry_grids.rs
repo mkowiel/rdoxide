@@ -35,7 +35,7 @@ fn pkl_bytes(o: &Bound<'_, PyAny>) -> PyResult<Vec<u8>> {
 )]
 #[derive(Debug, Clone)]
 pub struct PyUniformGrid3D {
-    g: UniformGrid3D,
+    pub(crate) g: UniformGrid3D,
 }
 
 #[pymethods]
