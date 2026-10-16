@@ -427,11 +427,13 @@ Code/GraphMol/ScaffoldNetwork/Wrap/testScaffoldNetwork.py::TestScaffoldNetwork::
 Code/GraphMol/SubstructLibrary/Wrap/rough_test.py::TestCase::test0SubstructLibrary
 Code/GraphMol/SubstructLibrary/Wrap/rough_test.py::TestCase::test1SubstructLibrary
 Code/GraphMol/SubstructLibrary/Wrap/rough_test.py::TestCase::testBinaryCache
+Code/GraphMol/SubstructLibrary/Wrap/rough_test.py::TestCase::testMolBundles
 Code/GraphMol/SubstructLibrary/Wrap/rough_test.py::TestCase::testOptions
 Code/GraphMol/SubstructLibrary/Wrap/rough_test.py::TestCase::testPropHolder
 Code/GraphMol/SubstructLibrary/Wrap/rough_test.py::TestCase::testSearchOrder
 Code/GraphMol/SubstructLibrary/Wrap/rough_test.py::TestCase::testSearchOrder2
 Code/GraphMol/SubstructLibrary/Wrap/rough_test.py::TestCase::testSmilesCache
+Code/GraphMol/SubstructLibrary/Wrap/rough_test.py::TestCase::testSubstructParameters
 Code/GraphMol/SubstructLibrary/Wrap/rough_test.py::TestCase::testTrustedSmilesCache
 Code/GraphMol/SubstructLibrary/Wrap/rough_test.py::TestCase::test_PatternHolder
 Code/GraphMol/SubstructLibrary/Wrap/rough_test.py::TestCase::test_addpatterns

@@ -7,7 +7,7 @@
 //! spread over worker threads and return the same indices for any thread
 //! count.
 //!
-//! Not ported: searches with `MolBundle` and `ExtendedQueryMol` queries, and boost-serialization pickles; libraries
+//! Not ported: boost-serialization pickles; libraries
 //! serialize to this crate's own format ([`SubstructLibrary::to_bytes`]).
 
 mod holders;
@@ -16,9 +16,14 @@ mod serialization;
 
 use std::sync::{Arc, PoisonError, RwLock, RwLockReadGuard};
 
+use search::QueryRef;
+
 pub use holders::{KeyFromPropHolder, MolHolder, PatternHolder};
 
+use crate::datastructs::{BitVect, ExplicitBitVect};
 use crate::error::{RDKitError, Result};
+use crate::graphmol::generalized_substruct::ExtendedQueryMol;
+use crate::graphmol::mol_bundle::MolBundle;
 use crate::graphmol::romol::ROMol;
 use crate::graphmol::substruct::SubstructMatchParameters;
 use crate::graphmol::tautomer_query::TautomerQuery;
@@ -154,7 +159,7 @@ impl SubstructLibrary {
         max_results: i32,
     ) -> Result<Vec<u32>> {
         self.search(
-            query,
+            QueryRef::Mol(query),
             None,
             start_idx,
             end_idx,
@@ -176,8 +181,8 @@ impl SubstructLibrary {
         max_results: i32,
     ) -> Result<Vec<u32>> {
         self.search(
-            query.template_molecule(),
-            Some(query),
+            QueryRef::Tautomer(query),
+            None,
             start_idx,
             end_idx,
             params,
@@ -214,11 +219,67 @@ impl SubstructLibrary {
             .is_empty())
     }
 
-    #[allow(clippy::too_many_arguments)]
+    /// The pattern fingerprint of the query to screen the library with
+    /// (`Bits`), and the fingerprints to screen against; `None` when there
+    /// is nothing to filter with.
+    fn query_bits<'a>(
+        fps: Option<&'a PatternHolder>,
+        query: QueryRef,
+    ) -> Result<(Option<&'a PatternHolder>, Option<ExplicitBitVect>)> {
+        let Some(f) = fps else {
+            return Ok((None, None));
+        };
+        let not_tautomeric = || {
+            rd_log_warning!(
+                "Pattern fingerprints for tautomersearch aren't tautomer fingerprints, ignoring..."
+            );
+            Ok((None, None))
+        };
+        // the bits every member of a bundle has
+        let common = |fp_of: &mut dyn FnMut(usize) -> Result<ExplicitBitVect>, n: usize| {
+            let mut bits: Option<ExplicitBitVect> = None;
+            for i in 0..n {
+                let fp = fp_of(i)?;
+                bits = Some(match bits {
+                    None => fp,
+                    Some(b) => b.and(&fp),
+                });
+            }
+            Ok::<_, RDKitError>(bits)
+        };
+        match query {
+            QueryRef::Mol(q) => Ok((Some(f), Some(f.make_fingerprint(q)?))),
+            QueryRef::Tautomer(tq) if f.is_tautomeric() => Ok((
+                Some(f),
+                Some(tq.pattern_fingerprint_template(f.num_bits())?),
+            )),
+            QueryRef::Tautomer(_) => not_tautomeric(),
+            QueryRef::Extended(ExtendedQueryMol::Mol(q)) => {
+                Ok((Some(f), Some(f.make_fingerprint(q)?)))
+            }
+            QueryRef::Extended(ExtendedQueryMol::Bundle(b)) => Ok((
+                Some(f),
+                common(&mut |i| f.make_fingerprint(&b.mols()[i]), b.size())?,
+            )),
+            QueryRef::Extended(ExtendedQueryMol::Tautomer(tq)) if f.is_tautomeric() => Ok((
+                Some(f),
+                Some(tq.pattern_fingerprint_template(f.num_bits())?),
+            )),
+            QueryRef::Extended(ExtendedQueryMol::TautomerBundle(v)) if f.is_tautomeric() => Ok((
+                Some(f),
+                common(
+                    &mut |i| v[i].pattern_fingerprint_template(f.num_bits()),
+                    v.len(),
+                )?,
+            )),
+            QueryRef::Extended(_) => not_tautomeric(),
+        }
+    }
+
     fn search(
         &self,
-        query: &ROMol,
-        tautomer: Option<&TautomerQuery>,
+        query: QueryRef,
+        skip: Option<&[bool]>,
         start_idx: u32,
         end_idx: u32,
         params: &SubstructMatchParameters,
@@ -227,35 +288,136 @@ impl SubstructLibrary {
     ) -> Result<Vec<u32>> {
         let mols = read(&self.mols);
         let fps = self.fps.as_ref().map(read);
-        let (fps_ref, query_bits) = match (&fps, tautomer) {
-            (Some(f), Some(tq)) if f.is_tautomeric() => (
-                Some(&**f),
-                Some(tq.pattern_fingerprint_template(f.num_bits())?),
-            ),
-            (Some(_), Some(_)) => {
-                rd_log_warning!(
-                    "Pattern fingerprints for tautomersearch aren't tautomer fingerprints, ignoring..."
-                );
-                (None, None)
-            }
-            (Some(f), None) => (Some(&**f), Some(f.make_fingerprint(query)?)),
-            (None, _) => (None, None),
-        };
+        let (fps_ref, query_bits) = Self::query_bits(fps.as_deref(), query)?;
         let search = search::Search {
             mols: &mols,
             fps: fps_ref,
             query,
-            tautomer,
+            skip,
             query_bits,
             // only whether there is a match matters
             params: SubstructMatchParameters {
                 max_matches: 1,
                 ..params.clone()
             },
-            needs_rings: search::query_needs_rings(query),
+            needs_rings: query.needs_rings(),
             search_order: &self.search_order,
         };
         search::run(&search, start_idx, end_idx, num_threads, max_results)
+    }
+
+    /// `getMatches` for an extended query.
+    pub fn get_xq_matches(
+        &self,
+        query: &ExtendedQueryMol,
+        start_idx: u32,
+        end_idx: u32,
+        params: &SubstructMatchParameters,
+        num_threads: i32,
+        max_results: i32,
+    ) -> Result<Vec<u32>> {
+        self.search(
+            QueryRef::Extended(query),
+            None,
+            start_idx,
+            end_idx,
+            params,
+            num_threads,
+            max_results,
+        )
+    }
+
+    /// `countMatches` for an extended query.
+    pub fn count_xq_matches(
+        &self,
+        query: &ExtendedQueryMol,
+        start_idx: u32,
+        end_idx: u32,
+        params: &SubstructMatchParameters,
+        num_threads: i32,
+    ) -> Result<u32> {
+        Ok(self
+            .get_xq_matches(query, start_idx, end_idx, params, num_threads, -1)?
+            .len() as u32)
+    }
+
+    /// `hasMatch` for an extended query.
+    pub fn has_xq_match(
+        &self,
+        query: &ExtendedQueryMol,
+        start_idx: u32,
+        end_idx: u32,
+        params: &SubstructMatchParameters,
+        num_threads: i32,
+    ) -> Result<bool> {
+        Ok(!self
+            .get_xq_matches(query, start_idx, end_idx, params, num_threads, 1)?
+            .is_empty())
+    }
+
+    /// `getMatches` for a bundle: the molecules matching any of its members,
+    /// each reported once, member by member (`molbundleGetMatches`).
+    pub fn get_bundle_matches(
+        &self,
+        query: &MolBundle,
+        start_idx: u32,
+        end_idx: u32,
+        params: &SubstructMatchParameters,
+        num_threads: i32,
+        max_results: i32,
+    ) -> Result<Vec<u32>> {
+        let mut found = vec![false; self.len() as usize];
+        let mut res: Vec<u32> = Vec::new();
+        for member in query.mols() {
+            let remaining = if max_results > 0 {
+                max_results - res.len() as i32
+            } else {
+                max_results
+            };
+            let hits = self.search(
+                QueryRef::Mol(member),
+                Some(&found),
+                start_idx,
+                end_idx,
+                params,
+                num_threads,
+                remaining,
+            )?;
+            hits.iter().for_each(|&i| found[i as usize] = true);
+            res.extend(hits);
+            if max_results > 0 && res.len() as i32 >= max_results {
+                break;
+            }
+        }
+        Ok(res)
+    }
+
+    /// `countMatches` for a bundle.
+    pub fn count_bundle_matches(
+        &self,
+        query: &MolBundle,
+        start_idx: u32,
+        end_idx: u32,
+        params: &SubstructMatchParameters,
+        num_threads: i32,
+    ) -> Result<u32> {
+        Ok(self
+            .get_bundle_matches(query, start_idx, end_idx, params, num_threads, -1)?
+            .len() as u32)
+    }
+
+    /// `hasMatch` for a bundle.
+    pub fn has_bundle_match(
+        &self,
+        query: &MolBundle,
+        start_idx: u32,
+        end_idx: u32,
+        params: &SubstructMatchParameters,
+        num_threads: i32,
+    ) -> Result<bool> {
+        Ok(!self
+            .get_bundle_matches(query, start_idx, end_idx, params, num_threads, 1)?
+            .is_empty())
     }
 
     /// `countMatches`
