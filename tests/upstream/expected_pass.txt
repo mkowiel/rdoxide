@@ -417,6 +417,10 @@ Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testPrepareAndDrawMolec
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testPrepareForDrawing
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testProtectedAttributes
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testQueryColour
+Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testReaction1
+Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testReaction2
+Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testReaction3
+Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testReaction4
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testRepeatedPrepareForDrawingCalls
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testSetDrawOptions
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testSetLineWidth
@@ -1062,6 +1066,7 @@ rdkit/Chem/AtomPairs/UnitTestDescriptors.py::TestCase::testPairsRegression
 rdkit/Chem/AtomPairs/UnitTestDescriptors.py::TestCase::testTorsionsRegression
 rdkit/Chem/Draw/UnitTestDraw.py::TestCase::testDrawMorgan
 rdkit/Chem/Draw/UnitTestDraw.py::TestCase::testDrawRDKit
+rdkit/Chem/Draw/UnitTestDraw.py::TestCase::testDrawReaction
 rdkit/Chem/Draw/UnitTestDraw.py::TestCase::testGithub3762
 rdkit/Chem/Draw/UnitTestDraw.py::TestCase::testGithub5863
 rdkit/Chem/Draw/UnitTestDraw.py::TestCase::testGridSVG

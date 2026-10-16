@@ -49,9 +49,9 @@ pub struct MolDraw2DSVG {
     flexi_mode: bool,
     scale: f64,
     font_scale: f64,
-    x_offset: i32,
-    y_offset: i32,
-    active_mol_idx: i32,
+    pub(super) x_offset: i32,
+    pub(super) y_offset: i32,
+    pub(super) active_mol_idx: i32,
     pub(super) draw_mols: Vec<DrawMol>,
     global_draw_trans: Option<DrawMol>,
     pub(super) needs_init: bool,
@@ -549,7 +549,7 @@ impl MolDraw2DSVG {
         }
     }
 
-    fn check_supported(&self) -> Result<()> {
+    pub(super) fn check_supported(&self) -> Result<()> {
         if self.canvas.options.comic_mode {
             return Err(RDKitError::UnhandledFeature(
                 "comic mode is not supported yet".into(),
@@ -884,7 +884,7 @@ impl MolDraw2DSVG {
         }
     }
 
-    fn start_drawing(&mut self) {
+    pub(super) fn start_drawing(&mut self) {
         if self.needs_init {
             self.init_drawing();
             self.needs_init = false;

@@ -19,6 +19,7 @@ pub mod draw_mol_utils;
 pub mod draw_shape;
 pub mod draw_text;
 pub mod drawer;
+pub mod drawer_reaction;
 pub mod font;
 pub mod helpers;
 pub mod mol_draw2d_svg;

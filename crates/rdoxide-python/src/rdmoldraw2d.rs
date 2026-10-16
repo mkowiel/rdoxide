@@ -4,9 +4,7 @@
 
 use std::collections::BTreeMap;
 
-use pyo3::exceptions::{
-    PyKeyError, PyNotImplementedError, PyRuntimeError, PyTypeError, PyValueError,
-};
+use pyo3::exceptions::{PyKeyError, PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
 use rdoxide::graphmol::mol_draw2d::contour::{
@@ -28,6 +26,7 @@ use crate::enums::{add_enum_exported, to_py};
 use crate::errors::IntoPyResult;
 use crate::geometry::PyPoint2D;
 use crate::mol::PyMol;
+use crate::rdchemreactions::PyChemicalReaction;
 
 // ----------------------------------------------------------------------
 // conversions
@@ -914,15 +913,28 @@ impl PyMolDraw2D {
     #[pyo3(signature = (rxn, highlightByReactant = false, highlightColorsReactants = None, confIds = None))]
     fn DrawReaction(
         &mut self,
-        rxn: &Bound<'_, PyAny>,
+        rxn: PyRef<'_, PyChemicalReaction>,
         highlightByReactant: bool,
         highlightColorsReactants: Option<&Bound<'_, PyAny>>,
         confIds: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<()> {
-        let _ = (rxn, highlightByReactant, highlightColorsReactants, confIds);
-        Err(PyNotImplementedError::new_err(
-            "drawing reactions is not supported yet",
-        ))
+        let colours = match given(highlightColorsReactants)? {
+            Some(c) => Some(
+                c.try_iter()?
+                    .map(|t| py_colour(&t?))
+                    .collect::<PyResult<Vec<_>>>()?,
+            ),
+            None => None,
+        };
+        let conf_ids = int_list(confIds, None)?;
+        self.d
+            .draw_reaction(
+                &rxn.rxn,
+                highlightByReactant,
+                colours.as_deref(),
+                conf_ids.as_deref(),
+            )
+            .py()
     }
 
     /// get the width of the drawing canvas
