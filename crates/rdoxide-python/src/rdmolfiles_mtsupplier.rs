@@ -50,7 +50,7 @@ fn next_item(py: Python<'_>, supplier: &mut MultithreadedMolSupplier) -> PyResul
 ///   The molecules come back in the order of the file.
 #[pyclass(
     name = "MultithreadedSDMolSupplier",
-    module = "rdkit.Chem.rdmolfiles",
+    module = "rdoxide.Chem.rdmolfiles",
     unsendable
 )]
 pub struct PyMultithreadedSDMolSupplier {
@@ -185,7 +185,7 @@ impl PyMultithreadedSDMolSupplier {
 ///   The molecules come back in the order of the file.
 #[pyclass(
     name = "MultithreadedSmilesMolSupplier",
-    module = "rdkit.Chem.rdmolfiles",
+    module = "rdoxide.Chem.rdmolfiles",
     unsendable
 )]
 pub struct PyMultithreadedSmilesMolSupplier {

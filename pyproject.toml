@@ -31,7 +31,7 @@ test = ["pytest>=8"]
 
 [tool.maturin]
 python-source = "python"
-module-name = "rdkit._rdoxide"
+module-name = "rdoxide._rdoxide"
 manifest-path = "crates/rdoxide-python/Cargo.toml"
 features = ["pyo3/extension-module"]
 
@@ -40,4 +40,4 @@ testpaths = ["tests/python"]
 
 [tool.ruff]
 line-length = 100
-extend-exclude = ["python/rdkit/upstream_*", "upstream"]
+extend-exclude = ["python/rdoxide/upstream_*", "upstream"]

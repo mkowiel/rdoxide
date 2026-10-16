@@ -1,4 +1,4 @@
-//! `rdkit.Chem.MolStandardize.rdMolStandardize` (upstream
+//! `rdoxide.Chem.MolStandardize.rdMolStandardize` (upstream
 //! `GraphMol/MolStandardize/nbWrap/rdMolStandardize.cpp`).
 
 use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
@@ -29,7 +29,7 @@ use crate::mol::PyMol;
 /// Parameters controlling molecular standardization
 #[pyclass(
     name = "CleanupParameters",
-    module = "rdkit.Chem.MolStandardize.rdMolStandardize",
+    module = "rdoxide.Chem.MolStandardize.rdMolStandardize",
     skip_from_py_object
 )]
 #[derive(Clone, Debug, Default)]
@@ -428,7 +428,7 @@ fn add_standardize_functions(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
 #[pyclass(
     name = "FragmentRemover",
-    module = "rdkit.Chem.MolStandardize.rdMolStandardize"
+    module = "rdoxide.Chem.MolStandardize.rdMolStandardize"
 )]
 #[derive(Debug)]
 pub struct PyFragmentRemover {
@@ -484,7 +484,7 @@ fn fragment_remover_from_data(
 
 #[pyclass(
     name = "LargestFragmentChooser",
-    module = "rdkit.Chem.MolStandardize.rdMolStandardize"
+    module = "rdoxide.Chem.MolStandardize.rdMolStandardize"
 )]
 #[derive(Debug)]
 pub struct PyLargestFragmentChooser {
@@ -536,7 +536,7 @@ impl PyLargestFragmentChooser {
 
 #[pyclass(
     name = "Normalizer",
-    module = "rdkit.Chem.MolStandardize.rdMolStandardize"
+    module = "rdoxide.Chem.MolStandardize.rdMolStandardize"
 )]
 #[derive(Debug)]
 pub struct PyNormalizer {
@@ -596,7 +596,7 @@ fn normalizer_from_params_py(params: PyRef<'_, PyCleanupParameters>) -> PyResult
 
 #[pyclass(
     name = "ChargeCorrection",
-    module = "rdkit.Chem.MolStandardize.rdMolStandardize",
+    module = "rdoxide.Chem.MolStandardize.rdMolStandardize",
     skip_from_py_object
 )]
 #[derive(Debug, Clone)]
@@ -660,7 +660,7 @@ fn charge_corrections_py() -> Vec<PyChargeCorrection> {
 
 #[pyclass(
     name = "Reionizer",
-    module = "rdkit.Chem.MolStandardize.rdMolStandardize"
+    module = "rdoxide.Chem.MolStandardize.rdMolStandardize"
 )]
 #[derive(Debug)]
 pub struct PyReionizer {
@@ -717,7 +717,7 @@ fn reionizer_from_data(
 
 #[pyclass(
     name = "Uncharger",
-    module = "rdkit.Chem.MolStandardize.rdMolStandardize"
+    module = "rdoxide.Chem.MolStandardize.rdMolStandardize"
 )]
 #[derive(Debug)]
 pub struct PyUncharger {
@@ -754,7 +754,7 @@ impl PyUncharger {
 /// Metal Disconnector Options
 #[pyclass(
     name = "MetalDisconnectorOptions",
-    module = "rdkit.Chem.MolStandardize.rdMolStandardize",
+    module = "rdoxide.Chem.MolStandardize.rdMolStandardize",
     skip_from_py_object
 )]
 #[derive(Debug, Clone, Default)]
@@ -812,7 +812,7 @@ impl PyMetalDisconnectorOptions {
 /// a class to disconnect metals that are defined as covalently bonded to non-metals
 #[pyclass(
     name = "MetalDisconnector",
-    module = "rdkit.Chem.MolStandardize.rdMolStandardize"
+    module = "rdoxide.Chem.MolStandardize.rdMolStandardize"
 )]
 #[derive(Debug)]
 pub struct PyMetalDisconnector {
@@ -917,7 +917,7 @@ enum Member {
 
 #[pyclass(
     name = "ValidationMethod",
-    module = "rdkit.Chem.MolStandardize.rdMolStandardize",
+    module = "rdoxide.Chem.MolStandardize.rdMolStandardize",
     subclass
 )]
 #[derive(Debug, Default)]
@@ -1000,7 +1000,7 @@ macro_rules! simple_validation {
     ($name:ident, $py:literal, $value:expr) => {
         #[pyclass(
             name = $py,
-            module = "rdkit.Chem.MolStandardize.rdMolStandardize",
+            module = "rdoxide.Chem.MolStandardize.rdMolStandardize",
             extends = PyValidationMethod
         )]
         #[derive(Debug)]
@@ -1068,7 +1068,7 @@ macro_rules! validation_attributes {
 
 #[pyclass(
     name = "RDKitValidation",
-    module = "rdkit.Chem.MolStandardize.rdMolStandardize",
+    module = "rdoxide.Chem.MolStandardize.rdMolStandardize",
     extends = PyValidationMethod
 )]
 #[derive(Debug)]
@@ -1107,7 +1107,7 @@ impl PyRDKitValidation {
 
 #[pyclass(
     name = "IsotopeValidation",
-    module = "rdkit.Chem.MolStandardize.rdMolStandardize",
+    module = "rdoxide.Chem.MolStandardize.rdMolStandardize",
     extends = PyValidationMethod
 )]
 #[derive(Debug)]
@@ -1139,7 +1139,7 @@ impl PyIsotopeValidation {
 
 #[pyclass(
     name = "Is2DValidation",
-    module = "rdkit.Chem.MolStandardize.rdMolStandardize",
+    module = "rdoxide.Chem.MolStandardize.rdMolStandardize",
     extends = PyValidationMethod
 )]
 #[derive(Debug)]
@@ -1171,7 +1171,7 @@ impl PyIs2DValidation {
 
 #[pyclass(
     name = "FeaturesValidation",
-    module = "rdkit.Chem.MolStandardize.rdMolStandardize",
+    module = "rdoxide.Chem.MolStandardize.rdMolStandardize",
     extends = PyValidationMethod
 )]
 #[derive(Debug)]
@@ -1218,7 +1218,7 @@ validation_attributes!(PyFeaturesValidation, Features {
 
 #[pyclass(
     name = "Layout2DValidation",
-    module = "rdkit.Chem.MolStandardize.rdMolStandardize",
+    module = "rdoxide.Chem.MolStandardize.rdMolStandardize",
     extends = PyValidationMethod
 )]
 #[derive(Debug)]
@@ -1277,7 +1277,7 @@ fn extract_atoms(py: Python<'_>, atoms: &Bound<'_, PyAny>, what: &str) -> PyResu
 
 #[pyclass(
     name = "AllowedAtomsValidation",
-    module = "rdkit.Chem.MolStandardize.rdMolStandardize",
+    module = "rdoxide.Chem.MolStandardize.rdMolStandardize",
     extends = PyValidationMethod
 )]
 #[derive(Debug)]
@@ -1297,7 +1297,7 @@ impl PyAllowedAtomsValidation {
 
 #[pyclass(
     name = "DisallowedAtomsValidation",
-    module = "rdkit.Chem.MolStandardize.rdMolStandardize",
+    module = "rdoxide.Chem.MolStandardize.rdMolStandardize",
     extends = PyValidationMethod
 )]
 #[derive(Debug)]
@@ -1317,7 +1317,7 @@ impl PyDisallowedAtomsValidation {
 
 #[pyclass(
     name = "MolVSValidation",
-    module = "rdkit.Chem.MolStandardize.rdMolStandardize",
+    module = "rdoxide.Chem.MolStandardize.rdMolStandardize",
     extends = PyValidationMethod
 )]
 #[derive(Debug)]

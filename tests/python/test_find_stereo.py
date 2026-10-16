@@ -3,9 +3,9 @@
 Expected values were produced with the reference RDKit.
 """
 
-from rdkit import Chem
-from rdkit.Chem import rdchem
-from rdkit.Chem.EnumerateStereoisomers import (
+from rdoxide import Chem
+from rdoxide.Chem import rdchem
+from rdoxide.Chem.EnumerateStereoisomers import (
     EnumerateStereoisomers,
     StereoEnumerationOptions,
 )

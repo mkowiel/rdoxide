@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdMolDescriptors.BCUT2D` (upstream `Descriptors/BCUT.cpp` and
+//! `rdoxide.Chem.rdMolDescriptors.BCUT2D` (upstream `Descriptors/BCUT.cpp` and
 //! its wrappers in `Wrap/rdMolDescriptors.cpp`).
 
 use pyo3::exceptions::PyTypeError;

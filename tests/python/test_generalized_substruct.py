@@ -2,8 +2,8 @@
 # Boost serialization; rdoxide has its own serialization, so it always runs.
 import unittest
 
-from rdkit import Chem
-from rdkit.Chem import rdGeneralizedSubstruct
+from rdoxide import Chem
+from rdoxide.Chem import rdGeneralizedSubstruct
 
 
 class TestCase(unittest.TestCase):

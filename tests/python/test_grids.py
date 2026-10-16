@@ -5,7 +5,7 @@ import pickle
 
 import pytest
 
-from rdkit.Geometry import rdGeometry as geo
+from rdoxide.Geometry import rdGeometry as geo
 
 
 def sphere_grid():

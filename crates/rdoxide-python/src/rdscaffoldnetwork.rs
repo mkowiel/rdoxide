@@ -1,4 +1,4 @@
-//! `rdkit.Chem.Scaffolds.rdScaffoldNetwork` (upstream
+//! `rdoxide.Chem.Scaffolds.rdScaffoldNetwork` (upstream
 //! `GraphMol/ScaffoldNetwork/Wrap/rdScaffoldNetwork.cpp`). Pickling of
 //! networks is not supported (upstream needs Boost serialization).
 
@@ -16,7 +16,7 @@ use crate::mol::PyMol;
 /// Scaffold network parameters
 #[pyclass(
     name = "ScaffoldNetworkParams",
-    module = "rdkit.Chem.Scaffolds.rdScaffoldNetwork",
+    module = "rdoxide.Chem.Scaffolds.rdScaffoldNetwork",
     skip_from_py_object
 )]
 #[derive(Clone)]
@@ -90,7 +90,7 @@ impl PyScaffoldNetworkParams {
 /// A scaffold network edge
 #[pyclass(
     name = "NetworkEdge",
-    module = "rdkit.Chem.Scaffolds.rdScaffoldNetwork",
+    module = "rdoxide.Chem.Scaffolds.rdScaffoldNetwork",
     skip_from_py_object
 )]
 #[derive(Clone)]
@@ -116,7 +116,7 @@ impl PyNetworkEdge {
     #[getter(r#type)]
     fn edge_type(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let cls = py
-            .import("rdkit.Chem.Scaffolds.rdScaffoldNetwork")?
+            .import("rdoxide.Chem.Scaffolds.rdScaffoldNetwork")?
             .getattr("EdgeType")?;
         Ok(cls.call1((self.edge.edge_type as i64,))?.unbind())
     }
@@ -129,7 +129,7 @@ impl PyNetworkEdge {
 /// A scaffold network
 #[pyclass(
     name = "ScaffoldNetwork",
-    module = "rdkit.Chem.Scaffolds.rdScaffoldNetwork"
+    module = "rdoxide.Chem.Scaffolds.rdScaffoldNetwork"
 )]
 #[derive(Default)]
 struct PyScaffoldNetwork {

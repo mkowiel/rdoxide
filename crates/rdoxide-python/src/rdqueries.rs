@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdqueries` — port of upstream `Code/GraphMol/Wrap/queries.cpp`:
+//! `rdoxide.Chem.rdqueries` — port of upstream `Code/GraphMol/Wrap/queries.cpp`:
 //! factories for `QueryAtom`/`QueryBond` objects and `ReplaceAtomWithQueryAtom`.
 //!
 //! The upstream module is a wall of macro-generated functions; here the

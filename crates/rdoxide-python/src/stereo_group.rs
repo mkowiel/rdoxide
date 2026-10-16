@@ -13,7 +13,7 @@ use crate::mol::PyMol;
 ///
 /// Used to help represent a sample with unknown stereochemistry, or that is a mix
 /// of diastereomers.
-#[pyclass(name = "StereoGroup", module = "rdkit.Chem.rdchem")]
+#[pyclass(name = "StereoGroup", module = "rdoxide.Chem.rdchem")]
 #[derive(Debug)]
 pub struct PyStereoGroup {
     pub group: StereoGroup,

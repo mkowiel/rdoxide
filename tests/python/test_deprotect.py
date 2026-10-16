@@ -1,5 +1,5 @@
-from rdkit import Chem
-from rdkit.Chem import rdDeprotect
+from rdoxide import Chem
+from rdoxide.Chem import rdDeprotect
 
 
 def test_defaults_annotate_the_molecule():

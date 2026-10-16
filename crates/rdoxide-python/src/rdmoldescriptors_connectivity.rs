@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdMolDescriptors`: Chi, Hall-Kier alpha, Kappa and Phi
+//! `rdoxide.Chem.rdMolDescriptors`: Chi, Hall-Kier alpha, Kappa and Phi
 //! (upstream `Descriptors/ConnectivityDescriptors.cpp` and its wrappers in
 //! `Wrap/rdMolDescriptors.cpp`).
 

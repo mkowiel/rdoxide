@@ -1,4 +1,4 @@
-//! Sub-molecule extraction of `rdkit.Chem.rdmolops` (upstream
+//! Sub-molecule extraction of `rdoxide.Chem.rdmolops` (upstream
 //! `GraphMol/Wrap/MolOps.cpp`): `SubsetMethod`, `SubsetOptions`,
 //! `SubsetInfo`, `UIntUIntMap`, `CopyMolSubset` and `PathToSubmol`.
 
@@ -21,7 +21,7 @@ use crate::rdmolfiles_write::Args;
 /// An `unsigned int -> unsigned int` map (Boost's `map_indexing_suite`).
 #[pyclass(
     name = "UIntUIntMap",
-    module = "rdkit.Chem.rdmolops",
+    module = "rdoxide.Chem.rdmolops",
     skip_from_py_object
 )]
 #[derive(Debug, Clone, Default)]
@@ -69,7 +69,7 @@ fn method_to_py(py: Python<'_>, method: SubsetMethod) -> PyResult<Py<PyAny>> {
 /// Options controlling what `CopyMolSubset` copies.
 #[pyclass(
     name = "SubsetOptions",
-    module = "rdkit.Chem.rdmolops",
+    module = "rdoxide.Chem.rdmolops",
     skip_from_py_object
 )]
 #[derive(Debug, Clone, Default)]
@@ -164,7 +164,7 @@ impl PySubsetOptions {
 }
 
 /// Where the atoms and bonds of a subset came from.
-#[pyclass(name = "SubsetInfo", module = "rdkit.Chem.rdmolops")]
+#[pyclass(name = "SubsetInfo", module = "rdoxide.Chem.rdmolops")]
 #[derive(Debug)]
 pub struct PySubsetInfo {
     atom_mapping: Py<PyUIntUIntMap>,
@@ -212,10 +212,10 @@ impl PySubsetInfo {
 }
 
 const COPY_SIGNATURES: &str = concat!(
-    "CopyMolSubset(RDKit::ROMol mol, boost::python::api::object path, RDKit::SubsetInfo {lvalue} subsetInfo, RDKit::SubsetOptions options=<rdkit.Chem.rdmolops.SubsetOptions object at 0x0>)\n",
-    "    CopyMolSubset(RDKit::ROMol mol, boost::python::api::object path, RDKit::SubsetOptions options=<rdkit.Chem.rdmolops.SubsetOptions object at 0x0>)\n",
-    "    CopyMolSubset(RDKit::ROMol mol, boost::python::api::object atomIndices, boost::python::api::object bondIndices, RDKit::SubsetInfo {lvalue} subsetInfo, RDKit::SubsetOptions options=<rdkit.Chem.rdmolops.SubsetOptions object at 0x0>)\n",
-    "    CopyMolSubset(RDKit::ROMol mol, boost::python::api::object atomIndices, boost::python::api::object bondIndices, RDKit::SubsetOptions options=<rdkit.Chem.rdmolops.SubsetOptions object at 0x0>)"
+    "CopyMolSubset(RDKit::ROMol mol, boost::python::api::object path, RDKit::SubsetInfo {lvalue} subsetInfo, RDKit::SubsetOptions options=<rdoxide.Chem.rdmolops.SubsetOptions object at 0x0>)\n",
+    "    CopyMolSubset(RDKit::ROMol mol, boost::python::api::object path, RDKit::SubsetOptions options=<rdoxide.Chem.rdmolops.SubsetOptions object at 0x0>)\n",
+    "    CopyMolSubset(RDKit::ROMol mol, boost::python::api::object atomIndices, boost::python::api::object bondIndices, RDKit::SubsetInfo {lvalue} subsetInfo, RDKit::SubsetOptions options=<rdoxide.Chem.rdmolops.SubsetOptions object at 0x0>)\n",
+    "    CopyMolSubset(RDKit::ROMol mol, boost::python::api::object atomIndices, boost::python::api::object bondIndices, RDKit::SubsetOptions options=<rdoxide.Chem.rdmolops.SubsetOptions object at 0x0>)"
 );
 
 /// A sequence of indices; `None`, 0 and empty sequences give an empty list.

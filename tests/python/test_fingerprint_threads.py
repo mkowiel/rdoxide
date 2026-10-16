@@ -2,8 +2,8 @@
 
 import pytest
 
-from rdkit import Chem
-from rdkit.Chem import rdFingerprintGenerator as G
+from rdoxide import Chem
+from rdoxide.Chem import rdFingerprintGenerator as G
 
 SMILES = [
     "CC(=O)Nc1ccc(O)cc1",

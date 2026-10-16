@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdDepictor` (upstream `Depictor/Wrap/rdDepictor.cpp`).
+//! `rdoxide.Chem.rdDepictor` (upstream `Depictor/Wrap/rdDepictor.cpp`).
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;

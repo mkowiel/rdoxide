@@ -2,8 +2,8 @@
 
 import pytest
 
-from rdkit import Chem
-from rdkit.Chem import rdMolDescriptors as D
+from rdoxide import Chem
+from rdoxide.Chem import rdMolDescriptors as D
 
 
 @pytest.mark.parametrize(

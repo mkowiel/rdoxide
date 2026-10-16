@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdAbbreviations` (upstream
+//! `rdoxide.Chem.rdAbbreviations` (upstream
 //! `GraphMol/Abbreviations/Wrap/rdAbbreviations.cpp`).
 
 use std::sync::Arc;
@@ -17,7 +17,7 @@ use crate::mol::PyMol;
 /// Abbreviation Definition
 #[pyclass(
     name = "AbbreviationDefinition",
-    module = "rdkit.Chem.rdAbbreviations",
+    module = "rdoxide.Chem.rdAbbreviations",
     skip_from_py_object
 )]
 #[derive(Clone, Default)]

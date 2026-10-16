@@ -1,8 +1,8 @@
 """XYZ I/O and rdDetermineBonds; expected values come from reference RDKit."""
 
 import pytest
-from rdkit import Chem
-from rdkit.Chem import rdDetermineBonds as DB
+from rdoxide import Chem
+from rdoxide.Chem import rdDetermineBonds as DB
 
 ETHANOL = """9
 ethanol

@@ -37,7 +37,7 @@ enum Handle {
 }
 
 /// A collection of atoms and bonds with associated properties
-#[pyclass(name = "SubstanceGroup", module = "rdkit.Chem.rdchem")]
+#[pyclass(name = "SubstanceGroup", module = "rdoxide.Chem.rdchem")]
 #[derive(Debug)]
 pub struct PySubstanceGroup {
     handle: Handle,
@@ -377,7 +377,7 @@ fn bad_vect_cast(key: &str) -> PyErr {
 /// CSTATE for a SubstanceGroup
 #[pyclass(
     name = "SubstanceGroupCState",
-    module = "rdkit.Chem.rdchem",
+    module = "rdoxide.Chem.rdchem",
     skip_from_py_object
 )]
 #[derive(Debug, Clone)]
@@ -413,7 +413,7 @@ impl PySubstanceGroupCState {
 /// AttachPoint for a SubstanceGroup
 #[pyclass(
     name = "SubstanceGroupAttach",
-    module = "rdkit.Chem.rdchem",
+    module = "rdoxide.Chem.rdchem",
     skip_from_py_object
 )]
 #[derive(Debug, Clone)]
@@ -454,7 +454,7 @@ impl PySubstanceGroupAttach {
 }
 
 /// The result of `GetMolSubstanceGroups`: a mutable list of group copies.
-#[pyclass(name = "SubstanceGroup_VECT", module = "rdkit.Chem.rdchem")]
+#[pyclass(name = "SubstanceGroup_VECT", module = "rdoxide.Chem.rdchem")]
 #[derive(Debug, Default)]
 pub struct PySubstanceGroupVect {
     items: Vec<Py<PySubstanceGroup>>,

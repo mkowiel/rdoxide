@@ -2,8 +2,8 @@
 
 import pytest
 
-from rdkit import Chem
-from rdkit.Chem import rdMolDescriptors as D
+from rdoxide import Chem
+from rdoxide.Chem import rdMolDescriptors as D
 
 NAMES = ("Chi0v", "Chi1v", "Chi2v", "Chi3v", "Chi4v", "Chi0n", "Chi1n", "Chi2n", "Chi3n", "Chi4n",
          "HallKierAlpha", "Kappa1", "Kappa2", "Kappa3")

@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdChemReactions` (upstream `ChemReactions/Wrap/rdChemReactions.cpp`):
+//! `rdoxide.Chem.rdChemReactions` (upstream `ChemReactions/Wrap/rdChemReactions.cpp`):
 //! chemical reactions defined by templates, and running them on molecules.
 //!
 //! Template accessors (`GetReactantTemplate`, `GetReactants`, ...) return
@@ -55,8 +55,8 @@ use crate::substruct::PySubstructMatchParameters;
 /// A class for storing and applying chemical reactions.
 ///
 /// Sample Usage:
-///   >>> from rdkit import Chem
-///   >>> from rdkit.Chem import rdChemReactions
+///   >>> from rdoxide import Chem
+///   >>> from rdoxide.Chem import rdChemReactions
 ///   >>> rxn = rdChemReactions.ReactionFromSmarts('[C:1](=[O:2])O.[N:3]>>[C:1](=[O:2])[N:3]')
 ///   >>> rxn.GetNumReactantTemplates()
 ///   2
@@ -69,7 +69,7 @@ use crate::substruct::PySubstructMatchParameters;
 ///   'CNC(C)=O'
 #[pyclass(
     name = "ChemicalReaction",
-    module = "rdkit.Chem.rdChemReactions",
+    module = "rdoxide.Chem.rdChemReactions",
     dict,
     skip_from_py_object
 )]
@@ -691,7 +691,7 @@ fn parse_reaction(
 }
 
 /// construct a ChemicalReaction from a reaction SMARTS string.
-/// see the documentation for rdkit.Chem.MolFromSmiles for an explanation
+/// see the documentation for rdoxide.Chem.MolFromSmiles for an explanation
 /// of the replacements argument.
 #[pyfunction]
 #[pyo3(name = "ReactionFromSmarts", signature = (SMARTS, replacements = None, useSmiles = false))]
@@ -706,7 +706,7 @@ fn py_reaction_from_smarts(
 }
 
 /// construct a ChemicalReaction from a reaction SMILES string.
-/// see the documentation for rdkit.Chem.MolFromSmiles for an explanation
+/// see the documentation for rdoxide.Chem.MolFromSmiles for an explanation
 /// of the replacements argument.
 #[pyfunction]
 #[pyo3(name = "ReactionFromSmiles", signature = (SMILES, replacements = None))]
@@ -818,7 +818,7 @@ fn fingerprint_type_members() -> [(&'static str, i64); 5] {
 /// fingerprints of chemical reactions.
 #[pyclass(
     name = "ReactionFingerprintParams",
-    module = "rdkit.Chem.rdChemReactions",
+    module = "rdoxide.Chem.rdChemReactions",
     from_py_object
 )]
 #[derive(Clone, Default)]
@@ -1344,14 +1344,14 @@ fn py_match_only_at_rgroups_adjust_params() -> PyAdjustQueryParameters {
 ///     - rxn: the reaction to be modified
 ///     - sanitizeOps: (optional) reaction sanitization operations to be carried out
 ///       these should be constructed by or'ing together the
-///       operations in rdkit.Chem.rdChemReactions.SanitizeFlags
+///       operations in rdoxide.Chem.rdChemReactions.SanitizeFlags
 ///     - optional adjustment parameters for changing the meaning of the substructure
 ///       matching done in the templates.  The default is
-///       rdkit.Chem.rdChemReactions.DefaultRxnAdjustParams which aromatizes
+///       rdoxide.Chem.rdChemReactions.DefaultRxnAdjustParams which aromatizes
 ///       kekule structures if possible.
 ///     - catchErrors: (optional) if provided, instead of raising an exception
 ///       when sanitization fails (the default behavior), the
-///       first operation that failed (as defined in rdkit.Chem.rdChemReactions.SanitizeFlags)
+///       first operation that failed (as defined in rdoxide.Chem.rdChemReactions.SanitizeFlags)
 ///       is returned. Zero is returned on success.
 ///
 ///   The operations carried out by default are:

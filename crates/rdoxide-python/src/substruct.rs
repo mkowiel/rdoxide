@@ -21,7 +21,7 @@ use crate::mol::PyMol;
 /// Parameters controlling substructure matching
 #[pyclass(
     name = "SubstructMatchParameters",
-    module = "rdkit.Chem.rdchem",
+    module = "rdoxide.Chem.rdchem",
     skip_from_py_object
 )]
 #[derive(Clone)]
@@ -157,7 +157,7 @@ fn guarded(errors: &ErrorSlot, f: impl FnOnce(Python<'_>) -> PyResult<bool>) -> 
 /// Allows using atom coordinates as part of substructure matching
 #[pyclass(
     name = "AtomCoordsMatcher",
-    module = "rdkit.Chem.rdchem",
+    module = "rdoxide.Chem.rdchem",
     skip_from_py_object
 )]
 #[derive(Debug, Clone)]

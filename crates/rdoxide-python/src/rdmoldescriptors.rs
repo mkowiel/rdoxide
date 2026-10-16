@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdMolDescriptors` (upstream
+//! `rdoxide.Chem.rdMolDescriptors` (upstream
 //! `GraphMol/Descriptors/Wrap/rdMolDescriptors.cpp`): the legacy fingerprint
 //! functions so far.
 
@@ -820,10 +820,10 @@ const LIPINSKI_VERSIONS: &[(&str, &str)] = &[
 ];
 
 /// The constants of the atom-pair codes (`AtomPairsParameters`), read by
-/// `rdkit.Chem.AtomPairs.Utils` to decode atom codes.
+/// `rdoxide.Chem.AtomPairs.Utils` to decode atom codes.
 #[pyclass(
     name = "AtomPairsParameters",
-    module = "rdkit.Chem.rdMolDescriptors",
+    module = "rdoxide.Chem.rdMolDescriptors",
     dict
 )]
 #[derive(Debug)]

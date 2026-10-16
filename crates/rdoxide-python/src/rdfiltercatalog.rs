@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdfiltercatalog` (upstream `FilterCatalog/nbWrap/FilterCatalog.cpp`):
+//! `rdoxide.Chem.rdfiltercatalog` (upstream `FilterCatalog/nbWrap/FilterCatalog.cpp`):
 //! structural-alert filters, with matchers that may be written in Python.
 
 use std::any::Any;
@@ -22,7 +22,7 @@ use crate::enums::add_enum;
 use crate::errors::to_py;
 use crate::mol::PyMol;
 
-const MODULE: &str = "rdkit.Chem.rdfiltercatalog";
+const MODULE: &str = "rdoxide.Chem.rdfiltercatalog";
 
 /// A Python exception raised inside a Python-defined matcher; the matcher
 /// interface only carries `RDKitError`, so the exception waits here until
@@ -151,7 +151,7 @@ impl FilterMatcher for PyMatcher {
 /// This is why GetMatches can return multiple FilterMatcherBases.
 #[pyclass(
     name = "FilterMatcher",
-    module = "rdkit.Chem.rdfiltercatalog",
+    module = "rdoxide.Chem.rdfiltercatalog",
     subclass
 )]
 pub struct PyFilterMatcher {
@@ -344,7 +344,7 @@ impl PyFilterMatcher {
 ///
 ///   note: If the supplied smarts pattern is not valid, the IsValid() function will
 ///    return False
-#[pyclass(name = "SmartsMatcher", module = "rdkit.Chem.rdfiltercatalog", extends = PyFilterMatcher)]
+#[pyclass(name = "SmartsMatcher", module = "rdoxide.Chem.rdfiltercatalog", extends = PyFilterMatcher)]
 pub struct PySmartsMatcher {
     m: SmartsMatcher,
 }
@@ -441,7 +441,7 @@ impl PySmartsMatcher {
     }
 }
 
-#[pyclass(name = "ExclusionList", module = "rdkit.Chem.rdfiltercatalog", extends = PyFilterMatcher)]
+#[pyclass(name = "ExclusionList", module = "rdoxide.Chem.rdfiltercatalog", extends = PyFilterMatcher)]
 pub struct PyExclusionList {
     m: ExclusionList,
 }
@@ -476,7 +476,7 @@ impl PyExclusionList {
 
 macro_rules! binary_op {
     ($class:ident, $pyname:literal, $core:ident, $default:literal) => {
-        #[pyclass(name = $pyname, module = "rdkit.Chem.rdfiltercatalog.FilterMatchOps", extends = PyFilterMatcher)]
+        #[pyclass(name = $pyname, module = "rdoxide.Chem.rdfiltercatalog.FilterMatchOps", extends = PyFilterMatcher)]
         pub struct $class {
             m: $core,
         }
@@ -498,7 +498,7 @@ macro_rules! binary_op {
 binary_op!(PyAnd, "And", And, "And");
 binary_op!(PyOr, "Or", Or, "Or");
 
-#[pyclass(name = "Not", module = "rdkit.Chem.rdfiltercatalog.FilterMatchOps", extends = PyFilterMatcher)]
+#[pyclass(name = "Not", module = "rdoxide.Chem.rdfiltercatalog.FilterMatchOps", extends = PyFilterMatcher)]
 pub struct PyNot {
     m: Not,
 }
@@ -520,7 +520,7 @@ impl PyNot {
 ///  FilterHierarchyMatcher's have children and can form matching
 ///   trees.  When GetFilterMatches is called, the most specific (
 ///   i.e. lowest node in a branch) is returned.
-#[pyclass(name = "FilterHierarchyMatcher", module = "rdkit.Chem.rdfiltercatalog", extends = PyFilterMatcher)]
+#[pyclass(name = "FilterHierarchyMatcher", module = "rdoxide.Chem.rdfiltercatalog", extends = PyFilterMatcher)]
 pub struct PyFilterHierarchyMatcher {
     node: HierarchyNode,
 }
@@ -591,7 +591,7 @@ impl PyFilterHierarchyMatcher {
 /// use FilterMatchOps.Not)
 #[pyclass(
     name = "FilterMatch",
-    module = "rdkit.Chem.rdfiltercatalog",
+    module = "rdoxide.Chem.rdfiltercatalog",
     skip_from_py_object
 )]
 #[derive(Debug, Clone)]
@@ -632,7 +632,7 @@ impl PyFilterMatch {
 /// undesirable property.
 #[pyclass(
     name = "FilterCatalogEntry",
-    module = "rdkit.Chem.rdfiltercatalog",
+    module = "rdoxide.Chem.rdfiltercatalog",
     skip_from_py_object
 )]
 #[derive(Debug, Clone)]
@@ -718,7 +718,7 @@ impl PyFilterCatalogEntry {
 /// Parameters of a FilterCatalog
 #[pyclass(
     name = "FilterCatalogParams",
-    module = "rdkit.Chem.rdfiltercatalog",
+    module = "rdoxide.Chem.rdfiltercatalog",
     skip_from_py_object
 )]
 #[derive(Debug, Clone)]
@@ -742,7 +742,7 @@ impl PyFilterCatalogParams {
     }
 }
 
-#[pyclass(name = "FilterCatalog", module = "rdkit.Chem.rdfiltercatalog")]
+#[pyclass(name = "FilterCatalog", module = "rdoxide.Chem.rdfiltercatalog")]
 pub struct PyFilterCatalog {
     c: FilterCatalog,
 }

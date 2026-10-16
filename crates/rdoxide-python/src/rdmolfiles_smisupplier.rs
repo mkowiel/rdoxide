@@ -74,7 +74,7 @@ fn params(
 ///   are accessible using the mol.GetProp(propName) method.
 #[pyclass(
     name = "SmilesMolSupplier",
-    module = "rdkit.Chem.rdmolfiles",
+    module = "rdoxide.Chem.rdmolfiles",
     unsendable
 )]
 pub struct PySmilesMolSupplier {

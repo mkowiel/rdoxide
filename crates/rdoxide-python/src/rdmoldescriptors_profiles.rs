@@ -1,4 +1,4 @@
-//! `CalcAUTOCORR3D`, `CalcRDF`, `CalcMORSE`, `CalcCoulombMat` and `CalcEEMcharges`, `CalcWHIM` and `CalcGETAWAY` of `rdkit.Chem.rdMolDescriptors`
+//! `CalcAUTOCORR3D`, `CalcRDF`, `CalcMORSE`, `CalcCoulombMat` and `CalcEEMcharges`, `CalcWHIM` and `CalcGETAWAY` of `rdoxide.Chem.rdMolDescriptors`
 //! (upstream `Descriptors/AUTOCORR3D.cpp`, `RDF.cpp`, `MORSE.cpp`,
 //! `CoulombMat.cpp`, `EEM.cpp`, `WHIM.cpp`, `GETAWAY.cpp` and their
 //! wrappers in `Wrap/rdMolDescriptors.cpp`).

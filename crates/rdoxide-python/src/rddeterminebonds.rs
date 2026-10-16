@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdDetermineBonds` (upstream
+//! `rdoxide.Chem.rdDetermineBonds` (upstream
 //! `GraphMol/DetermineBonds/Wrap/rdDetermineBonds.cpp`).
 
 use pyo3::prelude::*;

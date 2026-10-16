@@ -1,4 +1,4 @@
-//! `rdkit.ML.Cluster.Clustering` (upstream `ML/Cluster/Murtagh/Clustering.cpp`):
+//! `rdoxide.ML.Cluster.Clustering` (upstream `ML/Cluster/Murtagh/Clustering.cpp`):
 //! Murtagh's hierarchical clustering of points or of precomputed distances.
 
 use pyo3::exceptions::PyValueError;

@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdReducedGraphs` (upstream
+//! `rdoxide.Chem.rdReducedGraphs` (upstream
 //! `GraphMol/ReducedGraphs/Wrap/rdReducedGraphs.cpp`).
 
 use pyo3::exceptions::PyValueError;

@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdMolCatalog` (upstream `MolCatalog/Wrap/rdMolCatalog.cpp`).
+//! `rdoxide.Chem.rdMolCatalog` (upstream `MolCatalog/Wrap/rdMolCatalog.cpp`).
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -11,7 +11,7 @@ use crate::mol::PyMol;
 /// A molecule catalog entry.
 #[pyclass(
     name = "MolCatalogEntry",
-    module = "rdkit.Chem.rdMolCatalog",
+    module = "rdoxide.Chem.rdMolCatalog",
     from_py_object
 )]
 #[derive(Clone, Default)]
@@ -81,7 +81,7 @@ impl PyMolCatalogEntry {
 }
 
 /// A hierarchical catalog of molecules.
-#[pyclass(name = "MolCatalog", module = "rdkit.Chem.rdMolCatalog")]
+#[pyclass(name = "MolCatalog", module = "rdoxide.Chem.rdMolCatalog")]
 pub struct PyMolCatalog {
     cat: MolCatalog,
 }

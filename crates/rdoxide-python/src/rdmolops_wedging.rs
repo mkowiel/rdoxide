@@ -1,4 +1,4 @@
-//! Bond wedging of `rdkit.Chem.rdmolops` (upstream `GraphMol/Wrap/MolOps.cpp`):
+//! Bond wedging of `rdoxide.Chem.rdmolops` (upstream `GraphMol/Wrap/MolOps.cpp`):
 //! `BondWedgingParameters`, `WedgeMolBonds`, `WedgeBond`,
 //! `ReapplyMolBlockWedging` and `RemoveNonExplicit3DChirality`.
 
@@ -18,7 +18,7 @@ use crate::mol::PyMol;
 /// Parameters controlling how bond wedging is done.
 #[pyclass(
     name = "BondWedgingParameters",
-    module = "rdkit.Chem.rdmolops",
+    module = "rdoxide.Chem.rdmolops",
     skip_from_py_object
 )]
 #[derive(Debug, Clone, Default)]

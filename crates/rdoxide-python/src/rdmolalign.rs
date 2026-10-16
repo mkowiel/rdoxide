@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdMolAlign` (upstream `MolAlign/Wrap/rdMolAlign.cpp`):
+//! `rdoxide.Chem.rdMolAlign` (upstream `MolAlign/Wrap/rdMolAlign.cpp`):
 //! alignment of molecules and conformers. The O3A functions need MMFF and
 //! Crippen parameters and are not provided.
 
@@ -125,7 +125,7 @@ fn opt_flag(a: &Args<'_, '_>, pos: usize, key: &str, default: bool) -> PyResult<
 /// Parameters controlling RMSD alignment
 #[pyclass(
     name = "BestAlignmentParams",
-    module = "rdkit.Chem.rdMolAlign",
+    module = "rdoxide.Chem.rdMolAlign",
     skip_from_py_object
 )]
 #[derive(Debug, Clone, Default)]

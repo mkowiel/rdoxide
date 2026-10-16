@@ -1,4 +1,4 @@
-//! `rdkit.DistanceGeometry.DistGeom` (upstream `DistGeom/Wrap/DistGeom.cpp`):
+//! `rdoxide.DistanceGeometry.DistGeom` (upstream `DistGeom/Wrap/DistGeom.cpp`):
 //! basic distance-geometry operations on bounds matrices.
 
 use std::collections::BTreeMap;

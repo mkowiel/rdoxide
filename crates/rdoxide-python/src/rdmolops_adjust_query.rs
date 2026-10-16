@@ -1,5 +1,5 @@
 //! `AdjustQueryProperties`, `AdjustQueryParameters` and `AdjustQueryWhichFlags`
-//! of `rdkit.Chem.rdmolops` (upstream `GraphMol/Wrap/MolOps.cpp`).
+//! of `rdoxide.Chem.rdmolops` (upstream `GraphMol/Wrap/MolOps.cpp`).
 
 use pyo3::prelude::*;
 use rdoxide::graphmol::adjust_query::{AdjustQueryParameters, adjust_query_properties};
@@ -38,7 +38,7 @@ const WHICH_FLAGS: [(&str, i64); 7] = [
 ///    Some of the options obviously make no sense for bonds
 #[pyclass(
     name = "AdjustQueryParameters",
-    module = "rdkit.Chem.rdmolops",
+    module = "rdoxide.Chem.rdmolops",
     dict,
     skip_from_py_object
 )]

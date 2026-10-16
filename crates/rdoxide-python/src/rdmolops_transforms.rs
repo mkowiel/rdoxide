@@ -1,4 +1,4 @@
-//! Substructure transforms and stereo-bond marking of `rdkit.Chem.rdmolops`
+//! Substructure transforms and stereo-bond marking of `rdoxide.Chem.rdmolops`
 //! (upstream `GraphMol/Wrap/MolOps.cpp`): `DeleteSubstructs`,
 //! `ReplaceSubstructs`, `ReplaceSidechains`, `ReplaceCore`,
 //! `MurckoDecompose` and `FindPotentialStereoBonds`.

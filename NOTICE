@@ -20,7 +20,7 @@ Licensing summary
   is licensed under the BSD 3-Clause License (see LICENSE).
 * Files translated from, or copied verbatim from, RDKit remain subject to
   the RDKit BSD 3-Clause license; each such file names its upstream source in
-  its header. The pure-Python modules under python/rdkit/ that are copied
+  its header. The pure-Python modules under python/rdoxide/ that are copied
   verbatim keep their original RDKit copyright headers.
 * Data tables under crates/rdoxide/data/ are extracted from RDKit
   (Code/GraphMol/atomic_data.cpp) and remain under the RDKit BSD license.

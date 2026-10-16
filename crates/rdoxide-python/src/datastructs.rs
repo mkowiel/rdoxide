@@ -1,4 +1,4 @@
-//! `rdkit.DataStructs.cDataStructs`: bit vectors and similarity functions
+//! `rdoxide.DataStructs.cDataStructs`: bit vectors and similarity functions
 //! (upstream `DataStructs/Wrap/{DataStructs,wrap_ExplicitBV,wrap_SparseBV,
 //! wrap_BitOps,wrap_Utils}.cpp`).
 
@@ -41,7 +41,7 @@ fn norm_index(which: i64, n: u32) -> PyResult<u32> {
 macro_rules! bitvect_class {
     ($py:ident, $rs:ty, $name:literal, $doc:literal) => {
         #[doc = $doc]
-        #[pyclass(name = $name, module = "rdkit.DataStructs.cDataStructs", dict, skip_from_py_object)]
+        #[pyclass(name = $name, module = "rdoxide.DataStructs.cDataStructs", dict, skip_from_py_object)]
 
         #[derive(Debug)]
         pub struct $py {

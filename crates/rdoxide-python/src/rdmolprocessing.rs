@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdMolProcessing` (upstream `MolProcessing/Wrap/rdMolProcessing.cpp`).
+//! `rdoxide.Chem.rdMolProcessing` (upstream `MolProcessing/Wrap/rdMolProcessing.cpp`).
 
 use pyo3::prelude::*;
 use pyo3::types::PyTuple;
@@ -11,7 +11,7 @@ use crate::rdfingerprintgenerator::PyFPGen;
 /// Supplier Options
 #[pyclass(
     name = "SupplierOptions",
-    module = "rdkit.Chem.rdMolProcessing",
+    module = "rdoxide.Chem.rdMolProcessing",
     from_py_object
 )]
 #[derive(Clone, Default)]

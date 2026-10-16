@@ -23,7 +23,7 @@ fn norm_index(i: isize, len: usize) -> PyResult<usize> {
 
 macro_rules! flat_vect {
     ($py:ident, $name:literal, $t:ty) => {
-        #[pyclass(name = $name, module = "rdkit.rdBase", sequence, skip_from_py_object)]
+        #[pyclass(name = $name, module = "rdoxide.rdBase", sequence, skip_from_py_object)]
         #[derive(Debug, Clone, Default)]
         pub struct $py {
             pub v: Vec<$t>,
@@ -116,7 +116,7 @@ const LIST_VECTI: &str = "_listSt6vectorIiSaIiEE";
 
 /// A sequence of int vectors (`std::list<std::vector<int>>`, e.g. `PATH_LIST`).
 /// Items come back as `_vecti` copies.
-#[pyclass(module = "rdkit.rdBase", sequence, skip_from_py_object)]
+#[pyclass(module = "rdoxide.rdBase", sequence, skip_from_py_object)]
 #[derive(Debug, Clone, Default)]
 pub struct PyListVectI {
     pub v: Vec<Vec<i32>>,
@@ -179,7 +179,7 @@ const VECT_VECTI: &str = "_vectSt6vectorIiSaIiEE";
 
 /// A vector of int vectors (`std::vector<std::vector<int>>`, e.g. the
 /// clusters of a picker). Items come back as `_vecti` copies.
-#[pyclass(module = "rdkit.rdBase", sequence, skip_from_py_object)]
+#[pyclass(module = "rdoxide.rdBase", sequence, skip_from_py_object)]
 #[derive(Debug, Clone, Default)]
 pub struct PyVectVectI {
     pub v: Vec<Vec<i32>>,

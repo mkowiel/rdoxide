@@ -1,6 +1,6 @@
 """SubstanceGroups in mol blocks; expectations validated against RDKit 2026.09.1."""
 
-from rdkit import Chem
+from rdoxide import Chem
 
 def v2000(mlines):
     atoms = [f"{x:10.4f}    0.0000    0.0000 {s}   0  0  0  0  0  0  0  0  0  0  0  0"

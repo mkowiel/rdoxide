@@ -1,8 +1,8 @@
 """CXSMILES output (MolToCXSmiles); expectations from the reference RDKit."""
 import pytest
 
-from rdkit import Chem
-from rdkit.Chem import rdmolfiles
+from rdoxide import Chem
+from rdoxide.Chem import rdmolfiles
 
 F = rdmolfiles.CXSmilesFields
 
@@ -75,7 +75,7 @@ def test_fragment_cxsmiles():
 
 
 def test_canonicalize_enhanced_stereo_roundtrip():
-    from rdkit import Chem
+    from rdoxide import Chem
 
     m = Chem.MolFromSmiles("C[C@H](F)C[C@@H](Cl)Br |&1:1,4|")
     Chem.CanonicalizeEnhancedStereo(m)

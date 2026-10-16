@@ -66,7 +66,7 @@ fn params(sanitize: bool, remove_hs: bool, strict_parsing: bool) -> MolFileParse
 ///   The properties are accessible using the mol.GetProp(propName) method.
 #[pyclass(
     name = "SDMolSupplier",
-    module = "rdkit.Chem.rdmolfiles",
+    module = "rdoxide.Chem.rdmolfiles",
     subclass,
     unsendable
 )]

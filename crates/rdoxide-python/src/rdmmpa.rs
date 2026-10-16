@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdMMPA` (upstream `GraphMol/MMPA/Wrap/rdMMPA.cpp`).
+//! `rdoxide.Chem.rdMMPA` (upstream `GraphMol/MMPA/Wrap/rdMMPA.cpp`).
 
 use pyo3::exceptions::{PyAttributeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;

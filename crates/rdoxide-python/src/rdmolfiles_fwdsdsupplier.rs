@@ -47,7 +47,7 @@ enum Source {
 ///   The properties are accessible using the mol.GetProp(propName) method.
 #[pyclass(
     name = "ForwardSDMolSupplier",
-    module = "rdkit.Chem.rdmolfiles",
+    module = "rdoxide.Chem.rdmolfiles",
     unsendable
 )]
 pub struct PyForwardSDMolSupplier {

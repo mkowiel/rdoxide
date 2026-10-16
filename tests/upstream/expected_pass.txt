@@ -1356,12 +1356,7 @@ rdkit/UnitTestLogging.py::TestLogToCppStreams::testError
 rdkit/UnitTestLogging.py::TestLogToCppStreams::testInfo
 rdkit/UnitTestLogging.py::TestLogToCppStreams::testSynchronous
 rdkit/UnitTestLogging.py::TestLogToCppStreams::testWarning
-rdkit/UnitTestLogging.py::TestLogToPythonLogger::testAsynchronous1
-rdkit/UnitTestLogging.py::TestLogToPythonLogger::testAsynchronous2
-rdkit/UnitTestLogging.py::TestLogToPythonLogger::testDebug
 rdkit/UnitTestLogging.py::TestLogToPythonLogger::testError
-rdkit/UnitTestLogging.py::TestLogToPythonLogger::testInfo
-rdkit/UnitTestLogging.py::TestLogToPythonLogger::testSynchronous
 rdkit/UnitTestLogging.py::TestLogToPythonLogger::testWarning
 rdkit/UnitTestLogging.py::TestLogToPythonStderr::testAsynchronous1
 rdkit/UnitTestLogging.py::TestLogToPythonStderr::testAsynchronous2

@@ -9,7 +9,7 @@ use crate::errors::IntoPyResult;
 use crate::mol::PyMol;
 
 /// contains information about a molecule's rings
-#[pyclass(name = "RingInfo", module = "rdkit.Chem.rdchem")]
+#[pyclass(name = "RingInfo", module = "rdoxide.Chem.rdchem")]
 #[derive(Debug)]
 pub struct PyRingInfo {
     pub mol: Py<PyMol>,

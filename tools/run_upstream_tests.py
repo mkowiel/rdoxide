@@ -48,8 +48,14 @@ def run_file(path: Path, timeout: int) -> dict[str, tuple[str, str]]:
     rel = path.relative_to(UPSTREAM).as_posix()
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / "results.json"
-        env = dict(os.environ, RDBASE=str(UPSTREAM), PYTHONDONTWRITEBYTECODE="1")
-        # -P: don't put the (upstream) cwd on sys.path, so `import rdkit`
+        env = dict(
+            os.environ,
+            RDBASE=str(UPSTREAM),
+            PYTHONDONTWRITEBYTECODE="1",
+            # `import rdkit` resolves to rdoxide (also in subprocesses of tests)
+            PYTHONPATH=str(ROOT / "tools" / "_alias"),
+        )
+        # -P: don't put the (upstream) cwd on sys.path, so `import rdoxide`
         # resolves to the installed rdoxide package
         cmd = [sys.executable, "-P", str(RUNNER), str(path), str(out)]
         try:

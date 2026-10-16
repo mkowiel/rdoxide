@@ -1,4 +1,4 @@
-//! Structure-level functions of `rdkit.Chem.rdmolops` (upstream
+//! Structure-level functions of `rdoxide.Chem.rdmolops` (upstream
 //! `GraphMol/Wrap/MolOps.cpp`): `GetMolFrags`, `CombineMols`, `RenumberAtoms`,
 //! `GetFormalCharge`, `GetShortestPath` and `RemoveStereochemistry`.
 
@@ -111,7 +111,7 @@ fn py_combine_mols(
                         py,
                         "CombineMols",
                         &["Mol".into(), "Mol".into(), boost_type_name(o)],
-                        "CombineMols(RDKit::ROMol mol1, RDKit::ROMol mol2, RDGeom::Point3D offset=<rdkit.Geometry.rdGeometry.Point3D object at 0x0>)",
+                        "CombineMols(RDKit::ROMol mol1, RDKit::ROMol mol2, RDGeom::Point3D offset=<rdoxide.Geometry.rdGeometry.Point3D object at 0x0>)",
                     )
                 })?
                 .p

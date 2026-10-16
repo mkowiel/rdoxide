@@ -1,4 +1,4 @@
-//! The 3D shape descriptors of `rdkit.Chem.rdMolDescriptors` (upstream
+//! The 3D shape descriptors of `rdoxide.Chem.rdMolDescriptors` (upstream
 //! `Descriptors/PMI.cpp`, `PBF.cpp` and their wrappers in
 //! `Wrap/rdMolDescriptors.cpp`): CalcPBF, CalcNPR1/2, CalcPMI1/2/3,
 //! CalcRadiusOfGyration, CalcInertialShapeFactor, CalcEccentricity,

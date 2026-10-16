@@ -1,10 +1,10 @@
-"""rdkit.DataStructs bit vectors (expectations checked against RDKit 2026.09.1)."""
+"""rdoxide.DataStructs bit vectors (expectations checked against RDKit 2026.09.1)."""
 
 import pickle
 
 import pytest
 
-from rdkit import DataStructs as DS
+from rdoxide import DataStructs as DS
 
 
 def _bv(n, bits, cls=DS.ExplicitBitVect):

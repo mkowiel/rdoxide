@@ -1,8 +1,8 @@
 import pytest
 
-from rdkit import Chem
-from rdkit.Chem import rdRGroupDecomposition as rgd
-from rdkit.Chem.rdRGroupDecomposition import (RGroupCoreAlignment, RGroupDecompose,
+from rdoxide import Chem
+from rdoxide.Chem import rdRGroupDecomposition as rgd
+from rdoxide.Chem.rdRGroupDecomposition import (RGroupCoreAlignment, RGroupDecompose,
                                               RGroupDecomposition, RGroupDecompositionParameters,
                                               RGroupLabelling, RGroupLabels, RGroupMatching,
                                               RGroupScore, RelabelMappedDummies)

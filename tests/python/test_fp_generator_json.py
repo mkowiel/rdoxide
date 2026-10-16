@@ -3,8 +3,8 @@
 import json
 
 import pytest
-from rdkit import Chem
-from rdkit.Chem import rdFingerprintGenerator as rfg
+from rdoxide import Chem
+from rdoxide.Chem import rdFingerprintGenerator as rfg
 
 GENERATORS = {
     "atompair": lambda: rfg.GetAtomPairGenerator(),

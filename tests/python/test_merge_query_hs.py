@@ -1,7 +1,7 @@
 """MergeQueryHs / HasQueryHs / MolFromSmarts(mergeHs=True); verified against RDKit 2026.09.1."""
 
 import pytest
-from rdkit import Chem
+from rdoxide import Chem
 
 
 def merged(smarts, *args):

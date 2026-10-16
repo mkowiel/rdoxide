@@ -2,8 +2,8 @@
 
 import pytest
 
-from rdkit import Chem
-from rdkit.Chem import rdMolDescriptors as D
+from rdoxide import Chem
+from rdoxide.Chem import rdMolDescriptors as D
 
 # smiles: (Labute ASA, Labute ASA without implicit Hs, TPSA, TPSA with S and P)
 CASES = {

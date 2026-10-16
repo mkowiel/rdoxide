@@ -1,5 +1,5 @@
 //! `ResonanceMolSupplier` and `ResonanceMolSupplierCallback` of
-//! `rdkit.Chem.rdchem` (upstream `Wrap/ResonanceMolSupplier.cpp`).
+//! `rdoxide.Chem.rdchem` (upstream `Wrap/ResonanceMolSupplier.cpp`).
 
 use std::sync::{Arc, Mutex};
 
@@ -26,7 +26,7 @@ const PURE_VIRTUAL: &str = "Pure virtual function called";
 /// derived class to ResonanceMolSupplier.SetProgressCallback()
 #[pyclass(
     name = "ResonanceMolSupplierCallback",
-    module = "rdkit.Chem.rdchem",
+    module = "rdoxide.Chem.rdchem",
     subclass
 )]
 pub struct PyResonanceMolSupplierCallback {
@@ -123,7 +123,11 @@ impl PyResonanceMolSupplierCallback {
 ///        >>> nResMols = len(suppl)
 ///        >>> for i in range(nResMols):
 ///        ...   suppl[i].GetNumAtoms()
-#[pyclass(name = "ResonanceMolSupplier", module = "rdkit.Chem.rdchem", subclass)]
+#[pyclass(
+    name = "ResonanceMolSupplier",
+    module = "rdoxide.Chem.rdchem",
+    subclass
+)]
 pub struct PyResonanceMolSupplier {
     inner: ResonanceMolSupplier,
     callback: Option<Py<PyAny>>,

@@ -1,4 +1,4 @@
-//! `rdkit.rdBase` — port of upstream `Code/RDBoost/Wrap/RDBase.cpp`.
+//! `rdoxide.rdBase` — port of upstream `Code/RDBoost/Wrap/RDBase.cpp`.
 
 use std::sync::Arc;
 
@@ -19,7 +19,7 @@ impl LogSink for PyStderrSink {
     }
 }
 
-/// Sends each line to `logging.getLogger("rdkit").<level>` (upstream `PyLogStream`).
+/// Sends each line to `logging.getLogger("rdoxide").<level>` (upstream `PyLogStream`).
 struct PyLoggerSink;
 impl LogSink for PyLoggerSink {
     fn write(&self, level: Level, text: &str) {
@@ -32,7 +32,7 @@ impl LogSink for PyLoggerSink {
         Python::attach(|py| {
             let logger = py
                 .import("logging")
-                .and_then(|l| l.call_method1("getLogger", ("rdkit",)));
+                .and_then(|l| l.call_method1("getLogger", ("rdoxide",)));
             match logger {
                 Ok(logger) => {
                     for line in text.lines() {
@@ -154,7 +154,7 @@ fn version() -> &'static str {
 }
 
 /// Temporarily block logs from outputting while this instance is in scope.
-#[pyclass(name = "BlockLogs", module = "rdkit.rdBase", unsendable)]
+#[pyclass(name = "BlockLogs", module = "rdoxide.rdBase", unsendable)]
 struct BlockLogs {
     setter: Option<LogStateSetter>,
 }
@@ -186,7 +186,7 @@ impl BlockLogs {
 /// Can be used as a context manager. The ``messages`` property is
 /// accessible both inside the context and after it exits.
 /// Nesting is supported: inner captures shadow outer ones.
-#[pyclass(name = "CaptureErrorLog", module = "rdkit.rdBase", unsendable)]
+#[pyclass(name = "CaptureErrorLog", module = "rdoxide.rdBase", unsendable)]
 struct PyCaptureErrorLog {
     capture: CaptureLog,
 }

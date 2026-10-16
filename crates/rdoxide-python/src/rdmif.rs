@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdMIF`: molecular interaction fields (upstream
+//! `rdoxide.Chem.rdMIF`: molecular interaction fields (upstream
 //! `GraphMol/MolInteractionFields/Wrap/rdMIF.cpp`).
 
 use pyo3::exceptions::PyValueError;
@@ -103,7 +103,7 @@ fn charges_and_positions(
 
 /// Electrostatic interaction (Coulomb energy) between probe and molecule in
 /// vacuum (no dielectric).
-#[pyclass(name = "Coulomb", module = "rdkit.Chem.rdMIF")]
+#[pyclass(name = "Coulomb", module = "rdoxide.Chem.rdMIF")]
 pub struct PyCoulomb {
     d: Coulomb,
 }
@@ -192,7 +192,7 @@ impl PyCoulomb {
 
 /// Electrostatic interaction with a distance-dependent dielectric (same
 /// energy term as used in GRID MIFs).
-#[pyclass(name = "CoulombDielectric", module = "rdkit.Chem.rdMIF")]
+#[pyclass(name = "CoulombDielectric", module = "rdoxide.Chem.rdMIF")]
 pub struct PyCoulombDielectric {
     d: CoulombDielectric,
 }
@@ -288,7 +288,7 @@ impl PyCoulombDielectric {
 
 /// van der Waals interactions between a molecule and a probe at a
 /// gridpoint, based on the MMFF forcefield.
-#[pyclass(name = "MMFFVdWaals", module = "rdkit.Chem.rdMIF")]
+#[pyclass(name = "MMFFVdWaals", module = "rdoxide.Chem.rdMIF")]
 pub struct PyMMFFVdWaals {
     d: VdWaals,
 }
@@ -319,7 +319,7 @@ impl PyMMFFVdWaals {
 
 /// van der Waals interactions between a molecule and a probe at a
 /// gridpoint, based on the UFF forcefield.
-#[pyclass(name = "UFFVdWaals", module = "rdkit.Chem.rdMIF")]
+#[pyclass(name = "UFFVdWaals", module = "rdoxide.Chem.rdMIF")]
 pub struct PyUFFVdWaals {
     d: VdWaals,
 }
@@ -365,7 +365,7 @@ fn py_construct_grid(
 
 /// Hydrogen bonding interaction between a molecule and a probe at a
 /// gridpoint (the probe is "OH", "O", "NH" or "N").
-#[pyclass(name = "HBond", module = "rdkit.Chem.rdMIF")]
+#[pyclass(name = "HBond", module = "rdoxide.Chem.rdMIF")]
 pub struct PyHBond {
     d: HBond,
 }
@@ -395,7 +395,7 @@ impl PyHBond {
 
 /// Hydrophilic field: the minimum of the hydrogen bond interactions with a
 /// water oxygen and a water hydrogen probe.
-#[pyclass(name = "Hydrophilic", module = "rdkit.Chem.rdMIF")]
+#[pyclass(name = "Hydrophilic", module = "rdoxide.Chem.rdMIF")]
 pub struct PyHydrophilic {
     d: Hydrophilic,
 }

@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdMolDescriptors`: Labute ASA, TPSA and the VSA binnings
+//! `rdoxide.Chem.rdMolDescriptors`: Labute ASA, TPSA and the VSA binnings
 //! (upstream `Descriptors/MolSurf.cpp` and its wrappers in
 //! `Wrap/rdMolDescriptors.cpp`).
 

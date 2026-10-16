@@ -24,7 +24,7 @@ const FLUSH: Site = Site {
 };
 
 /// A class for writing molecules to text files.
-#[pyclass(name = "SmilesWriter", module = "rdkit.Chem.rdmolfiles", unsendable)]
+#[pyclass(name = "SmilesWriter", module = "rdoxide.Chem.rdmolfiles", unsendable)]
 pub struct PySmilesWriter {
     sink: Option<WriterSink>,
     writer: SmilesWriter,

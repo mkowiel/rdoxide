@@ -1,6 +1,6 @@
 import pytest
-from rdkit import Chem
-from rdkit.Chem import rdMolEnumerator
+from rdoxide import Chem
+from rdoxide.Chem import rdMolEnumerator
 
 
 def test_sru_enumeration_with_defaults():

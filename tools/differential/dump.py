@@ -7,6 +7,16 @@ usage: python -I dump.py MODE INPUT.smi > out.jsonl
 import json
 import sys
 
+import sys
+from pathlib import Path
+
+try:
+    import rdkit  # noqa: F401  (the reference interpreter)
+except ImportError:  # rdoxide installs its package as `rdoxide`
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    import rdkit_alias
+
+    rdkit_alias.install()
 from rdkit import Chem, RDLogger
 
 RDLogger.DisableLog("rdApp.*")

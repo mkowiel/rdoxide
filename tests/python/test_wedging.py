@@ -5,8 +5,8 @@ import os
 
 import pytest
 
-from rdkit import Chem
-from rdkit.Chem import rdDepictor, rdmolops
+from rdoxide import Chem
+from rdoxide.Chem import rdDepictor, rdmolops
 
 with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "mols3d.json")) as f:
     BLOCKS = json.load(f)

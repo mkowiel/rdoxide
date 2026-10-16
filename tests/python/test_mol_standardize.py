@@ -1,9 +1,9 @@
 """rdMolStandardize bindings (the behaviour is checked by the upstream
 testMolStandardize.py and the `standardize` differential)."""
 import pytest
-from rdkit import Chem
-from rdkit.Chem.MolStandardize import ReorderTautomers
-from rdkit.Chem.MolStandardize import rdMolStandardize as ms
+from rdoxide import Chem
+from rdoxide.Chem.MolStandardize import ReorderTautomers
+from rdoxide.Chem.MolStandardize import rdMolStandardize as ms
 
 
 def smi(m):
@@ -11,9 +11,9 @@ def smi(m):
 
 
 def test_module_and_classes():
-    assert ms.__name__ == "rdkit.Chem.MolStandardize.rdMolStandardize"
+    assert ms.__name__ == "rdoxide.Chem.MolStandardize.rdMolStandardize"
     for cls in (ms.CleanupParameters, ms.TautomerEnumerator, ms.Uncharger, ms.Pipeline):
-        assert cls.__module__ == "rdkit.Chem.MolStandardize.rdMolStandardize"
+        assert cls.__module__ == "rdoxide.Chem.MolStandardize.rdMolStandardize"
     assert issubclass(ms.RDKitValidation, ms.ValidationMethod)
     assert ms.TautomerEnumerator.tautomerScoreVersion == "1.0.0"
 
@@ -132,7 +132,7 @@ def test_tautomer_callback():
 
 def test_pipeline():
     m = Chem.MolFromSmiles("CC[O-].[Na+]")
-    from rdkit.Chem import rdDepictor
+    from rdoxide.Chem import rdDepictor
     rdDepictor.Compute2DCoords(m)
     res = ms.Pipeline().run(Chem.MolToMolBlock(m))
     assert res.stage == ms.PipelineStage.COMPLETED
@@ -161,7 +161,7 @@ def test_vector_suites():
 
 def test_pipeline_log_is_shared():
     m = Chem.MolFromSmiles("CC[O-].[Na+]")
-    from rdkit.Chem import rdDepictor
+    from rdoxide.Chem import rdDepictor
     rdDepictor.Compute2DCoords(m)
     res = ms.Pipeline().run(Chem.MolToMolBlock(m))
     n = len(res.log)

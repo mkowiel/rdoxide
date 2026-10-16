@@ -2,9 +2,9 @@
 
 import pytest
 
-from rdkit import Chem
-from rdkit.Chem import Descriptors
-from rdkit.Chem import rdMolDescriptors as D
+from rdoxide import Chem
+from rdoxide.Chem import Descriptors
+from rdoxide.Chem import rdMolDescriptors as D
 
 MQNS = {
     "CC(=O)Nc1ccc(O)cc1": [8, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 11, 4, 1, 0, 3, 3, 0, 1, 5, 3, 2, 2,

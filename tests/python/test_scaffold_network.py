@@ -1,8 +1,8 @@
 import pickle
 
 import pytest
-from rdkit import Chem
-from rdkit.Chem.Scaffolds import rdScaffoldNetwork
+from rdoxide import Chem
+from rdoxide.Chem.Scaffolds import rdScaffoldNetwork
 
 
 def test_brics_scaffolds_and_options():

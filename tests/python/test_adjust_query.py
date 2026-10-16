@@ -1,8 +1,8 @@
 """AdjustQueryProperties; verified against RDKit 2026.09.1."""
 
 import pytest
-from rdkit import Chem
-from rdkit.Chem import rdmolops
+from rdoxide import Chem
+from rdoxide.Chem import rdmolops
 
 
 def adjusted(smiles, **attrs):

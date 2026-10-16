@@ -3,8 +3,8 @@ import os
 from pathlib import Path
 
 import pytest
-from rdkit import Chem
-from rdkit.Chem import rdSynthonSpaceSearch
+from rdoxide import Chem
+from rdoxide.Chem import rdSynthonSpaceSearch
 
 DATA = Path(__file__).resolve().parents[2] / "upstream" / "rdkit" / "Code" / "GraphMol" / "SynthonSpaceSearch" / "data"
 pytestmark = pytest.mark.skipif(not DATA.exists(), reason="upstream test data not checked out")
@@ -54,7 +54,7 @@ def test_formatted_integer_string():
 
 
 def test_rascal_and_fingerprint_search():
-    from rdkit.Chem import rdFingerprintGenerator, rdRascalMCES
+    from rdoxide.Chem import rdFingerprintGenerator, rdRascalMCES
 
     space = rdSynthonSpaceSearch.SynthonSpace()
     space.ReadTextFile(str(DATA / "amide_space.txt"))

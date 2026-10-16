@@ -18,7 +18,7 @@ pub enum ConfHandle {
 }
 
 /// The class to store 2D or 3D conformation of a molecule
-#[pyclass(name = "Conformer", module = "rdkit.Chem.rdchem", subclass)]
+#[pyclass(name = "Conformer", module = "rdoxide.Chem.rdchem", subclass)]
 #[derive(Debug)]
 pub struct PyConformer {
     pub handle: ConfHandle,

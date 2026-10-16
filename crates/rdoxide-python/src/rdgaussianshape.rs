@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdGaussianShape`: Gaussian-based shape overlay and scoring
+//! `rdoxide.Chem.rdGaussianShape`: Gaussian-based shape overlay and scoring
 //! (upstream `GraphMol/GaussianShape/Wrap/rdGaussianShape.cpp`).
 
 use pyo3::exceptions::{PyTypeError, PyValueError};
@@ -89,7 +89,7 @@ fn optim_mode_from(v: i64) -> PyResult<OptimMode> {
 /// ShapeInputOptions - options for setting up ShapeInput objects.
 #[pyclass(
     name = "ShapeInputOptions",
-    module = "rdkit.Chem.rdGaussianShape",
+    module = "rdoxide.Chem.rdGaussianShape",
     from_py_object
 )]
 #[derive(Clone, Default)]
@@ -235,7 +235,7 @@ impl PyShapeInputOptions {
 /// ShapeOverlayOptions - options for controlling the shape overlay process.
 #[pyclass(
     name = "ShapeOverlayOptions",
-    module = "rdkit.Chem.rdGaussianShape",
+    module = "rdoxide.Chem.rdGaussianShape",
     from_py_object
 )]
 #[derive(Clone, Default)]
@@ -361,7 +361,7 @@ impl PyShapeOverlayOptions {
 }
 
 /// ShapeInput object
-#[pyclass(name = "ShapeInput", module = "rdkit.Chem.rdGaussianShape")]
+#[pyclass(name = "ShapeInput", module = "rdoxide.Chem.rdGaussianShape")]
 pub struct PyShapeInput {
     pub(crate) shape: ShapeInput,
 }

@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdchem.MolBundle` (upstream `GraphMol/Wrap/MolBundle.cpp`): a
+//! `rdoxide.Chem.rdchem.MolBundle` (upstream `GraphMol/Wrap/MolBundle.cpp`): a
 //! group of related molecules. Not supported: pickles, the substructure
 //! search methods and the properties.
 
@@ -12,7 +12,7 @@ use crate::errors::IntoPyResult;
 use crate::mol::PyMol;
 
 /// A class for storing groups of related molecules.
-#[pyclass(name = "MolBundle", module = "rdkit.Chem.rdchem")]
+#[pyclass(name = "MolBundle", module = "rdoxide.Chem.rdchem")]
 #[derive(Default)]
 pub struct PyMolBundle {
     pub bundle: MolBundle,

@@ -1,8 +1,8 @@
 """rdCIPLabeler and what uses it under the new stereo perception."""
 
 import pytest
-from rdkit import Chem, RDConfig
-from rdkit.Chem import rdCIPLabeler, rdFingerprintGenerator
+from rdoxide import Chem, RDConfig
+from rdoxide.Chem import rdCIPLabeler, rdFingerprintGenerator
 
 
 @pytest.fixture

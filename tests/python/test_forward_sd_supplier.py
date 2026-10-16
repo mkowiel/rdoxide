@@ -5,7 +5,7 @@ import os
 
 import pytest
 
-from rdkit import Chem
+from rdoxide import Chem
 
 SDF = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "molfiles", "first_200.props.sdf")
 

@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdMolDescriptors`: the property registry — `Properties`,
+//! `rdoxide.Chem.rdMolDescriptors`: the property registry — `Properties`,
 //! `PythonPropertyFunctor`, `PropertyRangeQuery` and `MakePropertyRangeQuery`
 //! (upstream `Descriptors/Property.cpp` and the `nbWrap` wrapper).
 //!
@@ -26,7 +26,7 @@ use crate::vects::{PyVectD, PyVectStr};
 /// instances of this class; Python subclasses override `__call__`.
 #[pyclass(
     name = "PythonPropertyFunctor",
-    module = "rdkit.Chem.rdMolDescriptors",
+    module = "rdoxide.Chem.rdMolDescriptors",
     subclass,
     weakref
 )]
@@ -156,7 +156,7 @@ fn get_property(py: Python<'_>, name: &str) -> PyResult<Py<PyPropertyFunctor>> {
 /// properties = rdMolDescriptors.Properties(['exactmw', 'lipinskiHBA'])
 /// for name, value in zip(properties.GetPropertyNames(), properties.ComputeProperties(mol)):
 ///   print(name, value)
-#[pyclass(name = "Properties", module = "rdkit.Chem.rdMolDescriptors")]
+#[pyclass(name = "Properties", module = "rdoxide.Chem.rdMolDescriptors")]
 #[derive(Debug)]
 pub struct PyProperties {
     properties: Vec<Py<PyPropertyFunctor>>,
@@ -266,7 +266,7 @@ impl PyProperties {
 }
 
 /// Property Range Query for a molecule.  Match(mol) -> true if in range
-#[pyclass(name = "PropertyRangeQuery", module = "rdkit.Chem.rdMolDescriptors")]
+#[pyclass(name = "PropertyRangeQuery", module = "rdoxide.Chem.rdMolDescriptors")]
 #[derive(Debug)]
 pub struct PyPropertyRangeQuery {
     query: PropertyRangeQuery,

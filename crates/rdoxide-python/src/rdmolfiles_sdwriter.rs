@@ -47,7 +47,7 @@ const FLUSH: Site = Site {
 ///
 ///        >>> writer = SDWriter('out.sdf')
 ///        >>> writer.SetProps(['prop1','prop2'])
-#[pyclass(name = "SDWriter", module = "rdkit.Chem.rdmolfiles", unsendable)]
+#[pyclass(name = "SDWriter", module = "rdoxide.Chem.rdmolfiles", unsendable)]
 pub struct PySDWriter {
     sink: Option<WriterSink>,
     props: Vec<String>,

@@ -1,8 +1,8 @@
-"""rdkit.Chem.rdMHFPFingerprint; expected values come from reference RDKit."""
+"""rdoxide.Chem.rdMHFPFingerprint; expected values come from reference RDKit."""
 
 import pytest
-from rdkit import Chem
-from rdkit.Chem import rdMHFPFingerprint as M
+from rdoxide import Chem
+from rdoxide.Chem import rdMHFPFingerprint as M
 
 
 @pytest.fixture(scope="module")

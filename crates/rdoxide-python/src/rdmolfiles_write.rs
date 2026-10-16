@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdmolfiles`: SMILES writing — port of the corresponding parts
+//! `rdoxide.Chem.rdmolfiles`: SMILES writing — port of the corresponding parts
 //! of upstream `Code/GraphMol/Wrap/rdmolfiles.cpp`.
 
 use pyo3::exceptions::{PyTypeError, PyValueError};
@@ -20,7 +20,7 @@ use crate::mol::PyMol;
 /// Parameters controlling SMILES writing
 #[pyclass(
     name = "SmilesWriteParams",
-    module = "rdkit.Chem.rdmolfiles",
+    module = "rdoxide.Chem.rdmolfiles",
     get_all,
     set_all,
     skip_from_py_object

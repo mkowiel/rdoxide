@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
-from rdkit import Chem
-from rdkit.Chem import AllChem, rdDistGeom
+from rdoxide import Chem
+from rdoxide.Chem import AllChem, rdDistGeom
 
 
 def _mol(smi):
@@ -60,7 +60,7 @@ def test_experimental_torsions():
 
 
 def test_distance_geometry_module():
-    from rdkit.DistanceGeometry import DoTriangleSmoothing, EmbedBoundsMatrix
+    from rdoxide.DistanceGeometry import DoTriangleSmoothing, EmbedBoundsMatrix
 
     m = _mol("CCO")
     b = rdDistGeom.GetMoleculeBoundsMatrix(m, doTriangleSmoothing=False)

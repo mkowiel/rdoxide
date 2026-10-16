@@ -2,9 +2,9 @@
 
 import pytest
 
-from rdkit import Chem
-from rdkit.Chem import Crippen, rdMolDescriptors
-from rdkit.Geometry import Point3D
+from rdoxide import Chem
+from rdoxide.Chem import Crippen, rdMolDescriptors
+from rdoxide.Geometry import Point3D
 
 
 def test_calc_crippen_descriptors():

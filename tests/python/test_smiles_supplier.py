@@ -2,7 +2,7 @@
 
 import pytest
 
-from rdkit import Chem, RDLogger
+from rdoxide import Chem, RDLogger
 
 RDLogger.DisableLog("rdApp.*")
 

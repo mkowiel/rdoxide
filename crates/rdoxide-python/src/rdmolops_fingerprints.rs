@@ -1,4 +1,4 @@
-//! Legacy path fingerprints of `rdkit.Chem.rdmolops` (`RDKFingerprint`,
+//! Legacy path fingerprints of `rdoxide.Chem.rdmolops` (`RDKFingerprint`,
 //! `UnfoldedRDKFingerprintCountBased`, `PatternFingerprint`, `LayeredFingerprint`; upstream
 //! `GraphMol/Wrap/MolOps.cpp`).
 

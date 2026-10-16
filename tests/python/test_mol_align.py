@@ -7,10 +7,10 @@ import os
 import numpy as np
 import pytest
 
-from rdkit import Chem
-from rdkit.Chem import rdMolAlign as A
-from rdkit.Chem import rdMolTransforms as T
-from rdkit.Geometry import Point3D
+from rdoxide import Chem
+from rdoxide.Chem import rdMolAlign as A
+from rdoxide.Chem import rdMolTransforms as T
+from rdoxide.Geometry import Point3D
 
 DATA = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data")
 with open(os.path.join(DATA, "align_1oir.json")) as f:

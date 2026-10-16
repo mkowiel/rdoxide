@@ -1,4 +1,4 @@
-//! `rdkit.Geometry.rdGeometry` — port of upstream `Code/Geometry/Wrap/Point.cpp`
+//! `rdoxide.Geometry.rdGeometry` — port of upstream `Code/Geometry/Wrap/Point.cpp`
 //! (Point3D, Point2D so far).
 
 use pyo3::exceptions::{PyIndexError, PyRuntimeError, PyTypeError};
@@ -14,7 +14,7 @@ use crate::errors::IntoPyResult;
 /// (i.e. pt.x = 4) or indexing (i.e. pt[0] = 4).
 #[pyclass(
     name = "Point3D",
-    module = "rdkit.Geometry.rdGeometry",
+    module = "rdoxide.Geometry.rdGeometry",
     subclass,
     skip_from_py_object
 )]
@@ -175,7 +175,7 @@ impl PyPoint3D {
 /// A class to represent a two-dimensional point
 #[pyclass(
     name = "Point2D",
-    module = "rdkit.Geometry.rdGeometry",
+    module = "rdoxide.Geometry.rdGeometry",
     subclass,
     skip_from_py_object
 )]
@@ -324,7 +324,7 @@ impl PyPoint2D {
 /// A class to represent an N-dimensional point
 #[pyclass(
     name = "PointND",
-    module = "rdkit.Geometry.rdGeometry",
+    module = "rdoxide.Geometry.rdGeometry",
     subclass,
     skip_from_py_object
 )]

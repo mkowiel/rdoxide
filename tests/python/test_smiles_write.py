@@ -6,7 +6,7 @@ Code/GraphMol/Wrap/rough_test.py and rdkit/Chem/UnitTestSmiles.py
 
 import pytest
 
-from rdkit import Chem
+from rdoxide import Chem
 
 
 @pytest.mark.parametrize(

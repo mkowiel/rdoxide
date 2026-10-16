@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdchem` — port of upstream `Code/GraphMol/Wrap/rdchem.cpp`
+//! `rdoxide.Chem.rdchem` — port of upstream `Code/GraphMol/Wrap/rdchem.cpp`
 //! and `Code/GraphMol/Wrap/Table.cpp`.
 
 use pyo3::prelude::*;
@@ -60,7 +60,7 @@ fn lookup(elem: &ElementArg) -> PyResult<&'static AtomicData> {
 ///
 ///   When it makes sense, these can be queried using either an atomic number (integer)
 ///   or an atomic symbol (string)
-#[pyclass(name = "PeriodicTable", module = "rdkit.Chem.rdchem", frozen)]
+#[pyclass(name = "PeriodicTable", module = "rdoxide.Chem.rdchem", frozen)]
 #[derive(Debug)]
 pub struct PyPeriodicTable;
 
@@ -147,31 +147,31 @@ fn get_periodic_table(py: Python<'_>) -> PyResult<Py<PyPeriodicTable>> {
 }
 
 pyo3::create_exception!(
-    rdkit.Chem.rdchem,
+    rdoxide.Chem.rdchem,
     MolSanitizeException,
     pyo3::exceptions::PyValueError
 );
 pyo3::create_exception!(
-    rdkit.Chem.rdchem,
+    rdoxide.Chem.rdchem,
     AtomSanitizeException,
     MolSanitizeException
 );
 pyo3::create_exception!(
-    rdkit.Chem.rdchem,
+    rdoxide.Chem.rdchem,
     AtomValenceException,
     AtomSanitizeException
 );
 pyo3::create_exception!(
-    rdkit.Chem.rdchem,
+    rdoxide.Chem.rdchem,
     AtomKekulizeException,
     AtomSanitizeException
 );
-pyo3::create_exception!(rdkit.Chem.rdchem, KekulizeException, MolSanitizeException);
+pyo3::create_exception!(rdoxide.Chem.rdchem, KekulizeException, MolSanitizeException);
 
 /// exception arising from sanitization (the `cause` of the Python exceptions)
 #[pyclass(
     name = "_cppMolSanitizeException",
-    module = "rdkit.Chem.rdchem",
+    module = "rdoxide.Chem.rdchem",
     frozen
 )]
 #[derive(Debug)]

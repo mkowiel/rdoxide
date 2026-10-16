@@ -1,8 +1,8 @@
 //! Python bindings for rdoxide, API-compatible with RDKit's Boost.Python
-//! wrappers. Built as the extension module `rdkit._rdoxide`; each RDKit
-//! extension module (`rdkit.rdBase`, `rdkit.Chem.rdchem`, ...) is a submodule
+//! wrappers. Built as the extension module `rdoxide._rdoxide`; each RDKit
+//! extension module (`rdoxide.rdBase`, `rdoxide.Chem.rdchem`, ...) is a submodule
 //! here whose `__name__` is the upstream module name. The pure-Python shims in
-//! `python/rdkit` replace themselves in `sys.modules` with these submodules.
+//! `python/rdoxide` replace themselves in `sys.modules` with these submodules.
 
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -123,7 +123,7 @@ mod vector_suite;
 mod vects;
 mod writer_sink;
 
-/// Create a submodule named `full_name` (e.g. `rdkit.Chem.rdchem`) and attach
+/// Create a submodule named `full_name` (e.g. `rdoxide.Chem.rdchem`) and attach
 /// it to `parent` under `attr`.
 fn add_submodule<'py>(
     parent: &Bound<'py, PyModule>,
@@ -136,7 +136,7 @@ fn add_submodule<'py>(
     m.setattr("__name__", full_name)?;
     init(&m)?;
     parent.add(attr, &m)?;
-    // make `import rdkit.x.y` find it even before the shim runs
+    // make `import rdoxide.x.y` find it even before the shim runs
     let modules = py
         .import("sys")?
         .getattr("modules")?
@@ -148,245 +148,250 @@ fn add_submodule<'py>(
 #[pymodule]
 fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("__version__", rdoxide::rdgeneral::RDOXIDE_VERSION)?;
-    add_submodule(m, "rdBase", "rdkit.rdBase", rdbase::init)?;
-    add_submodule(m, "rdGeometry", "rdkit.Geometry.rdGeometry", geometry::init)?;
-    add_submodule(m, "rdchem", "rdkit.Chem.rdchem", rdchem::init)?;
-    add_submodule(m, "rdmolfiles", "rdkit.Chem.rdmolfiles", rdmolfiles::init)?;
-    add_submodule(m, "rdmolops", "rdkit.Chem.rdmolops", rdmolops::init)?;
-    add_submodule(m, "rdDepictor", "rdkit.Chem.rdDepictor", rddepictor::init)?;
-    add_submodule(m, "rdqueries", "rdkit.Chem.rdqueries", rdqueries::init)?;
-    add_submodule(m, "rdMolAlign", "rdkit.Chem.rdMolAlign", rdmolalign::init)?;
-    add_submodule(m, "rdDistGeom", "rdkit.Chem.rdDistGeom", rddistgeom::init)?;
+    add_submodule(m, "rdBase", "rdoxide.rdBase", rdbase::init)?;
+    add_submodule(
+        m,
+        "rdGeometry",
+        "rdoxide.Geometry.rdGeometry",
+        geometry::init,
+    )?;
+    add_submodule(m, "rdchem", "rdoxide.Chem.rdchem", rdchem::init)?;
+    add_submodule(m, "rdmolfiles", "rdoxide.Chem.rdmolfiles", rdmolfiles::init)?;
+    add_submodule(m, "rdmolops", "rdoxide.Chem.rdmolops", rdmolops::init)?;
+    add_submodule(m, "rdDepictor", "rdoxide.Chem.rdDepictor", rddepictor::init)?;
+    add_submodule(m, "rdqueries", "rdoxide.Chem.rdqueries", rdqueries::init)?;
+    add_submodule(m, "rdMolAlign", "rdoxide.Chem.rdMolAlign", rdmolalign::init)?;
+    add_submodule(m, "rdDistGeom", "rdoxide.Chem.rdDistGeom", rddistgeom::init)?;
     add_submodule(
         m,
         "rdTautomerQuery",
-        "rdkit.Chem.rdTautomerQuery",
+        "rdoxide.Chem.rdTautomerQuery",
         rdtautomerquery::init,
     )?;
     add_submodule(
         m,
         "rdtrajectory",
-        "rdkit.Chem.rdtrajectory",
+        "rdoxide.Chem.rdtrajectory",
         rdtrajectory::init,
     )?;
     add_submodule(
         m,
         "rdCIPLabeler",
-        "rdkit.Chem.rdCIPLabeler",
+        "rdoxide.Chem.rdCIPLabeler",
         rdcip_labeler::init,
     )?;
     add_submodule(
         m,
         "rdDeprotect",
-        "rdkit.Chem.rdDeprotect",
+        "rdoxide.Chem.rdDeprotect",
         rddeprotect::init,
     )?;
     add_submodule(
         m,
         "rdMolEnumerator",
-        "rdkit.Chem.rdMolEnumerator",
+        "rdoxide.Chem.rdMolEnumerator",
         rdmolenumerator::init,
     )?;
     add_submodule(
         m,
         "rdScaffoldNetwork",
-        "rdkit.Chem.Scaffolds.rdScaffoldNetwork",
+        "rdoxide.Chem.Scaffolds.rdScaffoldNetwork",
         rdscaffoldnetwork::init,
     )?;
     add_submodule(
         m,
         "rdGeneralizedSubstruct",
-        "rdkit.Chem.rdGeneralizedSubstruct",
+        "rdoxide.Chem.rdGeneralizedSubstruct",
         rdgeneralizedsubstruct::init,
     )?;
     add_submodule(
         m,
         "rdMolCatalog",
-        "rdkit.Chem.rdMolCatalog",
+        "rdoxide.Chem.rdMolCatalog",
         rdmolcatalog::init,
     )?;
     add_submodule(
         m,
         "rdfragcatalog",
-        "rdkit.Chem.rdfragcatalog",
+        "rdoxide.Chem.rdfragcatalog",
         rdfragcatalog::init,
     )?;
     add_submodule(
         m,
         "rdMolProcessing",
-        "rdkit.Chem.rdMolProcessing",
+        "rdoxide.Chem.rdMolProcessing",
         rdmolprocessing::init,
     )?;
-    add_submodule(m, "rdFMCS", "rdkit.Chem.rdFMCS", rdfmcs::init)?;
+    add_submodule(m, "rdFMCS", "rdoxide.Chem.rdFMCS", rdfmcs::init)?;
     add_submodule(
         m,
         "rdRGroupDecomposition",
-        "rdkit.Chem.rdRGroupDecomposition",
+        "rdoxide.Chem.rdRGroupDecomposition",
         rdrgroupdecomposition::init,
     )?;
     add_submodule(
         m,
         "rdfiltercatalog",
-        "rdkit.Chem.rdfiltercatalog",
+        "rdoxide.Chem.rdfiltercatalog",
         rdfiltercatalog::init,
     )?;
     add_submodule(
         m,
         "DistGeom",
-        "rdkit.DistanceGeometry.DistGeom",
+        "rdoxide.DistanceGeometry.DistGeom",
         rddistgeom_dg::init,
     )?;
     add_submodule(
         m,
         "rdForceField",
-        "rdkit.ForceField.rdForceField",
+        "rdoxide.ForceField.rdForceField",
         rdforcefield::init_force_field,
     )?;
     add_submodule(
         m,
         "rdForceFieldHelpers",
-        "rdkit.Chem.rdForceFieldHelpers",
+        "rdoxide.Chem.rdForceFieldHelpers",
         rdforcefield::init_helpers,
     )?;
     add_submodule(
         m,
         "rdChemicalFeatures",
-        "rdkit.Chem.rdChemicalFeatures",
+        "rdoxide.Chem.rdChemicalFeatures",
         rdchemicalfeatures::init,
     )?;
     add_submodule(
         m,
         "rdChemReactions",
-        "rdkit.Chem.rdChemReactions",
+        "rdoxide.Chem.rdChemReactions",
         rdchemreactions::init,
     )?;
     add_submodule(
         m,
         "rdMolChemicalFeatures",
-        "rdkit.Chem.rdMolChemicalFeatures",
+        "rdoxide.Chem.rdMolChemicalFeatures",
         rdmolchemicalfeatures::init,
     )?;
     add_submodule(
         m,
         "rdMolTransforms",
-        "rdkit.Chem.rdMolTransforms",
+        "rdoxide.Chem.rdMolTransforms",
         rdmoltransforms::init,
     )?;
     add_submodule(
         m,
         "rdMolDescriptors",
-        "rdkit.Chem.rdMolDescriptors",
+        "rdoxide.Chem.rdMolDescriptors",
         rdmoldescriptors::init,
     )?;
     add_submodule(
         m,
         "rdFingerprintGenerator",
-        "rdkit.Chem.rdFingerprintGenerator",
+        "rdoxide.Chem.rdFingerprintGenerator",
         rdfingerprintgenerator::init,
     )?;
     add_submodule(
         m,
         "rdInfoTheory",
-        "rdkit.ML.InfoTheory.rdInfoTheory",
+        "rdoxide.ML.InfoTheory.rdInfoTheory",
         rdinfotheory::init,
     )?;
     add_submodule(
         m,
         "rdReducedGraphs",
-        "rdkit.Chem.rdReducedGraphs",
+        "rdoxide.Chem.rdReducedGraphs",
         rdreducedgraphs::init,
     )?;
     add_submodule(
         m,
         "rdSubstructLibrary",
-        "rdkit.Chem.rdSubstructLibrary",
+        "rdoxide.Chem.rdSubstructLibrary",
         rdsubstructlibrary::init,
     )?;
     add_submodule(
         m,
         "rdGaussianShape",
-        "rdkit.Chem.rdGaussianShape",
+        "rdoxide.Chem.rdGaussianShape",
         rdgaussianshape::init,
     )?;
     add_submodule(
         m,
         "rdRascalMCES",
-        "rdkit.Chem.rdRascalMCES",
+        "rdoxide.Chem.rdRascalMCES",
         rdrascalmces::init,
     )?;
     add_submodule(
         m,
         "rdSynthonSpaceSearch",
-        "rdkit.Chem.rdSynthonSpaceSearch",
+        "rdoxide.Chem.rdSynthonSpaceSearch",
         rdsynthonspacesearch::init,
     )?;
-    add_submodule(m, "rdMIF", "rdkit.Chem.rdMIF", rdmif::init)?;
-    add_submodule(m, "rdMolHash", "rdkit.Chem.rdMolHash", rdmolhash::init)?;
+    add_submodule(m, "rdMIF", "rdoxide.Chem.rdMIF", rdmif::init)?;
+    add_submodule(m, "rdMolHash", "rdoxide.Chem.rdMolHash", rdmolhash::init)?;
     add_submodule(
         m,
         "rdMolStandardize",
-        "rdkit.Chem.MolStandardize.rdMolStandardize",
+        "rdoxide.Chem.MolStandardize.rdMolStandardize",
         rdmolstandardize::init,
     )?;
-    add_submodule(m, "rdMMPA", "rdkit.Chem.rdMMPA", rdmmpa::init)?;
+    add_submodule(m, "rdMMPA", "rdoxide.Chem.rdMMPA", rdmmpa::init)?;
     add_submodule(
         m,
         "rdMolInterchange",
-        "rdkit.Chem.rdMolInterchange",
+        "rdoxide.Chem.rdMolInterchange",
         rdmolinterchange::init,
     )?;
     add_submodule(
         m,
         "rdDetermineBonds",
-        "rdkit.Chem.rdDetermineBonds",
+        "rdoxide.Chem.rdDetermineBonds",
         rddeterminebonds::init,
     )?;
     add_submodule(
         m,
         "rdAbbreviations",
-        "rdkit.Chem.rdAbbreviations",
+        "rdoxide.Chem.rdAbbreviations",
         rdabbreviations::init,
     )?;
     add_submodule(
         m,
         "rdMHFPFingerprint",
-        "rdkit.Chem.rdMHFPFingerprint",
+        "rdoxide.Chem.rdMHFPFingerprint",
         rdmhfpfingerprint::init,
     )?;
     add_submodule(
         m,
         "rdEnumerateStereoisomers",
-        "rdkit.Chem.rdEnumerateStereoisomers",
+        "rdoxide.Chem.rdEnumerateStereoisomers",
         rdenumeratestereoisomers::init,
     )?;
     add_submodule(
         m,
         "rdPartialCharges",
-        "rdkit.Chem.rdPartialCharges",
+        "rdoxide.Chem.rdPartialCharges",
         rdpartialcharges::init,
     )?;
     add_submodule(
         m,
         "rdMetricMatrixCalc",
-        "rdkit.DataManip.Metric.rdMetricMatrixCalc",
+        "rdoxide.DataManip.Metric.rdMetricMatrixCalc",
         rdmetricmatrixcalc::init,
     )?;
     add_submodule(
         m,
         "Clustering",
-        "rdkit.ML.Cluster.Clustering",
+        "rdoxide.ML.Cluster.Clustering",
         rdclustering::init,
     )?;
     add_submodule(
         m,
         "rdSimDivPickers",
-        "rdkit.SimDivFilters.rdSimDivPickers",
+        "rdoxide.SimDivFilters.rdSimDivPickers",
         rdsimdivpickers::init,
     )?;
     add_submodule(
         m,
         "cDataStructs",
-        "rdkit.DataStructs.cDataStructs",
+        "rdoxide.DataStructs.cDataStructs",
         datastructs::init,
     )?;
     Ok(())

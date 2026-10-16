@@ -1,7 +1,7 @@
 """ResonanceMolSupplier; the expectations come from RDKit's own rough_test.py."""
 
 import pytest
-from rdkit import Chem
+from rdoxide import Chem
 
 
 def total_charge(mol):

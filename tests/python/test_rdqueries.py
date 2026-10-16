@@ -1,8 +1,8 @@
 """rdqueries, QueryAtom/QueryBond; verified against RDKit 2026.09.1."""
 
 import pytest
-from rdkit import Chem
-from rdkit.Chem import rdqueries as q
+from rdoxide import Chem
+from rdoxide.Chem import rdqueries as q
 
 
 def matching(mol, query_atom):

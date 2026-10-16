@@ -29,7 +29,7 @@
 [module."rdoxide_python::rdchem".sources]
 "Code/GraphMol/Wrap/Table.cpp" = "8f66014772cd97894de74b11f57efbb5dee18d4e"
 
-[module."python::rdkit.Chem.__init__".sources]
+[module."python::rdoxide.Chem.__init__".sources]
 "rdkit/Chem/__init__.py" = "fa0e7f12b763cd4312eea7d1a9d879c07cac32db"
 
 [module."rdoxide::rdgeneral::common_properties".sources]
@@ -120,7 +120,7 @@
 "Code/Geometry/Wrap/UniformRealValueGrid3D.cpp" = "644658475b04e414478d176cbbfeb9b58cf9da6b"
 "Code/Geometry/Wrap/rdGeometry.cpp" = "1868be120afedde6ad8ce78e16c3a0fc6851b03f"
 
-[module."python::rdkit.Geometry.__init__".sources]
+[module."python::rdoxide.Geometry.__init__".sources]
 "rdkit/Geometry/__init__.py" = "ce2a8f5aae4528ae84fd9797869a16395a612e46"
 
 [module."rdoxide::graphmol::mol_ops::query_hs".sources]
@@ -555,7 +555,7 @@
 [module."rdoxide_python::rdmoldescriptors_bcut".sources]
 "Code/GraphMol/Descriptors/Wrap/rdMolDescriptors.cpp" = "4d3c2e1d6315579af9f3bf02b1564224fe48b82e"
 
-[module."python::rdkit.Chem.AllChem".sources]
+[module."python::rdoxide.Chem.AllChem".sources]
 "rdkit/Chem/AllChem.py" = "25c893b1b335fe25af3736d4c1b1413e69d4f1db"
 
 [module."rdoxide::graphmol::file_parsers::smiles_mol_supplier".sources]

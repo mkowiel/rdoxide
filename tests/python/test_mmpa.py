@@ -1,8 +1,8 @@
-"""rdkit.Chem.rdMMPA; expected values come from reference RDKit."""
+"""rdoxide.Chem.rdMMPA; expected values come from reference RDKit."""
 
 import pytest
-from rdkit import Chem
-from rdkit.Chem import rdMMPA
+from rdoxide import Chem
+from rdoxide.Chem import rdMMPA
 
 
 def test_single_and_double_cuts():

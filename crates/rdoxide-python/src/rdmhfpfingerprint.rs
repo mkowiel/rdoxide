@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdMHFPFingerprint` (upstream
+//! `rdoxide.Chem.rdMHFPFingerprint` (upstream
 //! `GraphMol/Fingerprints/Wrap/MHFPWrapper.cpp`).
 //!
 //! The bulk methods encode the molecules on all available cores.
@@ -81,7 +81,7 @@ fn mols_of(list: &Bound<'_, pyo3::types::PyList>) -> PyResult<Vec<ROMol>> {
 }
 
 /// A MinHash encoder (MHFP and SECFP fingerprints).
-#[pyclass(name = "MHFPEncoder", module = "rdkit.Chem.rdMHFPFingerprint")]
+#[pyclass(name = "MHFPEncoder", module = "rdoxide.Chem.rdMHFPFingerprint")]
 pub struct PyMhfpEncoder {
     encoder: MhfpEncoder,
 }

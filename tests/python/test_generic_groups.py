@@ -1,6 +1,6 @@
 """Generic group matching; cases from upstream GenericGroups/generic_tests.cpp."""
 import pytest
-from rdkit import Chem
+from rdoxide import Chem
 
 CASES = [
     (['Alkyl', 'ALK'], [('O=CCC', 1), ('O=CC=C', 0), ('O=CCC=C', 0), ('O=CCO', 0), ('O=CC', 1), ('O=CC[H]', 1), ('O=C[H]', 0), ('O=CC.CC(C=O)C', 2), ('O=CCC1CC1', 0)]),

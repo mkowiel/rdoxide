@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdFingerprintGenerator` (upstream
+//! `rdoxide.Chem.rdFingerprintGenerator` (upstream
 //! `GraphMol/Fingerprints/Wrap/{FingerprintGeneratorWrapper,MorganWrapper}.cpp`).
 
 use pyo3::exceptions::PyValueError;
@@ -24,7 +24,7 @@ use crate::mol::PyMol;
 
 #[pyclass(
     name = "AtomInvariantsGenerator",
-    module = "rdkit.Chem.rdFingerprintGenerator"
+    module = "rdoxide.Chem.rdFingerprintGenerator"
 )]
 #[derive(Debug)]
 pub struct PyAtomInvGen {
@@ -33,7 +33,7 @@ pub struct PyAtomInvGen {
 
 #[pyclass(
     name = "BondInvariantsGenerator",
-    module = "rdkit.Chem.rdFingerprintGenerator"
+    module = "rdoxide.Chem.rdFingerprintGenerator"
 )]
 #[derive(Debug)]
 pub struct PyBondInvGen {
@@ -43,7 +43,7 @@ pub struct PyBondInvGen {
 /// `AdditionalOutput`
 #[pyclass(
     name = "AdditionalOutput",
-    module = "rdkit.Chem.rdFingerprintGenerator"
+    module = "rdoxide.Chem.rdFingerprintGenerator"
 )]
 #[derive(Debug, Default)]
 pub struct PyAdditionalOutput {
@@ -159,7 +159,7 @@ fn nested_map<T: Copy + for<'py> IntoPyObject<'py>>(
 /// `FingerprintGenerator64`
 #[pyclass(
     name = "FingerprintGenerator64",
-    module = "rdkit.Chem.rdFingerprintGenerator"
+    module = "rdoxide.Chem.rdFingerprintGenerator"
 )]
 #[derive(Debug)]
 pub struct PyFPGen {
@@ -546,7 +546,7 @@ where
 /// The generator `FPType` stands for, with the upstream defaults of the
 /// matching `Get*Generator` function (Morgan uses radius 2).
 fn default_generator(py: Python<'_>, kind: i64) -> PyResult<FingerprintGenerator> {
-    let module = py.import("rdkit.Chem.rdFingerprintGenerator")?;
+    let module = py.import("rdoxide.Chem.rdFingerprintGenerator")?;
     let (factory, args) = match kind {
         FP_RDKIT => ("GetRDKitFPGenerator", PyTuple::empty(py)),
         FP_MORGAN => ("GetMorganGenerator", PyTuple::new(py, [2u32])?),
@@ -626,7 +626,7 @@ fn fingerprint_generator_from_json(jsonString: &str) -> PyResult<PyFPGen> {
 /// `FingerprintOptions`: a view on the options of its generator.
 #[pyclass(
     name = "FingerprintOptions",
-    module = "rdkit.Chem.rdFingerprintGenerator",
+    module = "rdoxide.Chem.rdFingerprintGenerator",
     subclass
 )]
 #[derive(Debug)]
@@ -686,7 +686,7 @@ impl PyFingerprintOptions {
 }
 
 /// `MorganFingerprintOptions`
-#[pyclass(name = "MorganFingerprintOptions", module = "rdkit.Chem.rdFingerprintGenerator", extends = PyFingerprintOptions)]
+#[pyclass(name = "MorganFingerprintOptions", module = "rdoxide.Chem.rdFingerprintGenerator", extends = PyFingerprintOptions)]
 #[derive(Debug)]
 pub struct PyMorganOptions;
 
@@ -705,7 +705,7 @@ fn atom_pair_args(g: &mut FingerprintGenerator) -> &mut AtomPairArguments {
 }
 
 /// `AtomPairFingerprintOptions`
-#[pyclass(name = "AtomPairFingerprintOptions", module = "rdkit.Chem.rdFingerprintGenerator", extends = PyFingerprintOptions)]
+#[pyclass(name = "AtomPairFingerprintOptions", module = "rdoxide.Chem.rdFingerprintGenerator", extends = PyFingerprintOptions)]
 #[derive(Debug)]
 pub struct PyAtomPairOptions;
 
@@ -753,7 +753,7 @@ fn torsion_args(g: &mut FingerprintGenerator) -> &mut TopologicalTorsionArgument
 }
 
 /// `TopologicalTorsionFingerprintOptions`
-#[pyclass(name = "TopologicalTorsionFingerprintOptions", module = "rdkit.Chem.rdFingerprintGenerator", extends = PyFingerprintOptions)]
+#[pyclass(name = "TopologicalTorsionFingerprintOptions", module = "rdoxide.Chem.rdFingerprintGenerator", extends = PyFingerprintOptions)]
 #[derive(Debug)]
 pub struct PyTorsionOptions;
 
@@ -837,7 +837,7 @@ fn rdkit_fp_args(g: &mut FingerprintGenerator) -> &mut RDKitFPArguments {
 }
 
 /// `RDKitFingerprintOptions`
-#[pyclass(name = "RDKitFingerprintOptions", module = "rdkit.Chem.rdFingerprintGenerator", extends = PyFingerprintOptions)]
+#[pyclass(name = "RDKitFingerprintOptions", module = "rdoxide.Chem.rdFingerprintGenerator", extends = PyFingerprintOptions)]
 #[derive(Debug)]
 pub struct PyRDKitFPOptions;
 

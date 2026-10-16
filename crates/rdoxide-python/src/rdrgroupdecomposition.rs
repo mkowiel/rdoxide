@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdRGroupDecomposition` (upstream
+//! `rdoxide.Chem.rdRGroupDecomposition` (upstream
 //! `RGroupDecomposition/Wrap/rdRGroupComposition.cpp`): decomposition of
 //! molecules into a core and its R groups.
 
@@ -19,7 +19,7 @@ use crate::mol::PyMol;
 use crate::pyconv::set_declared_attribute;
 use crate::substruct::PySubstructMatchParameters;
 
-const MODULE: &str = "rdkit.Chem.rdRGroupDecomposition";
+const MODULE: &str = "rdoxide.Chem.rdRGroupDecomposition";
 
 /// RGroupDecompositionParameters controls how the RGroupDecomposition sets labelling and matches structures
 ///   OPTIONS:
@@ -52,7 +52,7 @@ const MODULE: &str = "rdkit.Chem.rdRGroupDecomposition";
 ///     - allowMultipleCoresInSameMol: permit a core to match more than once in the same molecule if the sets of matched atoms are not equal (default=False)
 #[pyclass(
     name = "RGroupDecompositionParameters",
-    module = "rdkit.Chem.rdRGroupDecomposition",
+    module = "rdoxide.Chem.rdRGroupDecomposition",
     skip_from_py_object
 )]
 #[derive(Debug)]
@@ -299,7 +299,7 @@ fn columns_to_py<'py>(
 /// Decomposes molecules into a core and its R groups
 #[pyclass(
     name = "RGroupDecomposition",
-    module = "rdkit.Chem.rdRGroupDecomposition"
+    module = "rdoxide.Chem.rdRGroupDecomposition"
 )]
 pub struct PyRGroupDecomposition {
     decomp: RGroupDecomposition,

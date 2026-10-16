@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdmolfiles`: SMARTS parsing — port of the corresponding parts
+//! `rdoxide.Chem.rdmolfiles`: SMARTS parsing — port of the corresponding parts
 //! of upstream `Code/GraphMol/Wrap/rdmolfiles.cpp`.
 
 use std::collections::BTreeMap;
@@ -17,7 +17,7 @@ use crate::mol::PyMol;
 /// Parameters controlling SMARTS Parsing
 #[pyclass(
     name = "SmartsParserParams",
-    module = "rdkit.Chem.rdmolfiles",
+    module = "rdoxide.Chem.rdmolfiles",
     skip_from_py_object
 )]
 #[derive(Clone)]

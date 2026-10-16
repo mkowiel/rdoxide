@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdGeneralizedSubstruct` (upstream
+//! `rdoxide.Chem.rdGeneralizedSubstruct` (upstream
 //! `GeneralizedSubstruct/Wrap/rdGeneralizedSubstruct.cpp`): generalized
 //! substructure searching with extended query molecules.
 //!
@@ -22,7 +22,7 @@ use crate::substruct::PySubstructMatchParameters;
 /// Extended query molecule for use in generalized substructure searching.
 #[pyclass(
     name = "ExtendedQueryMol",
-    module = "rdkit.Chem.rdGeneralizedSubstruct",
+    module = "rdoxide.Chem.rdGeneralizedSubstruct",
     skip_from_py_object
 )]
 pub struct PyExtendedQueryMol {

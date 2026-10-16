@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdRascalMCES`: the RASCAL maximum common edge substructure and
+//! `rdoxide.Chem.rdRascalMCES`: the RASCAL maximum common edge substructure and
 //! clustering (upstream `GraphMol/RascalMCES/Wrap/rdRascalMCES.cpp`).
 
 use std::sync::Arc;
@@ -16,7 +16,7 @@ use crate::errors::IntoPyResult;
 use crate::mol::PyMol;
 
 /// Used to return RASCAL MCES results.
-#[pyclass(name = "RascalResult", module = "rdkit.Chem.rdRascalMCES")]
+#[pyclass(name = "RascalResult", module = "rdoxide.Chem.rdRascalMCES")]
 pub struct PyRascalResult {
     res: RascalResult,
 }
@@ -90,7 +90,7 @@ impl PyRascalResult {
 /// RASCAL Options
 #[pyclass(
     name = "RascalOptions",
-    module = "rdkit.Chem.rdRascalMCES",
+    module = "rdoxide.Chem.rdRascalMCES",
     from_py_object
 )]
 #[derive(Clone, Default)]
@@ -167,7 +167,7 @@ option_props! {
 /// calculations.  Only similarityCutoff is used by RascalButinaCluster.
 #[pyclass(
     name = "RascalClusterOptions",
-    module = "rdkit.Chem.rdRascalMCES",
+    module = "rdoxide.Chem.rdRascalMCES",
     from_py_object
 )]
 #[derive(Clone, Default)]

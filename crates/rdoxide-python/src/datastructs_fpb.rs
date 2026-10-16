@@ -34,7 +34,7 @@ fn neighbors<'py>(py: Python<'py>, hits: Vec<Neighbor>) -> PyResult<Bound<'py, P
 /// A class for reading and searching FPB files from Andrew Dalke's chemfp.
 /// Note that this functionality is still experimental and the API may
 /// change in future releases.
-#[pyclass(name = "FPBReader", module = "rdkit.DataStructs.cDataStructs", dict)]
+#[pyclass(name = "FPBReader", module = "rdoxide.DataStructs.cDataStructs", dict)]
 #[derive(Debug)]
 pub struct PyFpbReader {
     reader: SharedFpbReader,
@@ -164,7 +164,7 @@ impl PyFpbReader {
 /// change in future releases.
 #[pyclass(
     name = "MultiFPBReader",
-    module = "rdkit.DataStructs.cDataStructs",
+    module = "rdoxide.DataStructs.cDataStructs",
     dict
 )]
 #[derive(Debug)]

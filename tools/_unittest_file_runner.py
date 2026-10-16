@@ -6,9 +6,15 @@ import json
 import multiprocessing
 import sys
 import unittest
+from pathlib import Path
 
 
 def main(path: str, out: str) -> None:
+    # upstream's tests import `rdkit`; rdoxide's package is `rdoxide`
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import rdkit_alias
+
+    rdkit_alias.install()
     results = {}
     # The test module is loaded under a private name, so child processes that
     # target functions in it can only work if they are forked, not spawned.

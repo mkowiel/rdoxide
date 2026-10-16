@@ -4,9 +4,9 @@ import math
 
 import pytest
 
-from rdkit import Chem
-from rdkit.Chem import rdMolDescriptors as D
-from rdkit.Chem import rdPartialCharges as P
+from rdoxide import Chem
+from rdoxide.Chem import rdMolDescriptors as D
+from rdoxide.Chem import rdPartialCharges as P
 
 # smiles: (atom charges, charges of the implicit hydrogens on each atom)
 CASES = {

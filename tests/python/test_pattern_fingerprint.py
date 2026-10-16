@@ -1,8 +1,8 @@
 """Chem.PatternFingerprint (expectations from the reference RDKit)."""
 
 import pytest
-from rdkit import Chem
-from rdkit.DataStructs import ExplicitBitVect
+from rdoxide import Chem
+from rdoxide.DataStructs import ExplicitBitVect
 
 
 def test_ethanol_bits():

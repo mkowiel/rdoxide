@@ -1,4 +1,4 @@
-//! `rdkit.ML.InfoTheory.rdInfoTheory` (upstream `ML/InfoTheory/Wrap/rdInfoTheory.cpp`):
+//! `rdoxide.ML.InfoTheory.rdInfoTheory` (upstream `ML/InfoTheory/Wrap/rdInfoTheory.cpp`):
 //! `InfoEntropy`, `InfoGain` and `ChiSquare` of numpy count arrays. The bit
 //! ranker and the correlation-matrix generator are not ported yet.
 
