@@ -327,3 +327,84 @@ fn mrv_files() {
         failures.join("\n")
     );
 }
+
+/// (file, reactants, agents, products, warnings, errors); the `RxnTest`s of
+/// upstream that are expected to parse
+const RXN_TESTS: &[(&str, usize, usize, usize, u32, u32)] = &[
+    ("AlexRxn.mrv", 1, 0, 1, 2, 0),
+    ("BadReactionSign.mrv", 2, 0, 1, 3, 0),
+    ("bondArray_node.mrv", 2, 4, 1, 3, 0),
+    ("marvin03.mrv", 1, 1, 1, 2, 0),
+    ("marvin04.mrv", 2, 1, 2, 4, 0),
+    ("marvin08.mrv", 2, 3, 2, 4, 0),
+    ("marvin09.mrv", 2, 3, 2, 4, 0),
+    ("marvin11.mrv", 2, 0, 1, 0, 0),
+    ("marvin05.mrv", 2, 1, 1, 3, 0),
+    ("EmptyRxn.mrv", 0, 0, 0, 0, 0),
+    ("RxnNoCoords.mrv", 2, 0, 1, 3, 0),
+    ("mrvValenceZero.mrv", 3, 0, 1, 4, 0),
+    ("condition_coordinates_mpoint.mrv", 1, 0, 1, 0, 0),
+    ("aspirineSynthesisWithAttributes.mrv", 2, 0, 1, 3, 0),
+];
+
+#[test]
+fn mrv_reactions() {
+    use rdoxide::graphmol::chem_reactions::mdl::reaction_to_rxn_block;
+    use rdoxide::graphmol::file_parsers::marvin::{
+        mrv_file_is_reaction, reaction_from_mrv_file, reaction_to_mrv_block,
+    };
+    use rdoxide::graphmol::kekulize::kekulize;
+    if !std::path::Path::new(DATA).exists() {
+        return;
+    }
+    let mut failures = Vec::new();
+    for &(file, nr, na, np, warnings, errors) in RXN_TESTS {
+        let path = format!("{DATA}{file}");
+        let run = || -> Result<(), String> {
+            if !mrv_file_is_reaction(&path).unwrap() {
+                return Err("not a reaction".into());
+            }
+            let params = MrvParserParams {
+                sanitize: true,
+                remove_hs: false,
+            };
+            let mut rxn = reaction_from_mrv_file(&path, &params).map_err(|e| e.to_string())?;
+            if (
+                rxn.reactants().len(),
+                rxn.agents().len(),
+                rxn.products().len(),
+            ) != (nr, na, np)
+            {
+                return Err("template counts".into());
+            }
+            rxn.init_reactant_matchers(true);
+            if nr > 0 && np > 0 {
+                let (ok, w, e) = rxn.validate(true);
+                if !ok || (w, e) != (warnings, errors) {
+                    return Err(format!("validate {ok} {w} {e}"));
+                }
+            }
+            for m in rxn.templates_mut() {
+                if m.needs_update_property_cache() {
+                    m.update_property_cache(false).map_err(|e| e.to_string())?;
+                }
+                kekulize(m, true, true, 100).map_err(|e| e.to_string())?;
+            }
+            let rxn_block = reaction_to_rxn_block(&rxn, false, true).map_err(|e| e.to_string())?;
+            let want = std::fs::read_to_string(format!("{path}.expected.rxn")).unwrap_or_default();
+            if want != rxn_block {
+                return Err("rxn block".into());
+            }
+            let mrv = reaction_to_mrv_block(&rxn, false).map_err(|e| e.to_string())?;
+            let want = std::fs::read_to_string(format!("{path}.expected.mrv")).unwrap_or_default();
+            if want != mrv {
+                return Err("mrv block".into());
+            }
+            Ok(())
+        };
+        if let Err(e) = run() {
+            failures.push(format!("{file}: {e}"));
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}

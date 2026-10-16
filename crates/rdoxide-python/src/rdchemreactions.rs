@@ -34,6 +34,10 @@ use rdoxide::graphmol::chem_reactions::writer::{
 };
 use rdoxide::graphmol::chem_reactions::{self as cr, ChemicalReaction, runner};
 use rdoxide::graphmol::file_parsers::MolFileParserParams;
+use rdoxide::graphmol::file_parsers::marvin::{
+    MrvParserParams, mrv_block_is_reaction, mrv_file_is_reaction, reaction_from_mrv_block,
+    reaction_from_mrv_file, reaction_to_mrv_block, reaction_to_mrv_file,
+};
 use rdoxide::graphmol::functional_group_hierarchy::flattened_functional_group_hierarchy;
 use rdoxide::graphmol::romol::ROMol;
 use rdoxide::graphmol::smiles_parse::cx_write::cx_fields;
@@ -42,7 +46,7 @@ use rdoxide::graphmol::smiles_parse::write::SmilesWriteParams;
 use crate::datastructs::PyExplicitBitVect;
 use crate::datastructs_siv::PyUIntSIV;
 use crate::enums::{add_enum, add_enum_exported, to_py as enum_to_py};
-use crate::errors::IntoPyResult;
+use crate::errors::{IntoPyResult, to_py};
 use crate::mol::PyMol;
 use crate::rdmolfiles_write::PySmilesWriteParams;
 use crate::rdmolops_adjust_query::PyAdjustQueryParameters;
@@ -1022,6 +1026,98 @@ fn py_reaction_to_v3k_rxn_block(
     reaction_to_v3k_rxn_block(&synced(reaction).rxn, separateAgents).py()
 }
 
+/// Maps the errors of a Marvin reaction reader the way upstream does: a
+/// missing file is an `IOError`, everything else gives `None`.
+fn mrv_reaction_result(
+    res: rdoxide::Result<ChemicalReaction>,
+) -> PyResult<Option<PyChemicalReaction>> {
+    match res {
+        Ok(rxn) => Ok(Some(PyChemicalReaction::new(rxn))),
+        Err(e @ rdoxide::RDKitError::BadFile(_)) => Err(to_py(e)),
+        Err(rdoxide::RDKitError::FileParse(m)) => {
+            rdoxide::rd_log_warning!("{m}");
+            Ok(None)
+        }
+        Err(_) => Ok(None),
+    }
+}
+
+/// construct a ChemicalReaction from a Marvin (mrv) rxn file
+#[pyfunction]
+#[pyo3(name = "ReactionFromMrvFile", signature = (filename, sanitize = false, removeHs = false))]
+#[allow(non_snake_case)]
+fn py_reaction_from_mrv_file(
+    py: Python<'_>,
+    filename: &str,
+    sanitize: bool,
+    removeHs: bool,
+) -> PyResult<Option<PyChemicalReaction>> {
+    let params = MrvParserParams {
+        sanitize,
+        remove_hs: removeHs,
+    };
+    mrv_reaction_result(py.detach(|| reaction_from_mrv_file(filename, &params)))
+}
+
+/// construct a ChemicalReaction from a string in Marvin (mrv) format
+#[pyfunction]
+#[pyo3(name = "ReactionFromMrvBlock", signature = (rxnblock, sanitize = false, removeHs = false))]
+#[allow(non_snake_case)]
+fn py_reaction_from_mrv_block(
+    py: Python<'_>,
+    rxnblock: &Bound<'_, PyAny>,
+    sanitize: bool,
+    removeHs: bool,
+) -> PyResult<Option<PyChemicalReaction>> {
+    let text = match rxnblock.extract::<String>() {
+        Ok(s) => s,
+        Err(_) => String::from_utf8_lossy(&rxnblock.extract::<Vec<u8>>()?).into_owned(),
+    };
+    let params = MrvParserParams {
+        sanitize,
+        remove_hs: removeHs,
+    };
+    mrv_reaction_result(py.detach(|| reaction_from_mrv_block(&text, &params)))
+}
+
+/// returns whether or not an MRV file contains reaction data
+#[pyfunction]
+#[pyo3(name = "MrvFileIsReaction", signature = (filename))]
+fn py_mrv_file_is_reaction(filename: &str) -> PyResult<bool> {
+    mrv_file_is_reaction(filename).py()
+}
+
+/// returns whether or not an MRV block contains reaction data
+#[pyfunction]
+#[pyo3(name = "MrvBlockIsReaction", signature = (mrvData))]
+#[allow(non_snake_case)]
+fn py_mrv_block_is_reaction(mrvData: &str) -> PyResult<bool> {
+    mrv_block_is_reaction(mrvData).py()
+}
+
+/// construct a string in Marvin (MRV) format for a ChemicalReaction
+#[pyfunction]
+#[pyo3(name = "ReactionToMrvBlock", signature = (reaction, prettyPrint = false))]
+#[allow(non_snake_case)]
+fn py_reaction_to_mrv_block(
+    reaction: &Bound<'_, PyChemicalReaction>,
+    prettyPrint: bool,
+) -> PyResult<String> {
+    reaction_to_mrv_block(&synced(reaction).rxn, prettyPrint).py()
+}
+
+/// write a Marvin (MRV) file for a ChemicalReaction
+#[pyfunction]
+#[pyo3(name = "ReactionToMrvFile", signature = (reaction, filename, prettyPrint = false))]
+#[allow(non_snake_case)]
+fn py_reaction_to_mrv_file(
+    reaction: &Bound<'_, PyChemicalReaction>,
+    filename: &str,
+    prettyPrint: bool,
+) -> PyResult<()> {
+    reaction_to_mrv_file(&synced(reaction).rxn, filename, prettyPrint).py()
+}
+
 /// construct a ChemicalReaction from an molecule if the RXN role property of the molecule is set
 #[pyfunction]
 #[pyo3(name = "ReactionFromMolecule")]
@@ -1342,6 +1438,12 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_reaction_from_rxn_block, m)?)?;
     m.add_function(wrap_pyfunction!(py_reaction_to_rxn_block, m)?)?;
     m.add_function(wrap_pyfunction!(py_reaction_to_v3k_rxn_block, m)?)?;
+    m.add_function(wrap_pyfunction!(py_reaction_from_mrv_file, m)?)?;
+    m.add_function(wrap_pyfunction!(py_reaction_from_mrv_block, m)?)?;
+    m.add_function(wrap_pyfunction!(py_mrv_file_is_reaction, m)?)?;
+    m.add_function(wrap_pyfunction!(py_mrv_block_is_reaction, m)?)?;
+    m.add_function(wrap_pyfunction!(py_reaction_to_mrv_block, m)?)?;
+    m.add_function(wrap_pyfunction!(py_reaction_to_mrv_file, m)?)?;
     m.add_function(wrap_pyfunction!(py_is_agent, m)?)?;
     m.add_function(wrap_pyfunction!(py_has_atom_mapping, m)?)?;
     m.add_function(wrap_pyfunction!(py_has_reaction_substruct_match, m)?)?;

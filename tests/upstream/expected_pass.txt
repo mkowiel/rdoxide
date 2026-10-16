@@ -102,6 +102,8 @@ Code/GraphMol/ChemReactions/Wrap/testReactionWrapper.py::DocTestCase::runTest
 Code/GraphMol/ChemReactions/Wrap/testReactionWrapper.py::StereoGroupTests::testGithub4651
 Code/GraphMol/ChemReactions/Wrap/testReactionWrapper.py::StereoGroupTests::testGithub6138
 Code/GraphMol/ChemReactions/Wrap/testReactionWrapper.py::StereoGroupTests::testGithub6211
+Code/GraphMol/ChemReactions/Wrap/testReactionWrapper.py::StereoGroupTests::testMrvBlockContainsReaction
+Code/GraphMol/ChemReactions/Wrap/testReactionWrapper.py::StereoGroupTests::testMrvOutput
 Code/GraphMol/ChemReactions/Wrap/testReactionWrapper.py::StereoGroupTests::testPickleCompatibility
 Code/GraphMol/ChemReactions/Wrap/testReactionWrapper.py::StereoGroupTests::testReactionInPlace
 Code/GraphMol/ChemReactions/Wrap/testReactionWrapper.py::StereoGroupTests::testSanitizeRxnAsMols
@@ -660,6 +662,9 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::testTranslateChiralFlag
 Code/GraphMol/Wrap/rough_test.py::TestCase::testUnfoldedRDKFingerprint
 Code/GraphMol/Wrap/rough_test.py::TestCase::testValidationMol
 Code/GraphMol/Wrap/rough_test.py::TestCase::testValidationMrv
+Code/GraphMol/Wrap/rough_test.py::TestCase::testValidationMrvRxn
+Code/GraphMol/Wrap/rough_test.py::TestCase::testValidationMrvRxn2
+Code/GraphMol/Wrap/rough_test.py::TestCase::testValidationMrvRxn3
 Code/GraphMol/Wrap/rough_test.py::TestCase::testValidationRxn
 Code/GraphMol/Wrap/rough_test.py::TestCase::testValidationSmiles
 Code/GraphMol/Wrap/rough_test.py::TestCase::testVerifyWedges
@@ -921,6 +926,9 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::testTranslateChiralFlag
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testUnfoldedRDKFingerprint
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testValidationMol
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testValidationMrv
+Code/GraphMol/nbWrap/rough_test.py::TestCase::testValidationMrvRxn
+Code/GraphMol/nbWrap/rough_test.py::TestCase::testValidationMrvRxn2
+Code/GraphMol/nbWrap/rough_test.py::TestCase::testValidationMrvRxn3
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testValidationRxn
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testValidationSmiles
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testVerifyWedges
