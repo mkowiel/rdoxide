@@ -378,6 +378,11 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<crate::conformer::PyConformer>()?;
     m.add_class::<crate::mol::PyMol>()?;
     m.add_class::<crate::molbundle::PyMolBundle>()?;
+    m.add_class::<crate::molbundle::PyFixedMolSizeMolBundle>()?;
+    m.add_function(wrap_pyfunction!(
+        crate::molbundle::mol_bundle_can_serialize,
+        m
+    )?)?;
     m.add_class::<crate::mol::PyRWMol>()?;
     m.add_class::<crate::mol::PyEditableMol>()?;
     m.add_class::<crate::mol::AtomSeq>()?;
