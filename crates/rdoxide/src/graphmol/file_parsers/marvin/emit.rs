@@ -6,7 +6,7 @@ use super::xml::XmlTree;
 use crate::rdgeneral::strings::format_g;
 
 /// `getDoubleAsText`
-fn double_as_text(val: f64, precision: u32) -> String {
+pub(super) fn double_as_text(val: f64, precision: u32) -> String {
     // (kept for backwards compatibility upstream)
     if precision == 6 && val.abs() < 0.00001 {
         return "0.00000".to_string();

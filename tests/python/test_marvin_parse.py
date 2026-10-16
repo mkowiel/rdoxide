@@ -78,3 +78,19 @@ def test_unlabelled_query_atoms_become_stars():
     # (as upstream: only labelled queries such as Q or X are rejected)
     m = Chem.MolFromSmarts("[C,N]C")
     assert 'elementType="*"' in Chem.MolToMrvBlock(m)
+
+
+@needs_data
+def test_reactions():
+    from rdkit.Chem import rdChemReactions
+    path = os.path.join(DATA, "AlexRxn.mrv")
+    assert rdChemReactions.MrvFileIsReaction(path)
+    assert not rdChemReactions.MrvFileIsReaction(os.path.join(DATA, "aspirin.mrv"))
+    rxn = rdChemReactions.ReactionFromMrvFile(path)
+    assert (rxn.GetNumReactantTemplates(), rxn.GetNumProductTemplates()) == (1, 1)
+    block = rdChemReactions.ReactionToMrvBlock(rxn)
+    assert rdChemReactions.MrvBlockIsReaction(block)
+    rxn2 = rdChemReactions.ReactionFromMrvBlock(block)
+    assert rxn2.GetNumReactantTemplates() == 1
+    with pytest.raises(IOError):
+        rdChemReactions.ReactionFromMrvFile("/does/not/exist.mrv")
