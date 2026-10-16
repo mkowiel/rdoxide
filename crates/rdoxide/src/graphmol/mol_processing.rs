@@ -2,12 +2,13 @@
 //! dispatch of `FileParsers/GeneralFileReader.h`: fingerprints for all the
 //! molecules of a file.
 //!
-//! Not supported: TDT and Maestro files, compressed files (the RDKit builds
-//! that lack Boost.IOStreams do not support them either).
+//! Not supported: Maestro files and compressed files (the RDKit builds that
+//! lack Boost.IOStreams do not support compressed files either).
 
 use super::file_parsers::mol_file_parser::MolFileParserParams;
 use super::file_parsers::multithreaded_supplier::{MultithreadedMolSupplier, SupplierParams};
 use super::file_parsers::smiles_mol_supplier::SmilesMolSupplierParams;
+use super::file_parsers::tdt_mol_supplier::{TdtMolSupplier, TdtMolSupplierParams};
 use super::fingerprints::morgan::MorganArguments;
 use super::fingerprints::{
     AtomInvariantsGenerator, BondInvariantsGenerator, EnvGenerator, FingerprintArguments,
@@ -96,8 +97,36 @@ fn determine_format(path: &str) -> Result<(FileFormat, bool)> {
     Ok((format, compressed))
 }
 
+/// The suppliers `GeneralMolSupplier::getSupplier` makes: SDF and SMILES
+/// files are read on several threads, TDT files by a sequential supplier.
+enum Supplier {
+    Threaded(MultithreadedMolSupplier),
+    Tdt(TdtMolSupplier),
+}
+
+impl Supplier {
+    /// The next entry: `None` at the end of the input, `Some(None)` for a
+    /// molecule that could not be read.
+    fn next_entry(&mut self) -> Result<Option<Option<RWMol>>> {
+        match self {
+            Supplier::Threaded(s) => Ok(s.next_mol()),
+            Supplier::Tdt(s) => {
+                // (the loop of upstream's `worker` for sequential suppliers)
+                if s.at_end()? {
+                    return Ok(None);
+                }
+                match s.next_mol()? {
+                    Some(mol) => Ok(Some(Some(mol))),
+                    None if !s.at_end()? => Ok(Some(None)),
+                    None => Ok(None),
+                }
+            }
+        }
+    }
+}
+
 /// `GeneralMolSupplier::getSupplier`
-fn get_supplier(path: &str, opt: &SupplierOptions) -> Result<MultithreadedMolSupplier> {
+fn get_supplier(path: &str, opt: &SupplierOptions) -> Result<Supplier> {
     let (format, compressed) = determine_format(path)?;
     if compressed {
         return Err(RDKitError::BadFile(
@@ -124,7 +153,8 @@ fn get_supplier(path: &str, opt: &SupplierOptions) -> Result<MultithreadedMolSup
                 ..MolFileParserParams::default()
             },
             params,
-        ),
+        )
+        .map(Supplier::Threaded),
         FileFormat::Smiles => {
             let mut parse_params = SmilesMolSupplierParams {
                 delimiter: opt.delimiter.clone(),
@@ -135,15 +165,19 @@ fn get_supplier(path: &str, opt: &SupplierOptions) -> Result<MultithreadedMolSup
             };
             parse_params.parse_parameters.sanitize = opt.sanitize;
             MultithreadedMolSupplier::from_smiles_file(path, parse_params, params)
+                .map(Supplier::Threaded)
         }
-        FileFormat::Tdt | FileFormat::Mae => Err(RDKitError::BadFile(format!(
-            "Unsupported file format: {}",
-            if format == FileFormat::Tdt {
-                "tdt"
-            } else {
-                "mae"
-            }
-        ))),
+        FileFormat::Tdt => {
+            let mut parse_params = TdtMolSupplierParams {
+                name_record: opt.name_record.clone(),
+                conf_id_2d: opt.conf_id_2d,
+                conf_id_3d: opt.conf_id_3d,
+                ..TdtMolSupplierParams::default()
+            };
+            parse_params.parse_parameters.sanitize = opt.sanitize;
+            TdtMolSupplier::from_file(path, parse_params).map(Supplier::Tdt)
+        }
+        FileFormat::Mae => Err(RDKitError::BadFile("Unsupported file format: mae".into())),
     }
 }
 
@@ -197,7 +231,7 @@ pub fn get_fingerprints_for_mols_in_file(
     loop {
         let mut chunk: Vec<Option<RWMol>> = Vec::with_capacity(CHUNK);
         while chunk.len() < CHUNK {
-            match supplier.next_mol() {
+            match supplier.next_entry()? {
                 Some(mol) => chunk.push(mol),
                 None => break,
             }
@@ -232,8 +266,10 @@ pub fn get_fingerprints_for_mols_in_file(
     }
     // upstream reports no entries for unreadable molecules at the end of the
     // input (including the empty record that follows the last newline)
-    while results.last().is_some_and(Option::is_none) {
-        results.pop();
+    if matches!(supplier, Supplier::Threaded(_)) {
+        while results.last().is_some_and(Option::is_none) {
+            results.pop();
+        }
     }
     Ok(results)
 }

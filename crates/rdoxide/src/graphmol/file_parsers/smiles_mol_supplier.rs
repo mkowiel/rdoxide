@@ -59,13 +59,13 @@ pub(super) fn tokenize<'a>(line: &'a str, delimiter: &str) -> Vec<&'a str> {
     line.split(|c| delimiter.contains(c)).collect()
 }
 
-fn no_stream() -> RDKitError {
+pub(super) fn no_stream() -> RDKitError {
     RDKitError::precondition("no stream")
 }
 
 /// `std::istream::tellg`: -1 (`None`) unless the stream is good — a stream
 /// that only has eofbit set fails the sentry, which sets failbit.
-fn tellg(s: &mut LineStream<'_>) -> Option<usize> {
+pub(super) fn tellg(s: &mut LineStream<'_>) -> Option<usize> {
     if s.eof() && !s.fail() {
         *s = LineStream::with_state(s.data(), (s.position(), true, true));
     }
@@ -73,7 +73,7 @@ fn tellg(s: &mut LineStream<'_>) -> Option<usize> {
 }
 
 /// C++11 `seekg(pos)`: eofbit is cleared first; a failed stream does not move.
-fn seekg(s: &mut LineStream<'_>, pos: usize) {
+pub(super) fn seekg(s: &mut LineStream<'_>, pos: usize) {
     let (cur, _, fail) = s.state();
     *s = if fail {
         LineStream::with_state(s.data(), (cur, false, true))
@@ -83,7 +83,7 @@ fn seekg(s: &mut LineStream<'_>, pos: usize) {
 }
 
 /// `seekg(pos)` with `pos` as returned by `tellg()` (-1 puts the stream in the fail state).
-fn seekg_opt(s: &mut LineStream<'_>, pos: Option<usize>) {
+pub(super) fn seekg_opt(s: &mut LineStream<'_>, pos: Option<usize>) {
     match pos {
         Some(p) => seekg(s, p),
         None => *s = LineStream::with_state(s.data(), (s.position(), false, true)),
@@ -91,7 +91,7 @@ fn seekg_opt(s: &mut LineStream<'_>, pos: Option<usize>) {
 }
 
 /// `clear()`
-fn clear(s: &mut LineStream<'_>) {
+pub(super) fn clear(s: &mut LineStream<'_>) {
     s.seek(s.position());
 }
 

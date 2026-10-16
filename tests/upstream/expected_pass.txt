@@ -534,6 +534,7 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::test33Issue65
 Code/GraphMol/Wrap/rough_test.py::TestCase::test34Issue124
 Code/GraphMol/Wrap/rough_test.py::TestCase::test37SanitException
 Code/GraphMol/Wrap/rough_test.py::TestCase::test38Issue266
+Code/GraphMol/Wrap/rough_test.py::TestCase::test38TDTSuppliers
 Code/GraphMol/Wrap/rough_test.py::TestCase::test39Issue273
 Code/GraphMol/Wrap/rough_test.py::TestCase::test3Bond
 Code/GraphMol/Wrap/rough_test.py::TestCase::test3dChiralCxsmiles
@@ -545,6 +546,7 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::test42LifeTheUniverseAndEverything
 Code/GraphMol/Wrap/rough_test.py::TestCase::test46ReplaceCore
 Code/GraphMol/Wrap/rough_test.py::TestCase::test47RWMols
 Code/GraphMol/Wrap/rough_test.py::TestCase::test47SmartsPieces
+Code/GraphMol/Wrap/rough_test.py::TestCase::test48Issue1928819
 Code/GraphMol/Wrap/rough_test.py::TestCase::test49Issue1932365
 Code/GraphMol/Wrap/rough_test.py::TestCase::test4Mol
 Code/GraphMol/Wrap/rough_test.py::TestCase::test50Issue1968608
@@ -566,6 +568,7 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::test67StreamSupplierStringIO
 Code/GraphMol/Wrap/rough_test.py::TestCase::test68ForwardSupplierUsingFilename
 Code/GraphMol/Wrap/rough_test.py::TestCase::test70StreamSDWriter
 Code/GraphMol/Wrap/rough_test.py::TestCase::test71StreamSmilesWriter
+Code/GraphMol/Wrap/rough_test.py::TestCase::test72StreamTDTWriter
 Code/GraphMol/Wrap/rough_test.py::TestCase::test73SanitizationOptions
 Code/GraphMol/Wrap/rough_test.py::TestCase::test74Issue3510149
 Code/GraphMol/Wrap/rough_test.py::TestCase::test75AllBondsExplicit
@@ -616,6 +619,7 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::testCXSMILESErrors
 Code/GraphMol/Wrap/rough_test.py::TestCase::testCXSmilesOptions
 Code/GraphMol/Wrap/rough_test.py::TestCase::testClearPropertyCache
 Code/GraphMol/Wrap/rough_test.py::TestCase::testConjGrpPerception
+Code/GraphMol/Wrap/rough_test.py::TestCase::testContextManagers
 Code/GraphMol/Wrap/rough_test.py::TestCase::testCountAtomElec
 Code/GraphMol/Wrap/rough_test.py::TestCase::testCrambin
 Code/GraphMol/Wrap/rough_test.py::TestCase::testCustomSubstructMatchCheck
@@ -712,6 +716,7 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::testSubstructMatchDMAP
 Code/GraphMol/Wrap/rough_test.py::TestCase::testSubstructParameters
 Code/GraphMol/Wrap/rough_test.py::TestCase::testSubstructParametersBundles
 Code/GraphMol/Wrap/rough_test.py::TestCase::testSubstructParametersBundles2
+Code/GraphMol/Wrap/rough_test.py::TestCase::testSuppliersReadingDirectories
 Code/GraphMol/Wrap/rough_test.py::TestCase::testTranslateChiralFlag
 Code/GraphMol/Wrap/rough_test.py::TestCase::testUnfoldedRDKFingerprint
 Code/GraphMol/Wrap/rough_test.py::TestCase::testValidationMol
