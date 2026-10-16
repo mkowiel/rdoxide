@@ -420,6 +420,7 @@ Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testSetLineWidth
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testSetPalette
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testSettingOptions
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testShowAllCIPCodes
+Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testUpdateMolDrawOptionsAndDrawerParamsFromJSON
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testUpdatePalette
 Code/GraphMol/MolEnumerator/Wrap/rough_test.py::TestCase::testCombined
 Code/GraphMol/MolEnumerator/Wrap/rough_test.py::TestCase::testLinkNodes

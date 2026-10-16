@@ -328,3 +328,27 @@ fn native_text_writes_text_elements() {
     assert!(svg.contains("font-family:sans-serif;text-anchor:start;"));
     assert!(!svg.contains("class='atom-2' d='M"));
 }
+
+#[test]
+fn options_from_json() {
+    use rdoxide::graphmol::mol_draw2d::helpers::{LegendPosition, MolDrawOptions};
+    use rdoxide::graphmol::mol_draw2d::options_json::update_mol_draw_options_from_json;
+    let mut o = MolDrawOptions::default();
+    update_mol_draw_options_from_json(
+        &mut o,
+        r#"{"addAtomIndices": true, "bondLineWidth": 3.5, "legendPosition": "Left",
+            "symbolColour": [0.5, 0.25, 1], "fontFile": "BuiltinRobotoRegular",
+            "atomColourPalette": {"7": [0, 0, 1]}}"#,
+    )
+    .unwrap();
+    assert!(o.add_atom_indices);
+    assert_eq!(o.bond_line_width, 3.5);
+    assert_eq!(o.legend_position, LegendPosition::Left);
+    assert_eq!(o.symbol_colour, DrawColour::new(0.5, 0.25, 1.0));
+    assert_eq!(o.font_file, "BuiltinRobotoRegular");
+    assert_eq!(o.atom_colour_palette[&7], DrawColour::new(0.0, 0.0, 1.0));
+    // untouched options keep their values; bad JSON is an error
+    assert_eq!(o.padding, 0.05);
+    assert!(update_mol_draw_options_from_json(&mut o, "{oops").is_err());
+    update_mol_draw_options_from_json(&mut o, "").unwrap();
+}
