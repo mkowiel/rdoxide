@@ -21,7 +21,9 @@ use super::draw_mol_utils::{
 };
 use super::draw_shape::DrawShape;
 use super::draw_text::DrawTextFT;
-use super::helpers::{DrawColour, LegendPosition, MolDrawOptions, OrientType, draw_element};
+use super::helpers::{
+    DrawColour, LegendPosition, MolDrawOptions, MultiColourHighlightStyle, OrientType, draw_element,
+};
 use super::string_rect::StringRect;
 use super::utils::{mean_bond_length, prepare_mol_for_drawing};
 use crate::geometry::{Point2D, Transform2D};
@@ -41,6 +43,16 @@ pub struct DrawMolHighlights {
     pub bond_map: BTreeMap<i32, DrawColour>,
     pub bond_colours: Vec<(DrawColour, DrawColour)>,
     pub radii: BTreeMap<i32, f64>,
+}
+
+/// The multi-colour highlighting of a molecule (`DrawMolMCH`): the colours
+/// of each highlighted atom and bond, and the line widths of bond highlights.
+#[derive(Clone, Debug)]
+pub struct McHighlights {
+    pub style: MultiColourHighlightStyle,
+    pub atom_map: BTreeMap<i32, Vec<DrawColour>>,
+    pub bond_map: BTreeMap<i32, Vec<DrawColour>>,
+    pub linewidth_multipliers: BTreeMap<i32, i32>,
 }
 
 /// Everything needed to draw one molecule.
@@ -111,6 +123,8 @@ pub struct DrawMol {
     pub active_bnd_idx_offset: i32,
     pub flexi_canvas_x: bool,
     pub flexi_canvas_y: bool,
+    /// Multi-colour highlights, when this is a `DrawMolMCH`.
+    pub mch: Option<McHighlights>,
 }
 
 impl DrawMol {
@@ -192,9 +206,35 @@ impl DrawMol {
             active_bnd_idx_offset: 0,
             flexi_canvas_x: width < 0,
             flexi_canvas_y: height < 0,
+            mch: None,
         };
         text.set_font_scale(dm.font_scale, true);
         dm.init_draw_molecule(mol)?;
+        Ok(dm)
+    }
+
+    /// `DrawMolMCH`: a molecule with multi-colour highlights, which only
+    /// takes the highlight radii from the single-colour ones.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_mch(
+        mol: &ROMol,
+        legend: &str,
+        width: i32,
+        height: i32,
+        opts: &MolDrawOptions,
+        text: &mut DrawTextFT,
+        mch: McHighlights,
+        radii: BTreeMap<i32, f64>,
+        conf_id: i32,
+    ) -> Result<Self> {
+        let highlights = DrawMolHighlights {
+            radii,
+            ..Default::default()
+        };
+        let mut dm = Self::new(
+            mol, legend, width, height, opts, text, highlights, true, conf_id, false,
+        )?;
+        dm.mch = Some(mch);
         Ok(dm)
     }
 
@@ -283,6 +323,7 @@ impl DrawMol {
             active_bnd_idx_offset: 0,
             flexi_canvas_x: false,
             flexi_canvas_y: false,
+            mch: None,
         }
     }
 

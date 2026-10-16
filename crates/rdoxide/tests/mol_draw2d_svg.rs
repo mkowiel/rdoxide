@@ -352,3 +352,64 @@ fn options_from_json() {
     assert!(update_mol_draw_options_from_json(&mut o, "{oops").is_err());
     update_mol_draw_options_from_json(&mut o, "").unwrap();
 }
+
+#[test]
+fn multi_colour_highlights() {
+    let red = DrawColour::new(1.0, 0.0, 0.0);
+    let green = DrawColour::new(0.0, 1.0, 0.0);
+    let blue = DrawColour::new(0.0, 0.0, 1.0);
+    let m = smi("CCOC");
+    let draw = |fill: bool| {
+        let mut d = MolDraw2DSVG::new(300, 300, -1, -1).unwrap();
+        d.draw_options_mut().fill_highlights = fill;
+        let mut atoms = BTreeMap::new();
+        atoms.insert(0, vec![red]);
+        atoms.insert(1, vec![red, green]);
+        atoms.insert(2, vec![red, green, blue]);
+        let mut bonds = BTreeMap::new();
+        bonds.insert(0, vec![red]);
+        bonds.insert(1, vec![green, blue]);
+        d.draw_molecule_with_highlights(&m, "", atoms, bonds, BTreeMap::new(), BTreeMap::new(), -1)
+            .unwrap();
+        d.finish_drawing();
+        d.get_drawing_text()
+    };
+    let filled = draw(true);
+    // one ellipse for a single colour, arcs (polygons) for several
+    assert_eq!(filled.matches("<ellipse").count(), 1);
+    assert!(filled.contains("fill:#FF0000;"));
+    assert!(filled.contains("fill:#00FF00;"));
+    assert!(filled.contains("fill:#0000FF;"));
+    let open = draw(false);
+    assert_eq!(open.matches("<ellipse").count(), 1);
+    assert!(open.contains("fill:none;fill-rule:evenodd;stroke:#00FF00"));
+    assert_ne!(filled, open);
+    // out of range indices are errors
+    let mut d = MolDraw2DSVG::new(300, 300, -1, -1).unwrap();
+    let mut bad = BTreeMap::new();
+    bad.insert(17, vec![red]);
+    assert!(
+        d.draw_molecule_with_highlights(
+            &m,
+            "",
+            bad.clone(),
+            BTreeMap::new(),
+            BTreeMap::new(),
+            BTreeMap::new(),
+            -1
+        )
+        .is_err()
+    );
+    assert!(
+        d.draw_molecule_with_highlights(
+            &m,
+            "",
+            BTreeMap::new(),
+            bad,
+            BTreeMap::new(),
+            BTreeMap::new(),
+            -1
+        )
+        .is_err()
+    );
+}

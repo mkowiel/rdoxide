@@ -12,7 +12,7 @@
 
 use std::collections::BTreeMap;
 
-use super::draw_mol::{DrawMol, DrawMolHighlights};
+use super::draw_mol::{DrawMol, DrawMolHighlights, McHighlights};
 use super::draw_mol_utils::get_bond_highlights_for_atoms;
 use super::draw_shape::ShapeCanvas;
 use super::draw_text::{DrawTextFT, atom_label_to_pieces};
@@ -592,6 +592,50 @@ impl MolDraw2DSVG {
             true,
             conf_id,
             false,
+        )?;
+        dm.set_offsets(
+            f64::from(self.x_offset),
+            f64::from(self.y_offset),
+            &mut self.text,
+        )?;
+        dm.create_draw_objects(&mut self.text)?;
+        self.fix_variable_dimensions(&dm);
+        self.draw_mols.push(dm);
+        self.active_mol_idx += 1;
+        self.start_drawing();
+        self.draw_the_molecule(self.draw_mols.len() - 1)
+    }
+
+    /// Draws a molecule with several highlight colours per atom and bond, in
+    /// the style of the options (`drawMoleculeWithHighlights`).
+    pub fn draw_molecule_with_highlights(
+        &mut self,
+        mol: &ROMol,
+        legend: &str,
+        highlight_atom_map: BTreeMap<i32, Vec<DrawColour>>,
+        highlight_bond_map: BTreeMap<i32, Vec<DrawColour>>,
+        highlight_radii: BTreeMap<i32, f64>,
+        highlight_linewidth_multipliers: BTreeMap<i32, i32>,
+        conf_id: i32,
+    ) -> Result<()> {
+        self.check_supported()?;
+        self.setup_text_drawer();
+        let mch = McHighlights {
+            style: self.canvas.options.multi_colour_highlight_style,
+            atom_map: highlight_atom_map,
+            bond_map: highlight_bond_map,
+            linewidth_multipliers: highlight_linewidth_multipliers,
+        };
+        let mut dm = DrawMol::new_mch(
+            mol,
+            legend,
+            self.panel_width,
+            self.panel_height,
+            &self.canvas.options,
+            &mut self.text,
+            mch,
+            highlight_radii,
+            conf_id,
         )?;
         dm.set_offsets(
             f64::from(self.x_offset),

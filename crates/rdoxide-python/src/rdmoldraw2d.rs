@@ -795,18 +795,30 @@ impl PyMolDraw2D {
         highlight_linewidth_multipliers: &Bound<'_, PyAny>,
         confId: i32,
     ) -> PyResult<()> {
-        let _ = (
-            mol,
-            legend,
-            highlight_atom_map,
-            highlight_bond_map,
-            highlight_radii,
-            highlight_linewidth_multipliers,
-            confId,
-        );
-        Err(PyNotImplementedError::new_err(
-            "multi-colour highlighting is not supported yet",
-        ))
+        let colour_lists = |obj: &Bound<'_, PyAny>| -> PyResult<BTreeMap<i32, Vec<DrawColour>>> {
+            let mut res = BTreeMap::new();
+            if given(Some(obj))?.is_some() {
+                for (k, v) in obj.cast::<PyDict>()?.iter() {
+                    let cols = v
+                        .try_iter()?
+                        .map(|c| py_colour(&c?))
+                        .collect::<PyResult<Vec<_>>>()?;
+                    res.insert(k.extract()?, cols);
+                }
+            }
+            Ok(res)
+        };
+        let atoms = colour_lists(highlight_atom_map)?;
+        let bonds = colour_lists(highlight_bond_map)?;
+        let radii = double_map(Some(highlight_radii))?.unwrap_or_default();
+        let mults: BTreeMap<i32, i32> = if given(Some(highlight_linewidth_multipliers))?.is_some() {
+            highlight_linewidth_multipliers.extract()?
+        } else {
+            BTreeMap::new()
+        };
+        self.d
+            .draw_molecule_with_highlights(&mol.mol, legend, atoms, bonds, radii, mults, confId)
+            .py()
     }
 
     /// renders multiple molecules
