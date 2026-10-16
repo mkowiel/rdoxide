@@ -4,9 +4,9 @@ import pickle
 
 import pytest
 
-from rdkit import Chem
-from rdkit.Chem import ChemicalFeatures
-from rdkit.Geometry import Point3D
+from rdoxide import Chem
+from rdoxide.Chem import ChemicalFeatures
+from rdoxide.Geometry import Point3D
 
 FDEF = """
 # donors and acceptors

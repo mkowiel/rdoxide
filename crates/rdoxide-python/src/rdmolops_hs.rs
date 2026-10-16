@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdmolops`: hydrogen removal and stereo perception — port of
+//! `rdoxide.Chem.rdmolops`: hydrogen removal and stereo perception — port of
 //! the corresponding parts of upstream `Code/GraphMol/Wrap/MolOps.cpp`.
 
 use pyo3::exceptions::PyTypeError;
@@ -17,7 +17,7 @@ use crate::pyconv::python_object_to_vect;
 /// Parameters controlling which Hs are removed.
 #[pyclass(
     name = "RemoveHsParameters",
-    module = "rdkit.Chem.rdmolops",
+    module = "rdoxide.Chem.rdmolops",
     get_all,
     set_all,
     skip_from_py_object
@@ -288,7 +288,7 @@ fn py_set_double_bond_neighbor_directions(
 /// Parameters controlling which Hs are added.
 #[pyclass(
     name = "AddHsParameters",
-    module = "rdkit.Chem.rdmolops",
+    module = "rdoxide.Chem.rdmolops",
     skip_from_py_object
 )]
 #[derive(Debug, Clone, Default)]

@@ -2,8 +2,8 @@
 
 import pytest
 
-from rdkit import Chem
-from rdkit.Geometry import Point3D
+from rdoxide import Chem
+from rdoxide.Geometry import Point3D
 
 
 def sru(smiles="CCOCC", atoms=(1, 2), bonds=(0, 3)):

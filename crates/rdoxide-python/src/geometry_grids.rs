@@ -1,4 +1,4 @@
-//! `rdkit.Geometry.rdGeometry` grids: `UniformGrid3D_` (and its
+//! `rdoxide.Geometry.rdGeometry` grids: `UniformGrid3D_` (and its
 //! `UniformGrid3D` factory function), `UniformRealValueGrid3D` and the grid
 //! utilities (upstream `Geometry/Wrap/UniformGrid3D.cpp`,
 //! `UniformRealValueGrid3D.cpp`).
@@ -30,7 +30,7 @@ fn pkl_bytes(o: &Bound<'_, PyAny>) -> PyResult<Vec<u8>> {
 /// of efficiency these value can either be binary, fit in 2, 4, 8 or 16 bits
 #[pyclass(
     name = "UniformGrid3D_",
-    module = "rdkit.Geometry.rdGeometry",
+    module = "rdoxide.Geometry.rdGeometry",
     skip_from_py_object
 )]
 #[derive(Debug, Clone)]
@@ -284,7 +284,7 @@ fn py_find_grid_terminal_points<'py>(
 /// cubic grid. Each grid point can store a floating point value.
 #[pyclass(
     name = "UniformRealValueGrid3D",
-    module = "rdkit.Geometry.rdGeometry",
+    module = "rdoxide.Geometry.rdGeometry",
     skip_from_py_object
 )]
 #[derive(Debug, Clone)]

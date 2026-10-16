@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdtrajectory` (upstream `GraphMol/Wrap/{rdTrajectory,Trajectory}.cpp`):
+//! `rdoxide.Chem.rdtrajectory` (upstream `GraphMol/Wrap/{rdTrajectory,Trajectory}.cpp`):
 //! trajectories and snapshots.
 
 use pyo3::prelude::*;
@@ -14,7 +14,7 @@ use crate::mol::PyMol;
 /// A class which allows storing coordinates from a trajectory
 #[pyclass(
     name = "Snapshot",
-    module = "rdkit.Chem.rdtrajectory",
+    module = "rdoxide.Chem.rdtrajectory",
     skip_from_py_object
 )]
 #[derive(Debug, Clone)]
@@ -82,7 +82,7 @@ impl PySnapshot {
 /// A class which allows storing Snapshots from a trajectory
 #[pyclass(
     name = "Trajectory",
-    module = "rdkit.Chem.rdtrajectory",
+    module = "rdoxide.Chem.rdtrajectory",
     skip_from_py_object
 )]
 #[derive(Debug, Clone)]

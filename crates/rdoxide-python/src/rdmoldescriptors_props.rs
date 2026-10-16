@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdMolDescriptors`: molecular weights, formula and atom counts
+//! `rdoxide.Chem.rdMolDescriptors`: molecular weights, formula and atom counts
 //! (upstream `Descriptors/MolDescriptors.cpp` and its wrappers in
 //! `Wrap/rdMolDescriptors.cpp`).
 

@@ -1,12 +1,16 @@
 # rdoxide
 
 **RDKit, rusted.** A pure-Rust port of the [RDKit](https://www.rdkit.org)
-cheminformatics toolkit with the *same Python API*, so it can replace RDKit
-1:1:
+cheminformatics toolkit with the *same Python API* under its own package
+name, so code written for RDKit only needs its imports changed, and both
+libraries can be installed side by side:
 
 ```python
-from rdkit import Chem          # served by rdoxide
+from rdoxide import Chem          # instead of: from rdkit import Chem
 ```
+
+rdoxide is an independent project and is not affiliated with or endorsed by
+the RDKit project.
 
 * Ported from **RDKit 2026.09.1** (see [`UPSTREAM.toml`](UPSTREAM.toml)).
 * Python **3.10 – 3.15** (single `abi3` wheel).

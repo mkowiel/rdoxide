@@ -2,8 +2,8 @@
 
 import numpy as np
 import pytest
-from rdkit import DataStructs
-from rdkit.SimDivFilters import rdSimDivPickers as pickers
+from rdoxide import DataStructs
+from rdoxide.SimDivFilters import rdSimDivPickers as pickers
 
 POINTS = np.array([0.0, 1.0, 2.5, 4.0, 4.2, 7.0, 9.0, 9.5, 10.0, 15.0])
 

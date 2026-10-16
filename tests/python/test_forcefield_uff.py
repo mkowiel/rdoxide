@@ -1,9 +1,9 @@
 """UFF force fields; the expectations come from RDKit's own testHelpers.py."""
 
 import pytest
-from rdkit import Chem
-from rdkit.Chem import ChemicalForceFields
-from rdkit.ForceField import rdForceField
+from rdoxide import Chem
+from rdoxide.Chem import ChemicalForceFields
+from rdoxide.ForceField import rdForceField
 
 BENZENE = """
      RDKit          3D

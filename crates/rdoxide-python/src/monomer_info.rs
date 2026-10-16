@@ -21,14 +21,14 @@ pub enum InfoHandle {
 }
 
 /// The class to store monomer information attached to Atoms
-#[pyclass(name = "AtomMonomerInfo", module = "rdkit.Chem.rdchem", subclass)]
+#[pyclass(name = "AtomMonomerInfo", module = "rdoxide.Chem.rdchem", subclass)]
 #[derive(Debug)]
 pub struct PyMonomerInfo {
     handle: InfoHandle,
 }
 
 /// The class to store PDB residue information attached to Atoms
-#[pyclass(name = "AtomPDBResidueInfo", module = "rdkit.Chem.rdchem", extends = PyMonomerInfo)]
+#[pyclass(name = "AtomPDBResidueInfo", module = "rdoxide.Chem.rdchem", extends = PyMonomerInfo)]
 pub struct PyPdbResidueInfo;
 
 impl PyMonomerInfo {

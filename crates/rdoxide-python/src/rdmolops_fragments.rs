@@ -1,4 +1,4 @@
-//! Bond fragmentation of `rdkit.Chem.rdmolops` (upstream
+//! Bond fragmentation of `rdoxide.Chem.rdmolops` (upstream
 //! `GraphMol/Wrap/MolOps.cpp`): `FragmentOnBonds`, `FragmentOnSomeBonds` and
 //! `FragmentOnBRICSBonds`.
 

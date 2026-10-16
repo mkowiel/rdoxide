@@ -1,7 +1,7 @@
 """rdFingerprintGenerator Morgan generator (expectations from RDKit 2026.09.1)."""
 
-from rdkit import Chem
-from rdkit.Chem import rdFingerprintGenerator as G
+from rdoxide import Chem
+from rdoxide.Chem import rdFingerprintGenerator as G
 
 
 def test_morgan_basics():

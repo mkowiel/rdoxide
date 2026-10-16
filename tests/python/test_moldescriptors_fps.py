@@ -1,7 +1,7 @@
 """Legacy fingerprint functions of rdMolDescriptors (expectations from RDKit 2026.09.1)."""
 
-from rdkit import Chem, RDLogger
-from rdkit.Chem import rdMolDescriptors as D
+from rdoxide import Chem, RDLogger
+from rdoxide.Chem import rdMolDescriptors as D
 
 RDLogger.DisableLog("rdApp.*")
 

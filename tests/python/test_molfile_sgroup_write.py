@@ -2,9 +2,9 @@
 
 import pytest
 
-from rdkit import Chem
-from rdkit.Chem import rdDepictor
-from rdkit.Geometry import Point3D
+from rdoxide import Chem
+from rdoxide.Chem import rdDepictor
+from rdoxide.Geometry import Point3D
 
 
 def depicted(smiles="CCOCC"):

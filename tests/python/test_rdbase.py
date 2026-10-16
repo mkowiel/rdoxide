@@ -1,19 +1,19 @@
-"""rdkit.rdBase basics (upstream logging behaviour is covered by the verbatim
+"""rdoxide.rdBase basics (upstream logging behaviour is covered by the verbatim
 upstream rdkit/UnitTestLogging.py, run via tools/run_upstream_tests.py)."""
 
-import rdkit
-from rdkit import RDLogger, rdBase
+import rdoxide
+from rdoxide import RDLogger, rdBase
 
 
 def test_versions():
     assert rdBase.rdkitVersion == "2026.09.1"
-    assert rdkit.__version__ == rdBase.rdkitVersion
+    assert rdoxide.__version__ == rdBase.rdkitVersion
     assert rdBase._version() == rdBase.rdkitVersion
 
 
 def test_module_names():
-    assert rdBase.__name__ == "rdkit.rdBase"
-    import rdkit.rdBase as again
+    assert rdBase.__name__ == "rdoxide.rdBase"
+    import rdoxide.rdBase as again
 
     assert again is rdBase
 

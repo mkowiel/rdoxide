@@ -2,8 +2,8 @@
 
 import pytest
 
-from rdkit import Chem
-from rdkit.Chem import rdDepictor
+from rdoxide import Chem
+from rdoxide.Chem import rdDepictor
 
 
 def delete(smi, query, **kwargs):

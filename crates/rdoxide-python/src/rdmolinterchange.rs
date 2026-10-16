@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdMolInterchange` (upstream
+//! `rdoxide.Chem.rdMolInterchange` (upstream
 //! `GraphMol/MolInterchange/Wrap/rdMolInterchange.cpp`).
 
 use pyo3::exceptions::PyRuntimeError;
@@ -24,7 +24,7 @@ fn map_error(err: RDKitError) -> PyErr {
 /// Parameters controlling the JSON parser
 #[pyclass(
     name = "JSONParseParameters",
-    module = "rdkit.Chem.rdMolInterchange",
+    module = "rdoxide.Chem.rdMolInterchange",
     skip_from_py_object
 )]
 #[derive(Clone, Default)]
@@ -94,7 +94,7 @@ impl PyJsonParseParameters {
 /// Parameters controlling the JSON writer
 #[pyclass(
     name = "JSONWriteParameters",
-    module = "rdkit.Chem.rdMolInterchange",
+    module = "rdoxide.Chem.rdMolInterchange",
     skip_from_py_object
 )]
 #[derive(Clone, Default)]

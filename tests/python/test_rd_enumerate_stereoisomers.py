@@ -1,8 +1,8 @@
-"""rdkit.Chem.rdEnumerateStereoisomers; expected values come from reference RDKit."""
+"""rdoxide.Chem.rdEnumerateStereoisomers; expected values come from reference RDKit."""
 
 import pytest
-from rdkit import Chem
-from rdkit.Chem import rdEnumerateStereoisomers as E
+from rdoxide import Chem
+from rdoxide.Chem import rdEnumerateStereoisomers as E
 
 
 def _all(mol, **opts):

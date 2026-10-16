@@ -1,8 +1,8 @@
 """SubstructLibrary searches with MolBundle and ExtendedQueryMol queries (the latter is
 upstream's test_using_xqms, which upstream skips without Boost serialization)."""
 import pytest
-from rdkit import Chem
-from rdkit.Chem import rdGeneralizedSubstruct, rdSubstructLibrary
+from rdoxide import Chem
+from rdoxide.Chem import rdGeneralizedSubstruct, rdSubstructLibrary
 
 SMIS = ["COCC=O", "COOCC=O", "COOOCC=O", "COOOOCC=O"]
 

@@ -31,7 +31,7 @@ use crate::stereo_group::PyStereoGroup;
 ///           molecule itself is modified, for example).
 ///         Molecules also have the concept of *private* properties, which are tagged
 ///           by beginning the property name with an underscore (_).
-#[pyclass(name = "Mol", module = "rdkit.Chem.rdchem", subclass, weakref, dict)]
+#[pyclass(name = "Mol", module = "rdoxide.Chem.rdchem", subclass, weakref, dict)]
 #[derive(Debug)]
 pub struct PyMol {
     pub mol: ROMol,
@@ -279,7 +279,7 @@ impl PyMol {
         }
     }
 
-    /// Returns a read-only sequence containing all of the atoms in a molecule that match the query atom. Atom query options are defined in the rdkit.Chem.rdqueries module.
+    /// Returns a read-only sequence containing all of the atoms in a molecule that match the query atom. Atom query options are defined in the rdoxide.Chem.rdqueries module.
     #[pyo3(name = "GetAtomsMatchingQuery", signature = (qa))]
     fn get_atoms_matching_query(slf: &Bound<'_, Self>, qa: &Bound<'_, PyAny>) -> PyResult<AtomSeq> {
         let py = slf.py();
@@ -504,7 +504,7 @@ fn copy_same_type(slf: &Bound<'_, PyMol>) -> PyResult<Py<PyAny>> {
 }
 
 /// Read-only sequence of atoms (`_ROAtomSeq`).
-#[pyclass(name = "_ROAtomSeq", module = "rdkit.Chem.rdchem")]
+#[pyclass(name = "_ROAtomSeq", module = "rdoxide.Chem.rdchem")]
 #[derive(Debug)]
 pub struct AtomSeq {
     pub(crate) mol: Py<PyMol>,
@@ -568,7 +568,7 @@ impl AtomSeq {
 }
 
 /// Read-only sequence of bonds (`_ROBondSeq`).
-#[pyclass(name = "_ROBondSeq", module = "rdkit.Chem.rdchem")]
+#[pyclass(name = "_ROBondSeq", module = "rdoxide.Chem.rdchem")]
 #[derive(Debug)]
 pub struct BondSeq {
     pub(crate) mol: Py<PyMol>,
@@ -639,7 +639,7 @@ impl BondSeq {
 ///   molecule using GetMol() (this is still available, however).
 ///
 ///   n.b. Eventually this class may become a direct replacement for EditableMol
-#[pyclass(name = "RWMol", module = "rdkit.Chem.rdchem", extends = PyMol, subclass)]
+#[pyclass(name = "RWMol", module = "rdoxide.Chem.rdchem", extends = PyMol, subclass)]
 #[derive(Debug)]
 pub struct PyRWMol;
 
@@ -820,7 +820,7 @@ impl PyRWMol {
 }
 
 /// an editable molecule class
-#[pyclass(name = "EditableMol", module = "rdkit.Chem.rdchem")]
+#[pyclass(name = "EditableMol", module = "rdoxide.Chem.rdchem")]
 #[derive(Debug)]
 pub struct PyEditableMol {
     mol: Option<ROMol>,

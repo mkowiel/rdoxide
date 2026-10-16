@@ -181,7 +181,7 @@ fn py_mol_to_pdb_file(
 }
 
 /// A class for writing molecules to PDB files.
-#[pyclass(name = "PDBWriter", module = "rdkit.Chem.rdmolfiles", unsendable)]
+#[pyclass(name = "PDBWriter", module = "rdoxide.Chem.rdmolfiles", unsendable)]
 pub struct PyPdbWriter {
     sink: Option<WriterSink>,
     flavor: u32,

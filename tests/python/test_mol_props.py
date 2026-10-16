@@ -2,8 +2,8 @@
 
 import pytest
 
-from rdkit import Chem
-from rdkit.Chem import rdMolDescriptors as D
+from rdoxide import Chem
+from rdoxide.Chem import rdMolDescriptors as D
 
 # smiles: (MW, MW heavy, exact MW, exact MW heavy, formula, formula with isotopes,
 #          formula with isotopes and no D/T abbreviation, heavy atoms, all atoms)

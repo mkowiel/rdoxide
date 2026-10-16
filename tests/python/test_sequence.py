@@ -1,13 +1,13 @@
 """MolFromSequence / MolFromFASTA / MolToSequence / MolToFASTA. Also valid on upstream RDKit."""
 
 import pytest
-from rdkit import Chem
+from rdoxide import Chem
 
 
 def test_peptide_roundtrip():
     m = Chem.MolFromSequence("AGKV")
     assert Chem.MolToSequence(m) == "AGKV"
-    from rdkit.Chem import rdMolDescriptors
+    from rdoxide.Chem import rdMolDescriptors
     assert rdMolDescriptors.CalcMolFormula(m) == "C16H31N5O5"
     info = m.GetAtomWithIdx(1).GetPDBResidueInfo()
     assert (info.GetName(), info.GetResidueName(), info.GetChainId()) == (" CA ", "ALA", "A")

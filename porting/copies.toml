@@ -5,19 +5,19 @@
 
 [[copy]]
 from = "rdkit/__init__.py"
-to = "python/rdkit/__init__.py"
+to = "python/rdoxide/__init__.py"
 
 [[copy]]
 from = "rdkit/RDLogger.py"
-to = "python/rdkit/RDLogger.py"
+to = "python/rdoxide/RDLogger.py"
 
 [[copy]]
 from = "rdkit/RDRandom.py"
-to = "python/rdkit/RDRandom.py"
+to = "python/rdoxide/RDRandom.py"
 
 [[copy]]
 from = "rdkit/RDConfig.py"
-to = "python/rdkit/RDConfig.py"
+to = "python/rdoxide/RDConfig.py"
 
 [[copy]]
 from = "Code/GraphMol/FileParsers/test_data/chiral1.mol"
@@ -73,195 +73,195 @@ to = "tests/data/molfiles/atrop_BMS-986142.sdf"
 
 [[copy]]
 from = "rdkit/DataStructs/__init__.py"
-to = "python/rdkit/DataStructs/__init__.py"
+to = "python/rdoxide/DataStructs/__init__.py"
 
 [[copy]]
 from = "rdkit/DataStructs/TopNContainer.py"
-to = "python/rdkit/DataStructs/TopNContainer.py"
+to = "python/rdoxide/DataStructs/TopNContainer.py"
 
 [[copy]]
 from = "rdkit/DataStructs/BitUtils.py"
-to = "python/rdkit/DataStructs/BitUtils.py"
+to = "python/rdoxide/DataStructs/BitUtils.py"
 
 [[copy]]
 from = "rdkit/DataStructs/VectCollection.py"
-to = "python/rdkit/DataStructs/VectCollection.py"
+to = "python/rdoxide/DataStructs/VectCollection.py"
 
 [[copy]]
 from = "rdkit/DataStructs/LazySignature.py"
-to = "python/rdkit/DataStructs/LazySignature.py"
+to = "python/rdoxide/DataStructs/LazySignature.py"
 
 [[copy]]
 from = "rdkit/DataStructs/BitEnsemble.py"
-to = "python/rdkit/DataStructs/BitEnsemble.py"
+to = "python/rdoxide/DataStructs/BitEnsemble.py"
 
 [[copy]]
 from = "rdkit/Chem/MACCSkeys.py"
-to = "python/rdkit/Chem/MACCSkeys.py"
+to = "python/rdoxide/Chem/MACCSkeys.py"
 
 [[copy]]
 from = "rdkit/Chem/Crippen.py"
-to = "python/rdkit/Chem/Crippen.py"
+to = "python/rdoxide/Chem/Crippen.py"
 
 [[copy]]
 from = "rdkit/Chem/Lipinski.py"
-to = "python/rdkit/Chem/Lipinski.py"
+to = "python/rdoxide/Chem/Lipinski.py"
 
 [[copy]]
 from = "rdkit/Chem/MolSurf.py"
-to = "python/rdkit/Chem/MolSurf.py"
+to = "python/rdoxide/Chem/MolSurf.py"
 
 [[copy]]
 from = "rdkit/Chem/ChemUtils/__init__.py"
-to = "python/rdkit/Chem/ChemUtils/__init__.py"
+to = "python/rdoxide/Chem/ChemUtils/__init__.py"
 
 [[copy]]
 from = "rdkit/Chem/ChemUtils/DescriptorUtilities.py"
-to = "python/rdkit/Chem/ChemUtils/DescriptorUtilities.py"
+to = "python/rdoxide/Chem/ChemUtils/DescriptorUtilities.py"
 
 [[copy]]
 from = "rdkit/Chem/EState/__init__.py"
-to = "python/rdkit/Chem/EState/__init__.py"
+to = "python/rdoxide/Chem/EState/__init__.py"
 
 [[copy]]
 from = "rdkit/Chem/EState/AtomTypes.py"
-to = "python/rdkit/Chem/EState/AtomTypes.py"
+to = "python/rdoxide/Chem/EState/AtomTypes.py"
 
 [[copy]]
 from = "rdkit/Chem/EState/EState.py"
-to = "python/rdkit/Chem/EState/EState.py"
+to = "python/rdoxide/Chem/EState/EState.py"
 
 [[copy]]
 from = "rdkit/Chem/EState/EState_VSA.py"
-to = "python/rdkit/Chem/EState/EState_VSA.py"
+to = "python/rdoxide/Chem/EState/EState_VSA.py"
 
 [[copy]]
 from = "rdkit/Chem/EState/Fingerprinter.py"
-to = "python/rdkit/Chem/EState/Fingerprinter.py"
+to = "python/rdoxide/Chem/EState/Fingerprinter.py"
 
 [[copy]]
 from = "rdkit/Chem/QED.py"
-to = "python/rdkit/Chem/QED.py"
+to = "python/rdoxide/Chem/QED.py"
 
 [[copy]]
 from = "rdkit/Chem/SpacialScore.py"
-to = "python/rdkit/Chem/SpacialScore.py"
+to = "python/rdoxide/Chem/SpacialScore.py"
 
 [[copy]]
 from = "rdkit/Chem/Descriptors.py"
-to = "python/rdkit/Chem/Descriptors.py"
+to = "python/rdoxide/Chem/Descriptors.py"
 
 [[copy]]
 from = "rdkit/ML/__init__.py"
-to = "python/rdkit/ML/__init__.py"
+to = "python/rdoxide/ML/__init__.py"
 
 [[copy]]
 from = "rdkit/ML/InfoTheory/__init__.py"
-to = "python/rdkit/ML/InfoTheory/__init__.py"
+to = "python/rdoxide/ML/InfoTheory/__init__.py"
 
 [[copy]]
 from = "rdkit/ML/InfoTheory/entropy.py"
-to = "python/rdkit/ML/InfoTheory/entropy.py"
+to = "python/rdoxide/ML/InfoTheory/entropy.py"
 
 [[copy]]
 from = "rdkit/Chem/Graphs.py"
-to = "python/rdkit/Chem/Graphs.py"
+to = "python/rdoxide/Chem/Graphs.py"
 
 [[copy]]
 from = "rdkit/Chem/GraphDescriptors.py"
-to = "python/rdkit/Chem/GraphDescriptors.py"
+to = "python/rdoxide/Chem/GraphDescriptors.py"
 
 [[copy]]
 from = "rdkit/Chem/Fragments.py"
-to = "python/rdkit/Chem/Fragments.py"
+to = "python/rdoxide/Chem/Fragments.py"
 
 [[copy]]
 from = "rdkit/Chem/Descriptors3D.py"
-to = "python/rdkit/Chem/Descriptors3D.py"
+to = "python/rdoxide/Chem/Descriptors3D.py"
 
 [[copy]]
 from = "Data/FragmentDescriptors.csv"
-to = "python/rdkit/share/RDKit/Data/FragmentDescriptors.csv"
+to = "python/rdoxide/share/RDKit/Data/FragmentDescriptors.csv"
 
 [[copy]]
 from = "rdkit/SimDivFilters/__init__.py"
-to = "python/rdkit/SimDivFilters/__init__.py"
+to = "python/rdoxide/SimDivFilters/__init__.py"
 
 [[copy]]
 from = "rdkit/SimDivFilters/SimilarityPickers.py"
-to = "python/rdkit/SimDivFilters/SimilarityPickers.py"
+to = "python/rdoxide/SimDivFilters/SimilarityPickers.py"
 
 [[copy]]
 from = "rdkit/ML/Cluster/__init__.py"
-to = "python/rdkit/ML/Cluster/__init__.py"
+to = "python/rdoxide/ML/Cluster/__init__.py"
 
 [[copy]]
 from = "rdkit/ML/Cluster/Murtagh.py"
-to = "python/rdkit/ML/Cluster/Murtagh.py"
+to = "python/rdoxide/ML/Cluster/Murtagh.py"
 
 [[copy]]
 from = "rdkit/ML/Cluster/Clusters.py"
-to = "python/rdkit/ML/Cluster/Clusters.py"
+to = "python/rdoxide/ML/Cluster/Clusters.py"
 
 [[copy]]
 from = "rdkit/ML/Cluster/ClusterUtils.py"
-to = "python/rdkit/ML/Cluster/ClusterUtils.py"
+to = "python/rdoxide/ML/Cluster/ClusterUtils.py"
 
 [[copy]]
 from = "rdkit/ML/Cluster/Butina.py"
-to = "python/rdkit/ML/Cluster/Butina.py"
+to = "python/rdoxide/ML/Cluster/Butina.py"
 
 [[copy]]
 from = "rdkit/TestRunner.py"
-to = "python/rdkit/TestRunner.py"
+to = "python/rdoxide/TestRunner.py"
 
 [[copy]]
 from = "rdkit/DataManip/__init__.py"
-to = "python/rdkit/DataManip/__init__.py"
+to = "python/rdoxide/DataManip/__init__.py"
 
 [[copy]]
 from = "rdkit/DataManip/Metric/__init__.py"
-to = "python/rdkit/DataManip/Metric/__init__.py"
+to = "python/rdoxide/DataManip/Metric/__init__.py"
 
 [[copy]]
 from = "rdkit/Chem/AtomPairs/__init__.py"
-to = "python/rdkit/Chem/AtomPairs/__init__.py"
+to = "python/rdoxide/Chem/AtomPairs/__init__.py"
 
 [[copy]]
 from = "rdkit/Chem/AtomPairs/Pairs.py"
-to = "python/rdkit/Chem/AtomPairs/Pairs.py"
+to = "python/rdoxide/Chem/AtomPairs/Pairs.py"
 
 [[copy]]
 from = "rdkit/Chem/AtomPairs/Torsions.py"
-to = "python/rdkit/Chem/AtomPairs/Torsions.py"
+to = "python/rdoxide/Chem/AtomPairs/Torsions.py"
 
 [[copy]]
 from = "rdkit/Chem/AtomPairs/Utils.py"
-to = "python/rdkit/Chem/AtomPairs/Utils.py"
+to = "python/rdoxide/Chem/AtomPairs/Utils.py"
 
 [[copy]]
 from = "rdkit/Chem/AtomPairs/Sheridan.py"
-to = "python/rdkit/Chem/AtomPairs/Sheridan.py"
+to = "python/rdoxide/Chem/AtomPairs/Sheridan.py"
 
 [[copy]]
 from = "rdkit/Chem/Scaffolds/__init__.py"
-to = "python/rdkit/Chem/Scaffolds/__init__.py"
+to = "python/rdoxide/Chem/Scaffolds/__init__.py"
 
 [[copy]]
 from = "rdkit/Chem/Scaffolds/MurckoScaffold.py"
-to = "python/rdkit/Chem/Scaffolds/MurckoScaffold.py"
+to = "python/rdoxide/Chem/Scaffolds/MurckoScaffold.py"
 
 [[copy]]
 from = "rdkit/Chem/Fingerprints/__init__.py"
-to = "python/rdkit/Chem/Fingerprints/__init__.py"
+to = "python/rdoxide/Chem/Fingerprints/__init__.py"
 
 [[copy]]
 from = "rdkit/Chem/Fingerprints/FingerprintMols.py"
-to = "python/rdkit/Chem/Fingerprints/FingerprintMols.py"
+to = "python/rdoxide/Chem/Fingerprints/FingerprintMols.py"
 
 [[copy]]
 from = "rdkit/Chem/Fingerprints/SimilarityScreener.py"
-to = "python/rdkit/Chem/Fingerprints/SimilarityScreener.py"
+to = "python/rdoxide/Chem/Fingerprints/SimilarityScreener.py"
 
 [[copy]]
 from = "Code/GraphMol/FileParsers/test_data/NCI_aids_few.sdf"
@@ -281,59 +281,59 @@ to = "tests/data/molfiles/sdErrors1.sdf"
 
 [[copy]]
 from = "rdkit/Chem/ReducedGraphs.py"
-to = "python/rdkit/Chem/ReducedGraphs.py"
+to = "python/rdoxide/Chem/ReducedGraphs.py"
 
 [[copy]]
 from = "rdkit/Chem/Randomize.py"
-to = "python/rdkit/Chem/Randomize.py"
+to = "python/rdoxide/Chem/Randomize.py"
 
 [[copy]]
 from = "rdkit/Chem/SaltRemover.py"
-to = "python/rdkit/Chem/SaltRemover.py"
+to = "python/rdoxide/Chem/SaltRemover.py"
 
 [[copy]]
 from = "rdkit/Chem/PropertyMol.py"
-to = "python/rdkit/Chem/PropertyMol.py"
+to = "python/rdoxide/Chem/PropertyMol.py"
 
 [[copy]]
 from = "rdkit/Chem/FragmentMatcher.py"
-to = "python/rdkit/Chem/FragmentMatcher.py"
+to = "python/rdoxide/Chem/FragmentMatcher.py"
 
 [[copy]]
 from = "rdkit/Chem/FunctionalGroups.py"
-to = "python/rdkit/Chem/FunctionalGroups.py"
+to = "python/rdoxide/Chem/FunctionalGroups.py"
 
 [[copy]]
 from = "rdkit/Chem/TorsionFingerprints.py"
-to = "python/rdkit/Chem/TorsionFingerprints.py"
+to = "python/rdoxide/Chem/TorsionFingerprints.py"
 
 [[copy]]
 from = "rdkit/Chem/SATIS.py"
-to = "python/rdkit/Chem/SATIS.py"
+to = "python/rdoxide/Chem/SATIS.py"
 
 [[copy]]
 from = "rdkit/Chem/RegistrationHash.py"
-to = "python/rdkit/Chem/RegistrationHash.py"
+to = "python/rdoxide/Chem/RegistrationHash.py"
 
 [[copy]]
 from = "rdkit/Chem/FastSDMolSupplier.py"
-to = "python/rdkit/Chem/FastSDMolSupplier.py"
+to = "python/rdoxide/Chem/FastSDMolSupplier.py"
 
 [[copy]]
 from = "rdkit/Chem/EnumerateStereoisomers.py"
-to = "python/rdkit/Chem/EnumerateStereoisomers.py"
+to = "python/rdoxide/Chem/EnumerateStereoisomers.py"
 
 [[copy]]
 from = "rdkit/Chem/MolStandardize/__init__.py"
-to = "python/rdkit/Chem/MolStandardize/__init__.py"
+to = "python/rdoxide/Chem/MolStandardize/__init__.py"
 
 [[copy]]
 from = "rdkit/Chem/ChemicalForceFields.py"
-to = "python/rdkit/Chem/ChemicalForceFields.py"
+to = "python/rdoxide/Chem/ChemicalForceFields.py"
 
 [[copy]]
 from = "rdkit/ForceField/__init__.py"
-to = "python/rdkit/ForceField/__init__.py"
+to = "python/rdoxide/ForceField/__init__.py"
 
 [[copy]]
 from = "Code/GraphMol/ForceFieldHelpers/MMFF/test_data/small1.mol"
@@ -361,12 +361,12 @@ to = "tests/data/molfiles/mmff_Issue239.mol"
 
 [[copy]]
 from = "rdkit/Chem/FilterCatalog.py"
-to = "python/rdkit/Chem/FilterCatalog.py"
+to = "python/rdoxide/Chem/FilterCatalog.py"
 
 [[copy]]
 from = "rdkit/Chem/MolCatalog.py"
-to = "python/rdkit/Chem/MolCatalog.py"
+to = "python/rdoxide/Chem/MolCatalog.py"
 
 [[copy]]
 from = "rdkit/Chem/FragmentCatalog.py"
-to = "python/rdkit/Chem/FragmentCatalog.py"
+to = "python/rdoxide/Chem/FragmentCatalog.py"

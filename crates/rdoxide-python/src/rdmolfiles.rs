@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdmolfiles` — port of upstream `Code/GraphMol/Wrap/rdmolfiles.cpp`
+//! `rdoxide.Chem.rdmolfiles` — port of upstream `Code/GraphMol/Wrap/rdmolfiles.cpp`
 //! (SMILES input so far).
 
 use std::collections::BTreeMap;
@@ -12,7 +12,7 @@ use crate::mol::PyMol;
 /// Parameters controlling SMILES Parsing
 #[pyclass(
     name = "SmilesParserParams",
-    module = "rdkit.Chem.rdmolfiles",
+    module = "rdoxide.Chem.rdmolfiles",
     skip_from_py_object
 )]
 #[derive(Debug, Clone)]

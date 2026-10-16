@@ -5,7 +5,7 @@ Code/GraphMol/Wrap/rough_test.py and Substruct/catch_tests.cpp (BSD-3-Clause).""
 
 import pytest
 
-from rdkit import Chem
+from rdoxide import Chem
 
 
 def test_basic_matching():

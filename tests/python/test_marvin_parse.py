@@ -2,7 +2,7 @@
 import os
 
 import pytest
-from rdkit import Chem
+from rdoxide import Chem
 
 DATA = os.path.join(
     os.path.dirname(__file__), "..", "..", "upstream", "rdkit", "Code", "GraphMol",
@@ -82,7 +82,7 @@ def test_unlabelled_query_atoms_become_stars():
 
 @needs_data
 def test_reactions():
-    from rdkit.Chem import rdChemReactions
+    from rdoxide.Chem import rdChemReactions
     path = os.path.join(DATA, "AlexRxn.mrv")
     assert rdChemReactions.MrvFileIsReaction(path)
     assert not rdChemReactions.MrvFileIsReaction(os.path.join(DATA, "aspirin.mrv"))

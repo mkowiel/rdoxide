@@ -1,4 +1,4 @@
-//! The pipeline part of `rdkit.Chem.MolStandardize.rdMolStandardize`
+//! The pipeline part of `rdoxide.Chem.MolStandardize.rdMolStandardize`
 //! (upstream `GraphMol/MolStandardize/nbWrap/Pipeline.cpp`).
 
 use pyo3::prelude::*;
@@ -89,7 +89,7 @@ const STAGE: [(&str, i64); 7] = [
 
 #[pyclass(
     name = "PipelineOptions",
-    module = "rdkit.Chem.MolStandardize.rdMolStandardize",
+    module = "rdoxide.Chem.MolStandardize.rdMolStandardize",
     skip_from_py_object
 )]
 #[derive(Debug, Clone, Default)]
@@ -142,7 +142,7 @@ options! {
 
 #[pyclass(
     name = "PipelineLogEntry",
-    module = "rdkit.Chem.MolStandardize.rdMolStandardize",
+    module = "rdoxide.Chem.MolStandardize.rdMolStandardize",
     skip_from_py_object
 )]
 #[derive(Debug, Clone)]
@@ -172,7 +172,7 @@ impl PyPipelineLogEntry {
 /// The log entries of a pipeline run (upstream's `vector_indexing_suite`).
 #[pyclass(
     name = "PipelineLog",
-    module = "rdkit.Chem.MolStandardize.rdMolStandardize",
+    module = "rdoxide.Chem.MolStandardize.rdMolStandardize",
     sequence,
     skip_from_py_object
 )]
@@ -222,7 +222,7 @@ no_python_init!(PyPipelineLogEntry, PyPipelineLog, PyPipelineResult);
 
 #[pyclass(
     name = "PipelineResult",
-    module = "rdkit.Chem.MolStandardize.rdMolStandardize"
+    module = "rdoxide.Chem.MolStandardize.rdMolStandardize"
 )]
 #[derive(Debug)]
 pub struct PyPipelineResult {
@@ -266,7 +266,7 @@ impl PyPipelineResult {
 
 #[pyclass(
     name = "Pipeline",
-    module = "rdkit.Chem.MolStandardize.rdMolStandardize"
+    module = "rdoxide.Chem.MolStandardize.rdMolStandardize"
 )]
 #[derive(Debug)]
 pub struct PyPipeline {

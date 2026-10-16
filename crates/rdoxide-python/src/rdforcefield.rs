@@ -1,5 +1,5 @@
-//! `rdkit.ForceField.rdForceField` (upstream `ForceField/Wrap/ForceField.cpp`)
-//! and `rdkit.Chem.rdForceFieldHelpers` (upstream
+//! `rdoxide.ForceField.rdForceField` (upstream `ForceField/Wrap/ForceField.cpp`)
+//! and `rdoxide.Chem.rdForceFieldHelpers` (upstream
 //! `ForceFieldHelpers/Wrap/rdForceFields.cpp`), UFF part.
 //!
 //! A force field made from a molecule stays linked to it: upstream's points
@@ -27,7 +27,7 @@ use crate::errors::IntoPyResult;
 use crate::mol::PyMol;
 
 /// A force field
-#[pyclass(name = "ForceField", module = "rdkit.ForceField.rdForceField")]
+#[pyclass(name = "ForceField", module = "rdoxide.ForceField.rdForceField")]
 pub struct PyForceField {
     field: ForceField,
     /// the molecule and conformer the points come from
@@ -702,7 +702,7 @@ fn py_uff_vdw_params(py: Python<'_>, mol: &PyMol, idx1: u32, idx2: u32) -> PyRes
 // ------------------------------------------------------------------ MMFF
 
 /// MMFF molecular properties
-#[pyclass(name = "MMFFMolProperties", module = "rdkit.ForceField.rdForceField")]
+#[pyclass(name = "MMFFMolProperties", module = "rdoxide.ForceField.rdForceField")]
 pub struct PyMmffMolProperties {
     props: MmffMolProperties,
 }
@@ -1285,7 +1285,7 @@ fn py_optimize_molecule_confs(
         .py()
 }
 
-/// `rdkit.ForceField.rdForceField`
+/// `rdoxide.ForceField.rdForceField`
 pub fn init_force_field(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("__doc__", "Exposes the ForceField class")?;
     m.add_class::<PyForceField>()?;
@@ -1293,7 +1293,7 @@ pub fn init_force_field(m: &Bound<'_, PyModule>) -> PyResult<()> {
     Ok(())
 }
 
-/// `rdkit.Chem.rdForceFieldHelpers`
+/// `rdoxide.Chem.rdForceFieldHelpers`
 pub fn init_helpers(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add(
         "__doc__",

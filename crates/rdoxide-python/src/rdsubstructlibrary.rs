@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdSubstructLibrary` (upstream
+//! `rdoxide.Chem.rdSubstructLibrary` (upstream
 //! `GraphMol/SubstructLibrary/Wrap/SubstructLibraryWrap.cpp`).
 //!
 //! Libraries pickle to this port's own (text) format.
@@ -40,7 +40,7 @@ fn write<T>(holder: &Shared<T>) -> std::sync::RwLockWriteGuard<'_, T> {
 ///   GetMol(idx) -> return the molecule at index idx
 #[pyclass(
     name = "MolHolderBase",
-    module = "rdkit.Chem.rdSubstructLibrary",
+    module = "rdoxide.Chem.rdSubstructLibrary",
     subclass
 )]
 pub struct PyMolHolderBase {
@@ -81,7 +81,7 @@ fn molecule(holder: &Shared<MolHolder>, idx: u32) -> PyResult<Option<PyMol>> {
 macro_rules! mol_holder_class {
     ($py:ident, $name:literal, $variant:ident, $doc:literal) => {
         #[doc = $doc]
-        #[pyclass(name = $name, module = "rdkit.Chem.rdSubstructLibrary", extends = PyMolHolderBase)]
+        #[pyclass(name = $name, module = "rdoxide.Chem.rdSubstructLibrary", extends = PyMolHolderBase)]
         pub struct $py;
 
         #[pymethods]
@@ -173,7 +173,7 @@ fn wrap_mol_holder(py: Python<'_>, inner: Shared<MolHolder>) -> PyResult<Py<PyAn
 /// Base class for the fingerprints used to rule out impossible matches
 #[pyclass(
     name = "FPHolderBase",
-    module = "rdkit.Chem.rdSubstructLibrary",
+    module = "rdoxide.Chem.rdSubstructLibrary",
     subclass
 )]
 pub struct PyFPHolderBase {
@@ -222,7 +222,7 @@ impl PyFPHolderBase {
 }
 
 /// Holds fingerprints with optional, user-defined number of bits (default: 2048) used for filtering of molecules.
-#[pyclass(name = "PatternHolder", module = "rdkit.Chem.rdSubstructLibrary", extends = PyFPHolderBase, subclass)]
+#[pyclass(name = "PatternHolder", module = "rdoxide.Chem.rdSubstructLibrary", extends = PyFPHolderBase, subclass)]
 pub struct PyPatternHolder;
 
 #[pymethods]
@@ -240,7 +240,7 @@ impl PyPatternHolder {
 
 /// Holds tautomeric fingerprints with optional, user-defined number of bits (default: 2048) used for filtering of molecules.
 /// These fingerprints are designed to be used with TautomerQueries.
-#[pyclass(name = "TautomerPatternHolder", module = "rdkit.Chem.rdSubstructLibrary", extends = PyPatternHolder)]
+#[pyclass(name = "TautomerPatternHolder", module = "rdoxide.Chem.rdSubstructLibrary", extends = PyPatternHolder)]
 pub struct PyTautomerPatternHolder;
 
 #[pymethods]
@@ -273,7 +273,7 @@ fn wrap_fp_holder(py: Python<'_>, inner: Shared<PatternHolder>) -> PyResult<Py<P
 /// By default use the _Name property but can be overridden to be any property
 #[pyclass(
     name = "KeyHolderBase",
-    module = "rdkit.Chem.rdSubstructLibrary",
+    module = "rdoxide.Chem.rdSubstructLibrary",
     subclass
 )]
 pub struct PyKeyHolderBase {
@@ -313,7 +313,7 @@ impl PyKeyHolderBase {
 
 /// Holds keys to return external references to the molecules in the molholder.
 /// By default use the _Name property but can be overridden to be any property
-#[pyclass(name = "KeyFromPropHolder", module = "rdkit.Chem.rdSubstructLibrary", extends = PyKeyHolderBase)]
+#[pyclass(name = "KeyFromPropHolder", module = "rdoxide.Chem.rdSubstructLibrary", extends = PyKeyHolderBase)]
 pub struct PyKeyFromPropHolder;
 
 #[pymethods]
@@ -483,7 +483,7 @@ fn query_of(query: &Bound<'_, PyAny>) -> PyResult<Query> {
 
 /// SubstructLibrary: This provides a simple API for substructure searching large datasets
 /// The SubstructLibrary takes full advantage of available threads during the search operation.
-#[pyclass(name = "SubstructLibrary", module = "rdkit.Chem.rdSubstructLibrary")]
+#[pyclass(name = "SubstructLibrary", module = "rdoxide.Chem.rdSubstructLibrary")]
 pub struct PySubstructLibrary {
     lib: SubstructLibrary,
 }

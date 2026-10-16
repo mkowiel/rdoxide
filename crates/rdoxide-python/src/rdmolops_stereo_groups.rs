@@ -1,4 +1,4 @@
-//! Enhanced-stereo helpers of `rdkit.Chem.rdmolops` (upstream
+//! Enhanced-stereo helpers of `rdoxide.Chem.rdmolops` (upstream
 //! `GraphMol/Wrap/MolOps.cpp` and `ChiralityOps.cpp`): `AddStereoAnnotations`,
 //! `SimplifyEnhancedStereo`, `FindMesoCenters`, `CleanupStereoGroups` and
 //! `TranslateChiralFlagToStereoGroups`.
@@ -145,7 +145,7 @@ fn py_translate_chiral_flag_to_stereo_groups(
                     py,
                     "TranslateChiralFlagToStereoGroups",
                     &["Mol".to_string(), boost_type_name(t)],
-                    "TranslateChiralFlagToStereoGroups(RDKit::ROMol {lvalue} mol, RDKit::StereoGroupType zeroFlagGroupType=rdkit.Chem.rdchem.StereoGroupType.STEREO_AND)",
+                    "TranslateChiralFlagToStereoGroups(RDKit::ROMol {lvalue} mol, RDKit::StereoGroupType zeroFlagGroupType=rdoxide.Chem.rdchem.StereoGroupType.STEREO_AND)",
                 ));
             }
             PyStereoGroupType::extract(t)?

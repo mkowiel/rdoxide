@@ -1,4 +1,4 @@
-//! `molzip` of `rdkit.Chem.rdmolops` (upstream `GraphMol/Wrap/MolOps.cpp`):
+//! `molzip` of `rdoxide.Chem.rdmolops` (upstream `GraphMol/Wrap/MolOps.cpp`):
 //! `MolzipLabel`, `MolzipParams`, `molzip` and `molzipFragments`.
 
 use std::collections::BTreeMap;
@@ -40,7 +40,7 @@ const LABELS: [(&str, i64); 4] = [
 ///     i.e.  'C[V]' and 'N[Xe]' with atoms pairs [('V', 'Xe')] results in 'CN'
 #[pyclass(
     name = "MolzipParams",
-    module = "rdkit.Chem.rdmolops",
+    module = "rdoxide.Chem.rdmolops",
     dict,
     skip_from_py_object
 )]
@@ -130,9 +130,9 @@ impl PyMolzipParams {
     }
 }
 
-const ROW_SIGNATURE: &str = "molzip(boost::python::dict row, RDKit::MolzipParams params=<rdkit.Chem.rdmolops.MolzipParams object at 0x0>)";
-const SINGLE_SIGNATURE: &str = "molzip(RDKit::ROMol a, RDKit::MolzipParams params=<rdkit.Chem.rdmolops.MolzipParams object at 0x0>)";
-const PAIR_SIGNATURE: &str = "molzip(RDKit::ROMol a, RDKit::ROMol b, RDKit::MolzipParams params=<rdkit.Chem.rdmolops.MolzipParams object at 0x0>)";
+const ROW_SIGNATURE: &str = "molzip(boost::python::dict row, RDKit::MolzipParams params=<rdoxide.Chem.rdmolops.MolzipParams object at 0x0>)";
+const SINGLE_SIGNATURE: &str = "molzip(RDKit::ROMol a, RDKit::MolzipParams params=<rdoxide.Chem.rdmolops.MolzipParams object at 0x0>)";
+const PAIR_SIGNATURE: &str = "molzip(RDKit::ROMol a, RDKit::ROMol b, RDKit::MolzipParams params=<rdoxide.Chem.rdmolops.MolzipParams object at 0x0>)";
 
 fn params_arg(arg: Option<Bound<'_, PyAny>>) -> Option<PyResult<MolzipParams>> {
     match arg {

@@ -1,8 +1,8 @@
-"""rdkit.Chem.rdAbbreviations; expected values come from reference RDKit."""
+"""rdoxide.Chem.rdAbbreviations; expected values come from reference RDKit."""
 
 import pytest
-from rdkit import Chem
-from rdkit.Chem import rdAbbreviations as A
+from rdoxide import Chem
+from rdoxide.Chem import rdAbbreviations as A
 
 
 def test_default_tables():

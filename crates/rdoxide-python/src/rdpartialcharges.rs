@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdPartialCharges` (upstream `PartialCharges/Wrap/rdPartialCharges.cpp`).
+//! `rdoxide.Chem.rdPartialCharges` (upstream `PartialCharges/Wrap/rdPartialCharges.cpp`).
 
 use pyo3::prelude::*;
 use rdoxide::graphmol::partial_charges::gasteiger::{self, DEFAULT_ITERATIONS};

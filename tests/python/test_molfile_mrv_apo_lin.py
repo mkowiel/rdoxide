@@ -2,7 +2,7 @@
 
 import pytest
 
-from rdkit import Chem
+from rdoxide import Chem
 
 
 def block(extra, n=5):

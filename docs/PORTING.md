@@ -10,7 +10,7 @@ Conventions for translating RDKit C++ into rdoxide.
 | `Code/GraphMol/X.{h,cpp}` | `crates/rdoxide/src/graphmol/x.rs` |
 | `Code/GraphMol/Sub/X.cpp` | `crates/rdoxide/src/graphmol/sub/x.rs` |
 | `Code/**/Wrap/rdFoo.cpp` | `crates/rdoxide-python/src/<module>.rs` |
-| `rdkit/**/*.py` | `python/rdkit/**` (verbatim via `porting/copies.toml` when possible) |
+| `rdkit/**/*.py` | `python/rdoxide/**` (verbatim via `porting/copies.toml` when possible) |
 | data embedded in C++ | `crates/rdoxide/data/` extracted by `tools/sync_upstream.py regen` |
 
 Every new Rust module gets an entry in `porting/manifest.toml` listing its

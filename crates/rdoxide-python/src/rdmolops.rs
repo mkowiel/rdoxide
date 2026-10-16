@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdmolops` — port of upstream `Code/GraphMol/Wrap/MolOps.cpp`
+//! `rdoxide.Chem.rdmolops` — port of upstream `Code/GraphMol/Wrap/MolOps.cpp`
 //! (ring finding so far).
 
 use pyo3::prelude::*;
@@ -169,10 +169,10 @@ fn py_kekulize_if_possible(
 ///     - mol: the molecule to be modified
 ///     - sanitizeOps: (optional) sanitization operations to be carried out
 ///       these should be constructed by or'ing together the
-///       operations in rdkit.Chem.SanitizeFlags
+///       operations in rdoxide.Chem.SanitizeFlags
 ///     - catchErrors: (optional) if provided, instead of raising an exception
 ///       when sanitization fails (the default behavior), the
-///       operations that failed (as defined in rdkit.Chem.SanitizeFlags)
+///       operations that failed (as defined in rdoxide.Chem.SanitizeFlags)
 ///       is returned. Zero is returned on success.
 #[pyfunction]
 #[pyo3(name = "SanitizeMol", signature = (mol, sanitizeOps = None, catchErrors = false))]

@@ -1,8 +1,8 @@
-"""rdkit.Chem.rdMolInterchange; expected values come from reference RDKit."""
+"""rdoxide.Chem.rdMolInterchange; expected values come from reference RDKit."""
 
 import pytest
-from rdkit import Chem, rdBase
-from rdkit.Chem import rdMolInterchange as R
+from rdoxide import Chem, rdBase
+from rdoxide.Chem import rdMolInterchange as R
 
 HEADER = (
     '{"rdkitjson":{"version":12},"defaults":{"atom":{"z":6,"impHs":0,"chg":0,"nRad":0,'
@@ -91,7 +91,7 @@ def test_round_trip_stereo_groups_and_atropisomers():
 
 
 def test_conformers_properties_and_charges():
-    from rdkit.Chem import rdPartialCharges
+    from rdoxide.Chem import rdPartialCharges
 
     m = Chem.MolFromSmiles("CCO")
     c = Chem.Conformer(3)

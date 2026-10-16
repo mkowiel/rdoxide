@@ -5,7 +5,7 @@ Code/GraphMol/Wrap/rough_test.py (BSD-3-Clause)."""
 
 import pytest
 
-from rdkit import Chem
+from rdoxide import Chem
 
 
 def test_basic_smarts():

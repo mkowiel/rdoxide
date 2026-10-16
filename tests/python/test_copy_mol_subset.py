@@ -2,9 +2,9 @@
 
 import pytest
 
-from rdkit import Chem
-from rdkit.Chem import rdDepictor, rdmolops
-from rdkit.Chem.rdmolops import SubsetInfo, SubsetMethod, SubsetOptions
+from rdoxide import Chem
+from rdoxide.Chem import rdDepictor, rdmolops
+from rdoxide.Chem.rdmolops import SubsetInfo, SubsetMethod, SubsetOptions
 
 S = Chem.MolToSmiles
 

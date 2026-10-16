@@ -1,4 +1,4 @@
-//! Module-level atom helpers of `rdkit.Chem.rdchem` (upstream
+//! Module-level atom helpers of `rdoxide.Chem.rdchem` (upstream
 //! `GraphMol/Wrap/Atom.cpp`): MDL R labels, aliases and values, the
 //! supplemental SMILES label and `GetNumPiElectrons`.
 

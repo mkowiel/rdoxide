@@ -1,4 +1,4 @@
-//! `rdkit.SimDivFilters.rdSimDivPickers` (upstream `SimDivPickers/Wrap`):
+//! `rdoxide.SimDivFilters.rdSimDivPickers` (upstream `SimDivPickers/Wrap`):
 //! `MaxMinPicker` and `LeaderPicker`.
 
 use std::sync::Mutex;
@@ -98,7 +98,7 @@ fn picks_with_threshold(py: Python<'_>, res: max_min::MaxMinPicks) -> PyResult<B
 /// A class for diversity picking of items using the MaxMin Algorithm
 #[pyclass(
     name = "MaxMinPicker",
-    module = "rdkit.SimDivFilters.rdSimDivPickers",
+    module = "rdoxide.SimDivFilters.rdSimDivPickers",
     dict
 )]
 #[derive(Debug, Default)]
@@ -321,7 +321,7 @@ impl PyMaxMinPicker {
 /// https://github.com/rdkit/UGM_2019/raw/master/Presentations/Sayle_Clustering.pdf
 #[pyclass(
     name = "LeaderPicker",
-    module = "rdkit.SimDivFilters.rdSimDivPickers",
+    module = "rdoxide.SimDivFilters.rdSimDivPickers",
     dict
 )]
 #[derive(Debug, Default)]
@@ -418,7 +418,7 @@ fn copied_distance_matrix(py: Python<'_>, dist_mat: &Bound<'_, PyAny>) -> PyResu
 /// A class for diversity picking of items using Hierarchical Clustering
 #[pyclass(
     name = "HierarchicalClusterPicker",
-    module = "rdkit.SimDivFilters.rdSimDivPickers",
+    module = "rdoxide.SimDivFilters.rdSimDivPickers",
     dict
 )]
 #[derive(Debug)]

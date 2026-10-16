@@ -4,7 +4,7 @@ import os
 
 import pytest
 
-from rdkit import Chem
+from rdoxide import Chem
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 UPSTREAM_DATA = os.path.join(HERE, "..", "data", "molfiles")

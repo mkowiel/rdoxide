@@ -3,7 +3,7 @@
 import pickle
 
 import pytest
-from rdkit import Chem
+from rdoxide import Chem
 
 
 def test_defaults():

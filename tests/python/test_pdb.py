@@ -4,7 +4,7 @@ import io
 import os
 
 import pytest
-from rdkit import Chem
+from rdoxide import Chem
 
 GLY = """\
 HEADER    TEST PROTEIN                            01-JAN-00   1ABC

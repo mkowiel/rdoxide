@@ -1,7 +1,7 @@
 """MACCS keys (expectations from RDKit 2026.09.1)."""
 
-from rdkit import Chem
-from rdkit.Chem import MACCSkeys, rdMolDescriptors
+from rdoxide import Chem
+from rdoxide.Chem import MACCSkeys, rdMolDescriptors
 
 
 def test_maccs():

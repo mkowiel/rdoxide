@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdCIPLabeler` (upstream `GraphMol/CIPLabeler/Wrap/rdCIPLabeler.cpp`).
+//! `rdoxide.Chem.rdCIPLabeler` (upstream `GraphMol/CIPLabeler/Wrap/rdCIPLabeler.cpp`).
 
 use pyo3::prelude::*;
 use rdoxide::graphmol::cip_labeler::assign_cip_labels_selected;

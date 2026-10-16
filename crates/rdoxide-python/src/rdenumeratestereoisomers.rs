@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdEnumerateStereoisomers` (upstream
+//! `rdoxide.Chem.rdEnumerateStereoisomers` (upstream
 //! `GraphMol/EnumerateStereoisomers/Wrap/rdEnumerateStereoisomers.cpp`).
 
 use pyo3::prelude::*;
@@ -12,7 +12,7 @@ use crate::mol::PyMol;
 /// EnumerateSteroisomers options.
 #[pyclass(
     name = "StereoEnumerationOptions",
-    module = "rdkit.Chem.rdEnumerateStereoisomers",
+    module = "rdoxide.Chem.rdEnumerateStereoisomers",
     skip_from_py_object
 )]
 #[derive(Clone, Default)]
@@ -91,7 +91,7 @@ impl PyStereoEnumerationOptions {
 /// Stereoisomer enumerator.
 #[pyclass(
     name = "StereoisomerEnumerator",
-    module = "rdkit.Chem.rdEnumerateStereoisomers"
+    module = "rdoxide.Chem.rdEnumerateStereoisomers"
 )]
 pub struct PyStereoisomerEnumerator {
     enumerator: StereoisomerEnumerator,

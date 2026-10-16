@@ -7,9 +7,9 @@ import os
 
 import pytest
 
-from rdkit import Chem
-from rdkit.Chem import rdDepictor
-from rdkit.Geometry import Point2D
+from rdoxide import Chem
+from rdoxide.Chem import rdDepictor
+from rdoxide.Geometry import Point2D
 
 DATA = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "depict_expected.json")
 CASES = json.load(open(DATA))

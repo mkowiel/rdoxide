@@ -1,6 +1,6 @@
 import pytest
-from rdkit import DataStructs
-from rdkit.Chem import rdFingerprintGenerator, rdMolProcessing
+from rdoxide import DataStructs
+from rdoxide.Chem import rdFingerprintGenerator, rdMolProcessing
 
 
 def _write(tmp_path, name, text):

@@ -5,7 +5,7 @@ import os
 
 import pytest
 
-from rdkit import Chem
+from rdoxide import Chem
 
 DATA = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "molfiles")
 CASES = json.load(open(os.path.join(DATA, "writer_expected.json")))

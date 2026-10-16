@@ -26,7 +26,7 @@ pub enum BondHandle {
 /// The class to store Bonds.
 /// Note: unlike Atoms, is it currently impossible to construct Bonds from
 /// Python.
-#[pyclass(name = "Bond", module = "rdkit.Chem.rdchem", subclass)]
+#[pyclass(name = "Bond", module = "rdoxide.Chem.rdchem", subclass)]
 #[derive(Debug)]
 pub struct PyBond {
     pub handle: BondHandle,
@@ -44,7 +44,7 @@ fn no_owner() -> PyErr {
 
 /// The class to store QueryBonds.
 /// These cannot currently be constructed directly from Python
-#[pyclass(name = "QueryBond", module = "rdkit.Chem.rdchem", extends = PyBond)]
+#[pyclass(name = "QueryBond", module = "rdoxide.Chem.rdchem", extends = PyBond)]
 pub struct PyQueryBond;
 
 impl PyBond {
@@ -462,7 +462,7 @@ fn other_query(
         ];
         got.extend(extra.iter().map(crate::errors::boost_type_name));
         let expected = if method == "ExpandQuery" {
-            "ExpandQuery(RDKit::QueryBond* self, RDKit::QueryBond const* other, Queries::CompositeQueryType how=rdkit.Chem.rdchem.CompositeQueryType.COMPOSITE_AND, bool maintainOrder=True)"
+            "ExpandQuery(RDKit::QueryBond* self, RDKit::QueryBond const* other, Queries::CompositeQueryType how=rdoxide.Chem.rdchem.CompositeQueryType.COMPOSITE_AND, bool maintainOrder=True)"
         } else {
             "SetQuery(RDKit::QueryBond* self, RDKit::QueryBond const* other)"
         };

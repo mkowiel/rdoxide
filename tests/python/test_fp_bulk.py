@@ -1,8 +1,8 @@
 """Bulk fingerprint functions of rdFingerprintGenerator."""
 
 import pytest
-from rdkit import Chem
-from rdkit.Chem import rdFingerprintGenerator as rfg
+from rdoxide import Chem
+from rdoxide.Chem import rdFingerprintGenerator as rfg
 
 SMILES = ["CCC", "OCCCCC", "c1ccccc1O", "CC(=O)Nc1ccc(O)cc1", "C1CCC1C(=O)O"] * 8
 GENERATORS = {

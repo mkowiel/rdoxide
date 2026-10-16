@@ -1,5 +1,5 @@
-//! `rdkit.Chem.rdchem.StereoInfo` with its enums and
-//! `rdkit.Chem.rdmolops.FindPotentialStereo` (upstream
+//! `rdoxide.Chem.rdchem.StereoInfo` with its enums and
+//! `rdoxide.Chem.rdmolops.FindPotentialStereo` (upstream
 //! `GraphMol/Wrap/Chirality.cpp` and `ChiralityOps.cpp`).
 
 use pyo3::exceptions::PyValueError;
@@ -75,7 +75,11 @@ fn descriptor_code(v: StereoDescriptor) -> i64 {
 }
 
 /// Class describing stereochemistry
-#[pyclass(name = "StereoInfo", module = "rdkit.Chem.rdchem", skip_from_py_object)]
+#[pyclass(
+    name = "StereoInfo",
+    module = "rdoxide.Chem.rdchem",
+    skip_from_py_object
+)]
 #[derive(Clone, Default)]
 pub struct PyStereoInfo {
     info: StereoInfo,
@@ -167,7 +171,7 @@ fn py_find_potential_stereo(
         .collect())
 }
 
-/// Registers the enums and `StereoInfo` in `rdkit.Chem.rdchem`.
+/// Registers the enums and `StereoInfo` in `rdoxide.Chem.rdchem`.
 pub fn add_chem(m: &Bound<'_, PyModule>) -> PyResult<()> {
     add_enum(m, TYPE_ENUM, &members(&TYPES, type_code), None)?;
     add_enum(
@@ -185,7 +189,7 @@ pub fn add_chem(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyStereoInfo>()
 }
 
-/// Registers `FindPotentialStereo` in `rdkit.Chem.rdmolops`.
+/// Registers `FindPotentialStereo` in `rdoxide.Chem.rdmolops`.
 pub fn add_ops(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_find_potential_stereo, m)?)
 }

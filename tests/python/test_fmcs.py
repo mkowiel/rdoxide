@@ -1,5 +1,5 @@
-from rdkit import Chem
-from rdkit.Chem import rdFMCS
+from rdoxide import Chem
+from rdoxide.Chem import rdFMCS
 
 
 def _mols(*smiles):

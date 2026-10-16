@@ -28,7 +28,7 @@ pub enum AtomHandle {
 /// The class to store Atoms.
 /// Note that, though it is possible to create one, having an Atom on its own
 /// (i.e not associated with a molecule) is not particularly useful.
-#[pyclass(name = "Atom", module = "rdkit.Chem.rdchem", subclass)]
+#[pyclass(name = "Atom", module = "rdoxide.Chem.rdchem", subclass)]
 #[derive(Debug)]
 pub struct PyAtom {
     pub handle: AtomHandle,
@@ -49,7 +49,7 @@ fn no_owner() -> PyErr {
 
 /// The class to store QueryAtoms.
 /// These cannot currently be constructed directly from Python
-#[pyclass(name = "QueryAtom", module = "rdkit.Chem.rdchem", extends = PyAtom)]
+#[pyclass(name = "QueryAtom", module = "rdoxide.Chem.rdchem", extends = PyAtom)]
 pub struct PyQueryAtom;
 
 impl PyAtom {
@@ -684,7 +684,7 @@ fn other_query(
         ];
         got.extend(extra.iter().map(crate::errors::boost_type_name));
         let expected = if method == "ExpandQuery" {
-            "ExpandQuery(RDKit::QueryAtom* self, RDKit::QueryAtom const* other, Queries::CompositeQueryType how=rdkit.Chem.rdchem.CompositeQueryType.COMPOSITE_AND, bool maintainOrder=True)"
+            "ExpandQuery(RDKit::QueryAtom* self, RDKit::QueryAtom const* other, Queries::CompositeQueryType how=rdoxide.Chem.rdchem.CompositeQueryType.COMPOSITE_AND, bool maintainOrder=True)"
         } else {
             "SetQuery(RDKit::QueryAtom* self, RDKit::QueryAtom const* other)"
         };

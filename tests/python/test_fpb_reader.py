@@ -3,7 +3,7 @@
 from pathlib import Path
 
 import pytest
-from rdkit import DataStructs
+from rdoxide import DataStructs
 
 DATA = Path(__file__).parent.parent / "data" / "fpb"
 

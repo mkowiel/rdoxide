@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdMolTransforms` (upstream
+//! `rdoxide.Chem.rdMolTransforms` (upstream
 //! `MolTransforms/Wrap/rdMolTransforms.cpp`): 3D operations on conformers.
 
 use pyo3::exceptions::{PyTypeError, PyValueError};

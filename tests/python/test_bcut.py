@@ -2,8 +2,8 @@
 
 import pytest
 
-from rdkit import Chem
-from rdkit.Chem import Descriptors, rdMolDescriptors as D
+from rdoxide import Chem
+from rdoxide.Chem import Descriptors, rdMolDescriptors as D
 
 EXPECTED = {
   "CC(=O)Nc1ccc(O)cc1": [

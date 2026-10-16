@@ -6,9 +6,9 @@ import platform
 
 import pytest
 
-from rdkit import Chem
-from rdkit.Chem import rdmolops
-from rdkit.Chem.rdmolops import MolzipLabel, MolzipParams
+from rdoxide import Chem
+from rdoxide.Chem import rdmolops
+from rdoxide.Chem.rdmolops import MolzipLabel, MolzipParams
 
 with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "mols3d.json")) as f:
     BLOCKS = json.load(f)

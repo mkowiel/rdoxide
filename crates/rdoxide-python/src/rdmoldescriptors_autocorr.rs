@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdMolDescriptors.MQNs_` and `CalcAUTOCORR2D` (upstream
+//! `rdoxide.Chem.rdMolDescriptors.MQNs_` and `CalcAUTOCORR2D` (upstream
 //! `Descriptors/MQN.cpp`, `AUTOCORR2D.cpp` and their wrappers in
 //! `Wrap/rdMolDescriptors.cpp`).
 

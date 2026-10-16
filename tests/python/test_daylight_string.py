@@ -1,7 +1,7 @@
 """DataStructs.InitFromDaylightString (expectations from the reference RDKit)."""
 
 import pytest
-from rdkit import DataStructs
+from rdoxide import DataStructs
 
 
 @pytest.mark.parametrize("cls", [DataStructs.ExplicitBitVect, DataStructs.SparseBitVect])

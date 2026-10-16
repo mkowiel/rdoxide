@@ -9,8 +9,8 @@ import pickle
 
 import pytest
 
-from rdkit import Chem, rdBase
-from rdkit.Geometry import Point3D
+from rdoxide import Chem, rdBase
+from rdoxide.Geometry import Point3D
 
 
 def make_mol(nums, bonds):
@@ -38,7 +38,7 @@ def test_enums():
     bt = Chem.BondType
     assert bt.SINGLE == 1 and isinstance(bt.SINGLE, int)
     assert str(bt.AROMATIC) == "AROMATIC"
-    assert repr(bt.DOUBLE) == "rdkit.Chem.rdchem.BondType.DOUBLE"
+    assert repr(bt.DOUBLE) == "rdoxide.Chem.rdchem.BondType.DOUBLE"
     assert bt.values[12] is bt.AROMATIC
     assert bt.names["ZERO"] == 21
     assert bt(2) is bt.DOUBLE

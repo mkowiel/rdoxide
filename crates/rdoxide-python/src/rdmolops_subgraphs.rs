@@ -1,4 +1,4 @@
-//! Subgraph / path enumeration functions of `rdkit.Chem.rdmolops`
+//! Subgraph / path enumeration functions of `rdoxide.Chem.rdmolops`
 //! (upstream `GraphMol/Wrap/MolOps.cpp`).
 
 use pyo3::exceptions::PyValueError;

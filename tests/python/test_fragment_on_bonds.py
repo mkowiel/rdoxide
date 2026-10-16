@@ -2,8 +2,8 @@
 
 import pytest
 
-from rdkit import Chem
-from rdkit.Chem import rdmolops
+from rdoxide import Chem
+from rdoxide.Chem import rdmolops
 
 M = Chem.MolFromSmiles
 S = Chem.MolToSmiles

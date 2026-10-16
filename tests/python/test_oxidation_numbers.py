@@ -1,8 +1,8 @@
 """rdMolDescriptors.CalcOxidationNumbers (values taken from RDKit 2026.03.6)."""
 
 import pytest
-from rdkit import Chem
-from rdkit.Chem import rdMolDescriptors as md
+from rdoxide import Chem
+from rdoxide.Chem import rdMolDescriptors as md
 
 CASES = [
     ("CO", [-2, -2]),

@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdFMCS` (upstream `FMCS/Wrap/rdFMCS.cpp`): the maximum common
+//! `rdoxide.Chem.rdFMCS` (upstream `FMCS/Wrap/rdFMCS.cpp`): the maximum common
 //! substructure of a set of molecules.
 
 use std::sync::{Arc, Mutex};
@@ -79,7 +79,7 @@ macro_rules! bool_props {
 /// Parameters controlling how atom-atom matching is done
 #[pyclass(
     name = "MCSAtomCompareParameters",
-    module = "rdkit.Chem.rdFMCS",
+    module = "rdoxide.Chem.rdFMCS",
     skip_from_py_object
 )]
 #[derive(Debug, Clone, Default)]
@@ -160,7 +160,7 @@ impl PyAtomCompareParameters {
 /// Parameters controlling how bond-bond matching is done
 #[pyclass(
     name = "MCSBondCompareParameters",
-    module = "rdkit.Chem.rdFMCS",
+    module = "rdoxide.Chem.rdFMCS",
     skip_from_py_object
 )]
 #[derive(Debug, Clone, Default)]
@@ -223,7 +223,7 @@ impl PyBondCompareParameters {
 /// Information about the MCS progress
 #[pyclass(
     name = "MCSProgressData",
-    module = "rdkit.Chem.rdFMCS",
+    module = "rdoxide.Chem.rdFMCS",
     skip_from_py_object
 )]
 #[derive(Debug, Clone, Default)]
@@ -264,7 +264,7 @@ impl PyProgressData {
 /// MCSAtomCompare.__call__() to define custom
 /// atom compare functions, then set MCSParameters.AtomTyper
 /// to an instance of the subclass
-#[pyclass(name = "MCSAtomCompare", module = "rdkit.Chem.rdFMCS", subclass)]
+#[pyclass(name = "MCSAtomCompare", module = "rdoxide.Chem.rdFMCS", subclass)]
 pub struct PyAtomCompare;
 
 #[pymethods]
@@ -338,7 +338,7 @@ impl PyAtomCompare {
 /// MCSBondCompare.__call__() to define custom
 /// bond compare functions, then set MCSParameters.BondTyper
 /// to an instance of the subclass
-#[pyclass(name = "MCSBondCompare", module = "rdkit.Chem.rdFMCS", subclass)]
+#[pyclass(name = "MCSBondCompare", module = "rdoxide.Chem.rdFMCS", subclass)]
 pub struct PyBondCompare;
 
 #[pymethods]
@@ -397,7 +397,7 @@ impl PyBondCompare {
 macro_rules! callback_base {
     ($class:ident, $name:literal, $doc:literal, $subclass:literal, ($($arg:ident: $ty:ty),*)) => {
         #[doc = $doc]
-        #[pyclass(name = $name, module = "rdkit.Chem.rdFMCS", subclass)]
+        #[pyclass(name = $name, module = "rdoxide.Chem.rdFMCS", subclass)]
         pub struct $class;
 
         #[pymethods]
@@ -574,7 +574,7 @@ fn pairs_tuple<'py>(py: Python<'py>, pairs: &[(i32, i32)]) -> PyResult<Bound<'py
 /// Parameters controlling how the MCS is constructed
 #[pyclass(
     name = "MCSParameters",
-    module = "rdkit.Chem.rdFMCS",
+    module = "rdoxide.Chem.rdFMCS",
     skip_from_py_object
 )]
 #[derive(Debug)]
@@ -948,7 +948,7 @@ impl PyMCSParameters {
 // ------------------------------------------------------------------ results and FindMCS
 
 /// used to return MCS results
-#[pyclass(name = "MCSResult", module = "rdkit.Chem.rdFMCS")]
+#[pyclass(name = "MCSResult", module = "rdoxide.Chem.rdFMCS")]
 pub struct PyMCSResult {
     r: MCSResult,
 }

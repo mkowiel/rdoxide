@@ -182,7 +182,7 @@ mod tests {
     fn plain_commonchem_has_no_extensions() {
         let m = mol("C[C@H](O)C[C@@H](C)F |o1:1,4|");
         let rdkit = mol_to_json(&m, &JsonWriteParameters::default()).unwrap();
-        assert!(rdkit.contains("\"stereoGroups\""));
+        assert!(rdoxide.contains("\"stereoGroups\""));
         let plain = JsonWriteParameters {
             use_rdkit_extensions: false,
         };

@@ -1,8 +1,8 @@
-"""rdkit.ML.Cluster.Clustering (expectations from the reference RDKit)."""
+"""rdoxide.ML.Cluster.Clustering (expectations from the reference RDKit)."""
 
 import numpy as np
 import pytest
-from rdkit.ML.Cluster import Clustering
+from rdoxide.ML.Cluster import Clustering
 
 
 def test_points_single_link():

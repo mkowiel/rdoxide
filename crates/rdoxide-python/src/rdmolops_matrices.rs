@@ -1,4 +1,4 @@
-//! Matrix functions of `rdkit.Chem.rdmolops` (upstream `GraphMol/Wrap/MolOps.cpp`):
+//! Matrix functions of `rdoxide.Chem.rdmolops` (upstream `GraphMol/Wrap/MolOps.cpp`):
 //! `GetDistanceMatrix`, `Get3DDistanceMatrix` and `GetAdjacencyMatrix`.
 //!
 //! Like upstream, the matrices are cached on the molecule as computed

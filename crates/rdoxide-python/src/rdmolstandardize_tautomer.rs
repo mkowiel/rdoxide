@@ -1,4 +1,4 @@
-//! The tautomer part of `rdkit.Chem.MolStandardize.rdMolStandardize`
+//! The tautomer part of `rdoxide.Chem.MolStandardize.rdMolStandardize`
 //! (upstream `GraphMol/MolStandardize/nbWrap/Tautomer.cpp`).
 
 use std::sync::{Arc, Mutex};
@@ -76,7 +76,7 @@ fn py_scorer(func: Py<PyAny>, slot: ErrSlot) -> impl Fn(&ROMol) -> rdoxide::Resu
 /// used to hold the aromatic and kekulized versions of each tautomer
 #[pyclass(
     name = "Tautomer",
-    module = "rdkit.Chem.MolStandardize.rdMolStandardize"
+    module = "rdoxide.Chem.MolStandardize.rdMolStandardize"
 )]
 #[derive(Debug)]
 pub struct PyTautomer {
@@ -105,7 +105,7 @@ impl PyTautomer {
 /// maps SMILES strings to the respective Tautomer objects
 #[pyclass(
     name = "SmilesTautomerMap",
-    module = "rdkit.Chem.MolStandardize.rdMolStandardize"
+    module = "rdoxide.Chem.MolStandardize.rdMolStandardize"
 )]
 #[derive(Debug)]
 pub struct PySmilesTautomerMap {
@@ -152,7 +152,7 @@ impl PySmilesTautomerMap {
 /// used to return tautomer enumeration results
 #[pyclass(
     name = "TautomerEnumeratorResult",
-    module = "rdkit.Chem.MolStandardize.rdMolStandardize"
+    module = "rdoxide.Chem.MolStandardize.rdMolStandardize"
 )]
 #[derive(Debug)]
 pub struct PyTautomerEnumeratorResult {
@@ -247,7 +247,7 @@ impl PyTautomerEnumeratorResult {
 /// derived class to TautomerEnumerator.SetCallback()
 #[pyclass(
     name = "TautomerEnumeratorCallback",
-    module = "rdkit.Chem.MolStandardize.rdMolStandardize",
+    module = "rdoxide.Chem.MolStandardize.rdMolStandardize",
     subclass
 )]
 #[derive(Debug, Default)]
@@ -276,7 +276,7 @@ impl PyTautomerEnumeratorCallback {
 
 #[pyclass(
     name = "TautomerEnumerator",
-    module = "rdkit.Chem.MolStandardize.rdMolStandardize"
+    module = "rdoxide.Chem.MolStandardize.rdMolStandardize"
 )]
 #[derive(Debug)]
 pub struct PyTautomerEnumerator {
@@ -606,7 +606,7 @@ fn score_hetero_hs_py(mol: PyRef<'_, PyMol>) -> PyResult<i32> {
 /// Aromatic rings score 100, all carbon aromatic rings score 250
 #[pyclass(
     name = "SubstructTerm",
-    module = "rdkit.Chem.MolStandardize.rdMolStandardize",
+    module = "rdoxide.Chem.MolStandardize.rdMolStandardize",
     skip_from_py_object
 )]
 #[derive(Debug, Clone)]
@@ -648,7 +648,7 @@ impl PySubstructTerm {
 /// A list of SubstructTerm objects (upstream's `vector_indexing_suite`).
 #[pyclass(
     name = "SubstructTermVector",
-    module = "rdkit.Chem.MolStandardize.rdMolStandardize",
+    module = "rdoxide.Chem.MolStandardize.rdMolStandardize",
     sequence
 )]
 #[derive(Debug, Default)]

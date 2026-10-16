@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdChemicalFeatures` (upstream `ChemicalFeatures/Wrap/`):
+//! `rdoxide.Chem.rdChemicalFeatures` (upstream `ChemicalFeatures/Wrap/`):
 //! chemical features that are not associated with a molecule.
 
 use pyo3::prelude::*;
@@ -13,7 +13,7 @@ use crate::geometry::PyPoint3D;
 /// to molecular features
 #[pyclass(
     name = "FreeChemicalFeature",
-    module = "rdkit.Chem.rdChemicalFeatures",
+    module = "rdoxide.Chem.rdChemicalFeatures",
     skip_from_py_object
 )]
 #[derive(Debug, Clone)]

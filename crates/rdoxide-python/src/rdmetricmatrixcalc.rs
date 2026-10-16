@@ -1,4 +1,4 @@
-//! `rdkit.DataManip.Metric.rdMetricMatrixCalc` (upstream
+//! `rdoxide.DataManip.Metric.rdMetricMatrixCalc` (upstream
 //! `DataManip/MetricMatrixCalc/Wrap/rdMetricMatrixCalc.cpp`).
 
 use pyo3::exceptions::PyValueError;

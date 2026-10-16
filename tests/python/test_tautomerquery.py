@@ -1,7 +1,7 @@
 import pytest
 
-from rdkit import Chem
-from rdkit.Chem import rdTautomerQuery
+from rdoxide import Chem
+from rdoxide.Chem import rdTautomerQuery
 
 
 def test_query_properties():
@@ -44,7 +44,7 @@ def test_serialization_is_unavailable():
 
 
 def _library(holder_cls):
-    from rdkit.Chem import rdSubstructLibrary
+    from rdoxide.Chem import rdSubstructLibrary
     mols = rdSubstructLibrary.MolHolder()
     lib = rdSubstructLibrary.SubstructLibrary(mols, holder_cls())
     for smi in ["O=C1CCCC(CC)C1", "OC1=CCCC(CC)C1", "CCCCC", "c1ccccc1"]:
@@ -53,7 +53,7 @@ def _library(holder_cls):
 
 
 def test_substruct_library_tautomer_search():
-    from rdkit.Chem import rdSubstructLibrary
+    from rdoxide.Chem import rdSubstructLibrary
     query = rdTautomerQuery.TautomerQuery(Chem.MolFromSmiles("O=C1CCCCC1"))
     for holder in (rdSubstructLibrary.PatternHolder, rdSubstructLibrary.TautomerPatternHolder):
         lib = _library(holder)

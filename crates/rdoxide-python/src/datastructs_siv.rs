@@ -14,7 +14,7 @@ const SIV_DOC: &str = "A container class for storing integer\nvalues within a pa
 
 macro_rules! siv_class {
     ($py:ident, $name:literal, $kind:expr, $idx:ty) => {
-        #[pyclass(name = $name, module = "rdkit.DataStructs.cDataStructs", dict, skip_from_py_object)]
+        #[pyclass(name = $name, module = "rdoxide.DataStructs.cDataStructs", dict, skip_from_py_object)]
         #[derive(Debug)]
         pub struct $py {
             pub v: SparseIntVect,

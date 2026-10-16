@@ -2,8 +2,8 @@
 
 import numpy as np
 import pytest
-from rdkit import DataStructs
-from rdkit.DataManip.Metric import rdMetricMatrixCalc as mmc
+from rdoxide import DataStructs
+from rdoxide.DataManip.Metric import rdMetricMatrixCalc as mmc
 
 
 def triangle(dtype):

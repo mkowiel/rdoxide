@@ -2,7 +2,7 @@
 
 import pytest
 
-from rdkit import Chem, rdBase
+from rdoxide import Chem, rdBase
 
 
 def test_paths_and_subgraphs():

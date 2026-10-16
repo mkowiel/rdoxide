@@ -1,8 +1,8 @@
-"""MMFF bindings (rdkit.Chem.rdForceFieldHelpers, rdkit.ForceField)."""
+"""MMFF bindings (rdoxide.Chem.rdForceFieldHelpers, rdoxide.ForceField)."""
 
 import pytest
-from rdkit import Chem
-from rdkit.Chem import rdForceFieldHelpers as ffh
+from rdoxide import Chem
+from rdoxide.Chem import rdForceFieldHelpers as ffh
 
 
 def mol_with_conf(smiles="CC(=O)O"):

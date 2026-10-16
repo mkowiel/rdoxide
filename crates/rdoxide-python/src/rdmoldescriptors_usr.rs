@@ -1,4 +1,4 @@
-//! The USR/USRCAT functions of `rdkit.Chem.rdMolDescriptors` (upstream
+//! The USR/USRCAT functions of `rdoxide.Chem.rdMolDescriptors` (upstream
 //! `Descriptors/USRDescriptor.cpp` and its wrappers in
 //! `Wrap/rdMolDescriptors.cpp`).
 

@@ -16,7 +16,7 @@ use crate::rdmolfiles_write::Args;
 /// Parameters controlling Mol writing
 #[pyclass(
     name = "MolWriterParams",
-    module = "rdkit.Chem.rdmolfiles",
+    module = "rdoxide.Chem.rdmolfiles",
     get_all,
     set_all,
     skip_from_py_object

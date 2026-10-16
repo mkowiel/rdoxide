@@ -5,8 +5,8 @@ import os
 
 import pytest
 
-from rdkit import Chem
-from rdkit.Chem import rdchem, rdmolops
+from rdoxide import Chem
+from rdoxide.Chem import rdchem, rdmolops
 
 with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "mols3d.json")) as f:
     BLOCKS = json.load(f)
@@ -170,4 +170,4 @@ def test_enum_members_are_exported():
     assert [int(x) for x in (rdchem.COMPOSITE_AND, rdchem.COMPOSITE_OR, rdchem.COMPOSITE_XOR)] == [0, 1, 2]
     assert [int(rdchem.ALLOW_INCOMPLETE_OCTETS), int(rdchem.UNCONSTRAINED_ANIONS)] == [1, 16]
     assert rdchem.AllProps is Chem.PropertyPickleOptions.AllProps
-    assert repr(rdchem.KEKULE_ALL) == "rdkit.Chem.rdchem.ResonanceFlags.KEKULE_ALL"
+    assert repr(rdchem.KEKULE_ALL) == "rdoxide.Chem.rdchem.ResonanceFlags.KEKULE_ALL"

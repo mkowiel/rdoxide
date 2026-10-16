@@ -5,9 +5,9 @@ import os
 
 import pytest
 
-from rdkit import Chem
-from rdkit.Chem import rdmolops
-from rdkit.Geometry import Point3D
+from rdoxide import Chem
+from rdoxide.Chem import rdmolops
+from rdoxide.Geometry import Point3D
 
 with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "mols3d.json")) as f:
     BLOCKS = json.load(f)

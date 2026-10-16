@@ -4,9 +4,9 @@ When these labels are found, more specific queries are placed on the atoms.
 By default, the available quieries come from 
   FilterCatalog.GetFlattenedFunctionalGroupHierarchy(True)n
 Sample Usage:
-  >>> from rdkit import Chem, RDConfig
-  >>> from rdkit.Chem import MolFromSmiles, AllChem
-  >>> from rdkit.Chem.rdChemReactions import PreprocessReaction
+  >>> from rdoxide import Chem, RDConfig
+  >>> from rdoxide.Chem import MolFromSmiles, AllChem
+  >>> from rdoxide.Chem.rdChemReactions import PreprocessReaction
   >>> import os
   >>> testFile = os.path.join(RDConfig.RDCodeDir,'Chem','SimpleEnum','test_data','boronic1.rxn')
   >>> rxn = AllChem.ReactionFromRxnFile(testFile)

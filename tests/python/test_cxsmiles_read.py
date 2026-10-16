@@ -1,7 +1,7 @@
 """CXSMILES reading; expectations verified against RDKit 2026.09.1."""
 
 import pytest
-from rdkit import Chem
+from rdoxide import Chem
 
 
 def parse(smi, sanitize=True, strict=True):

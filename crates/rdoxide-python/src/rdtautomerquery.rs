@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdTautomerQuery` (upstream `TautomerQuery/Wrap/rdTautomerQuery.cpp`):
+//! `rdoxide.Chem.rdTautomerQuery` (upstream `TautomerQuery/Wrap/rdTautomerQuery.cpp`):
 //! substructure queries that match all tautomers of a molecule.
 //!
 //! Python callbacks in `SubstructMatchParameters` are not used by these
@@ -23,7 +23,7 @@ const NO_SERIALIZATION: &str = "Boost SERIALIZATION is not enabled";
 /// of a molecule.
 #[pyclass(
     name = "TautomerQuery",
-    module = "rdkit.Chem.rdTautomerQuery",
+    module = "rdoxide.Chem.rdTautomerQuery",
     skip_from_py_object
 )]
 pub struct PyTautomerQuery {

@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdDistGeom` (upstream `DistGeomHelpers/Wrap/rdDistGeom.cpp`):
+//! `rdoxide.Chem.rdDistGeom` (upstream `DistGeomHelpers/Wrap/rdDistGeom.cpp`):
 //! embedding molecules in 3D with distance geometry and ETKDG.
 
 use std::sync::Arc;
@@ -26,7 +26,7 @@ use crate::rdmolfiles_write::Args;
 /// Parameters controlling embedding
 #[pyclass(
     name = "EmbedParameters",
-    module = "rdkit.Chem.rdDistGeom",
+    module = "rdoxide.Chem.rdDistGeom",
     skip_from_py_object
 )]
 #[derive(Debug, Clone)]

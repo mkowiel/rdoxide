@@ -500,8 +500,27 @@ def regen_common_properties() -> None:
     print(f"common_properties.rs: {n} names")
 
 
+_PKG_DOTTED = re.compile(r"(?<![\w/.\-])rdkit(?=\.[A-Za-z_])")
+_PKG_IMPORT = re.compile(r"\b(from|import) rdkit\b(?!-)")
+
+
+def rename_package(path: Path) -> None:
+    """The Python package is called `rdoxide`, so the imports of the copied
+    upstream modules are rewritten."""
+    files = [path] if path.is_file() else list(path.rglob("*.py"))
+    for f in files:
+        if f.suffix != ".py":
+            continue
+        text = f.read_text(encoding="utf-8")
+        new = _PKG_IMPORT.sub(r"\1 rdoxide", _PKG_DOTTED.sub("rdoxide", text))
+        new = new.replace('getLogger("rdkit")', 'getLogger("rdoxide")')
+        if new != text:
+            f.write_text(new, encoding="utf-8")
+
+
 def regen_copies() -> None:
-    """Copy verbatim files (pure-python modules, test data) listed in porting/copies.toml."""
+    """Copy files (pure-python modules, test data) listed in porting/copies.toml; the
+    package name in the imports of the Python modules is changed to rdoxide."""
     if not COPIES.exists():
         return
     with open(COPIES, "rb") as fh:
@@ -517,6 +536,7 @@ def regen_copies() -> None:
         else:
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dst)
+        rename_package(dst)
         n += 1
     print(f"copied {n} upstream paths")
 

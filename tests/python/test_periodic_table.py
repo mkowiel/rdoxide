@@ -3,7 +3,7 @@ Code/GraphMol/catch_periodictable.cpp (BSD-3-Clause, RDKit contributors)."""
 
 import pytest
 
-from rdkit import Chem
+from rdoxide import Chem
 
 
 def feq(a, b, tol=1e-4):
@@ -44,7 +44,7 @@ def test_table():
 
 def test_singleton_and_module():
     assert Chem.GetPeriodicTable() is Chem.GetPeriodicTable()
-    assert Chem.PeriodicTable.__module__ == "rdkit.Chem.rdchem"
+    assert Chem.PeriodicTable.__module__ == "rdoxide.Chem.rdchem"
     with pytest.raises(TypeError):
         Chem.PeriodicTable()
 

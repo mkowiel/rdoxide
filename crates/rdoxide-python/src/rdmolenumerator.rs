@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdMolEnumerator` (upstream `GraphMol/MolEnumerator/Wrap/`).
+//! `rdoxide.Chem.rdMolEnumerator` (upstream `GraphMol/MolEnumerator/Wrap/`).
 
 use std::sync::Arc;
 
@@ -27,7 +27,7 @@ fn operation(typ: i64) -> PyResult<Arc<dyn MolEnumeratorOp>> {
 /// Molecular enumerator parameters
 #[pyclass(
     name = "MolEnumeratorParams",
-    module = "rdkit.Chem.rdMolEnumerator",
+    module = "rdoxide.Chem.rdMolEnumerator",
     skip_from_py_object
 )]
 #[derive(Clone)]

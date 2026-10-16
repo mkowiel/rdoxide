@@ -2,8 +2,8 @@
 
 import pytest
 
-from rdkit import Chem
-from rdkit.Chem import AllChem, rdChemReactions
+from rdoxide import Chem
+from rdoxide.Chem import AllChem, rdChemReactions
 
 AMIDE = "[C:1](=[O:2])O.[N:3]>>[C:1](=[O:2])[N:3]"
 

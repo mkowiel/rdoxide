@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdMolHash` (upstream `GraphMol/MolHash/Wrap/rdMolHash.cpp`).
+//! `rdoxide.Chem.rdMolHash` (upstream `GraphMol/MolHash/Wrap/rdMolHash.cpp`).
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;

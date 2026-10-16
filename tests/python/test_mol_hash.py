@@ -1,8 +1,8 @@
 """rdMolHash bindings (the full set of hashes is checked by the upstream testMolHash.py)."""
 import pytest
 
-from rdkit import Chem
-from rdkit.Chem import rdMolHash
+from rdoxide import Chem
+from rdoxide.Chem import rdMolHash
 
 HF = rdMolHash.HashFunction
 

@@ -1,8 +1,8 @@
 """rdMolDescriptors.AtomPairsParameters and the decoding helpers built on it."""
 
-from rdkit import Chem
-from rdkit.Chem import rdMolDescriptors
-from rdkit.Chem.AtomPairs import Pairs, Utils
+from rdoxide import Chem
+from rdoxide.Chem import rdMolDescriptors
+from rdoxide.Chem.AtomPairs import Pairs, Utils
 
 
 def test_constants_match_the_reference():

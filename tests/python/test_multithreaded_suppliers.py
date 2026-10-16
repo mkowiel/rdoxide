@@ -3,7 +3,7 @@
 from pathlib import Path
 
 import pytest
-from rdkit import Chem
+from rdoxide import Chem
 
 DATA = Path(__file__).parent.parent / "data" / "molfiles"
 NAMES = ["48", "78", "128", "163", "164", "170", "180", "186", "192", "203", "210", "211", "213", "220", "229", "256"]

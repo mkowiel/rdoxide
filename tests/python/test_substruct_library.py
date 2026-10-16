@@ -4,8 +4,8 @@ import pickle
 
 import pytest
 
-from rdkit import Chem
-from rdkit.Chem import rdSubstructLibrary as ssl
+from rdoxide import Chem
+from rdoxide.Chem import rdSubstructLibrary as ssl
 
 HOLDERS = [ssl.MolHolder, ssl.CachedMolHolder, ssl.CachedSmilesMolHolder,
            ssl.CachedTrustedSmilesMolHolder]

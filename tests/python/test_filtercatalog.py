@@ -1,8 +1,8 @@
 import pytest
 
-from rdkit import Chem
-from rdkit.Chem import FilterCatalog
-from rdkit.Chem.FilterCatalog import FilterCatalogParams, FilterMatchOps
+from rdoxide import Chem
+from rdoxide.Chem import FilterCatalog
+from rdoxide.Chem.FilterCatalog import FilterCatalogParams, FilterMatchOps
 
 
 def test_builtin_catalog_sizes():

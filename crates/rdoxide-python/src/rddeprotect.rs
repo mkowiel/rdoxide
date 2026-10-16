@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdDeprotect` (upstream `GraphMol/Deprotect/Wrap/`).
+//! `rdoxide.Chem.rdDeprotect` (upstream `GraphMol/Deprotect/Wrap/`).
 
 use pyo3::prelude::*;
 use rdoxide::graphmol::deprotect::{self, DeprotectData};
@@ -14,7 +14,7 @@ use crate::mol::PyMol;
 ///  deprotectdata.full_name - full name for the protecting group
 #[pyclass(
     name = "DeprotectData",
-    module = "rdkit.Chem.rdDeprotect",
+    module = "rdoxide.Chem.rdDeprotect",
     skip_from_py_object
 )]
 #[derive(Clone)]

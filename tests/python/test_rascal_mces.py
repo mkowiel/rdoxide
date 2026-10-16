@@ -1,7 +1,7 @@
 """rdRascalMCES: API surface not covered by the upstream tests."""
 import pytest
-from rdkit import Chem
-from rdkit.Chem import rdRascalMCES
+from rdoxide import Chem
+from rdoxide.Chem import rdRascalMCES
 
 
 def test_result_properties():

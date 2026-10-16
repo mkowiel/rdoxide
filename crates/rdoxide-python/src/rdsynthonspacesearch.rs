@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdSynthonSpaceSearch` (upstream
+//! `rdoxide.Chem.rdSynthonSpaceSearch` (upstream
 //! `SynthonSpaceSearch/Wrap/rdSynthonSpaceSearch.cpp`): searching of
 //! synthon-based chemical libraries.
 
@@ -27,7 +27,7 @@ use crate::substruct::PySubstructMatchParameters;
 /// Used to return results of SynthonSpace searches.
 #[pyclass(
     name = "SubstructureResult",
-    module = "rdkit.Chem.rdSynthonSpaceSearch"
+    module = "rdoxide.Chem.rdSynthonSpaceSearch"
 )]
 pub struct PySearchResults {
     res: SearchResults,
@@ -107,7 +107,7 @@ macro_rules! simple_props {
 /// SynthonSpaceSearch parameters.
 #[pyclass(
     name = "SynthonSpaceSearchParams",
-    module = "rdkit.Chem.rdSynthonSpaceSearch",
+    module = "rdoxide.Chem.rdSynthonSpaceSearch",
     skip_from_py_object
 )]
 #[derive(Clone, Default)]
@@ -232,7 +232,7 @@ simple_props! {
 /// Parameters for building shape objects for SynthonSpaceSearch.
 #[pyclass(
     name = "ShapeBuildParams",
-    module = "rdkit.Chem.rdSynthonSpaceSearch",
+    module = "rdoxide.Chem.rdSynthonSpaceSearch",
     skip_from_py_object
 )]
 #[derive(Clone, Default)]
@@ -296,7 +296,7 @@ simple_props! {
 }
 
 /// SynthonSpaceSearch object.
-#[pyclass(name = "SynthonSpace", module = "rdkit.Chem.rdSynthonSpaceSearch")]
+#[pyclass(name = "SynthonSpace", module = "rdoxide.Chem.rdSynthonSpaceSearch")]
 #[derive(Default)]
 pub struct PySynthonSpace {
     space: SynthonSpace,

@@ -1,8 +1,8 @@
 import pytest
 
-from rdkit import Chem
-from rdkit.Chem import ChemicalForceFields, rdtrajectory
-from rdkit.Chem.rdtrajectory import Snapshot, Trajectory
+from rdoxide import Chem
+from rdoxide.Chem import ChemicalForceFields, rdtrajectory
+from rdoxide.Chem.rdtrajectory import Snapshot, Trajectory
 
 
 def test_snapshot_points_need_a_trajectory():
@@ -34,7 +34,7 @@ def test_trajectory_editing():
 
 def test_minimize_trajectory_to_conformers():
     mol = Chem.AddHs(Chem.MolFromSmiles("CCO"))
-    from rdkit.Chem import AllChem
+    from rdoxide.Chem import AllChem
     AllChem.EmbedMolecule(mol, randomSeed=42)
     field = ChemicalForceFields.UFFGetMoleculeForceField(mol)
     res, snapshots = field.MinimizeTrajectory(1, 200, 1e-3)

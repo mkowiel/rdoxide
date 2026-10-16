@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdfragcatalog` (upstream `FragCatalog/Wrap`).
+//! `rdoxide.Chem.rdfragcatalog` (upstream `FragCatalog/Wrap`).
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -15,7 +15,7 @@ use crate::mol::PyMol;
 /// Parameters of a fragment catalog.
 #[pyclass(
     name = "FragCatParams",
-    module = "rdkit.Chem.rdfragcatalog",
+    module = "rdoxide.Chem.rdfragcatalog",
     from_py_object
 )]
 #[derive(Clone)]
@@ -73,7 +73,7 @@ impl PyFragCatParams {
 }
 
 /// A fragment catalog.
-#[pyclass(name = "FragCatalog", module = "rdkit.Chem.rdfragcatalog")]
+#[pyclass(name = "FragCatalog", module = "rdoxide.Chem.rdfragcatalog")]
 pub struct PyFragCatalog {
     cat: FragCatalog,
 }
@@ -195,7 +195,7 @@ impl PyFragCatalog {
 }
 
 /// Generates the fragments of molecules into a catalog.
-#[pyclass(name = "FragCatGenerator", module = "rdkit.Chem.rdfragcatalog")]
+#[pyclass(name = "FragCatGenerator", module = "rdoxide.Chem.rdfragcatalog")]
 pub struct PyFragCatGenerator;
 
 #[pymethods]
@@ -218,7 +218,7 @@ impl PyFragCatGenerator {
 }
 
 /// Generates fingerprints from a fragment catalog.
-#[pyclass(name = "FragFPGenerator", module = "rdkit.Chem.rdfragcatalog")]
+#[pyclass(name = "FragFPGenerator", module = "rdoxide.Chem.rdfragcatalog")]
 pub struct PyFragFPGenerator;
 
 #[pymethods]

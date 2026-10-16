@@ -1,4 +1,4 @@
-//! `rdkit.Chem.rdMolChemicalFeatures` (upstream
+//! `rdoxide.Chem.rdMolChemicalFeatures` (upstream
 //! `MolChemicalFeatures/Wrap/`): feature definitions, the factory that finds
 //! the features of a molecule, and the features themselves.
 
@@ -24,7 +24,7 @@ fn feature_error(e: FeatureError) -> PyErr {
 /// Class to featurize a molecule
 #[pyclass(
     name = "MolChemicalFeatureFactory",
-    module = "rdkit.Chem.rdMolChemicalFeatures"
+    module = "rdoxide.Chem.rdMolChemicalFeatures"
 )]
 #[derive(Debug)]
 struct PyFactory {
@@ -37,7 +37,7 @@ struct PyFactory {
 /// and location.
 #[pyclass(
     name = "MolChemicalFeature",
-    module = "rdkit.Chem.rdMolChemicalFeatures"
+    module = "rdoxide.Chem.rdMolChemicalFeatures"
 )]
 #[derive(Debug)]
 struct PyFeature {

@@ -1,7 +1,7 @@
 """rdGaussianShape: API surface not covered by the upstream tests."""
 import pytest
-from rdkit import Chem
-from rdkit.Chem import AllChem, rdGaussianShape
+from rdoxide import Chem
+from rdoxide.Chem import AllChem, rdGaussianShape
 
 
 def _mol(smiles):

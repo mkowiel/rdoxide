@@ -1,5 +1,5 @@
 //! Stereo-perception helpers and small atom/molecule predicates of
-//! `rdkit.Chem.rdmolops` (upstream `GraphMol/Wrap/MolOps.cpp`):
+//! `rdoxide.Chem.rdmolops` (upstream `GraphMol/Wrap/MolOps.cpp`):
 //! `AssignChiralTypesFromBondDirs`, `AssignStereochemistryFrom3D`,
 //! `AssignAtomChiralTags*`, `DetectBondStereo(c|C)hemistry`,
 //! `SetBondStereoFromDirections`, `SetTerminalAtomCoords`, `Cleanup*`,

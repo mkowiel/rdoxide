@@ -1,8 +1,8 @@
 """rdReducedGraphs (expectations from the reference RDKit)."""
 
 import pytest
-from rdkit import Chem
-from rdkit.Chem import rdReducedGraphs as rg
+from rdoxide import Chem
+from rdoxide.Chem import rdReducedGraphs as rg
 
 
 def sparse(fp):

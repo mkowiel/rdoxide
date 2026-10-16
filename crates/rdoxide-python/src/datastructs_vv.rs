@@ -25,7 +25,7 @@ fn pkl_bytes(o: &Bound<'_, PyAny>) -> PyResult<Vec<u8>> {
 
 #[pyclass(
     name = "DiscreteValueVect",
-    module = "rdkit.DataStructs.cDataStructs",
+    module = "rdoxide.DataStructs.cDataStructs",
     dict,
     sequence,
     skip_from_py_object
@@ -143,7 +143,7 @@ impl PyDiscreteValueVect {
 
 #[pyclass(
     name = "RealValueVect",
-    module = "rdkit.DataStructs.cDataStructs",
+    module = "rdoxide.DataStructs.cDataStructs",
     dict,
     sequence,
     skip_from_py_object
