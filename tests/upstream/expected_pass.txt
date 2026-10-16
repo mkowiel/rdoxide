@@ -667,6 +667,7 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::testCrambin
 Code/GraphMol/Wrap/rough_test.py::TestCase::testCustomSubstructMatchCheck
 Code/GraphMol/Wrap/rough_test.py::TestCase::testDisableNontetrahedralStereo
 Code/GraphMol/Wrap/rough_test.py::TestCase::testEnhancedStereoPreservesMol
+Code/GraphMol/Wrap/rough_test.py::TestCase::testExpandAndCollapseAttachmentPoints
 Code/GraphMol/Wrap/rough_test.py::TestCase::testFindMesoCenters
 Code/GraphMol/Wrap/rough_test.py::TestCase::testFindPotentialStereo
 Code/GraphMol/Wrap/rough_test.py::TestCase::testFindPotentialStereoBonds
@@ -707,6 +708,7 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::testHasQueryHs
 Code/GraphMol/Wrap/rough_test.py::TestCase::testHasValenceViolation
 Code/GraphMol/Wrap/rough_test.py::TestCase::testIgnoreAtomMapNumbers
 Code/GraphMol/Wrap/rough_test.py::TestCase::testInsertMol
+Code/GraphMol/Wrap/rough_test.py::TestCase::testIsMarkedAttachmentPoint
 Code/GraphMol/Wrap/rough_test.py::TestCase::testIsRingFused
 Code/GraphMol/Wrap/rough_test.py::TestCase::testIssue1735
 Code/GraphMol/Wrap/rough_test.py::TestCase::testKekulizeIfPossible

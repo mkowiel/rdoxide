@@ -89,6 +89,7 @@ mod rdmolhash;
 mod rdmolinterchange;
 mod rdmolops;
 mod rdmolops_adjust_query;
+mod rdmolops_attachment_points;
 mod rdmolops_fingerprints;
 mod rdmolops_fragments;
 mod rdmolops_hs;
