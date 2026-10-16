@@ -157,6 +157,7 @@ Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::test2Coords
 Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::test3IssueSF1526844
 Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::test6ChangeBondLength
 Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::testAddRingSystemTemplates
+Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::testNormalizeStraighten
 Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::testSetBadRingSystemTemplates
 Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::testSetRingSystemTemplates
 Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::testUseMultipleTemplates

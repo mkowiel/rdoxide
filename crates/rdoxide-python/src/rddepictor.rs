@@ -7,7 +7,9 @@ use rdoxide::graphmol::depictor::depict_utils::{IntPoint2DMap, bond_len, set_bon
 use rdoxide::graphmol::depictor::templates::{
     add_ring_system_templates, load_default_ring_system_templates, set_ring_system_templates,
 };
-use rdoxide::graphmol::depictor::{Compute2DCoordParameters, compute_2d_coords};
+use rdoxide::graphmol::depictor::{
+    Compute2DCoordParameters, compute_2d_coords, normalize_depiction, straighten_depiction,
+};
 
 use crate::errors::IntoPyResult;
 use crate::geometry::PyPoint2D;
@@ -92,6 +94,67 @@ fn compute_2d_coords_py(
         set_bond_len(old);
     }
     res.py()
+}
+
+/// Rotates the 2D depiction such that the majority of bonds have a
+/// 30-degree angle with the X axis.
+///
+///   ARGUMENTS:
+///
+///     - mol: the molecule to be rotated
+///     - confId: (optional) the id of the reference conformation to use
+///     - minimizeRotation: (optional) if False (the default), the
+///       molecule is rotated such that the majority of bonds have an angle
+///       with the X axis of 30 or 90 degrees. If True, the minimum rotation
+///       is applied such that the majority of bonds have an angle with the
+///       X axis of 0, 30, 60, or 90 degrees, with the goal of altering the
+///       initial orientation as little as possible.
+#[pyfunction]
+#[pyo3(name = "StraightenDepiction", signature = (mol, confId = -1, minimizeRotation = false))]
+#[allow(non_snake_case)]
+fn straighten_depiction_py(
+    mut mol: PyRefMut<'_, PyMol>,
+    confId: i32,
+    minimizeRotation: bool,
+) -> PyResult<()> {
+    straighten_depiction(&mut mol.mol, confId, minimizeRotation).py()
+}
+
+/// Normalizes the 2D depiction.
+/// If canonicalize is != 0, the depiction is subjected to a canonical
+/// transformation such that its main axis is aligned along the X axis
+/// (canonicalize >0, the default) or the Y axis (canonicalize <0).
+/// If canonicalize is 0, no canonicalization takes place.
+/// If scaleFactor is <0.0 (the default) the depiction is scaled such
+/// that bond lengths conform to RDKit standards. The applied scaling
+/// factor is returned.
+///
+///   ARGUMENTS:
+///
+///     - mol: the molecule to be normalized
+///     - confId: (optional) the id of the reference conformation to use
+///     - canonicalize: (optional) if != 0, a canonical transformation is
+///       applied: if >0 (the default), the main molecule axis is aligned
+///       to the X axis, if <0 to the Y axis. If 0, no canonical
+///       transformation is applied.
+///     - scaleFactor: (optional) if >0.0, the scaling factor to apply. The
+///       default (-1.0) means that the depiction is automatically scaled
+///       such that the average bond length is the standard RDKit bond
+///       length.
+///
+///   RETURNS:
+///
+///     - the applied scaling factor.
+#[pyfunction]
+#[pyo3(name = "NormalizeDepiction", signature = (mol, confId = -1, canonicalize = 1, scaleFactor = -1.0))]
+#[allow(non_snake_case)]
+fn normalize_depiction_py(
+    mut mol: PyRefMut<'_, PyMol>,
+    confId: i32,
+    canonicalize: i32,
+    scaleFactor: f64,
+) -> PyResult<f64> {
+    normalize_depiction(&mut mol.mol, confId, canonicalize, scaleFactor).py()
 }
 
 /// Loads the ring system templates from the specified file to be used in 2D
@@ -181,6 +244,8 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
         "Module containing the functionality to compute 2D coordinates for a molecule",
     )?;
     m.add_function(wrap_pyfunction!(compute_2d_coords_py, m)?)?;
+    m.add_function(wrap_pyfunction!(straighten_depiction_py, m)?)?;
+    m.add_function(wrap_pyfunction!(normalize_depiction_py, m)?)?;
     m.add_function(wrap_pyfunction!(set_ring_system_templates_py, m)?)?;
     m.add_function(wrap_pyfunction!(add_ring_system_templates_py, m)?)?;
     m.add_function(wrap_pyfunction!(load_default_ring_system_templates_py, m)?)?;
