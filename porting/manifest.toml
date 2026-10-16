@@ -1439,3 +1439,23 @@
 [module."rdoxide_python::rdgaussianshape".sources]
 "Code/GraphMol/GaussianShape/Wrap/rdGaussianShape.cpp" = "29fc9690e74aecb27c2d65bfbdc6b7a3967bf370"
 "Code/GraphMol/GaussianShape/nbWrap/rdGaussianShape.cpp" = "ac817757316d68bac5400ebd060f0502503551e0"
+
+[module."rdoxide::graphmol::rascal_mces".sources]
+"Code/GraphMol/RascalMCES/PartitionSet.cpp" = "c311b2e6cc513cdf327e341ad508ee5a12a52c82"
+"Code/GraphMol/RascalMCES/PartitionSet.h" = "2bc387c7b81c2785d8367780d7d79ada2495306d"
+"Code/GraphMol/RascalMCES/RascalButinaCluster.cpp" = "01803b2f6dab8388fff16d0f69ab6f1518d9a961"
+"Code/GraphMol/RascalMCES/RascalCluster.cpp" = "3b714a787ca91d84a68d0bd742013489b962480e"
+"Code/GraphMol/RascalMCES/RascalClusterOptions.h" = "1265c0385421a364fba036aff868f0508bca4a29"
+"Code/GraphMol/RascalMCES/RascalDetails.h" = "7344fc6b63bf33c1d72b747731ba622b758b2e24"
+"Code/GraphMol/RascalMCES/RascalMCES.cpp" = "939f8d769f1e65ee8e44d85fcc8a8b86a08b01e6"
+"Code/GraphMol/RascalMCES/RascalMCES.h" = "579926993377cb6d5f3135831cf95417a6bf778c"
+"Code/GraphMol/RascalMCES/RascalOptions.h" = "2cc5c0941a20a81d0e94432611bd786cea1ac0d9"
+"Code/GraphMol/RascalMCES/RascalResult.cpp" = "e2bf0fa51036c5e7fcd715a3c5138235d01b224b"
+"Code/GraphMol/RascalMCES/RascalResult.h" = "d27164e41c9a1a6295ac05338051cb7739bbd7aa"
+"Code/GraphMol/RascalMCES/lap_a_la_scipy.cpp" = "b0db6de571ed7e26dd61a0f0a9bab6bd1cc3605b"
+"Code/GraphMol/RascalMCES/mces_catch.cpp" = "60b5ab3bac4fe6f2c9ba890aa289d77f12a26613"
+"Code/GraphMol/RascalMCES/mces_cluster_catch.cpp" = "6f2d8a5c53bcf3a06debb7f2b5bf848cacfa77f9"
+
+[module."rdoxide_python::rdrascalmces".sources]
+"Code/GraphMol/RascalMCES/Wrap/rdRascalMCES.cpp" = "6cb471f107d3ca1012edeb49cf62ee4e0245f703"
+"Code/GraphMol/RascalMCES/nbWrap/rdRascalMCES.cpp" = "86e3c789d6fd84c8eee47eadc7882328fcafda48"

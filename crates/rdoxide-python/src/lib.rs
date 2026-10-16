@@ -105,6 +105,7 @@ mod rdmolstandardize_tautomer;
 mod rdmoltransforms;
 mod rdpartialcharges;
 mod rdqueries;
+mod rdrascalmces;
 mod rdreducedgraphs;
 mod rdresonance;
 mod rdrgroupdecomposition;
@@ -305,6 +306,12 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
         "rdGaussianShape",
         "rdkit.Chem.rdGaussianShape",
         rdgaussianshape::init,
+    )?;
+    add_submodule(
+        m,
+        "rdRascalMCES",
+        "rdkit.Chem.rdRascalMCES",
+        rdrascalmces::init,
     )?;
     add_submodule(m, "rdMIF", "rdkit.Chem.rdMIF", rdmif::init)?;
     add_submodule(m, "rdMolHash", "rdkit.Chem.rdMolHash", rdmolhash::init)?;

@@ -54,6 +54,7 @@ pub mod periodic_table;
 pub mod pickle;
 pub mod queries;
 pub mod query_ops;
+pub mod rascal_mces;
 pub mod reduced_graphs;
 pub mod resonance;
 pub mod rgroup_decomposition;
