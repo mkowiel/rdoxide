@@ -154,6 +154,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 43c | Marvin reactions (`ReactionFromMrvBlock/File`, `MrvBlockIsReaction`, `MrvFileIsReaction`, `ReactionToMrvBlock/File` with the reaction arrow and plus signs); Python in `rdChemReactions` | ✅ | the 14 reaction cases of upstream `testMrvToMol.cpp`: counts, validation and `.expected.rxn` / `.expected.mrv` identical |
 | 44a | MolInteractionFields (`graphmol::mol_interaction_fields`): `ConstructGrid`, `CalculateDescriptors` (grid planes computed on several threads, values independent of the thread count), `Coulomb`, `CoulombDielectric`, `MMFFVdWaals`, `UFFVdWaals`, Gaussian cube files; Python `rdkit.Chem.rdMIF` | ✅ | upstream `MolInteractionFields/Wrap/testMIF.py` tests 1-5 |
 | 44b | MolInteractionFields `HBond` (fixed/unfixed donors and acceptors, serine special case) and `Hydrophilic`; `CalculateDescriptors` accepts them | ✅ | upstream `testMIF.py` tests 6-7 |
+| 45 | GaussianShape (`graphmol::gaussian_shape`): `ShapeInput` (Gaussian atoms, pharmacophore colour features, canonical orientation, pruning, `BestSimilarity`), the PubChem-style quaternion optimiser, `AlignMol`/`AlignShapes`/`ScoreMol`/`ScoreShape`/`ScoreMoleculeAllConformers` (all-conformer overlays on several threads, result independent of the thread count); Python `rdkit.Chem.rdGaussianShape`. Not yet: `ShapeInput` text serialization (needs Boost serialization format) | ✅ | upstream `test_rdgaussian_shape.py` (10 tests) |
 | 7–13 | see PLAN.md | ⬜ | |
 
 ## Python package files
@@ -363,3 +364,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-19 — Stage 43c: Marvin reactions. MarvinParse is complete. Next: MolInteractionFields, GaussianShape, Rascal, SynthonSpaceSearch, MolDraw2D.
 * 2026-10-20 — Stage 44a: MolInteractionFields (grid, Coulomb, vdW, cube). Next: HBond / Hydrophilic, then GaussianShape, Rascal, SynthonSpaceSearch, MolDraw2D.
 * 2026-10-20 — Stage 44b: MolInteractionFields HBond / Hydrophilic. Next: GaussianShape, Rascal, SynthonSpaceSearch, MolDraw2D.
+* 2026-10-20 — Stage 45: GaussianShape (shape input, optimiser, overlay, scoring, Python). Next: Rascal, SynthonSpaceSearch, MolDraw2D.

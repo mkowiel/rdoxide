@@ -1425,3 +1425,17 @@
 [module."rdoxide_python::rdmif".sources]
 "Code/GraphMol/MolInteractionFields/Wrap/rdMIF.cpp" = "e858d9976090dca68984b9e9ea7099e361a323d3"
 "Code/GraphMol/MolInteractionFields/nbWrap/rdMIF.cpp" = "a262775ba269fc6560c025102f92fe44761587d5"
+
+[module."rdoxide::graphmol::gaussian_shape".sources]
+"Code/GraphMol/GaussianShape/GaussianShape.cpp" = "73ab4c8f3120eab5d0ce2fae395115997f9103e9"
+"Code/GraphMol/GaussianShape/GaussianShape.h" = "9d116a3cfa585ce7912b816070a7b189c54c467d"
+"Code/GraphMol/GaussianShape/ShapeInput.cpp" = "e482efe850d8e65c5f26bcbdd08f082a392ea66c"
+"Code/GraphMol/GaussianShape/ShapeInput.h" = "ef9333f5ee3bd7a1e7bd999cf6e63b908ceb311a"
+"Code/GraphMol/GaussianShape/ShapeOverlayOptions.h" = "24e82ad749487b1e33b52a3ac9559ddc2cf9ac4e"
+"Code/GraphMol/GaussianShape/SingleConformerAlignment.cpp" = "75a7f575f14debb21c5124ff85d3f28b9b0084ba"
+"Code/GraphMol/GaussianShape/SingleConformerAlignment.h" = "f9b1493903f91b793b74a2bbbcffeb8a4a39124f"
+"Code/GraphMol/GaussianShape/catch_tests.cpp" = "48bd478420b58564c211803bc36560923400af1e"
+
+[module."rdoxide_python::rdgaussianshape".sources]
+"Code/GraphMol/GaussianShape/Wrap/rdGaussianShape.cpp" = "29fc9690e74aecb27c2d65bfbdc6b7a3967bf370"
+"Code/GraphMol/GaussianShape/nbWrap/rdGaussianShape.cpp" = "ac817757316d68bac5400ebd060f0502503551e0"
