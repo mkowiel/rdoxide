@@ -1354,3 +1354,7 @@
 [module."rdoxide_python::rdgeneralizedsubstruct".sources]
 "Code/GraphMol/GeneralizedSubstruct/Wrap/rdGeneralizedSubstruct.cpp" = "e918ac323db2a90f06126849f3f6eac7b096bb24"
 "Code/GraphMol/GeneralizedSubstruct/nbWrap/rdGeneralizedSubstruct.cpp" = "c4e9714e3dbc0a841b9293d699fd49a9317b925a"
+
+[module."rdoxide::graphmol::generic_groups".sources]
+"Code/GraphMol/GenericGroups/GenericGroups.cpp" = "7515b423ba203b9cdbff6dfe765d7f2699af3639"
+"Code/GraphMol/GenericGroups/GenericGroups.h" = "853e63f3024b957f7cf2f9e974f777a404138281"

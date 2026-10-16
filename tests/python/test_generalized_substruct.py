@@ -104,7 +104,6 @@ class TestCase(unittest.TestCase):
     matches = rdGeneralizedSubstruct.MolGetSubstructMatches(mol, xqm2)
     self.assertEqual(len(matches), 1)
 
-  @unittest.skip('GenericGroups (useGenericMatchers) is not ported yet')
   def test7GenericMatchers(self):
     m = Chem.MolFromSmiles('COC1=NNC(*)=C1 |$;;;;;;AEL_p;$,LN:1:1.3|')
     qps = Chem.AdjustQueryParameters.NoAdjustments()

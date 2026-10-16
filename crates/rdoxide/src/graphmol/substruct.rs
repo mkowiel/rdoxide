@@ -18,6 +18,7 @@ use std::sync::Arc;
 
 use crate::graphmol::atom::{Atom, ChiralType};
 use crate::graphmol::bond::{BondStereo, BondType};
+use crate::graphmol::generic_groups::generic_atom_matcher;
 use crate::graphmol::queries::{
     AtomQuery, BondQuery, QueryKind, RecursionSets, atom_queries_match, has_recursive_query,
 };
@@ -742,6 +743,9 @@ impl<'a> FinalCheck<'a> {
 
     pub(crate) fn check(&mut self, q_c: &[u32], m_c: &[u32]) -> Result<bool> {
         let nq = self.query.num_atoms() as usize;
+        if self.ps.use_generic_matchers && !generic_atom_matcher(self.mol, self.query, &m_c[..nq]) {
+            return Ok(false);
+        }
         if let Some(FinalMatchCheck(f)) = &self.ps.extra_final_check {
             if !f(self.mol, &m_c[..nq]) {
                 return Ok(false);
@@ -1082,15 +1086,6 @@ fn prepare_recursion(
     Ok(rec)
 }
 
-fn check_params(ps: &SubstructMatchParameters) -> Result<()> {
-    if ps.use_generic_matchers {
-        return Err(RDKitError::Value(
-            "useGenericMatchers is not supported yet".into(),
-        ));
-    }
-    Ok(())
-}
-
 /// `atomCompat(queryAtom, molAtom, params)` for callers outside the matcher.
 pub(crate) fn atom_compat(
     query: &ROMol,
@@ -1133,7 +1128,6 @@ pub fn substruct_match(
     query: &ROMol,
     ps: &SubstructMatchParameters,
 ) -> Result<Vec<MatchVect>> {
-    check_params(ps)?;
     let (mn, qn) = (mol.num_atoms(), query.num_atoms());
     if mn == 0 || qn == 0 || qn > mn {
         return Ok(Vec::new());
@@ -1157,7 +1151,6 @@ pub fn substruct_match_count(
     query: &ROMol,
     ps: &SubstructMatchParameters,
 ) -> Result<u32> {
-    check_params(ps)?;
     if mol.num_atoms() == 0 || query.num_atoms() == 0 {
         return Ok(0);
     }
