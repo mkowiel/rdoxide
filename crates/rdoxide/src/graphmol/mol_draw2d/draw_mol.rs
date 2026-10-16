@@ -322,11 +322,12 @@ impl DrawMol {
         Ok(())
     }
 
-    /// Extracts everything to be drawn. Present so far: atom coordinates and
-    /// labels.
+    /// Extracts everything to be drawn. Present so far: atom coordinates, labels
+    /// and bonds.
     pub fn extract_all(&mut self, _scale: f64, text: &mut DrawTextFT) -> Result<()> {
         self.extract_atom_coords()?;
         self.extract_atom_symbols(text)?;
+        self.extract_bonds()?;
         Ok(())
     }
 

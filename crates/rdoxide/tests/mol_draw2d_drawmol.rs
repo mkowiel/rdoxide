@@ -203,3 +203,145 @@ fn atom_indices_and_without_mol() {
     );
     assert!(r.is_err());
 }
+
+fn kinds(dm: &DrawMol) -> Vec<&'static str> {
+    use rdoxide::graphmol::mol_draw2d::draw_shape::ShapeKind::*;
+    dm.bonds
+        .iter()
+        .map(|b| match b.kind {
+            Arrow { .. } => "arrow",
+            Ellipse => "ellipse",
+            SimpleLine { .. } => "line",
+            PolyLine { .. } => "poly",
+            SolidWedge { .. } => "solid",
+            DashedWedge { .. } => "dashed",
+            WavyLine { .. } => "wavy",
+            Arc { .. } => "arc",
+        })
+        .collect()
+}
+
+#[test]
+fn bond_shapes() {
+    let o = MolDrawOptions::default();
+    // a single bond between like atoms is one line; between unlike atoms two
+    // half lines, one per colour
+    let (dm, _) = build("CC", 300, 300, "", &o);
+    assert_eq!(kinds(&dm), vec!["line"]);
+    let (dm, _) = build("CN", 300, 300, "", &o);
+    assert_eq!(kinds(&dm), vec!["line", "line"]);
+    assert_ne!(dm.bonds[0].line_colour, dm.bonds[1].line_colour);
+    // each half line stays on its own side of the midpoint
+    let mid = (dm.bonds[0].points[1].x - dm.bonds[1].points[0].x).abs();
+    assert!(mid < 1e-9);
+    // a triple bond has three lines
+    let (dm, _) = build("CC#CC", 300, 300, "", &o);
+    assert_eq!(dm.bonds.iter().filter(|b| b.bond == 1).count(), 3);
+    // a double bond has two
+    let (dm, _) = build("CC=CC", 300, 300, "", &o);
+    assert_eq!(dm.bonds.iter().filter(|b| b.bond == 1).count(), 2);
+    let ls: Vec<_> = dm.bonds.iter().filter(|b| b.bond == 1).collect();
+    // the two lines are parallel and offset by the double bond offset
+    let d = |s: &rdoxide::graphmol::mol_draw2d::draw_shape::DrawShape| s.points[1] - s.points[0];
+    let cross = d(ls[0]).x * d(ls[1]).y - d(ls[0]).y * d(ls[1]).x;
+    assert!(cross.abs() < 1e-6);
+}
+
+#[test]
+fn ring_bonds_and_aromatics() {
+    let o = MolDrawOptions::default();
+    let (dm, _) = build("c1ccccc1", 300, 300, "", &o);
+    // kekulized with the aromatic flags kept: 3 double bonds of 2 lines and 3
+    // single ones of 1, plus the little joins between the single lines
+    let lines = dm
+        .bonds
+        .iter()
+        .filter(|b| {
+            matches!(
+                b.kind,
+                rdoxide::graphmol::mol_draw2d::draw_shape::ShapeKind::SimpleLine { .. }
+            )
+        })
+        .count();
+    assert_eq!(lines, 9);
+}
+
+#[test]
+fn wedges_wavy_dative_zero() {
+    let o = MolDrawOptions::default();
+    let (dm, _) = build("C[C@H](N)C(=O)O", 300, 300, "", &o);
+    let k = kinds(&dm);
+    assert!(k.contains(&"solid") || k.contains(&"dashed"), "{k:?}");
+    let mut m = smi("CC");
+    m.bond_mut(0)
+        .set_bond_dir(rdoxide::graphmol::bond::BondDir::Unknown);
+    let mut t = text();
+    let mut o2 = MolDrawOptions::default();
+    o2.prepare_mols_before_drawing = false;
+    let mut dm = DrawMol::new(
+        &m,
+        "",
+        300,
+        300,
+        &o2,
+        &mut t,
+        DrawMolHighlights::default(),
+        true,
+        -1,
+        false,
+    )
+    .unwrap();
+    dm.extract_all(1.0, &mut t).unwrap();
+    assert_eq!(kinds(&dm), vec!["wavy"]);
+
+    let (dm, _) = build("N->[Cu]", 300, 300, "", &o);
+    assert!(kinds(&dm).contains(&"arrow"), "{:?}", kinds(&dm));
+    let (dm, _) = build("[Na+].[Cl-]", 300, 300, "", &o);
+    assert!(dm.bonds.is_empty());
+}
+
+#[test]
+fn query_bonds() {
+    use rdoxide::graphmol::smiles_parse::smarts::{SmartsParserParams, mol_from_smarts};
+    let q = mol_from_smarts("C~C", &SmartsParserParams::default())
+        .unwrap()
+        .unwrap();
+    let mut t = text();
+    let mut o = MolDrawOptions::default();
+    o.prepare_mols_before_drawing = false;
+    let mut dm = DrawMol::new(
+        &q,
+        "",
+        300,
+        300,
+        &o,
+        &mut t,
+        DrawMolHighlights::default(),
+        true,
+        -1,
+        false,
+    )
+    .unwrap();
+    dm.extract_all(1.0, &mut t).unwrap();
+    // the generic query bond is dotted, in the query colour
+    assert_eq!(dm.bonds.len(), 1);
+    assert_eq!(dm.bonds[0].line_colour, o.query_colour);
+    let q = mol_from_smarts("CC", &SmartsParserParams::default())
+        .unwrap()
+        .unwrap();
+    let mut dm = DrawMol::new(
+        &q,
+        "",
+        300,
+        300,
+        &o,
+        &mut t,
+        DrawMolHighlights::default(),
+        true,
+        -1,
+        false,
+    )
+    .unwrap();
+    dm.extract_all(1.0, &mut t).unwrap();
+    assert_eq!(dm.bonds.len(), 3);
+}
