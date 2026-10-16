@@ -32,3 +32,4 @@ Code/GraphMol/MolEnumerator/Wrap/rough_test.py
 Code/GraphMol/ScaffoldNetwork/Wrap/testScaffoldNetwork.py
 Code/GraphMol/MolCatalog/Wrap/rough_test.py
 Code/GraphMol/FragCatalog/Wrap/rough_test.py
+Code/GraphMol/MolProcessing/Wrap/testMolProcessing.py

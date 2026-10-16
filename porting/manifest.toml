@@ -1396,3 +1396,12 @@
 "Code/GraphMol/FragCatalog/Wrap/FragCatalog.cpp" = "3917df26e13c2c94bd642f4777ca6c54a93c2296"
 "Code/GraphMol/FragCatalog/Wrap/FragFPGenerator.cpp" = "294a8390d2e6903c5deec8dfeb393fbd0f4b6e3c"
 "Code/GraphMol/FragCatalog/Wrap/rdfragcatalog.cpp" = "de26578c7361894e1b494dd2ccd4d9d474b53d35"
+
+[module."rdoxide::graphmol::mol_processing".sources]
+"Code/GraphMol/MolProcessing/MolProcessing.cpp" = "50be39493027e6deca32544867750796a2048c9f"
+"Code/GraphMol/MolProcessing/MolProcessing.h" = "927d7c777cc3c690e83788f1da233ca0a6903cd3"
+"Code/GraphMol/FileParsers/GeneralFileReader.h" = "950912fad2f84bb8ab34b9ea3e0ebcc3fa887225"
+
+[module."rdoxide_python::rdmolprocessing".sources]
+"Code/GraphMol/MolProcessing/Wrap/rdMolProcessing.cpp" = "c3a6df650693e7b8587dcec55593e482f7b489f7"
+"Code/GraphMol/MolProcessing/nbWrap/rdMolProcessing.cpp" = "bd06d2f944863b59253d66a809a8b02e6dbcea62"

@@ -95,6 +95,7 @@ mod rdmolops_subset;
 mod rdmolops_transforms;
 mod rdmolops_wedging;
 mod rdmolops_zip;
+mod rdmolprocessing;
 mod rdmolstandardize;
 mod rdmolstandardize_pipeline;
 mod rdmolstandardize_tautomer;
@@ -204,6 +205,12 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
         "rdfragcatalog",
         "rdkit.Chem.rdfragcatalog",
         rdfragcatalog::init,
+    )?;
+    add_submodule(
+        m,
+        "rdMolProcessing",
+        "rdkit.Chem.rdMolProcessing",
+        rdmolprocessing::init,
     )?;
     add_submodule(m, "rdFMCS", "rdkit.Chem.rdFMCS", rdfmcs::init)?;
     add_submodule(

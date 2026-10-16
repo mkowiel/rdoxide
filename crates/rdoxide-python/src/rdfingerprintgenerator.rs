@@ -163,7 +163,7 @@ fn nested_map<T: Copy + for<'py> IntoPyObject<'py>>(
 )]
 #[derive(Debug)]
 pub struct PyFPGen {
-    gen_: FingerprintGenerator,
+    pub(crate) gen_: FingerprintGenerator,
 }
 
 /// Owned versions of the optional per-call arguments (`convertPyArguments`).
