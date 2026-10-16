@@ -80,3 +80,17 @@ def test_canonicalize_enhanced_stereo_roundtrip():
     m = Chem.MolFromSmiles("C[C@H](F)C[C@@H](Cl)Br |&1:1,4|")
     Chem.CanonicalizeEnhancedStereo(m)
     assert len(m.GetStereoGroups()) == 1
+
+
+def test_cx_smarts():
+    from rdoxide import Chem
+
+    mol = Chem.MolFromSmarts("CC1.OC1 |$foo;;;bar$|")
+    assert Chem.MolToSmarts(mol) == "CCCO"
+    assert Chem.MolToCXSmarts(mol) == "CCCO |$foo;;bar;$|"
+    frag = Chem.MolFromSmarts("CCC |$foo;bar;baz$|")
+    assert Chem.MolFragmentToCXSmarts(frag, [1, 2]) == "CC |$bar;baz$|"
+    # dative bonds are plain single bonds in SMARTS
+    assert Chem.MolToCXSmarts(Chem.MolFromSmiles("[NH3]->[Fe]-[NH2]")) == "[#7]-[Fe]-[#7] |C:0.0|"
+    with pytest.raises(ValueError):
+        Chem.MolFragmentToCXSmarts(frag, [])

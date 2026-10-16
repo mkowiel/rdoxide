@@ -1,6 +1,6 @@
 //! `rdoxide.Chem.Draw.rdMolDraw2D` (upstream `MolDraw2D/Wrap/rdMolDraw2D.cpp`):
-//! the options, the SVG drawer and the helper functions. Reactions,
-//! multi-colour highlights, contouring and Cairo are not ported yet.
+//! the options, the SVG drawer and the helper functions. Cairo output is not
+//! ported.
 
 use std::collections::BTreeMap;
 

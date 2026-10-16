@@ -2,11 +2,12 @@
 //! `GetBondSmarts`.
 //!
 //! Ported from RDKit `Code/GraphMol/SmilesParse/SmartsWrite.{h,cpp}`
-//! (2026.09.1). CXSMARTS extensions are not ported yet.
+//! (2026.09.1), including the CXSMARTS writers.
 //!
 //! Copyright (C) 2002-2025 Greg Landrum and other RDKit contributors.
 //! Licensed under the BSD 3-Clause license (see LICENSES/RDKit-BSD-3-Clause.txt).
 
+use super::cx_write::{cx_fields, get_cx_extensions};
 use super::write::{SmilesWriteParams, get_atom_smiles, in_organic_subset};
 use crate::graphmol::atom::{Atom, ChiralType, HybridizationType};
 use crate::graphmol::bond::{Bond, BondDir, BondType};
@@ -865,4 +866,39 @@ pub fn mol_fragment_to_smarts(
     mol.set_prop(cp::_smilesAtomOutputOrder, ao, true)?;
     mol.set_prop(cp::_smilesBondOutputOrder, bo, true)?;
     Ok(res)
+}
+
+/// Appends the CX extensions of `mol` (which must have just been written, so
+/// that its output order is known) to a SMARTS.
+fn with_cx_extensions(mol: &mut ROMol, mut smarts: String) -> Result<String> {
+    if !smarts.is_empty() {
+        let extensions = get_cx_extensions(mol, cx_fields::ALL)?;
+        if !extensions.is_empty() {
+            smarts.push(' ');
+            smarts += &extensions;
+        }
+    }
+    Ok(smarts)
+}
+
+/// `MolToCXSmarts`: the SMARTS of a molecule followed by its CX extensions.
+/// Dative bonds are written as the single bonds they are in SMARTS.
+pub fn mol_to_cx_smarts(mol: &mut ROMol, params: &SmilesWriteParams) -> Result<String> {
+    let ps = SmilesWriteParams {
+        include_dative_bonds: false,
+        ..params.clone()
+    };
+    let smarts = mol_to_smarts(mol, &ps)?;
+    with_cx_extensions(mol, smarts)
+}
+
+/// `MolFragmentToCXSmarts`
+pub fn mol_fragment_to_cx_smarts(
+    mol: &mut ROMol,
+    params: &SmilesWriteParams,
+    atoms_to_use: &[i32],
+    bonds_to_use: Option<&[i32]>,
+) -> Result<String> {
+    let smarts = mol_fragment_to_smarts(mol, params, atoms_to_use, bonds_to_use)?;
+    with_cx_extensions(mol, smarts)
 }

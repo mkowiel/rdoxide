@@ -2,7 +2,7 @@
 //! `MolToRandomSmilesVect`, `GetAtomSmiles`, `GetBondSmiles`.
 //!
 //! Ported from RDKit `Code/GraphMol/SmilesParse/SmilesWrite.{h,cpp}`
-//! (2026.09.1). CXSMILES extensions are not ported yet.
+//! (2026.09.1). The CXSMILES extensions are written by `cx_write`.
 //!
 //! Copyright (C) 2002-2025 Greg Landrum and other RDKit contributors.
 //! Licensed under the BSD 3-Clause license (see LICENSES/RDKit-BSD-3-Clause.txt).
