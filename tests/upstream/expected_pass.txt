@@ -92,6 +92,10 @@ Code/GraphMol/Abbreviations/Wrap/testAbbreviations.py::TestCase::testCondenseLin
 Code/GraphMol/Abbreviations/Wrap/testAbbreviations.py::TestCase::testGithub3692
 Code/GraphMol/Abbreviations/Wrap/testAbbreviations.py::TestCase::testLabel
 Code/GraphMol/Abbreviations/Wrap/testAbbreviations.py::TestCase::testParsingAbbrevs
+Code/GraphMol/CIPLabeler/Wrap/pyCIPLabelWrapTest.py::TestCase::testAtropIsomer
+Code/GraphMol/CIPLabeler/Wrap/pyCIPLabelWrapTest.py::TestCase::testLabelAtomsList
+Code/GraphMol/CIPLabeler/Wrap/pyCIPLabelWrapTest.py::TestCase::testLabelAtomsSet
+Code/GraphMol/CIPLabeler/Wrap/pyCIPLabelWrapTest.py::TestCase::testLabelBondsList
 Code/GraphMol/ChemReactions/Wrap/testReactionWrapper.py::CXExtensionsTests::test_cxsmarts_reaction
 Code/GraphMol/ChemReactions/Wrap/testReactionWrapper.py::CXExtensionsTests::test_cxsmiles_reaction
 Code/GraphMol/ChemReactions/Wrap/testReactionWrapper.py::DocTestCase::runTest
@@ -488,6 +492,7 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::test91RankAtoms
 Code/GraphMol/Wrap/rough_test.py::TestCase::test92RankAtomsInFragment
 Code/GraphMol/Wrap/rough_test.py::TestCase::test93RWMolsAsROMol
 Code/GraphMol/Wrap/rough_test.py::TestCase::test9Smarts
+Code/GraphMol/Wrap/rough_test.py::TestCase::testAddStereoAnnotations
 Code/GraphMol/Wrap/rough_test.py::TestCase::testAdjustQueryProperties
 Code/GraphMol/Wrap/rough_test.py::TestCase::testAdjustQueryPropertiesFiveRings
 Code/GraphMol/Wrap/rough_test.py::TestCase::testAdjustQueryPropertiesgithubIssue1474
@@ -549,6 +554,7 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub4138
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub4144
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub4884
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub498
+Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub6945
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub8467
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub9101
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub9125
@@ -570,6 +576,7 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::testMolHasQuery
 Code/GraphMol/Wrap/rough_test.py::TestCase::testMolToV2KMolBlock
 Code/GraphMol/Wrap/rough_test.py::TestCase::testMolzip
 Code/GraphMol/Wrap/rough_test.py::TestCase::testNeedsHs
+Code/GraphMol/Wrap/rough_test.py::TestCase::testNewFindMolChiralCenters
 Code/GraphMol/Wrap/rough_test.py::TestCase::testNoExceptionSmilesParserParams
 Code/GraphMol/Wrap/rough_test.py::TestCase::testOldPropPickles
 Code/GraphMol/Wrap/rough_test.py::TestCase::testPickleCoordsAsDouble
@@ -748,6 +755,7 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::test91RankAtoms
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test92RankAtomsInFragment
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test93RWMolsAsROMol
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test9Smarts
+Code/GraphMol/nbWrap/rough_test.py::TestCase::testAddStereoAnnotations
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testAdjustQueryProperties
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testAdjustQueryPropertiesFiveRings
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testAdjustQueryPropertiesgithubIssue1474
@@ -807,6 +815,7 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::testGithub3198
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGithub4144
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGithub4884
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGithub498
+Code/GraphMol/nbWrap/rough_test.py::TestCase::testGithub6945
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGithub8467
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGithub8877
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGithub9101
@@ -829,6 +838,7 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::testMolHasQuery
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testMolToV2KMolBlock
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testMolzip
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testNeedsHs
+Code/GraphMol/nbWrap/rough_test.py::TestCase::testNewFindMolChiralCenters
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testNoExceptionSmilesParserParams
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testOldPropPickles
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testPickleProps
@@ -920,6 +930,7 @@ rdkit/Chem/Fingerprints/UnitTestSimScreener.py::TestCase::test3_ThresholdScreene
 rdkit/Chem/Fingerprints/UnitTestSimScreener.py::TestCase::test_SimilarityScreener
 rdkit/Chem/MolStandardize/UnitTestMolStandardize.py::TestCase::testBasic
 rdkit/Chem/MolStandardize/UnitTestMolStandardize.py::TestCase::testLength
+rdkit/Chem/MolStandardize/UnitTestMolStandardize.py::TestCase::testNoUnassignedStereoAfterCanonicalize
 rdkit/Chem/Scaffolds/UnitTestMurckoScaffold.py::DocTestCase::runTest
 rdkit/Chem/Scaffolds/UnitTestMurckoScaffold.py::TestCase::test1MurckoScaffold
 rdkit/Chem/Scaffolds/UnitTestMurckoScaffold.py::TestCase::test2MurckoScaffold

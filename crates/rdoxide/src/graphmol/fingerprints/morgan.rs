@@ -8,6 +8,7 @@ use super::{AdditionalOutput, FingerprintArguments, hash_combine, hash_pair, has
 use crate::error::{RDKitError, Result};
 use crate::graphmol::atom::ChiralType;
 use crate::graphmol::bond::{BondStereo, BondType};
+use crate::graphmol::chirality::get_use_legacy_stereo_perception;
 use crate::graphmol::periodic_table::PeriodicTable;
 use crate::graphmol::romol::ROMol;
 use crate::rdgeneral::RDProps;
@@ -96,7 +97,8 @@ pub fn get_connectivity_invariants(mol: &ROMol, include_ring_membership: bool) -
     Ok(invars)
 }
 
-/// `MorganBondInvGenerator::getBondInvariants` (legacy stereo perception)
+/// `MorganBondInvGenerator::getBondInvariants` (with the new stereo
+/// perception the molecule needs its CIP labels)
 pub fn morgan_bond_invariants(mol: &ROMol, use_bond_types: bool, use_chirality: bool) -> Vec<u32> {
     (0..mol.num_bonds())
         .map(|i| {
@@ -109,7 +111,17 @@ pub fn morgan_bond_invariants(mol: &ROMol, use_bond_types: bool, use_chirality: 
                 {
                     inv = bond.bond_type() as i32;
                 } else {
-                    inv = 100 + 10 * bond.bond_type() as i32 + bond.stereo() as i32;
+                    let mut stereo = bond.stereo();
+                    // with the new stereo perception the E/Z labels come from
+                    // the CIP labels; other stereo is used as it is
+                    if !get_use_legacy_stereo_perception() {
+                        match bond.get_prop(cp::_CIPCode).map(|v| v.to_rd_string()) {
+                            Some(c) if c == "E" => stereo = BondStereo::StereoE,
+                            Some(c) if c == "Z" => stereo = BondStereo::StereoZ,
+                            _ => {}
+                        }
+                    }
+                    inv = 100 + 10 * bond.bond_type() as i32 + stereo as i32;
                 }
             }
             inv as u32

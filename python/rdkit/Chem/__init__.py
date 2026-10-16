@@ -19,6 +19,10 @@
 from rdkit import DataStructs, RDConfig, rdBase
 from rdkit.Chem import rdchem
 from rdkit.Chem.rdchem import *
+try:
+  from rdkit.Chem.rdCIPLabeler import *
+except ImportError:
+  pass
 from rdkit.Chem.rdmolfiles import *
 from rdkit.Chem.rdmolops import *
 
