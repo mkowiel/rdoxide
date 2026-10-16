@@ -1405,3 +1405,13 @@
 [module."rdoxide_python::rdmolprocessing".sources]
 "Code/GraphMol/MolProcessing/Wrap/rdMolProcessing.cpp" = "c3a6df650693e7b8587dcec55593e482f7b489f7"
 "Code/GraphMol/MolProcessing/nbWrap/rdMolProcessing.cpp" = "bd06d2f944863b59253d66a809a8b02e6dbcea62"
+
+[module."rdoxide::graphmol::file_parsers::marvin".sources]
+"Code/GraphMol/MarvinParse/MarvinParser.cpp" = "ac8d644b6e4ca3781a343936d198493312566bb1"
+"Code/GraphMol/MarvinParse/MarvinParser.h" = "136a4cce1d5fdd899d76493a654988d4be716bb6"
+"Code/GraphMol/MarvinParse/MarvinDefs.cpp" = "fc1aa1463d00f91c66ba0e2185b197f530423573"
+"Code/GraphMol/MarvinParse/MarvinDefs.h" = "48bfd158af923a92672fd1990397d124ec68ae66"
+"Code/GraphMol/MarvinParse/testMrvToMol.cpp" = "c275e7f2b4b878172c9763f9e8bab9bec856d385"
+
+[module."rdoxide_python::rdmolfiles_marvin".sources]
+"Code/GraphMol/Wrap/rdmolfiles.cpp" = "829058d8e8a382c358d2464cee762f8cff04f75f"
