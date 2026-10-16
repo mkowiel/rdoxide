@@ -250,3 +250,14 @@ def test_multi_colour_highlights():
     assert svg.count("<ellipse") == 1 and "#00FF00" in svg
     with pytest.raises(ValueError):
         d.DrawMoleculeWithHighlights(m, "", {9: [red]}, {}, {}, {})
+
+
+def test_lasso_highlights():
+    m = Chem.MolFromSmiles("CCOCC")
+    d = rdMolDraw2D.MolDraw2DSVG(300, 300)
+    d.drawOptions().multiColourHighlightStyle = rdMolDraw2D.MultiColourHighlightStyle.Lasso
+    red, blue = (1.0, 0.0, 0.0), (0.0, 0.0, 1.0)
+    d.DrawMoleculeWithHighlights(m, "", {0: [red], 1: [red], 2: [red, blue], 3: [blue]}, {}, {}, {})
+    d.FinishDrawing()
+    svg = d.GetDrawingText()
+    assert "stroke:#FF0000;stroke-width:2." in svg and "<ellipse" not in svg

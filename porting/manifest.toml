@@ -1684,3 +1684,7 @@
 "Code/GraphMol/MolDraw2D/DrawMolMCH.h" = "b89e1fcddd9ce67f8599fc23584f3263616b635b"
 "Code/GraphMol/MolDraw2D/DrawMolMCHCircleAndLine.cpp" = "c47f79d5bbfaf140ec3638d9fefe8e67a6d7d6cf"
 "Code/GraphMol/MolDraw2D/DrawMolMCHCircleAndLine.h" = "141682d1d9c9a7683835347404802e1a2b01e243"
+
+[module."rdoxide::graphmol::mol_draw2d::draw_mol_lasso".sources]
+"Code/GraphMol/MolDraw2D/DrawMolMCHLasso.cpp" = "d40cb5c27094a9f416b99b287e42f5053bc20278"
+"Code/GraphMol/MolDraw2D/DrawMolMCHLasso.h" = "2966e5db5a03a938fe47c1c3eeaef4677cadd29a"

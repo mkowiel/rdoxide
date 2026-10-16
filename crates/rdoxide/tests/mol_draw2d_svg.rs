@@ -413,3 +413,56 @@ fn multi_colour_highlights() {
         .is_err()
     );
 }
+
+#[test]
+fn lasso_highlights() {
+    use rdoxide::graphmol::mol_draw2d::helpers::MultiColourHighlightStyle;
+    let red = DrawColour::new(1.0, 0.0, 0.0);
+    let blue = DrawColour::new(0.0, 0.0, 1.0);
+    let m = smi("CCOCC");
+    let mut d = MolDraw2DSVG::new(300, 300, -1, -1).unwrap();
+    d.draw_options_mut().multi_colour_highlight_style = MultiColourHighlightStyle::Lasso;
+    let mut atoms = BTreeMap::new();
+    // red lassos round atoms 0-2 (joined by lines), blue round 2 and 3, which
+    // share an atom with red so get nested lassos
+    atoms.insert(0, vec![red]);
+    atoms.insert(1, vec![red]);
+    atoms.insert(2, vec![red, blue]);
+    atoms.insert(3, vec![blue]);
+    d.draw_molecule_with_highlights(
+        &m,
+        "",
+        atoms,
+        BTreeMap::new(),
+        BTreeMap::new(),
+        BTreeMap::new(),
+        -1,
+    )
+    .unwrap();
+    d.finish_drawing();
+    let svg = d.get_drawing_text();
+    // lasso lines and arcs are drawn unfilled with the line width scaled, in both colours
+    assert!(svg.contains("stroke:#FF0000;stroke-width:2."));
+    assert!(svg.contains("stroke:#0000FF;stroke-width:2."));
+    assert!(svg.contains("fill:none;"));
+    assert!(!svg.contains("<ellipse"));
+    // an isolated atom gets a full circle
+    let mut d2 = MolDraw2DSVG::new(300, 300, -1, -1).unwrap();
+    d2.draw_options_mut().multi_colour_highlight_style = MultiColourHighlightStyle::Lasso;
+    let mut one = BTreeMap::new();
+    one.insert(4, vec![red]);
+    d2.draw_molecule_with_highlights(
+        &m,
+        "",
+        one,
+        BTreeMap::new(),
+        BTreeMap::new(),
+        BTreeMap::new(),
+        -1,
+    )
+    .unwrap();
+    assert!(
+        d2.get_drawing_text()
+            .contains("stroke:#FF0000;stroke-width:2.")
+    );
+}
