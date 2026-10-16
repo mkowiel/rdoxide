@@ -87,17 +87,22 @@ def test_fingerprint_variance_and_labels():
     assert rows[0] == {"Core": "[1*]c1ccccc1", "R1": "[1*]Cl"}
 
 
-def test_unsupported_features_are_reported():
+def test_ga_matching_is_reported_as_unsuccessful():
     core = Chem.MolFromSmiles("c1ccccc1")
     params = RGroupDecompositionParameters()
     params.matchingStrategy = RGroupMatching.GA
     decomp = RGroupDecomposition(core, params)
     assert decomp.Add(Chem.MolFromSmiles(SYMMETRY[0])) == 0
     assert not decomp.Process()
+
+
+def test_enumeration_of_cores_without_variations():
+    core = Chem.MolFromSmiles("c1ccccc1[*:1]")
     params = RGroupDecompositionParameters()
     params.doEnumeration = True
-    with pytest.raises(RuntimeError):
-        RGroupDecomposition(core, params)
+    decomp = RGroupDecomposition(core, params)
+    assert decomp.Add(Chem.MolFromSmiles("c1ccccc1C")) == 0
+    assert decomp.Process()
 
 
 def test_relabel_mapped_dummies():

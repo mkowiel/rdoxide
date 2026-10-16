@@ -99,9 +99,13 @@ impl RGroupDecompData {
 
     fn add_input_core(&mut self, input_core: &ROMol) -> Result<()> {
         if self.params.do_enumeration {
-            return Err(RDKitError::Runtime(
-                "doEnumeration is not supported: MolEnumerator::enumerate is not ported".into(),
-            ));
+            let bundle = crate::graphmol::mol_enumerator::enumerate_default(input_core, 0)?;
+            if !bundle.is_empty() {
+                for core in bundle.mols() {
+                    self.add_core(core)?;
+                }
+                return Ok(());
+            }
         }
         self.add_core(input_core)
     }

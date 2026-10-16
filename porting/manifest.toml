@@ -1318,3 +1318,21 @@
 [module."rdoxide_python::rddeprotect".sources]
 "Code/GraphMol/Deprotect/Wrap/DeprotectWrap.cpp" = "8a8588139d97de57d1e3a6e2e4f9fcef8243123b"
 "Code/GraphMol/Deprotect/Wrap/rdDeprotect.cpp" = "60370f48c099e3dd3a9dc323d7274b3840af7aa2"
+
+[module."rdoxide::graphmol::mol_enumerator".sources]
+"Code/GraphMol/MolEnumerator/MolEnumerator.cpp" = "d2246e97586d989de34e42dbba737c5ae1d0e6e3"
+"Code/GraphMol/MolEnumerator/MolEnumerator.h" = "bbd52da7c096d101f2daaebcddd94b81f747bec0"
+"Code/GraphMol/MolEnumerator/LinkNode.cpp" = "a1735c2311996c63763dea50cc590ec910fba637"
+"Code/GraphMol/MolEnumerator/LinkNode.h" = "c45ca4a202ee6f8c0b4d2efe88f4ff07dd349eec"
+"Code/GraphMol/MolEnumerator/PositionVariation.cpp" = "4a6c7641a24c47cdd44c43b0acdbe144b4da701f"
+"Code/GraphMol/MolEnumerator/RepeatUnit.cpp" = "4f6c5f8c362f24454302bda26994bd483d8eae5e"
+
+[module."rdoxide::graphmol::mol_bundle".sources]
+"Code/GraphMol/MolBundle.h" = "507ca388ce16ad22ab5d9e62599cd77ed8add5af"
+
+[module."rdoxide_python::rdmolenumerator".sources]
+"Code/GraphMol/MolEnumerator/Wrap/rdMolEnumerator.cpp" = "793e3d7b7e6f6e018fa30b21c7db299918a8ba96"
+"Code/GraphMol/MolEnumerator/nbWrap/rdMolEnumerator.cpp" = "a644810c7d3e734e8eb11b4f6490e3dc3a540dd9"
+
+[module."rdoxide_python::molbundle".sources]
+"Code/GraphMol/Wrap/MolBundle.cpp" = "e25cbbac30311d5f6dafc84fd3c0d4957b03613d"

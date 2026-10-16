@@ -377,6 +377,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<crate::bond::PyQueryBond>()?;
     m.add_class::<crate::conformer::PyConformer>()?;
     m.add_class::<crate::mol::PyMol>()?;
+    m.add_class::<crate::molbundle::PyMolBundle>()?;
     m.add_class::<crate::mol::PyRWMol>()?;
     m.add_class::<crate::mol::PyEditableMol>()?;
     m.add_class::<crate::mol::AtomSeq>()?;
