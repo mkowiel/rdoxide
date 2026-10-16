@@ -15,6 +15,7 @@ use super::utils::{
 };
 use crate::geometry::Point3D;
 use crate::graphmol::atom::{Atom, ValenceType};
+use crate::graphmol::attachment_points::expand_attachment_points;
 use crate::graphmol::bond::{Bond, BondDir, BondStereo, BondType};
 use crate::graphmol::chirality::clear_single_bond_dir_flags;
 use crate::graphmol::chirality::from_coords::{
@@ -1396,9 +1397,7 @@ pub fn finish_mol_processing(
     res.clear_all_atom_bookmarks();
     res.clear_all_bond_bookmarks();
     if params.expand_attachment_points {
-        return Err(RDKitError::invariant(
-            "expandAttachmentPoints is not ported yet",
-        ));
+        expand_attachment_points(res, true, true)?;
     }
     for i in 0..res.num_atoms() {
         res.calc_explicit_valence(i, false)?;

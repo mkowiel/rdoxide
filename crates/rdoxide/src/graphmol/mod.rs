@@ -5,6 +5,7 @@ pub mod adjust_query;
 pub mod aromaticity;
 pub mod atom;
 pub mod atropisomers;
+pub mod attachment_points;
 pub mod bond;
 pub mod canon;
 pub mod chem_reactions;
