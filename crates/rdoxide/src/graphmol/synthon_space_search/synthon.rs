@@ -1,6 +1,7 @@
 //! `Synthon.cpp`: a building block of a SynthonSpace.
 
 use super::details;
+use super::shape_input::SynthonShapeInput;
 use super::stream::{Reader, Writer};
 use crate::datastructs::bit_vect::{BitVect, ExplicitBitVect, bit_vect_from_binary};
 use crate::graphmol::chirality::find_stereo::find_potential_stereo;
@@ -25,8 +26,7 @@ pub struct Synthon {
     search_mol: Option<ROMol>,
     patt_fp: Option<ExplicitBitVect>,
     fp: Option<ExplicitBitVect>,
-    // Serialised `SynthonShapeInput`; kept verbatim for now.
-    shapes: Option<Vec<u8>>,
+    shapes: Option<SynthonShapeInput>,
     conn_regions: Vec<ROMol>,
     num_dummies: u32,
     num_heavy_atoms: u32,
@@ -114,10 +114,10 @@ impl Synthon {
     pub fn has_shapes(&self) -> bool {
         self.shapes.is_some()
     }
-    pub fn shapes(&self) -> Option<&[u8]> {
-        self.shapes.as_deref()
+    pub fn shapes(&self) -> Option<&SynthonShapeInput> {
+        self.shapes.as_ref()
     }
-    pub fn set_shapes(&mut self, shapes: Vec<u8>) {
+    pub fn set_shapes(&mut self, shapes: SynthonShapeInput) {
         self.shapes = Some(shapes);
     }
     pub fn clear_shapes(&mut self) {
@@ -191,7 +191,7 @@ impl Synthon {
         w.f64(self.mol_wt);
         if let Some(sh) = &self.shapes {
             w.bool(true);
-            w.string(sh);
+            w.string(sh.to_text().as_bytes());
         } else {
             w.bool(false);
         }
@@ -220,7 +220,7 @@ impl Synthon {
             s.calc_properties()?;
         }
         if version > 3010 && r.bool()? {
-            s.shapes = Some(r.bytes()?);
+            s.shapes = Some(SynthonShapeInput::from_text(&r.string()?)?);
         }
         Ok(s)
     }

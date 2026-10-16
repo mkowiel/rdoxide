@@ -24,6 +24,7 @@ use crate::rdgeneral::{RDProps, RDValue};
 use crate::{RDKitError, Result};
 
 /// A synthon and the position of a sample molecule built from it.
+#[derive(Clone)]
 pub struct SampleMolRec {
     pub synthon_idx: usize,
     pub synthon_nums: Vec<usize>,

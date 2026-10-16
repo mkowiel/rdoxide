@@ -1461,6 +1461,11 @@
 "Code/GraphMol/RascalMCES/nbWrap/rdRascalMCES.cpp" = "86e3c789d6fd84c8eee47eadc7882328fcafda48"
 
 [module."rdoxide::graphmol::synthon_space_search".sources]
+"Code/GraphMol/SynthonSpaceSearch/SynthonShapeInput.cpp" = "1c20793613a7c8a50fd0e3185e9570be9f528416"
+"Code/GraphMol/SynthonSpaceSearch/SynthonShapeInput.h" = "30b20b28845c6a6e5877c351079fbfb483024fd5"
+"Code/GraphMol/SynthonSpaceSearch/SynthonSpaceShapeSearcher.cpp" = "fe5cd23889b51d301ae22792b12869acf5be9d34"
+"Code/GraphMol/SynthonSpaceSearch/SynthonSpaceShapeSearcher.h" = "80521801c44727bf408fcc9ab23ac6cd3fe02f96"
+"Code/GraphMol/SynthonSpaceSearch/shape_search_catch_tests.cpp" = "2ee0c30e891b8164d5acc43df540dc4f3551f6cc"
 "Code/GraphMol/SynthonSpaceSearch/SynthonSpaceFingerprintSearcher.cpp" = "37ea9a835e0af158e330163c7b405a11ab9837a4"
 "Code/GraphMol/SynthonSpaceSearch/SynthonSpaceFingerprintSearcher.h" = "020e068ea4737853d047fee0ecc913474df7f7a1"
 "Code/GraphMol/SynthonSpaceSearch/SynthonSpaceRascalSearcher.cpp" = "ef23a2c6d0854d82a6d253f960ded28e27290396"

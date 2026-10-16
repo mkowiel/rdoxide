@@ -157,32 +157,32 @@ pub struct ShapePair {
 /// The Gaussian shapes of the conformers of a molecule.
 #[derive(Debug, Clone, Default)]
 pub struct ShapeInput {
-    active_shape: usize,
+    pub(super) active_shape: usize,
     /// The coordinates of the atoms and features, 3 values for each, for
     /// each shape.
-    coords: Vec<Vec<f64>>,
+    pub(super) coords: Vec<Vec<f64>>,
     /// `KAPPA / (r * r)` for the atoms and features. Negative values are
     /// switched off.
-    alphas: Vec<f64>,
+    pub(super) alphas: Vec<f64>,
     /// The feature types, 0 for atoms.
-    types: Vec<i32>,
-    num_atoms: usize,
-    num_feats: usize,
-    self_overlap_shape_vols: Vec<f64>,
-    self_overlap_color_vols: Vec<f64>,
+    pub(super) types: Vec<i32>,
+    pub(super) num_atoms: usize,
+    pub(super) num_feats: usize,
+    pub(super) self_overlap_shape_vols: Vec<f64>,
+    pub(super) self_overlap_color_vols: Vec<f64>,
     /// The points at the extremes of x, y and z: min x, y, z then max.
-    extreme_points: Vec<[usize; 6]>,
+    pub(super) extreme_points: Vec<[usize; 6]>,
     /// Flags those atoms with a carbon radius, for faster calculation later.
-    carbon_radii: Option<Vec<bool>>,
-    smiles: String,
+    pub(super) carbon_radii: Option<Vec<bool>>,
+    pub(super) smiles: String,
     /// Whether the shape has been put in its canonical orientation.
-    normalizeds: Vec<bool>,
+    pub(super) normalizeds: Vec<bool>,
     /// If the shape is moved, the normalization is no longer valid.
-    normalization_oks: Vec<bool>,
-    canon_rots: Vec<[f64; 9]>,
-    canon_transs: Vec<[f64; 3]>,
+    pub(super) normalization_oks: Vec<bool>,
+    pub(super) canon_rots: Vec<[f64; 9]>,
+    pub(super) canon_transs: Vec<[f64; 3]>,
     /// The sorted eigenvalues of the principal axes.
-    eigen_values: Vec<[f64; 3]>,
+    pub(super) eigen_values: Vec<[f64; 3]>,
 }
 
 /// The atoms of `mol` to keep, with aromatic flags fixed on those that are no

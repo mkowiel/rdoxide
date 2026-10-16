@@ -15,6 +15,14 @@ pub struct FpHitData<'a> {
     pub subtract_fp: Option<&'a ExplicitBitVect>,
 }
 
+/// The extra data of the hit sets of the shape searcher: for each fragment
+/// the number of its shape in the searcher's pool, and the order in which the
+/// fragments match the synthon sets.
+pub struct ShapeHitData {
+    pub frag_shapes: Vec<usize>,
+    pub synthon_set_order: Vec<usize>,
+}
+
 pub struct SynthonSpaceHitSet<'a> {
     pub reaction: &'a SynthonSet,
     /// `synthons_to_use[i]` is the selection from `reaction.synthons()[i]`:
@@ -24,6 +32,7 @@ pub struct SynthonSpaceHitSet<'a> {
     /// The fragments this hitset is derived from.
     pub frags: Vec<Arc<ROMol>>,
     pub fp: Option<FpHitData<'a>>,
+    pub shape: Option<ShapeHitData>,
 }
 
 impl<'a> SynthonSpaceHitSet<'a> {
@@ -53,7 +62,25 @@ impl<'a> SynthonSpaceHitSet<'a> {
             num_hits,
             frags: frag_set.to_vec(),
             fp: None,
+            shape: None,
         }
+    }
+
+    /// A hit set that also holds the shapes of the fragments.
+    pub fn new_shape(
+        reaction: &'a SynthonSet,
+        pool: &'a [Synthon],
+        stu: &[Vec<usize>],
+        frag_set: &[Arc<ROMol>],
+        frag_shapes: Vec<usize>,
+        synthon_set_order: Vec<usize>,
+    ) -> Self {
+        let mut hs = Self::new(reaction, pool, stu, frag_set);
+        hs.shape = Some(ShapeHitData {
+            frag_shapes,
+            synthon_set_order,
+        });
+        hs
     }
 
     /// A hit set that also holds the synthon fingerprints.

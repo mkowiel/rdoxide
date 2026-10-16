@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 
 use super::fingerprint::get_fingerprint;
-use super::params::{CONNECTOR_SYMBOLS, MAX_CONNECTOR_NUM};
+use super::params::{CONNECTOR_SYMBOLS, MAX_CONNECTOR_NUM, ShapeBuildParams};
 use super::stream::{Reader, Writer};
 use super::synthon::Synthon;
 use super::synthon_set::SynthonSet;
@@ -25,9 +25,9 @@ pub struct SynthonSpace {
     /// The synthon sets, sorted by reaction id.
     pub(crate) reactions: Vec<SynthonSet>,
     /// For each pool entry, the indices of the reactions it is in.
-    synthon_reactions: Vec<Vec<usize>>,
+    pub(super) synthon_reactions: Vec<Vec<usize>>,
     fp_type: String,
-    num_conformers: u32,
+    pub(super) num_conformers: u32,
     file_version: u32,
     num_products: u64,
     max_num_synthons: usize,
@@ -311,7 +311,7 @@ impl SynthonSpace {
         Ok(())
     }
 
-    fn fill_synthon_reactions(&mut self) {
+    pub(super) fn fill_synthon_reactions(&mut self) {
         self.synthon_reactions = vec![Vec::new(); self.pool.len()];
         for (r, rxn) in self.reactions.iter().enumerate() {
             let n_sets = rxn.synthons().len() as u32;
@@ -527,9 +527,21 @@ impl SynthonSpace {
     }
 }
 
-/// `convertTextToDBFile` (without fingerprints or shapes)
-pub fn convert_text_to_db_file(in_filename: &str, out_filename: &str) -> Result<()> {
+/// `convertTextToDBFile`: optionally with the synthon fingerprints and
+/// shapes.
+pub fn convert_text_to_db_file(
+    in_filename: &str,
+    out_filename: &str,
+    fp_gen: Option<&FingerprintGenerator>,
+    shape_options: Option<&ShapeBuildParams>,
+) -> Result<()> {
     let mut space = SynthonSpace::new();
     space.read_text_file(in_filename)?;
+    if let Some(fp_gen) = fp_gen {
+        space.build_synthon_fingerprints(fp_gen)?;
+    }
+    if let Some(options) = shape_options {
+        space.build_synthon_shapes(options)?;
+    }
     space.write_db_file(out_filename)
 }
