@@ -15,7 +15,9 @@ use std::f64::consts::PI;
 use super::atom::ChiralType;
 use super::atropisomers::can_have_direction;
 use super::bond::{BondDir, BondStereo, BondType};
+use super::chirality::find_stereo::{StereoSpecified, StereoType, find_potential_stereo_of};
 use super::conformer::Conformer;
+use super::file_parsers::mol_file_writer::get_mol_file_bond_stereo_info;
 use super::find_rings::find_sssr;
 use super::romol::ROMol;
 use crate::rdgeneral::common_properties as cp;
@@ -155,6 +157,44 @@ pub fn pick_bonds_to_wedge(mol: &mut ROMol, conf: Option<&Conformer>) -> Result<
     }
     crate::graphmol::atropisomers::wedge_bonds_from_atropisomers(mol, conf, &mut wedge)?;
     Ok(wedge)
+}
+
+/// `markUnspecifiedStereoAsUnknown` (`MolFileStereochem.cpp`): flags the
+/// double bonds a molfile would write as "either", and puts a wavy bond next
+/// to every tetrahedral centre without stereo.
+pub fn mark_unspecified_stereo_as_unknown(mol: &mut ROMol, conf_id: i32) -> Result<()> {
+    const NO_NBRS: i32 = 100;
+    if mol.num_conformers() == 0 {
+        return Err(RDKitError::precondition("no conformer"));
+    }
+    let conf = mol.conformer(conf_id)?.clone();
+    let wedge_bonds = pick_bonds_to_wedge(mol, Some(&conf))?;
+    for bid in 0..mol.num_bonds() {
+        if mol.bond(bid).bond_type() != BondType::Double {
+            continue;
+        }
+        let (dir_code, _) = get_mol_file_bond_stereo_info(mol, bid, &wedge_bonds, Some(&conf))?;
+        if dir_code == 3 {
+            mol.bond_mut(bid).set_stereo(BondStereo::StereoAny)?;
+        }
+    }
+    let potential = find_potential_stereo_of(mol)?;
+    if potential.is_empty() {
+        return Ok(());
+    }
+    let (_, n_chiral_nbrs) = count_chiral_nbrs(mol, NO_NBRS);
+    let no_wedges = WedgeBonds::new();
+    for si in potential {
+        if si.stereo_type != StereoType::AtomTetrahedral
+            || si.specified != StereoSpecified::Unspecified
+        {
+            continue;
+        }
+        let bond = pick_bond_to_wedge(mol, si.centered_on, &n_chiral_nbrs, &no_wedges, NO_NBRS)?
+            .ok_or_else(|| RDKitError::Index("Bond index out of range".into()))?;
+        mol.bond_mut(bond).set_bond_dir(BondDir::Unknown);
+    }
+    Ok(())
 }
 
 /// `detail::determineBondWedgeState(bond, fromAtomIdx, conf)`

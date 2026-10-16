@@ -278,3 +278,20 @@ def test_draw_reaction():
     d = rdMolDraw2D.MolDraw2DSVG(300, 200)
     d.DrawReaction(rdChemReactions.ChemicalReaction())
     assert "<path" in d.GetDrawingText()
+
+
+def test_comic_mode_and_unknown_stereo():
+    mol = Chem.MolFromSmiles("CC(F)(Cl)Br")
+
+    def svg(**opts):
+        d = rdMolDraw2D.MolDraw2DSVG(250, 200)
+        for k, v in opts.items():
+            setattr(d.drawOptions(), k, v)
+        d.DrawMolecule(mol)
+        d.FinishDrawing()
+        return d.GetDrawingText()
+
+    plain = svg()
+    comic = svg(comicMode=True)
+    assert comic != plain and "class='bond-0" in comic
+    assert svg(unspecifiedStereoIsUnknown=True) != plain

@@ -201,7 +201,7 @@ fn atom_indices_and_without_mol() {
         -1,
         false,
     );
-    assert!(r.is_err());
+    assert!(r.is_ok());
 }
 
 fn kinds(dm: &DrawMol) -> Vec<&'static str> {

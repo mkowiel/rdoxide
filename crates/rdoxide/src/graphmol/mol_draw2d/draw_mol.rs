@@ -30,7 +30,7 @@ use crate::geometry::{Point2D, Transform2D};
 use crate::graphmol::chirality::stereo_groups::simplify_enhanced_stereo;
 use crate::graphmol::depictor::{Compute2DCoordParameters, compute_2d_coords};
 use crate::graphmol::romol::{ROMol, RWMol};
-use crate::graphmol::wedge_bonds::reapply_mol_block_wedging;
+use crate::graphmol::wedge_bonds::{mark_unspecified_stereo_as_unknown, reapply_mol_block_wedging};
 use crate::rdgeneral::{RDProps, common_properties as cp};
 use crate::{RDKitError, Result};
 
@@ -341,9 +341,7 @@ impl DrawMol {
             compute_2d_coords(&mut self.draw_mol, &params)?;
         }
         if self.opts.unspecified_stereo_is_unknown {
-            return Err(RDKitError::UnhandledFeature(
-                "unspecifiedStereoIsUnknown is not supported yet".into(),
-            ));
+            mark_unspecified_stereo_as_unknown(&mut self.draw_mol, -1)?;
         }
         if self.opts.use_mol_block_wedging {
             reapply_mol_block_wedging(&mut self.draw_mol, true, false)?;
