@@ -26,6 +26,7 @@ pub mod find_rings;
 pub mod fingerprints;
 pub mod fmcs;
 pub mod forcefield_helpers;
+pub mod frag_catalog;
 pub mod functional_group_hierarchy;
 pub mod generalized_substruct;
 pub mod generic_groups;

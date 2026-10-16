@@ -349,6 +349,15 @@ Code/GraphMol/ForceFieldHelpers/Wrap/testHelpers.py::TestCase::testMMFFMolProper
 Code/GraphMol/ForceFieldHelpers/Wrap/testHelpers.py::TestCase::testOptimizeMolecule
 Code/GraphMol/ForceFieldHelpers/Wrap/testHelpers.py::TestCase::testOptimizeMoleculeConfs
 Code/GraphMol/ForceFieldHelpers/Wrap/testHelpers.py::TestCase::test_uff_get_forcefield_runs
+Code/GraphMol/FragCatalog/Wrap/rough_test.py::TestCase::test0Params
+Code/GraphMol/FragCatalog/Wrap/rough_test.py::TestCase::test1Catalog
+Code/GraphMol/FragCatalog/Wrap/rough_test.py::TestCase::test2Generator
+Code/GraphMol/FragCatalog/Wrap/rough_test.py::TestCase::test3FPgenerator
+Code/GraphMol/FragCatalog/Wrap/rough_test.py::TestCase::test4Serialize
+Code/GraphMol/FragCatalog/Wrap/rough_test.py::TestCase::test5FPsize
+Code/GraphMol/FragCatalog/Wrap/rough_test.py::TestCase::test6DownEntries
+Code/GraphMol/FragCatalog/Wrap/rough_test.py::TestCase::test7Issue116
+Code/GraphMol/FragCatalog/Wrap/rough_test.py::TestCase::test8Issue118
 Code/GraphMol/MMPA/Wrap/testMMPA.py::TestCase::test1
 Code/GraphMol/MMPA/Wrap/testMMPA.py::TestCase::test2
 Code/GraphMol/MMPA/Wrap/testMMPA.py::TestCase::test3

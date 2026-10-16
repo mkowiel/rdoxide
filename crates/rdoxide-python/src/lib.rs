@@ -45,6 +45,7 @@ mod rdfiltercatalog;
 mod rdfingerprintgenerator;
 mod rdfmcs;
 mod rdforcefield;
+mod rdfragcatalog;
 mod rdgeneralizedsubstruct;
 mod rdinfotheory;
 mod rdmetricmatrixcalc;
@@ -197,6 +198,12 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
         "rdMolCatalog",
         "rdkit.Chem.rdMolCatalog",
         rdmolcatalog::init,
+    )?;
+    add_submodule(
+        m,
+        "rdfragcatalog",
+        "rdkit.Chem.rdfragcatalog",
+        rdfragcatalog::init,
     )?;
     add_submodule(m, "rdFMCS", "rdkit.Chem.rdFMCS", rdfmcs::init)?;
     add_submodule(
