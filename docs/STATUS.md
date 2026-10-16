@@ -346,4 +346,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-17 — Stage 36: ScaffoldNetwork / rdScaffoldNetwork. Ratchet 1275 -> 1282. Next: GeneralizedSubstruct, MolBundle/ExtendedQueryMol search in SubstructLibrary.
 * 2026-10-18 — Stage 37: GeneralizedSubstruct / rdGeneralizedSubstruct (upstream test is skipped without serialization, so not in the ratchet; ported as pytest). Next: GenericGroups (useGenericMatchers), MolBundle/ExtendedQueryMol search in SubstructLibrary.
 * 2026-10-18 — Stage 38: GenericGroups. Ratchet 1282 -> 1295. Next: MolBundle/ExtendedQueryMol search in SubstructLibrary, MolBundle substructure search/props.
-* 2026-10-18 — Stage 39: SubstructLibrary MolBundle / ExtendedQueryMol queries. Ratchet 1295 -> 1297. Next: MolBundle substructure search/props, other unported modules (Rascal, SynthonSpaceSearch, MolDraw2D).
+* 2026-10-18 — Stage 39: SubstructLibrary MolBundle / ExtendedQueryMol queries. Ratchet +2 (1295 of 1563 upstream tests pass). Next: MolBundle substructure search/props, other unported modules (Rascal, SynthonSpaceSearch, MolDraw2D).
