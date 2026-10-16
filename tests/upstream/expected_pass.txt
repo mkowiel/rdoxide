@@ -150,6 +150,11 @@ Code/GraphMol/ChemReactions/Wrap/testSanitize.py::TestCase::test_github_4162
 Code/GraphMol/ChemReactions/Wrap/testSanitize.py::TestCase::test_only_aromatize_if_possible
 Code/GraphMol/ChemReactions/Wrap/testSanitize.py::TestCase::test_sanitize
 Code/GraphMol/ChemReactions/Wrap/testSanitize.py::TestCase::test_unused_rlabel_in_product
+Code/GraphMol/Deprotect/Wrap/rough_test.py::TestCase::testDeprotect
+Code/GraphMol/Deprotect/Wrap/rough_test.py::TestCase::testDeprotectInPlace
+Code/GraphMol/Deprotect/Wrap/rough_test.py::TestCase::testDeprotectVector
+Code/GraphMol/Deprotect/Wrap/rough_test.py::TestCase::test_examples
+Code/GraphMol/Deprotect/Wrap/rough_test.py::TestCase::test_examples_inplace
 Code/GraphMol/Descriptors/Wrap/test3D.py::TestCase::test1AUTOCORR2D
 Code/GraphMol/Descriptors/Wrap/test3D.py::TestCase::test2AUTOCORR3D
 Code/GraphMol/Descriptors/Wrap/test3D.py::TestCase::test3GETAWAY

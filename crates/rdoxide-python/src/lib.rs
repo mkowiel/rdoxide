@@ -35,6 +35,7 @@ mod rdchemreactions;
 mod rdcip_labeler;
 mod rdclustering;
 mod rddepictor;
+mod rddeprotect;
 mod rddeterminebonds;
 mod rddistgeom;
 mod rddistgeom_dg;
@@ -161,6 +162,12 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
         "rdCIPLabeler",
         "rdkit.Chem.rdCIPLabeler",
         rdcip_labeler::init,
+    )?;
+    add_submodule(
+        m,
+        "rdDeprotect",
+        "rdkit.Chem.rdDeprotect",
+        rddeprotect::init,
     )?;
     add_submodule(m, "rdFMCS", "rdkit.Chem.rdFMCS", rdfmcs::init)?;
     add_submodule(
