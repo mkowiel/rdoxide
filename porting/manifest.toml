@@ -1607,3 +1607,15 @@
 "Code/GraphMol/MolDraw2D/DrawAnnotation.h" = "03582eb3c14eeb850818c1f9ef2f14f0d7e6f3de"
 "Code/GraphMol/MolDraw2D/AtomSymbol.cpp" = "9bb0cf48d9a134c9bde43c38aeffeb73a7d58593"
 "Code/GraphMol/MolDraw2D/AtomSymbol.h" = "c111b2dd7bdaba75d16d2def500fcd879f3acce2"
+
+[module."rdoxide::graphmol::mol_draw2d::utils".sources]
+"Code/GraphMol/MolDraw2D/MolDraw2DUtils.cpp" = "106cf21d1a988fb900b3bef4413b2e0faa6a9fe5"
+"Code/GraphMol/MolDraw2D/MolDraw2DUtils.h" = "c1bdffd80590a5e638d07b25bb62ea4f7cc61aa9"
+
+[module."rdoxide::graphmol::mol_draw2d::draw_mol_utils".sources]
+"Code/GraphMol/MolDraw2D/DrawMol.cpp" = "f14287164ccbf3f4067d658229e65335159273ec"
+"Code/GraphMol/MolDraw2D/DrawMol.h" = "91cef7ed260064d3482febcc6de918660ab33a72"
+
+[module."rdoxide::graphmol::file_parsers::mol_file_stereochem".sources]
+"Code/GraphMol/FileParsers/MolFileStereochem.cpp" = "b3d1160d4a0913a8b7cfe0f491e23ed68b35f87c"
+"Code/GraphMol/FileParsers/MolFileStereochem.h" = "87de1dc400a4144434727e95537b806eca746975"

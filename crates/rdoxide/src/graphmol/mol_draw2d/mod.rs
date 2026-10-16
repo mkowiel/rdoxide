@@ -5,8 +5,10 @@
 
 pub mod details;
 pub mod draw_annotation;
+pub mod draw_mol_utils;
 pub mod draw_shape;
 pub mod draw_text;
 pub mod font;
 pub mod helpers;
 pub mod string_rect;
+pub mod utils;

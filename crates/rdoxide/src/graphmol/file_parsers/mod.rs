@@ -4,6 +4,7 @@ pub mod helm_parser;
 pub mod helm_writer;
 pub mod marvin;
 pub mod mol_file_parser;
+pub mod mol_file_stereochem;
 pub mod mol_file_v3000;
 pub mod mol_file_writer;
 pub mod multithreaded_supplier;
