@@ -19,6 +19,8 @@ mod sgroup_parsing;
 pub(crate) mod sgroup_writing;
 pub mod smiles_mol_supplier;
 pub mod smiles_writer;
+pub mod tdt_mol_supplier;
+pub mod tdt_writer;
 pub mod utils;
 pub mod xyz;
 

@@ -1492,3 +1492,15 @@
 [module."rdoxide_python::rdsynthonspacesearch".sources]
 "Code/GraphMol/SynthonSpaceSearch/Wrap/rdSynthonSpaceSearch.cpp" = "38d375c344b711b0e74809822ea4125213097a7e"
 "Code/GraphMol/SynthonSpaceSearch/nbWrap/rdSynthonSpaceSearch.cpp" = "bd4db49367926a6051390e91829b027be73c8f58"
+
+[module."rdoxide::graphmol::file_parsers::tdt_mol_supplier".sources]
+"Code/GraphMol/FileParsers/TDTMolSupplier.cpp" = "45f3972e4bc0fa5d54ef810e0a11251734f29de8"
+
+[module."rdoxide::graphmol::file_parsers::tdt_writer".sources]
+"Code/GraphMol/FileParsers/TDTWriter.cpp" = "089230b47fb9d5d6ea34d64ec287cb2d4bc20450"
+
+[module."rdoxide_python::rdmolfiles_tdtsupplier".sources]
+"Code/GraphMol/Wrap/TDTMolSupplier.cpp" = "cc53a707c314b56312dbd8dad838c61672b0164a"
+
+[module."rdoxide_python::rdmolfiles_tdtwriter".sources]
+"Code/GraphMol/Wrap/TDTWriter.cpp" = "e6993728c1e515dca5c1677aeecdd3ec097d48e4"
