@@ -1191,13 +1191,11 @@ impl PyMolDraw2D {
 
     /// Copies the drawing options passed in over our drawing options
     #[pyo3(signature = (opts))]
-    fn SetDrawOptions(
-        &mut self,
-        py: Python<'_>,
-        opts: &Bound<'_, PyMolDrawOptions>,
-    ) -> PyResult<()> {
-        let copy = opts.try_borrow()?.read(py, |o| o.clone())?;
-        *self.d.draw_options_mut() = copy;
+    fn SetDrawOptions(slf: &Bound<'_, Self>, opts: &Bound<'_, PyMolDrawOptions>) -> PyResult<()> {
+        // the options may be this drawer's own, so copy them before borrowing
+        // the drawer mutably
+        let copy = opts.try_borrow()?.read(slf.py(), |o| o.clone())?;
+        *slf.try_borrow_mut()?.d.draw_options_mut() = copy;
         Ok(())
     }
 }
