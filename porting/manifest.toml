@@ -352,6 +352,11 @@
 "Code/GraphMol/Depictor/RDDepictor.cpp" = "31a4547458b6fb1bf0ba2a1128f4362457b7ecd9"
 "Code/GraphMol/Depictor/RDDepictor.h" = "920846744603ec126c1690bc8ee247778ab9129e"
 
+[module."rdoxide::graphmol::depictor::templates".sources]
+"Code/GraphMol/Depictor/Templates.cpp" = "16f96480e921813b68b71e99fd587e7b79136298"
+"Code/GraphMol/Depictor/Templates.h" = "70587ff97ecd9efc21216761779e24107674ec87"
+"Code/GraphMol/Depictor/TemplateSmarts.h" = "e4e2914ca3fafefc35fe94b57ad1c3fde0dd55fc"
+
 [module."rdoxide::graphmol::depictor::depict_utils".sources]
 "Code/GraphMol/Depictor/DepictUtils.cpp" = "167919ec1c130a0c7bd59c99f909b380150a1901"
 "Code/GraphMol/Depictor/DepictUtils.h" = "109fe3bd93ac5ec047293a55fd8347df51d012ad"

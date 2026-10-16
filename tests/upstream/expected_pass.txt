@@ -152,6 +152,15 @@ Code/GraphMol/ChemReactions/Wrap/testSanitize.py::TestCase::test_github_4162
 Code/GraphMol/ChemReactions/Wrap/testSanitize.py::TestCase::test_only_aromatize_if_possible
 Code/GraphMol/ChemReactions/Wrap/testSanitize.py::TestCase::test_sanitize
 Code/GraphMol/ChemReactions/Wrap/testSanitize.py::TestCase::test_unused_rlabel_in_product
+Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::test1CisTrans
+Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::test2Coords
+Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::test3IssueSF1526844
+Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::test6ChangeBondLength
+Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::testAddRingSystemTemplates
+Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::testSetBadRingSystemTemplates
+Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::testSetRingSystemTemplates
+Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::testUseMultipleTemplates
+Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::testUseTemplateAndCoordMap
 Code/GraphMol/Deprotect/Wrap/rough_test.py::TestCase::testDeprotect
 Code/GraphMol/Deprotect/Wrap/rough_test.py::TestCase::testDeprotectInPlace
 Code/GraphMol/Deprotect/Wrap/rough_test.py::TestCase::testDeprotectVector
@@ -1075,6 +1084,11 @@ rdkit/Chem/AtomPairs/UnitTestDescriptors.py::TestCase::testGetTopologicalTorsion
 rdkit/Chem/AtomPairs/UnitTestDescriptors.py::TestCase::testGithub334
 rdkit/Chem/AtomPairs/UnitTestDescriptors.py::TestCase::testPairsRegression
 rdkit/Chem/AtomPairs/UnitTestDescriptors.py::TestCase::testTorsionsRegression
+rdkit/Chem/ChemUtils/UnitTestAlignDepict.py::TestCase::test1
+rdkit/Chem/ChemUtils/UnitTestAlignDepict.py::TestCase::test_AlignDepict
+rdkit/Chem/ChemUtils/UnitTestSDFToCSV.py::TestCase::test1
+rdkit/Chem/ChemUtils/UnitTestSDFToCSV.py::TestCase::test2
+rdkit/Chem/ChemUtils/UnitTestSDFToCSV.py::TestCase::test_parser
 rdkit/Chem/Draw/UnitTestDraw.py::TestCase::testDrawMorgan
 rdkit/Chem/Draw/UnitTestDraw.py::TestCase::testDrawRDKit
 rdkit/Chem/Draw/UnitTestDraw.py::TestCase::testDrawReaction
