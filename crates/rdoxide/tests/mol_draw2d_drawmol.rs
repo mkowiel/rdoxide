@@ -483,3 +483,176 @@ fn regions_and_attachments() {
     // the dummy has no label then
     assert!(dm.atom_labels[0].is_none());
 }
+
+#[test]
+fn atom_and_bond_notes_avoid_the_drawing() {
+    let mut o = MolDrawOptions::default();
+    o.add_atom_indices = true;
+    o.add_bond_indices = true;
+    let (dm, _) = build_hl("CC(=O)N", &o, DrawMolHighlights::default());
+    // one note per atom and per bond
+    assert_eq!(dm.annotations.len(), 4 + 3);
+    assert!(dm.annotations.iter().all(|a| a.font_scale > 0.0));
+    // an atom note ends up away from the atom itself
+    let first = &dm.annotations[0];
+    assert!((first.pos - dm.at_cds[0]).length() > 0.2);
+    // classes
+    assert!(dm.annotations.iter().all(|a| a.class == "note"));
+}
+
+#[test]
+fn cip_codes_and_stereo_groups() {
+    use rdoxide::rdgeneral::RDProps;
+    let mut o = MolDrawOptions::default();
+    o.add_stereo_annotation = true;
+    let mut t = text();
+    let mut m = smi("C[C@H](N)C=CC");
+    m.atom_mut(1).set_prop("_CIPCode", "S", true).unwrap();
+    m.bond_mut(3)
+        .set_stereo(rdoxide::graphmol::bond::BondStereo::StereoE)
+        .unwrap();
+    let mut o2 = o.clone();
+    o2.prepare_mols_before_drawing = false;
+    let mut dm = DrawMol::new(
+        &m,
+        "",
+        300,
+        300,
+        &o2,
+        &mut t,
+        DrawMolHighlights::default(),
+        true,
+        -1,
+        false,
+    )
+    .unwrap();
+    dm.extract_all(1.0, &mut t).unwrap();
+    let texts: Vec<_> = dm.annotations.iter().map(|a| a.text.as_str()).collect();
+    assert!(
+        texts.contains(&"(S)") && texts.contains(&"(E)"),
+        "{texts:?}"
+    );
+    assert!(dm.annotations.iter().any(|a| a.class == "CIP_Code"));
+
+    // enhanced stereo labels, and CIP codes hidden for OR/AND groups
+    let mut m = smi("C[C@H](N)C[C@@H](O)C |o1:1,4|");
+    m.atom_mut(1).set_prop("_CIPCode", "R", true).unwrap();
+    let mut dm = DrawMol::new(
+        &m,
+        "",
+        300,
+        300,
+        &o2,
+        &mut t,
+        DrawMolHighlights::default(),
+        true,
+        -1,
+        false,
+    )
+    .unwrap();
+    dm.extract_all(1.0, &mut t).unwrap();
+    let texts: Vec<_> = dm.annotations.iter().map(|a| a.text.as_str()).collect();
+    assert_eq!(
+        texts.iter().filter(|t| **t == "or1").count(),
+        2,
+        "{texts:?}"
+    );
+    assert!(!texts.contains(&"(R)"));
+    let mut shown = o2.clone();
+    shown.show_all_cip_codes = true;
+    let mut dm = DrawMol::new(
+        &m,
+        "",
+        300,
+        300,
+        &shown,
+        &mut t,
+        DrawMolHighlights::default(),
+        true,
+        -1,
+        false,
+    )
+    .unwrap();
+    dm.extract_all(1.0, &mut t).unwrap();
+    assert!(dm.annotations.iter().any(|a| a.text == "(R)"));
+    // and none when the stereo group annotation is off
+    let mut off = o2.clone();
+    off.add_stereo_group_annotation = false;
+    let mut dm = DrawMol::new(
+        &m,
+        "",
+        300,
+        300,
+        &off,
+        &mut t,
+        DrawMolHighlights::default(),
+        true,
+        -1,
+        false,
+    )
+    .unwrap();
+    dm.extract_all(1.0, &mut t).unwrap();
+    assert!(dm.annotations.iter().all(|a| a.class != "stereoGroup"));
+}
+
+#[test]
+fn molecule_notes_and_radicals() {
+    use rdoxide::rdgeneral::RDProps;
+    let mut o = MolDrawOptions::default();
+    o.prepare_mols_before_drawing = true;
+    let mut t = text();
+    let mut m = smi("CCO");
+    m.set_prop("molNote", "my note", false).unwrap();
+    let mut dm = DrawMol::new(
+        &m,
+        "",
+        300,
+        300,
+        &o,
+        &mut t,
+        DrawMolHighlights::default(),
+        true,
+        -1,
+        false,
+    )
+    .unwrap();
+    dm.extract_all(1.0, &mut t).unwrap();
+    dm.calculate_scale(&mut t);
+    dm.finish_create_draw_objects(&mut t).unwrap();
+    assert_eq!(dm.legends.len(), 1);
+    assert_eq!(dm.legends[0].text, "my note");
+    // in a corner of the canvas
+    let p = dm.legends[0].pos;
+    assert!(p.x >= 0.0 && p.x < 300.0 && p.y >= 0.0 && p.y <= 300.0);
+
+    // the chiral flag gives ABS when asked for
+    let mut m = smi("CCO");
+    m.set_prop("_MolFileChiralFlag", 1, false).unwrap();
+    let mut o2 = o.clone();
+    o2.include_chiral_flag_label = true;
+    let mut dm = DrawMol::new(
+        &m,
+        "",
+        300,
+        300,
+        &o2,
+        &mut t,
+        DrawMolHighlights::default(),
+        true,
+        -1,
+        false,
+    )
+    .unwrap();
+    dm.extract_all(1.0, &mut t).unwrap();
+    dm.calculate_scale(&mut t);
+    dm.finish_create_draw_objects(&mut t).unwrap();
+    assert_eq!(dm.legends[0].text, "ABS");
+
+    // radicals get a rectangle and an orientation each
+    let (dm, _) = build_hl("[CH2]C[O]", &o, DrawMolHighlights::default());
+    assert_eq!(dm.radicals.len(), 2);
+    let mut off = o.clone();
+    off.include_radicals = false;
+    let (dm, _) = build_hl("[CH2]C[O]", &off, DrawMolHighlights::default());
+    assert!(dm.radicals.is_empty());
+}

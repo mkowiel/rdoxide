@@ -323,7 +323,7 @@ impl DrawMol {
     }
 
     /// Extracts everything to be drawn. Present so far: atom coordinates, labels,
-    /// bonds, regions, highlights and attachments.
+    /// bonds, regions, highlights, attachments, notes and radicals.
     pub fn extract_all(&mut self, scale: f64, text: &mut DrawTextFT) -> Result<()> {
         self.extract_atom_coords()?;
         self.extract_atom_symbols(text)?;
@@ -331,6 +331,15 @@ impl DrawMol {
         self.extract_regions()?;
         self.extract_highlights(scale)?;
         self.extract_attachments()?;
+        self.extract_atom_notes(text)?;
+        if self.opts.add_stereo_annotation {
+            self.extract_cip_codes(self.opts.show_all_cip_codes, text)?;
+        }
+        if self.opts.add_stereo_group_annotation {
+            self.extract_stereo_groups(text)?;
+        }
+        self.extract_bond_notes(text)?;
+        self.extract_radicals()?;
         Ok(())
     }
 
@@ -867,6 +876,8 @@ impl DrawMol {
         // the legend needs the final scale to get its font the right size
         self.extract_legend(text)?;
         self.change_to_draw_coords(text)?;
+        // these need the drawing coordinates
+        self.extract_mol_notes(text)?;
         self.drawing_initialised = true;
         Ok(())
     }

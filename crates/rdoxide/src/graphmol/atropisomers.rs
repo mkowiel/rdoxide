@@ -669,3 +669,23 @@ pub fn wedge_bonds_from_atropisomers(
     }
     Ok(())
 }
+
+/// `getAllAtomIdsForStereoGroup` (with no wedge-info map, as the drawing code
+/// calls it): the atoms of the group, plus the atoms of its bonds that carry a
+/// wedge or hash on another bond.
+pub fn get_all_atom_ids_for_stereo_group(mol: &ROMol, group: &StereoGroup) -> Vec<u32> {
+    let mut ids: Vec<u32> = group.atoms().to_vec();
+    for &bond in group.bonds() {
+        let b = mol.bond(bond);
+        for atom in [b.begin_atom_idx(), b.end_atom_idx()] {
+            let wedged = mol.atom_bonds(atom).any(|ab| {
+                ab.idx() != bond
+                    && matches!(ab.bond_dir(), BondDir::BeginWedge | BondDir::BeginDash)
+            });
+            if wedged && !ids.contains(&atom) {
+                ids.push(atom);
+            }
+        }
+    }
+    ids
+}
