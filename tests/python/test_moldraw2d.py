@@ -238,3 +238,15 @@ def test_contours():
         rdMolDraw2D.ContourAndDrawGrid(d, [[1.0]], [0], [0])
     with pytest.raises(ValueError):
         rdMolDraw2D.ContourAndDrawGaussians(d, [], [], [])
+
+
+def test_multi_colour_highlights():
+    m = Chem.MolFromSmiles("CCOC")
+    d = rdMolDraw2D.MolDraw2DSVG(300, 300)
+    red, green = (1.0, 0.0, 0.0), (0.0, 1.0, 0.0)
+    d.DrawMoleculeWithHighlights(m, "legend", {0: [red], 1: [red, green]}, {0: [green]}, {}, {})
+    d.FinishDrawing()
+    svg = d.GetDrawingText()
+    assert svg.count("<ellipse") == 1 and "#00FF00" in svg
+    with pytest.raises(ValueError):
+        d.DrawMoleculeWithHighlights(m, "", {9: [red]}, {}, {}, {})

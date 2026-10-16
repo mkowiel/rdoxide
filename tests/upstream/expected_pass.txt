@@ -1065,6 +1065,7 @@ rdkit/Chem/Draw/UnitTestDraw.py::TestCase::testDrawRDKit
 rdkit/Chem/Draw/UnitTestDraw.py::TestCase::testGithub3762
 rdkit/Chem/Draw/UnitTestDraw.py::TestCase::testGithub5863
 rdkit/Chem/Draw/UnitTestDraw.py::TestCase::testGridSVG
+rdkit/Chem/Draw/UnitTestDraw.py::TestCase::testHighlightMatch
 rdkit/Chem/Draw/UnitTestDraw.py::TestCase::testMolToSVG
 rdkit/Chem/Draw/UnitTestDraw.py::TestCase::testMolsMatrixToGridImage
 rdkit/Chem/Draw/UnitTestDraw.py::TestCase::testMolsMatrixToLinear

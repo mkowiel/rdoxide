@@ -1678,3 +1678,9 @@
 [module."rdoxide::graphmol::mol_draw2d::contour".sources]
 "Code/GraphMol/MolDraw2D/MolDraw2DUtils.cpp" = "106cf21d1a988fb900b3bef4413b2e0faa6a9fe5"
 "Code/GraphMol/MolDraw2D/MolDraw2DUtils.h" = "c1bdffd80590a5e638d07b25bb62ea4f7cc61aa9"
+
+[module."rdoxide::graphmol::mol_draw2d::draw_mol_mch".sources]
+"Code/GraphMol/MolDraw2D/DrawMolMCH.cpp" = "1131e5228044e3ea5c48317093a3a41723e82f04"
+"Code/GraphMol/MolDraw2D/DrawMolMCH.h" = "b89e1fcddd9ce67f8599fc23584f3263616b635b"
+"Code/GraphMol/MolDraw2D/DrawMolMCHCircleAndLine.cpp" = "c47f79d5bbfaf140ec3638d9fefe8e67a6d7d6cf"
+"Code/GraphMol/MolDraw2D/DrawMolMCHCircleAndLine.h" = "141682d1d9c9a7683835347404802e1a2b01e243"
