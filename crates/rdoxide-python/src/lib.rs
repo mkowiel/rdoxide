@@ -46,6 +46,7 @@ mod rdfingerprintgenerator;
 mod rdfmcs;
 mod rdforcefield;
 mod rdfragcatalog;
+mod rdgaussianshape;
 mod rdgeneralizedsubstruct;
 mod rdinfotheory;
 mod rdmetricmatrixcalc;
@@ -298,6 +299,12 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
         "rdSubstructLibrary",
         "rdkit.Chem.rdSubstructLibrary",
         rdsubstructlibrary::init,
+    )?;
+    add_submodule(
+        m,
+        "rdGaussianShape",
+        "rdkit.Chem.rdGaussianShape",
+        rdgaussianshape::init,
     )?;
     add_submodule(m, "rdMIF", "rdkit.Chem.rdMIF", rdmif::init)?;
     add_submodule(m, "rdMolHash", "rdkit.Chem.rdMolHash", rdmolhash::init)?;

@@ -16,7 +16,7 @@ use crate::mol::PyMol;
 
 /// The arguments of a call by name, in the order of `names`; a name may be
 /// given by position or keyword.
-fn gather<'py>(
+pub(crate) fn gather<'py>(
     args: &Bound<'py, PyTuple>,
     kwargs: Option<&Bound<'py, PyDict>>,
     names: &[&str],

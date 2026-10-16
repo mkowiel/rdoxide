@@ -28,6 +28,7 @@ pub mod fmcs;
 pub mod forcefield_helpers;
 pub mod frag_catalog;
 pub mod functional_group_hierarchy;
+pub mod gaussian_shape;
 pub mod generalized_substruct;
 pub mod generic_groups;
 pub mod kekulize;

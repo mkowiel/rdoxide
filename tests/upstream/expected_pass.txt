@@ -360,6 +360,16 @@ Code/GraphMol/FragCatalog/Wrap/rough_test.py::TestCase::test5FPsize
 Code/GraphMol/FragCatalog/Wrap/rough_test.py::TestCase::test6DownEntries
 Code/GraphMol/FragCatalog/Wrap/rough_test.py::TestCase::test7Issue116
 Code/GraphMol/FragCatalog/Wrap/rough_test.py::TestCase::test8Issue118
+Code/GraphMol/GaussianShape/Wrap/test_rdgaussian_shape.py::TestCase::test10_multipleConformers
+Code/GraphMol/GaussianShape/Wrap/test_rdgaussian_shape.py::TestCase::test1_Defaults
+Code/GraphMol/GaussianShape/Wrap/test_rdgaussian_shape.py::TestCase::test2_NoColor
+Code/GraphMol/GaussianShape/Wrap/test_rdgaussian_shape.py::TestCase::test3_FromShape
+Code/GraphMol/GaussianShape/Wrap/test_rdgaussian_shape.py::TestCase::test4_customFeatures
+Code/GraphMol/GaussianShape/Wrap/test_rdgaussian_shape.py::TestCase::test5_customFeatures
+Code/GraphMol/GaussianShape/Wrap/test_rdgaussian_shape.py::TestCase::test6_FixedScore
+Code/GraphMol/GaussianShape/Wrap/test_rdgaussian_shape.py::TestCase::test7_customAtomRadii
+Code/GraphMol/GaussianShape/Wrap/test_rdgaussian_shape.py::TestCase::test8_atomSubset
+Code/GraphMol/GaussianShape/Wrap/test_rdgaussian_shape.py::TestCase::test9_tversky
 Code/GraphMol/MMPA/Wrap/testMMPA.py::TestCase::test1
 Code/GraphMol/MMPA/Wrap/testMMPA.py::TestCase::test2
 Code/GraphMol/MMPA/Wrap/testMMPA.py::TestCase::test3
@@ -750,6 +760,7 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::test24RDKFingerprint
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test26SmiMolSupplier
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test27SmilesWriter
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test28SmilesReverse
+Code/GraphMol/nbWrap/rough_test.py::TestCase::test29SDWriterLoop
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test2Atom
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test30Issues109and110
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test31ChiralitySmiles
