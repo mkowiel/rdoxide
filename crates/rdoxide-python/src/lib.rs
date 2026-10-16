@@ -50,6 +50,7 @@ mod rdgeneralizedsubstruct;
 mod rdinfotheory;
 mod rdmetricmatrixcalc;
 mod rdmhfpfingerprint;
+mod rdmif;
 mod rdmmpa;
 mod rdmolalign;
 mod rdmolcatalog;
@@ -298,6 +299,7 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
         "rdkit.Chem.rdSubstructLibrary",
         rdsubstructlibrary::init,
     )?;
+    add_submodule(m, "rdMIF", "rdkit.Chem.rdMIF", rdmif::init)?;
     add_submodule(m, "rdMolHash", "rdkit.Chem.rdMolHash", rdmolhash::init)?;
     add_submodule(
         m,

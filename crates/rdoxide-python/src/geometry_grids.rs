@@ -289,7 +289,7 @@ fn py_find_grid_terminal_points<'py>(
 )]
 #[derive(Debug, Clone)]
 pub struct PyUniformRealValueGrid3D {
-    g: UniformRealValueGrid3D,
+    pub(crate) g: UniformRealValueGrid3D,
 }
 
 #[pymethods]

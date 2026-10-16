@@ -388,6 +388,11 @@ Code/GraphMol/MolHash/Wrap/testMolHash.py::TestCase::test1
 Code/GraphMol/MolHash/Wrap/testMolHash.py::TestCase::testCxSmiles
 Code/GraphMol/MolHash/Wrap/testMolHash.py::TestCase::testProtomerV2
 Code/GraphMol/MolHash/Wrap/testMolHash.py::TestCase::testTautomerV2
+Code/GraphMol/MolInteractionFields/Wrap/testMIF.py::TestCase::test1ConstructGrid
+Code/GraphMol/MolInteractionFields/Wrap/testMIF.py::TestCase::test2CubeFiles
+Code/GraphMol/MolInteractionFields/Wrap/testMIF.py::TestCase::test3Coulomb
+Code/GraphMol/MolInteractionFields/Wrap/testMIF.py::TestCase::test4CoulombDielectric
+Code/GraphMol/MolInteractionFields/Wrap/testMIF.py::TestCase::test5VdWaals
 Code/GraphMol/MolInterchange/Wrap/testMolInterchange.py::TestCase::test1
 Code/GraphMol/MolInterchange/Wrap/testMolInterchange.py::TestCase::test2
 Code/GraphMol/MolProcessing/Wrap/testMolProcessing.py::TestCase::test1

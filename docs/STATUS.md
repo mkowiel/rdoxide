@@ -152,6 +152,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 43a | MarvinParse reader (`graphmol::file_parsers::marvin`: XML reader modelled on boost property trees, the Marvin molecule model with sgroup tree, superatom / multiple / multicenter sgroup restructuring, `MolFromMrvBlock` / `MolFromMrvFile`). Not yet: the writer (`MolToMrvBlock`) and reactions | ✅ | upstream `MarvinParse/testMrvToMol.cpp` mol-file table: 188 of 191 `.expected.sdf` identical (3 sanitized/no-reapply wedging differences noted in `tests/marvin_parse.rs`); `tests/python/test_marvin_parse.py` |
 | 43b | MarvinParse writer (`MolToMrvBlock` / `MolToMrvFile`: atoms, bonds with wedging, stereo groups, SRU/COP/MOD/DAT/SUP/MUL/GEN/MON sgroups with superatom and multiple contraction, boost-style XML output incl. pretty print). | ✅ | the 188 parsed cases of upstream `testMrvToMol.cpp` give `.expected.mrv` identical to upstream; `tests/python/test_marvin_parse.py` |
 | 43c | Marvin reactions (`ReactionFromMrvBlock/File`, `MrvBlockIsReaction`, `MrvFileIsReaction`, `ReactionToMrvBlock/File` with the reaction arrow and plus signs); Python in `rdChemReactions` | ✅ | the 14 reaction cases of upstream `testMrvToMol.cpp`: counts, validation and `.expected.rxn` / `.expected.mrv` identical |
+| 44a | MolInteractionFields (`graphmol::mol_interaction_fields`): `ConstructGrid`, `CalculateDescriptors` (grid planes computed on several threads, values independent of the thread count), `Coulomb`, `CoulombDielectric`, `MMFFVdWaals`, `UFFVdWaals`, Gaussian cube files; Python `rdkit.Chem.rdMIF`. Not yet: `HBond`, `Hydrophilic` | ✅ | upstream `MolInteractionFields/Wrap/testMIF.py` tests 1-5 |
 | 7–13 | see PLAN.md | ⬜ | |
 
 ## Python package files
@@ -359,3 +360,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-19 — Stage 43a: MarvinParse reader / `MolFromMrvFile`/`MolFromMrvBlock`. Next: Marvin writer (`MolToMrvBlock`), Marvin reactions, then MolInteractionFields, GaussianShape, Rascal, SynthonSpaceSearch, MolDraw2D.
 * 2026-10-19 — Stage 43b: Marvin writer / `MolToMrvBlock`, `MolToMrvFile`. Next: Marvin reactions, then MolInteractionFields, GaussianShape, Rascal, SynthonSpaceSearch, MolDraw2D.
 * 2026-10-19 — Stage 43c: Marvin reactions. MarvinParse is complete. Next: MolInteractionFields, GaussianShape, Rascal, SynthonSpaceSearch, MolDraw2D.
+* 2026-10-20 — Stage 44a: MolInteractionFields (grid, Coulomb, vdW, cube). Next: HBond / Hydrophilic, then GaussianShape, Rascal, SynthonSpaceSearch, MolDraw2D.

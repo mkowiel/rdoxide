@@ -1416,3 +1416,12 @@
 
 [module."rdoxide_python::rdmolfiles_marvin".sources]
 "Code/GraphMol/Wrap/rdmolfiles.cpp" = "829058d8e8a382c358d2464cee762f8cff04f75f"
+
+[module."rdoxide::graphmol::mol_interaction_fields".sources]
+"Code/GraphMol/MolInteractionFields/MIFDescriptors.cpp" = "fe99e15597e513a3313c4afbdd7d66dd6b0e08ab"
+"Code/GraphMol/MolInteractionFields/MIFDescriptors.h" = "617c787555d016a94ad788bbd8829e4985d95fbd"
+"Code/GraphMol/MolInteractionFields/testMIF.cpp" = "23571aa90d792a65fe61afe1b7d8fc0aabeac392"
+
+[module."rdoxide_python::rdmif".sources]
+"Code/GraphMol/MolInteractionFields/Wrap/rdMIF.cpp" = "e858d9976090dca68984b9e9ea7099e361a323d3"
+"Code/GraphMol/MolInteractionFields/nbWrap/rdMIF.cpp" = "a262775ba269fc6560c025102f92fe44761587d5"
