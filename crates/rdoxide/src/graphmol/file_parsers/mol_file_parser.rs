@@ -73,12 +73,6 @@ pub(super) fn fpe(msg: impl Into<String>) -> RDKitError {
     RDKitError::FileParse(msg.into())
 }
 
-pub(super) fn not_ported(what: &str, line: u32) -> RDKitError {
-    fpe(format!(
-        "{what} on line {line} is not supported by rdoxide yet"
-    ))
-}
-
 /// Maps a failed `lexical_cast` to the `FileParseException` upstream
 /// throws; other errors (e.g. `std::out_of_range`) pass through.
 pub(super) fn cast_err<T>(r: Result<T>, msg: impl FnOnce() -> String) -> Result<T> {

@@ -1,15 +1,14 @@
 //! V3000 CTAB reader (`ParseV3000CTAB` and helpers).
 //!
 //! Ported from RDKit `Code/GraphMol/FileParsers/MolFileParser.cpp`
-//! (2026.09.1). SGroup blocks are not ported yet and are reported as parse
-//! errors.
+//! (2026.09.1).
 //!
 //! Copyright (C) 2002-2025 Greg Landrum and other RDKit contributors.
 //! Licensed under the BSD 3-Clause license (see LICENSES/RDKit-BSD-3-Clause.txt).
 
 use super::mol_file_parser::{
     COMPLEX_QUERIES, GENERIC_GROUPS, calculate_3d_flag, complex_name_query, fpe,
-    lookup_atomic_number, not_ported,
+    lookup_atomic_number,
 };
 use super::sgroup_parsing::parse_v3000_sgroups_block;
 use super::utils::{
@@ -301,6 +300,65 @@ fn parse_v3000_rgroups(mol: &mut RWMol, idx: u32, text: &[u8], line: u32) -> Res
 }
 
 /// `ParseV3000AtomProps`
+/// The `molAttachOrderTemplate` property of an atom: pairs of the index of
+/// the atom a template atom is attached to and the name of the attachment
+/// point. Upstream stores a vector of pairs, which `RDValue` cannot hold, so
+/// each pair is kept as an `index:name` string.
+pub fn set_attach_order_template(atom: &mut crate::graphmol::atom::Atom, orders: &[(u32, String)]) {
+    let encoded: Vec<String> = orders
+        .iter()
+        .map(|(idx, label)| format!("{idx}:{label}"))
+        .collect();
+    atom.props.set_val(cp::molAttachOrderTemplate, encoded);
+}
+
+/// The pairs set by [`set_attach_order_template`] (none if there is no such
+/// property).
+pub fn attach_order_template(atom: &crate::graphmol::atom::Atom) -> Vec<(u32, String)> {
+    let Some(RDValue::VecString(encoded)) = atom.props.get(cp::molAttachOrderTemplate) else {
+        return Vec::new();
+    };
+    encoded
+        .iter()
+        .filter_map(|e| {
+            let (idx, label) = e.split_once(':')?;
+            Some((idx.parse().ok()?, label.to_string()))
+        })
+        .collect()
+}
+
+/// The template form of `ATTCHORD`: `(n idx label idx label ...)`, where `n`
+/// is the number of items that follow.
+fn parse_attach_order_template(atom_idx: u32, val: &[u8], line: u32) -> Result<Vec<(u32, String)>> {
+    let inner = &val[1..val.len().saturating_sub(1).max(1)];
+    let invalid = || {
+        fpe(format!(
+            "Invalid ATTCHORD value: '{}' for atom {} on line {line}\n",
+            lossy(inner),
+            atom_idx + 1
+        ))
+    };
+    let tokens: Vec<&[u8]> = inner.split(|c| matches!(c, b' ' | b'\t')).collect();
+    let item_count = to_int(tokens[0], true)? as u32;
+    if item_count == 0 || item_count % 2 != 0 || tokens.len() != item_count as usize + 1 {
+        return Err(invalid());
+    }
+    let mut orders: Vec<(u32, String)> = Vec::new();
+    for i in (1..item_count as usize).step_by(2) {
+        let idx = to_int(tokens[i], true)? as u32;
+        let label = lossy(tokens[i + 1]);
+        // check for uniqueness
+        if orders
+            .iter()
+            .any(|(prev, lbl)| idx == prev.wrapping_add(1) || *lbl == label)
+        {
+            return Err(invalid());
+        }
+        orders.push((idx.wrapping_sub(1), label));
+    }
+    Ok(orders)
+}
+
 fn parse_v3000_atom_props(
     mol: &mut RWMol,
     idx: u32,
@@ -459,10 +517,13 @@ fn parse_v3000_atom_props(
             }
             b"ATTCHORD" => {
                 if val.first() == Some(&b'(') {
-                    return Err(not_ported("ATTCHORD templates", line));
+                    // a template instance, e.g. ATTCHORD=(4 1 Al 3 Br)
+                    let attach_orders = parse_attach_order_template(idx, val, line)?;
+                    set_attach_order_template(mol.atom_mut(idx), &attach_orders);
+                } else {
+                    let v = ti(val)?;
+                    mol.atom_mut(idx).props.set_val(cp::molAttachOrder, v);
                 }
-                let v = ti(val)?;
-                mol.atom_mut(idx).props.set_val(cp::molAttachOrder, v);
             }
             b"CLASS" => mol
                 .atom_mut(idx)
