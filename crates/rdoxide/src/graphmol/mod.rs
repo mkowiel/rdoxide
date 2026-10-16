@@ -34,6 +34,7 @@ pub mod matrices;
 pub mod mmpa;
 pub mod mol_align;
 pub mod mol_bundle;
+pub mod mol_catalog;
 pub mod mol_chemical_features;
 pub mod mol_enumerator;
 pub mod mol_hash;

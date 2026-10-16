@@ -358,6 +358,9 @@ Code/GraphMol/MMPA/Wrap/testMMPA.py::TestCase::test6
 Code/GraphMol/MMPA/Wrap/testMMPA.py::TestCase::test7
 Code/GraphMol/MMPA/Wrap/testMMPA.py::TestCase::test8
 Code/GraphMol/MMPA/Wrap/testMMPA.py::TestCase::test9
+Code/GraphMol/MolCatalog/Wrap/rough_test.py::TestCase::test1
+Code/GraphMol/MolCatalog/Wrap/rough_test.py::TestCase::test2
+Code/GraphMol/MolCatalog/Wrap/rough_test.py::TestCase::test3
 Code/GraphMol/MolChemicalFeatures/Wrap/testChemicalFeatures.py::TestCase::testAtomMatch
 Code/GraphMol/MolChemicalFeatures/Wrap/testChemicalFeatures.py::TestCase::testBasic
 Code/GraphMol/MolChemicalFeatures/Wrap/testChemicalFeatures.py::TestCase::testGithub2530

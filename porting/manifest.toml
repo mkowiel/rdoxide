@@ -1358,3 +1358,22 @@
 [module."rdoxide::graphmol::generic_groups".sources]
 "Code/GraphMol/GenericGroups/GenericGroups.cpp" = "7515b423ba203b9cdbff6dfe765d7f2699af3639"
 "Code/GraphMol/GenericGroups/GenericGroups.h" = "853e63f3024b957f7cf2f9e974f777a404138281"
+
+[module."rdoxide::catalogs".sources]
+"Code/Catalogs/Catalog.h" = "b165e79a2fd5fff76d07cd48c53ffac4dc9b3b3d"
+"Code/Catalogs/Catalog.cpp" = "068dd6ef3e5d49a331b1c3bf58279113360ea431"
+"Code/Catalogs/CatalogEntry.h" = "03079f1a0560a3b9d0213967509accc96f826673"
+"Code/Catalogs/CatalogEntry.cpp" = "5f73fd38b0bd609e583d56ed18c1b856be7aa22f"
+"Code/Catalogs/CatalogParams.h" = "9604bfb217b24aeedcca80274f2ec2ad370a1dd0"
+"Code/Catalogs/CatalogParams.cpp" = "c110ceb735c4850a9e5ad0f7c182065b2a0d3c3f"
+
+[module."rdoxide::graphmol::mol_catalog".sources]
+"Code/GraphMol/MolCatalog/MolCatalog.h" = "3c06e3d99dd4d8404e1972c1f2db9cdba6118e68"
+"Code/GraphMol/MolCatalog/MolCatalogEntry.cpp" = "ec4ab2d5866d21c5ed7e5edca93dca22d9df8457"
+"Code/GraphMol/MolCatalog/MolCatalogEntry.h" = "b1db3dd08aeee2bc78a57a289b1587359f4b52c9"
+"Code/GraphMol/MolCatalog/MolCatalogParams.cpp" = "5655f9c3fb26b1ca4cc6a6fd59ec7d0fc57a37d0"
+"Code/GraphMol/MolCatalog/MolCatalogParams.h" = "edd8ded3ae32e7191d7448fabd3d0b4bf52b38f6"
+
+[module."rdoxide_python::rdmolcatalog".sources]
+"Code/GraphMol/MolCatalog/Wrap/rdMolCatalog.cpp" = "ffb83925f43ac85bd6dbf7c0156e5c653ce61d8c"
+"Code/GraphMol/MolCatalog/nbWrap/rdMolCatalog.cpp" = "e182174a713d8642d22b44845fd3bdbfb1c253c5"
