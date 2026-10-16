@@ -41,6 +41,7 @@ pub mod mol_enumerator;
 pub mod mol_hash;
 pub mod mol_interchange;
 pub mod mol_ops;
+pub mod mol_processing;
 pub mod mol_props;
 pub mod mol_standardize;
 pub mod mol_transforms;
