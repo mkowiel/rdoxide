@@ -200,6 +200,68 @@ pub fn union_rings(rings: &[Vec<i32>], exclude: Option<&[usize]>) -> Vec<i32> {
     res
 }
 
+/// `findCoreRings`: simplifies fused rings to a set of core rings by
+/// iteratively removing rings that share only one or two consecutive atoms.
+/// These are trivial to embed after the core rings have been embedded, and
+/// removing them makes template matching more powerful since it is not
+/// affected by the side rings. Returns the core rings and their indices.
+pub fn find_core_rings(fused_rings: &[Vec<i32>], mol: &ROMol) -> (Vec<Vec<i32>>, Vec<usize>) {
+    let mut removed = vec![false; fused_rings.len()];
+    loop {
+        let mut removed_a_ring = false;
+        for curr in 0..fused_rings.len() {
+            if removed[curr] || removed_a_ring {
+                continue;
+            }
+            let mut n_intersecting = 0;
+            let (mut aid1, mut aid2) = (-1, -1);
+            for other in 0..fused_rings.len() {
+                if curr == other || removed[other] {
+                    continue;
+                }
+                let common = fused_rings[curr]
+                    .iter()
+                    .copied()
+                    .filter(|a| fused_rings[other].contains(a));
+                for rii in common {
+                    if rii != aid1 && rii != aid2 {
+                        n_intersecting += 1;
+                        if aid1 == -1 {
+                            aid1 = rii;
+                        } else {
+                            aid2 = rii;
+                        }
+                        if n_intersecting == 2 {
+                            break;
+                        }
+                    }
+                }
+            }
+            // The set of rings is not the SSSR because of symmetrizeSSSR, so
+            // a check for only one fused ring is not possible. Instead make
+            // sure that this ring shares only one atom or one bond (two
+            // consecutive atoms).
+            if n_intersecting == 1
+                || (n_intersecting == 2
+                    && mol
+                        .get_bond_between_atoms(aid1 as u32, aid2 as u32)
+                        .ok()
+                        .flatten()
+                        .is_some())
+            {
+                removed[curr] = true;
+                removed_a_ring = true;
+            }
+        }
+        if !removed_a_ring {
+            break;
+        }
+    }
+    let ids: Vec<usize> = (0..fused_rings.len()).filter(|&i| !removed[i]).collect();
+    let rings = ids.iter().map(|&i| fused_rings[i].clone()).collect();
+    (rings, ids)
+}
+
 /// `findNextRingToEmbed`: returns `(commonAtoms, nextId)`.
 pub fn find_next_ring_to_embed(
     done_rings: &[usize],

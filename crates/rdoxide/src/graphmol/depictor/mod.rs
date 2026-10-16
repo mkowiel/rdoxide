@@ -1,14 +1,15 @@
 //! 2D coordinate generation (`RDDepict::compute2DCoords`).
 //!
 //! Ported from RDKit `Code/GraphMol/Depictor/RDDepictor.cpp` (2026.09.1).
-//! The RDKit depictor is used (not CoordGen); ring-system templates and
-//! random flip sampling are not ported yet.
+//! The RDKit depictor is used (not CoordGen); random flip sampling is not
+//! ported yet.
 //!
 //! Copyright (C) 2003-2025 Greg Landrum and other RDKit contributors.
 //! Licensed under the BSD 3-Clause license (see LICENSES/RDKit-BSD-3-Clause.txt).
 
 pub mod depict_utils;
 pub mod embedded_frag;
+pub mod templates;
 
 use crate::geometry::{Point2D, Point3D};
 use crate::graphmol::aromaticity::{make_ring_neighbor_map, pick_fused_rings};
@@ -27,6 +28,11 @@ use crate::{RDKitError, Result};
 use depict_utils::{IntPoint2DMap, bond_len, get_atom_depict_rank};
 use embedded_frag::EmbeddedFrag;
 use std::sync::OnceLock;
+
+/// `RDDepict::DepictException`, which Python sees as a `ValueError`.
+pub fn depict_error(msg: impl std::fmt::Display) -> RDKitError {
+    RDKitError::Value(format!("Depict error: {msg}"))
+}
 
 /// `RDDepict::Compute2DCoordParameters`
 #[derive(Debug, Clone)]

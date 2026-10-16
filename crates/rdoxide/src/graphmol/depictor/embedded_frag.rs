@@ -2,7 +2,7 @@
 //! (`RDDepict::EmbeddedAtom`, `RDDepict::EmbeddedFrag`).
 //!
 //! Ported from RDKit `Code/GraphMol/Depictor/EmbeddedFrag.{h,cpp}`
-//! (2026.09.1). Ring-system templates and random flip sampling are not
+//! (2026.09.1). Random flip sampling is not
 //! ported yet. Upstream's `std::map::operator[]` default-inserts missing
 //! atoms; [`EmbeddedFrag::ea`] reproduces that where upstream relies on it.
 //!
@@ -11,12 +11,15 @@
 
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::f64::consts::PI;
+use std::sync::Arc;
 
 use super::depict_utils::*;
+use super::templates::CoordinateTemplates;
 use crate::geometry::{Point2D, Transform2D};
 use crate::graphmol::bond::{BondStereo, BondType};
 use crate::graphmol::matrices::{get_distance_mat, get_shortest_path};
 use crate::graphmol::romol::ROMol;
+use crate::graphmol::substruct::{SubstructMatchParameters, substruct_match};
 use crate::rdgeneral::fp::fmuladd;
 use crate::{RDKitError, Result};
 
@@ -256,6 +259,9 @@ fn any_non_ring_bonds(aid: u32, path: &[u32], mol: &ROMol) -> Result<u32> {
     }
     Ok(n_open)
 }
+
+/// A template and the way a ring system matches it: (template atom, atom) pairs.
+type TemplateMatch = (Arc<ROMol>, Vec<(i32, i32)>);
 
 impl<'a> EmbeddedFrag<'a> {
     fn empty(mol: &'a ROMol) -> Self {
@@ -558,12 +564,197 @@ impl<'a> EmbeddedFrag<'a> {
         Ok(())
     }
 
+    /// `checkStereoChemistry`: whether the double bond stereochemistry of
+    /// the ring system matches that of the template, as laid out.
+    fn check_stereo_chemistry(
+        mol: &ROMol,
+        template: &ROMol,
+        matched: &[(i32, i32)],
+    ) -> Result<bool> {
+        for bond in mol.bonds() {
+            if bond.bond_type() != BondType::Double
+                || bond.stereo() == BondStereo::StereoAny
+                || bond.stereo() == BondStereo::StereoNone
+            {
+                continue;
+            }
+            // the four atoms around the double bond
+            let neighbors = bond.stereo_atoms();
+            if neighbors.len() != 2 {
+                continue;
+            }
+            let atom1_neighbor1 = neighbors[0];
+            let atom2_neighbor1 = neighbors[1];
+            let atom1 = bond.begin_atom_idx() as i32;
+            let atom2 = bond.end_atom_idx() as i32;
+            // now the other two atoms that are not part of the double bond (if any)
+            let other_neighbor = |atom: i32, first: i32, other_end: i32| -> i32 {
+                if mol.atom_degree(atom as u32) > 2 {
+                    for n in mol.atom_neighbors(atom as u32) {
+                        if n as i32 != first && n as i32 != other_end {
+                            return n as i32;
+                        }
+                    }
+                }
+                -1
+            };
+            let atom1_neighbor2 = other_neighbor(atom1, atom1_neighbor1, atom2);
+            let atom2_neighbor2 = other_neighbor(atom2, atom2_neighbor1, atom1);
+
+            // find the template atoms that correspond to the four atoms
+            let (mut t_atom1, mut t_atom2) = (-1, -1);
+            let (mut t_a1_n1, mut t_a1_n2, mut t_a2_n1, mut t_a2_n2) = (-1, -1, -1, -1);
+            for &(template_aidx, rs_aidx) in matched {
+                if rs_aidx == atom1 {
+                    t_atom1 = template_aidx;
+                } else if rs_aidx == atom2 {
+                    t_atom2 = template_aidx;
+                } else if rs_aidx == atom1_neighbor1 {
+                    t_a1_n1 = template_aidx;
+                } else if rs_aidx == atom2_neighbor1 {
+                    t_a2_n1 = template_aidx;
+                } else if rs_aidx == atom1_neighbor2 {
+                    t_a1_n2 = template_aidx;
+                } else if rs_aidx == atom2_neighbor2 {
+                    t_a2_n2 = template_aidx;
+                }
+            }
+            // the atoms controlling the double bond stereochemistry in the
+            // molecule may not be the atoms that matched the template: swap to
+            // the other atom
+            let mut swap_stereo = false;
+            if t_a1_n1 == -1 {
+                t_a1_n1 = t_a1_n2;
+                swap_stereo = !swap_stereo;
+            }
+            if t_a2_n1 == -1 {
+                t_a2_n1 = t_a2_n2;
+                swap_stereo = !swap_stereo;
+            }
+            if t_atom1 == -1 || t_atom2 == -1 || t_a1_n1 == -1 || t_a2_n1 == -1 {
+                return Ok(false);
+            }
+            let conf = template.conformer(-1)?;
+            let atom1_loc = conf.atom_pos(t_atom1 as u32)?;
+            let atom2_loc = conf.atom_pos(t_atom2 as u32)?;
+            let atom1_neighbor_loc = conf.atom_pos(t_a1_n1 as u32)?;
+            let atom2_neighbor_loc = conf.atom_pos(t_a2_n1 as u32)?;
+            // are the two neighbors on the same side of the bond?
+            let v12 = atom1_neighbor_loc - atom1_loc;
+            let v42 = atom2_neighbor_loc - atom1_loc;
+            let v32 = atom2_loc - atom1_loc;
+            let cross1 = v32.x * v12.y - v32.y * v12.x;
+            let cross2 = v32.x * v42.y - v32.y * v42.x;
+            let mut is_cis = cross1 * cross2 > 0.0;
+            if swap_stereo {
+                is_cis = !is_cis;
+            }
+            if is_cis != matches!(bond.stereo(), BondStereo::StereoZ | BondStereo::StereoCis) {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+
+    /// `matchToTemplate`: lays out a ring system as its template, if it has
+    /// one. Only an exact match to the ring system is looked for, because
+    /// completing rings from a template isn't reliably better than not using
+    /// a template at all.
+    fn match_to_template(&mut self, ring_system_atoms: &[i32]) -> Result<bool> {
+        const DUMMY_ATOMIC_NUM: u32 = 200;
+        let candidates = {
+            let templates = CoordinateTemplates::ring_system_templates()
+                .read()
+                .unwrap_or_else(|e| e.into_inner());
+            if !templates.has_template_of_size(ring_system_atoms.len() as u32) {
+                return Ok(false);
+            }
+            templates.matching_templates(ring_system_atoms.len() as u32)
+        };
+
+        // the induced subgraph of the ring system: everything else is dummies
+        let mut rs_mol = self.mol.clone();
+        rs_mol.clear_conformers();
+        let in_system = |a: u32| ring_system_atoms.contains(&(a as i32));
+        for idx in 0..rs_mol.num_atoms() {
+            if !in_system(idx) {
+                rs_mol.atom_mut(idx).set_atomic_num(DUMMY_ATOMIC_NUM as i32);
+            }
+        }
+        let num_bonds = rs_mol
+            .bonds()
+            .iter()
+            .filter(|b| in_system(b.begin_atom_idx()) && in_system(b.end_atom_idx()))
+            .count() as u32;
+
+        // how many atoms have 0 to 4 neighbors that are not dummies
+        let degree_counts = |mol: &ROMol| {
+            let mut counts = [0i32; 5];
+            for atom in mol.atoms() {
+                if atom.atomic_num() == DUMMY_ATOMIC_NUM {
+                    continue;
+                }
+                let degree = mol
+                    .atom_neighbors(atom.idx())
+                    .filter(|&n| mol.atom(n).atomic_num() != DUMMY_ATOMIC_NUM)
+                    .count()
+                    .min(4);
+                counts[degree] += 1;
+            }
+            counts
+        };
+        let rs_degrees = degree_counts(&rs_mol);
+
+        // find the template that this molecule matches, if any
+        let params = SubstructMatchParameters {
+            max_matches: 1,
+            ..SubstructMatchParameters::default()
+        };
+        let mut found: Option<TemplateMatch> = None;
+        for template in candidates {
+            // to reduce how often a substructure match is needed, check the
+            // bond count and the connectivity first
+            if template.num_bonds() != num_bonds || degree_counts(&template) != rs_degrees {
+                continue;
+            }
+            let matches = substruct_match(&rs_mol, &template, &params)?;
+            if let Some(first) = matches.first()
+                && Self::check_stereo_chemistry(&rs_mol, &template, first)?
+            {
+                found = Some((template, first.clone()));
+                break;
+            }
+        }
+        let Some((template, matched)) = found else {
+            return Ok(false);
+        };
+
+        // copy over the new coordinates
+        let conf = template.conformer(-1)?;
+        for &(template_aidx, rs_aidx) in &matched {
+            let pos = conf.atom_pos(template_aidx as u32)?;
+            let mut new_at = EmbeddedAtom::at(rs_aidx as u32, Point2D::new(pos.x, pos.y));
+            new_at.fixed = true;
+            self.eatoms.entry(rs_aidx as u32).or_insert(new_at);
+        }
+        self.setup_new_neighs()?;
+        self.setup_attachment_points()?;
+        Ok(true)
+    }
+
     /// `embedFusedRings`
     fn embed_fused_rings(&mut self, fused: &[Vec<i32>], use_ring_templates: bool) -> Result<()> {
-        if use_ring_templates {
-            return Err(RDKitError::Runtime(
-                "ring system templates are not supported by rdoxide yet".into(),
-            ));
+        // Look for a template for the whole system. Failing that simplify the
+        // system to a set of core atoms and look for a template for those. If
+        // that fails, start from a single ring. Then add rings one by one.
+        //
+        // Look for a template that matches the entire fused ring system. For
+        // single rings, only use templates for macrocycles (size > 8).
+        if use_ring_templates
+            && (fused.len() > 1 || (fused.len() == 1 && fused[0].len() > 8))
+            && self.match_to_template(&union_rings(fused, None))?
+        {
+            return Ok(());
         }
         let mut coords: Vec<IntPoint2DMap> = Vec::with_capacity(fused.len());
         for ring in fused {
@@ -571,9 +762,22 @@ impl<'a> EmbeddedFrag<'a> {
             Self::mirror_trans_ring_atoms(self.mol, ring, &mut rc)?;
             coords.push(rc);
         }
-        let first = pick_first_ring_to_embed(self.mol, fused);
-        self.init_from_ring_coords(&fused[first], &coords[first])?;
-        let mut done_rings = vec![first];
+        let mut done_rings: Vec<usize> = Vec::new();
+        if use_ring_templates {
+            let (core_rings, core_ids) = find_core_rings(fused, self.mol);
+            if core_rings.len() > 1
+                && core_rings.len() < fused.len()
+                && self.match_to_template(&union_rings(&core_rings, None))?
+            {
+                done_rings = core_ids;
+            }
+        }
+        // if not embedded, find a ring as a starting point
+        if done_rings.is_empty() {
+            let first = pick_first_ring_to_embed(self.mol, fused);
+            self.init_from_ring_coords(&fused[first], &coords[first])?;
+            done_rings.push(first);
+        }
         let funion = union_rings(fused, None);
         while self.eatoms.len() < funion.len() {
             let (common, next) = find_next_ring_to_embed(&done_rings, fused)?;

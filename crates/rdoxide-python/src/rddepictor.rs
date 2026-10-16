@@ -4,6 +4,9 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use rdoxide::graphmol::depictor::depict_utils::{IntPoint2DMap, bond_len, set_bond_len};
+use rdoxide::graphmol::depictor::templates::{
+    add_ring_system_templates, load_default_ring_system_templates, set_ring_system_templates,
+};
 use rdoxide::graphmol::depictor::{Compute2DCoordParameters, compute_2d_coords};
 
 use crate::errors::IntoPyResult;
@@ -91,11 +94,99 @@ fn compute_2d_coords_py(
     res.py()
 }
 
+/// Loads the ring system templates from the specified file to be used in 2D
+/// coordinate generation. Each template must be a single line in the file
+/// represented using CXSMILES, and the structure should be a single ring
+/// system. Throws a DepictException if any templates are invalid.
+#[pyfunction]
+#[pyo3(name = "SetRingSystemTemplates", signature = (templatePath))]
+#[allow(non_snake_case)]
+fn set_ring_system_templates_py(templatePath: &str) -> PyResult<()> {
+    set_ring_system_templates(templatePath).py()
+}
+
+/// Adds the ring system templates from the specified file to be used in 2D
+/// coordinate generation. If there are duplicates, the most recently added
+/// template will be used. Each template must be a single line in the file
+/// represented using CXSMILES, and the structure should be a single ring
+/// system. Throws a DepictException if any templates are invalid.
+#[pyfunction]
+#[pyo3(name = "AddRingSystemTemplates", signature = (templatePath))]
+#[allow(non_snake_case)]
+fn add_ring_system_templates_py(templatePath: &str) -> PyResult<()> {
+    add_ring_system_templates(templatePath).py()
+}
+
+/// Loads the default ring system templates and removes existing ones, if present.
+#[pyfunction]
+#[pyo3(name = "LoadDefaultRingSystemTemplates")]
+fn load_default_ring_system_templates_py() {
+    load_default_ring_system_templates();
+}
+
+/// Returns whether RDKit was built with CoordGen support
+/// (always False: CoordGen is not part of rdoxide)
+#[pyfunction]
+#[pyo3(name = "IsCoordGenSupportAvailable")]
+fn is_coord_gen_support_available() -> bool {
+    false
+}
+
+/// Set whether or not the CoordGen library should be preferred to the RDKit
+/// depiction library (which has no effect without CoordGen support).
+#[pyfunction]
+#[pyo3(name = "SetPreferCoordGen", signature = (val))]
+fn set_prefer_coord_gen(val: bool) {
+    let _ = val;
+}
+
+/// Always returns False (CoordGen support not enabled)
+#[pyfunction]
+#[pyo3(name = "GetPreferCoordGen")]
+fn get_prefer_coord_gen() -> bool {
+    false
+}
+
+/// Context manager to temporarily set CoordGen library preference in RDKit
+/// depiction.
+#[pyclass(name = "UsingCoordGen", module = "rdoxide.Chem.rdDepictor")]
+#[derive(Debug)]
+struct PyUsingCoordGen;
+
+#[pymethods]
+impl PyUsingCoordGen {
+    #[new]
+    #[pyo3(signature = (temp_state))]
+    fn new(temp_state: bool) -> Self {
+        let _ = temp_state;
+        PyUsingCoordGen
+    }
+
+    fn __enter__(&self) {}
+
+    #[pyo3(signature = (exc_type, exc_val, traceback))]
+    fn __exit__(
+        &self,
+        exc_type: &Bound<'_, PyAny>,
+        exc_val: &Bound<'_, PyAny>,
+        traceback: &Bound<'_, PyAny>,
+    ) {
+        let _ = (exc_type, exc_val, traceback);
+    }
+}
+
 pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add(
         "__doc__",
         "Module containing the functionality to compute 2D coordinates for a molecule",
     )?;
     m.add_function(wrap_pyfunction!(compute_2d_coords_py, m)?)?;
+    m.add_function(wrap_pyfunction!(set_ring_system_templates_py, m)?)?;
+    m.add_function(wrap_pyfunction!(add_ring_system_templates_py, m)?)?;
+    m.add_function(wrap_pyfunction!(load_default_ring_system_templates_py, m)?)?;
+    m.add_function(wrap_pyfunction!(is_coord_gen_support_available, m)?)?;
+    m.add_function(wrap_pyfunction!(set_prefer_coord_gen, m)?)?;
+    m.add_function(wrap_pyfunction!(get_prefer_coord_gen, m)?)?;
+    m.add_class::<PyUsingCoordGen>()?;
     Ok(())
 }
