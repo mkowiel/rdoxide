@@ -345,3 +345,141 @@ fn query_bonds() {
     dm.extract_all(1.0, &mut t).unwrap();
     assert_eq!(dm.bonds.len(), 3);
 }
+
+fn build_hl(smiles: &str, opts: &MolDrawOptions, hl: DrawMolHighlights) -> (DrawMol, DrawTextFT) {
+    let mut t = text();
+    let mut dm = DrawMol::new(
+        &smi(smiles),
+        "",
+        300,
+        300,
+        opts,
+        &mut t,
+        hl,
+        true,
+        -1,
+        false,
+    )
+    .unwrap();
+    dm.extract_all(1.0, &mut t).unwrap();
+    dm.calculate_scale(&mut t);
+    (dm, t)
+}
+
+#[test]
+fn continuous_bond_and_atom_highlights() {
+    use rdoxide::graphmol::mol_draw2d::draw_shape::ShapeKind;
+    let o = MolDrawOptions::default();
+    // an isolated highlighted bond is a rectangle; atoms get ellipses
+    let hl = DrawMolHighlights {
+        atoms: vec![0],
+        bonds: vec![0],
+        ..Default::default()
+    };
+    let (dm, _) = build_hl("CCC", &o, hl);
+    let polys: Vec<_> = dm
+        .highlights
+        .iter()
+        .filter(|h| matches!(h.kind, ShapeKind::PolyLine { .. }))
+        .collect();
+    let ells: Vec<_> = dm
+        .highlights
+        .iter()
+        .filter(|h| matches!(h.kind, ShapeKind::Ellipse))
+        .collect();
+    assert_eq!(polys.len(), 1);
+    assert_eq!(polys[0].points.len(), 4);
+    assert_eq!(ells.len(), 1);
+    assert_eq!(ells[0].line_colour, o.highlight_colour);
+    // two adjacent highlighted bonds are mitred: 4 points each, sharing the
+    // join, and the hull is convex (no butterfly)
+    let hl = DrawMolHighlights {
+        bonds: vec![0, 1],
+        ..Default::default()
+    };
+    let (dm, _) = build_hl("CCC", &o, hl);
+    assert_eq!(dm.highlights.len(), 2);
+    // a branch point with three highlighted bonds gives triangular ends
+    let hl = DrawMolHighlights {
+        bonds: vec![0, 1, 2],
+        ..Default::default()
+    };
+    let (dm, _) = build_hl("CC(C)C", &o, hl);
+    assert_eq!(dm.highlights.len(), 3);
+    assert!(dm.highlights.iter().any(|h| h.points.len() > 4));
+}
+
+#[test]
+fn circle_highlights_radii_and_colours() {
+    use rdoxide::graphmol::mol_draw2d::draw_shape::ShapeKind;
+    let mut o = MolDrawOptions::default();
+    o.continuous_highlight = false;
+    let col = rdoxide::graphmol::mol_draw2d::helpers::DrawColour::new(0.0, 1.0, 0.0);
+    let hl = DrawMolHighlights {
+        atoms: vec![0, 1],
+        atom_map: [(1, col)].into(),
+        radii: [(0, 0.7)].into(),
+        ..Default::default()
+    };
+    let (dm, _) = build_hl("CCO", &o, hl);
+    assert_eq!(dm.highlights.len(), 2);
+    assert!(matches!(dm.highlights[0].kind, ShapeKind::Ellipse));
+    assert_eq!(dm.highlights[0].points[1], Point2D::new(0.7, 0.7));
+    assert_eq!(dm.highlights[0].line_colour, o.highlight_colour);
+    assert_eq!(
+        dm.highlights[1].points[1],
+        Point2D::new(o.highlight_radius, o.highlight_radius)
+    );
+    assert_eq!(dm.highlights[1].line_colour, col);
+    // a highlighted atom with circles behind it is drawn in the colour of carbon
+    assert_eq!(
+        dm.get_colour(0).unwrap(),
+        rdoxide::graphmol::mol_draw2d::helpers::DrawColour::new(0.0, 0.0, 0.0)
+    );
+}
+
+#[test]
+fn labelled_atom_highlight_surrounds_label() {
+    let o = MolDrawOptions::default();
+    let hl = DrawMolHighlights {
+        atoms: vec![1],
+        ..Default::default()
+    };
+    let (dm, _) = build_hl("CO", &o, hl);
+    let e = &dm.highlights[0];
+    let label = dm.atom_labels[1].as_ref().unwrap();
+    // the ellipse is at least as big as the default radius and centred on the label
+    assert!(e.points[1].x >= o.highlight_radius);
+    assert!((e.points[0].x - label.cds.x).abs() < 1.0);
+    let mut circles = o.clone();
+    circles.atom_highlights_are_circles = true;
+    let hl = DrawMolHighlights {
+        atoms: vec![1],
+        ..Default::default()
+    };
+    let (dm, _) = build_hl("CO", &circles, hl);
+    assert_eq!(dm.highlights[0].points[1].x, dm.highlights[0].points[1].y);
+}
+
+#[test]
+fn regions_and_attachments() {
+    use rdoxide::graphmol::mol_draw2d::draw_shape::ShapeKind;
+    let mut o = MolDrawOptions::default();
+    o.atom_regions = vec![vec![0, 1, 2], vec![0]];
+    let (dm, _) = build_hl("CCC", &o, DrawMolHighlights::default());
+    // single-atom regions are ignored
+    assert_eq!(dm.highlights.len(), 1);
+    assert!(dm.highlights[0].fill && dm.highlights[0].points.len() == 4);
+
+    let mut o = MolDrawOptions::default();
+    o.dummies_are_attachments = true;
+    let (dm, _) = build_hl("*CC", &o, DrawMolHighlights::default());
+    let wavy = dm
+        .bonds
+        .iter()
+        .filter(|b| matches!(b.kind, ShapeKind::WavyLine { .. }))
+        .count();
+    assert_eq!(wavy, 1);
+    // the dummy has no label then
+    assert!(dm.atom_labels[0].is_none());
+}
