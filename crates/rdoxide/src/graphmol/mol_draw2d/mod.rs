@@ -5,6 +5,8 @@
 
 pub mod details;
 pub mod draw_annotation;
+pub mod draw_mol;
+pub mod draw_mol_legend;
 pub mod draw_mol_utils;
 pub mod draw_shape;
 pub mod draw_text;
