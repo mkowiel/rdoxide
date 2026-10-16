@@ -1597,3 +1597,7 @@
 [module."rdoxide::graphmol::mol_draw2d::font".sources]
 "Code/GraphMol/MolDraw2D/Fonts/roboto_regular.h" = "4f9da4d0c5ae88b63ace5a411041017aae4ec81e"
 "Data/Fonts/Telex-Regular.ttf" = "a3948a1e59eeaf8bcdd6df12def637a6edbe9fa1"
+
+[module."rdoxide::graphmol::mol_draw2d::draw_shape".sources]
+"Code/GraphMol/MolDraw2D/DrawShape.cpp" = "fdedbb6812023e819c31b8e857c506dc85099b27"
+"Code/GraphMol/MolDraw2D/DrawShape.h" = "a84bb2e91077eadd3e4838291c12065f7b8f6871"
