@@ -26,3 +26,4 @@ Code/GraphMol/FilterCatalog/Wrap/rough_test.py
 Code/GraphMol/RGroupDecomposition/Wrap/test_rgroups.py
 Code/GraphMol/TautomerQuery/Wrap/rough_test.py
 Code/GraphMol/Wrap/testTrajectory.py
+Code/GraphMol/CIPLabeler/Wrap/pyCIPLabelWrapTest.py

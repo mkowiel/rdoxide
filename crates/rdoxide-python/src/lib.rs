@@ -32,6 +32,7 @@ mod rdchem_atom_funcs;
 mod rdchem_stereo_info;
 mod rdchemicalfeatures;
 mod rdchemreactions;
+mod rdcip_labeler;
 mod rdclustering;
 mod rddepictor;
 mod rddeterminebonds;
@@ -154,6 +155,12 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
         "rdtrajectory",
         "rdkit.Chem.rdtrajectory",
         rdtrajectory::init,
+    )?;
+    add_submodule(
+        m,
+        "rdCIPLabeler",
+        "rdkit.Chem.rdCIPLabeler",
+        rdcip_labeler::init,
     )?;
     add_submodule(m, "rdFMCS", "rdkit.Chem.rdFMCS", rdfmcs::init)?;
     add_submodule(

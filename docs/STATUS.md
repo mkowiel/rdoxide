@@ -24,7 +24,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 3 | removeHs/removeAllHs (`RemoveHsParameters`), legacy assignStereochemistry (CIP ranks/codes, ring stereo, E/Z), setDoubleBondNeighborDirections | ✅ | differential `molfromsmiles` 10312/10312 + 35140 stereo-rich + 72 edge cases; SubstanceGroup checks wait for stage 2b |
 | 3 | Stereo from coordinates: assignChiralTypesFromBondDirs (pseudo-3D wedges), assignChiralTypesFrom3D (incl. non-tetrahedral), detectBondStereochemistry, atropisomer perception (2D/3D/no conformer) | ✅ | differential `molblock` |
 | 3 | addHs (`AddHs`, `AddHsParameters`, `onlyOnAtoms`, explicit/implicit Hs with coordinates from `Transform3D`; residue info waits for MonomerInfo) | ✅ | differential `addhs` 5000/5000, `addhs3d` 7706/7721 (the 15 are upstream molblocks with SGroups, which the reader cannot read yet) |
-| 3 | new (non-legacy) stereo perception: `findPotentialStereo`-based `stereoPerception` behind `SetUseLegacyStereoPerception(False)` (double bond stereo update, unspecified-bond cis/trans from directions, atropisomer detection, stereo-group cleanup); CIPLabeler | 🟡 | perception done (stage 31); CIPLabeler (`AssignCIPLabels`, needed by `FindMolChiralCenters`, Morgan/atom-pair chirality under new perception) not ported yet |
+| 3 | new (non-legacy) stereo perception: `findPotentialStereo`-based `stereoPerception` behind `SetUseLegacyStereoPerception(False)` (double bond stereo update, unspecified-bond cis/trans from directions, atropisomer detection, stereo-group cleanup); CIPLabeler | ✅ | perception (stage 31) and CIPLabeler (stage 32); `FindMolChiralCenters`, Morgan and atom-pair chirality work under the new perception |
 | 4 | SMILES parser (lexer + grammar + SmilesParseOps, non-tetrahedral stereo) | ✅ | differential: 10312/10312 identical to RDKit (sanitize=False) |
 | 4 | `MolFromSmiles` sanitize/removeHs/stereo path (defaults) | ✅ | differential `molfromsmiles` identical |
 | 4 | SMILES writer + canonical SMILES (Canon.cpp DFS, SmilesWrite.cpp, getMolFrags/copyMolSubset): `MolToSmiles` (both overloads), `MolFragmentToSmiles`, `MolToRandomSmilesVect`, `SmilesWriteParams` | ✅ | differential `smiles` (canonical, output order, non-canonical, kekule, non-isomeric, explicit, rooted, random, fragment, roundtrip) 10312 + 35973 identical |
@@ -139,6 +139,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 29 | SubstructLibrary searches with a `TautomerQuery` (`GetMatches`/`CountMatches`/`HasMatch`, Rust and Python); tautomer pattern fingerprints are used for screening, plain ones are ignored with a warning. Still not supported: `MolBundle` and `ExtendedQueryMol` queries | ✅ | Rust and Python tests (keto/enol library, both holder kinds) |
 | 30 | Trajectories (`graphmol::trajectory`: `Snapshot`, `Trajectory`, `addConformersToMol`, `readAmberTrajectory`, `readGromosTrajectory`), Python `rdkit.Chem.rdtrajectory` and `ForceField.MinimizeTrajectory` | ✅ | upstream `GraphMol/Wrap/testTrajectory.py` 9/9 |
 | 31 | New stereo perception (`chirality::perception`): `Chem.AssignStereochemistry` and everything built on it works with `SetUseLegacyStereoPerception(False)` | ✅ | `tests/python/test_new_stereo.py` (E/Z, cis/trans, centers, potential stereo); no reference RDKit available, cases checked by hand |
+| 32 | CIPLabeler (`graphmol::cip_labeler`: hierarchical digraphs, rules 1a–6, tetrahedral/double bond/atropisomer configurations, mancude fractional atomic numbers, iteration limit) and Python `rdkit.Chem.rdCIPLabeler.AssignCIPLabels`; the Morgan and atom-pair fingerprint generators label a copy of the molecule under the new stereo perception | ✅ | upstream `CIPLabeler/Wrap/pyCIPLabelWrapTest.py` 4/4, Rust tests ported from `catch_tests.cpp` (tetrahedral, E/Z, pseudo-asymmetric `r`/`s`, auxiliary labels, dummies, iteration limit, selections, mancude fractions), `tests/python/test_cip_labeler.py`; atropisomer labels are not tested yet (needs the CXSMILES atropisomer inputs of the catch tests) |
 | 7–13 | see PLAN.md | ⬜ | |
 
 ## Python package files
@@ -211,6 +212,8 @@ corpora (zinc, ChEMBL, idorsia enumeration, MMFF) and on `tests/data/stereo_edge
 New Python test files are also run against the official wheel to validate expectations.
 
 ## Known deviations (to revisit)
+
+* CIPLabeler: the old `Rule5` (unused upstream, `Rule5New` replaces it) and the Ctrl-C interruption are not ported; the labeler works on a copy of the molecule, so labelling does not initialize the ring info of the caller's molecule; the fingerprint generators label a copy of the molecule instead of the caller's one (upstream stores `_CIPComputed` on the input).
 
 * MolStandardize: the multi-molecule `*InPlace(mols, numThreads)` overloads treat
   `numThreads <= 0` as "all (but |n|) cores"; upstream strides its loop by `numThreads` and
@@ -330,3 +333,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-16 — Stage 29: SubstructLibrary tautomer-query search. Next: MinimizeTrajectory, new stereo perception.
 * 2026-10-16 — Stage 30: Trajectory/Snapshot and MinimizeTrajectory. Next: new stereo perception (CIPLabeler, FindPotentialStereo).
 * 2026-10-16 — Stage 31: new stereo perception (no longer raises). Next: CIPLabeler (6.9k lines C++, ~8 files of rules), then Morgan/atom-pair chirality and `FindMolChiralCenters` under new perception.
+* 2026-10-16 — Stage 32: CIPLabeler (rdCIPLabeler.AssignCIPLabels; FindMolChiralCenters, Morgan and atom-pair chirality under the new perception). Ratchet 1254 -> 1267. Next: atropisomer CIP tests, `CreateEmptyForceFieldForMol`, MolBundle/ExtendedQueryMol search in SubstructLibrary.

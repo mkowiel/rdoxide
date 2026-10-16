@@ -10,6 +10,7 @@ pub mod canon;
 pub mod chem_reactions;
 pub mod chem_transforms;
 pub mod chirality;
+pub mod cip_labeler;
 pub mod conformer;
 pub mod conjug_hybrid;
 pub mod debug;

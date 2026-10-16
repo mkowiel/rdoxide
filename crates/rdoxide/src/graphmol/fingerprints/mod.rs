@@ -17,6 +17,9 @@ use std::collections::BTreeMap;
 use crate::datastructs::sparse_int_vect::{IndexKind, SparseIntVect};
 use crate::datastructs::{BitVect, ExplicitBitVect, SparseBitVect};
 use crate::error::{RDKitError, Result};
+use crate::graphmol::atom::ChiralType;
+use crate::graphmol::bond::{BondStereo, BondType};
+use crate::graphmol::chirality::get_use_legacy_stereo_perception;
 use crate::graphmol::romol::ROMol;
 use crate::rdgeneral::RDProps;
 use crate::rdgeneral::common_properties as cp;
@@ -425,6 +428,38 @@ impl FingerprintGenerator {
         }
     }
 
+    /// Whether the new stereo perception is in use and the generators ask for
+    /// stereo information that needs the CIP labels (upstream computes them
+    /// where they are needed, on the molecule itself).
+    fn needs_cip_labels(&self, mol: &ROMol) -> bool {
+        if get_use_legacy_stereo_perception() || mol.has_prop(cp::_CIPComputed) {
+            return false;
+        }
+        let atom_pair_chirality = matches!(
+            self.atom_inv_gen,
+            Some(AtomInvariantsGenerator::AtomPair {
+                include_chirality: true,
+                ..
+            })
+        ) && mol
+            .atoms()
+            .iter()
+            .any(|a| a.chiral_tag() != ChiralType::Unspecified);
+        let morgan_chirality =
+            matches!(self.env, EnvGenerator::Morgan(_)) && self.args.include_chirality;
+        let bond_stereo = matches!(
+            self.bond_inv_gen,
+            Some(BondInvariantsGenerator::Morgan {
+                use_bond_types: true,
+                use_chirality: true,
+            })
+        ) && mol
+            .bonds()
+            .iter()
+            .any(|b| b.bond_type() == BondType::Double && b.stereo() != BondStereo::StereoNone);
+        atom_pair_chirality || morgan_chirality || bond_stereo
+    }
+
     /// `getFingerprintHelper`
     fn helper(
         &self,
@@ -432,6 +467,15 @@ impl FingerprintGenerator {
         fargs: &mut FingerprintFuncArguments<'_>,
         fp_size: u64,
     ) -> Result<Counts> {
+        let cip_mol;
+        let mol = if self.needs_cip_labels(mol) {
+            let mut m = mol.clone();
+            crate::graphmol::cip_labeler::assign_cip_labels(&mut m, 0)?;
+            cip_mol = m;
+            &cip_mol
+        } else {
+            mol
+        };
         let stereo_mol;
         let lmol = if self.args.include_chirality && !mol.has_prop(cp::_StereochemDone) {
             let mut m = mol.clone();
