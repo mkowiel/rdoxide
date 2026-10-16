@@ -13,10 +13,10 @@ use super::draw_mol_utils::{
 };
 use super::draw_shape::{DrawShape, no_dash};
 use super::helpers::{DrawColour, LINE_WIDTH_SCALE_FACTOR, MultiColourHighlightStyle};
+use crate::Result;
 use crate::geometry::Point2D;
 use crate::rdgeneral::cxx_sort::libcxx_sort_by;
 use crate::rdgeneral::{RDProps, common_properties as cp};
-use crate::{RDKitError, Result};
 
 fn mul(p: Point2D, f: f64) -> Point2D {
     Point2D::new(p.x * f, p.y * f)
@@ -26,22 +26,19 @@ impl DrawMol {
     /// Highlights drawn behind the molecule: fat bond lines and atom ellipses
     /// for continuous highlights, circles otherwise.
     pub fn extract_highlights(&mut self, scale: f64) -> Result<()> {
+        // the lasso style makes all the highlights itself
+        if let Some(mch) = self.mch.clone() {
+            if mch.style == MultiColourHighlightStyle::Lasso {
+                return self.extract_mc_lasso(&mch);
+            }
+        }
         if self.opts.continuous_highlight {
             self.make_continuous_highlights(scale)?;
         } else if self.opts.circle_atoms && !self.highlight_atoms.is_empty() {
             self.make_atom_circle_highlights()?;
         }
         if let Some(mch) = self.mch.clone() {
-            match mch.style {
-                MultiColourHighlightStyle::CircleAndLine => {
-                    self.extract_mc_circle_and_line(&mch)?;
-                }
-                MultiColourHighlightStyle::Lasso => {
-                    return Err(RDKitError::UnhandledFeature(
-                        "lasso highlights are not supported yet".into(),
-                    ));
-                }
-            }
+            self.extract_mc_circle_and_line(&mch)?;
         }
         Ok(())
     }
