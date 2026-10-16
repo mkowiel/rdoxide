@@ -544,8 +544,74 @@ fn py_mol_fragment_to_smarts(
         .py()
 }
 
+/// Returns a SMARTS string for a molecule, followed by its CX extensions
+///   ARGUMENTS:
+///
+///     - mol: the molecule
+///     - isomericSmiles: (optional) include information about stereochemistry in
+///       the SMARTS.  Defaults to true.
+///
+///   RETURNS:
+///
+///     a string
+#[pyfunction]
+#[pyo3(name = "MolToCXSmarts", signature = (mol, isomericSmiles = true))]
+#[allow(non_snake_case)]
+fn py_mol_to_cx_smarts(
+    py: Python<'_>,
+    mut mol: PyRefMut<'_, PyMol>,
+    isomericSmiles: bool,
+) -> PyResult<String> {
+    use rdoxide::graphmol::smiles_parse::smarts_write::mol_to_cx_smarts;
+    let params = SmilesWriteParams {
+        do_isomeric_smiles: isomericSmiles,
+        ..SmilesWriteParams::default()
+    };
+    let core = &mut mol.mol;
+    py.detach(|| mol_to_cx_smarts(core, &params)).py()
+}
+
+/// Returns a SMARTS string for a fragment of a molecule, followed by the CX extensions of the molecule
+///   ARGUMENTS:
+///
+///     - mol: the molecule
+///     - atomsToUse: indices of atoms to include in the SMARTS string
+///     - bondsToUse: indices of bonds to include in the SMARTS string (optional)
+///     - isomericSmarts: (optional) include information about stereochemistry in
+///       the SMARTS.  Defaults to true.
+///
+///   RETURNS:
+///
+///     a string
+#[pyfunction]
+#[pyo3(name = "MolFragmentToCXSmarts", signature = (mol, atomsToUse, bondsToUse = None, isomericSmarts = true))]
+#[allow(non_snake_case)]
+fn py_mol_fragment_to_cx_smarts(
+    py: Python<'_>,
+    mut mol: PyRefMut<'_, PyMol>,
+    atomsToUse: Bound<'_, PyAny>,
+    bondsToUse: Option<Bound<'_, PyAny>>,
+    isomericSmarts: bool,
+) -> PyResult<String> {
+    use rdoxide::graphmol::smiles_parse::smarts_write::mol_fragment_to_cx_smarts;
+    let (na, nb) = (mol.mol.num_atoms() as usize, mol.mol.num_bonds() as usize);
+    let atoms = int_vect(Some(atomsToUse), na)?
+        .filter(|v| !v.is_empty())
+        .ok_or_else(|| PyValueError::new_err("atomsToUse argument must be non-empty"))?;
+    let bonds = int_vect(bondsToUse, nb)?;
+    let params = SmilesWriteParams {
+        do_isomeric_smiles: isomericSmarts,
+        ..SmilesWriteParams::default()
+    };
+    let core = &mut mol.mol;
+    py.detach(|| mol_fragment_to_cx_smarts(core, &params, &atoms, bonds.as_deref()))
+        .py()
+}
+
 pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_mol_to_smarts, m)?)?;
+    m.add_function(wrap_pyfunction!(py_mol_to_cx_smarts, m)?)?;
+    m.add_function(wrap_pyfunction!(py_mol_fragment_to_cx_smarts, m)?)?;
     m.add_function(wrap_pyfunction!(py_mol_fragment_to_smarts, m)?)?;
     m.add_class::<PySmilesWriteParams>()?;
     m.add_function(wrap_pyfunction!(py_mol_to_smiles, m)?)?;
