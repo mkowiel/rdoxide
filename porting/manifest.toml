@@ -1639,6 +1639,3 @@
 [module."rdoxide::graphmol::mol_draw2d::draw_mol_notes".sources]
 "Code/GraphMol/MolDraw2D/DrawMol.cpp" = "f14287164ccbf3f4067d658229e65335159273ec"
 "Code/GraphMol/MolDraw2D/DrawMol.h" = "91cef7ed260064d3482febcc6de918660ab33a72"
-
-[module."rdoxide::graphmol::atropisomers".sources]
-"Code/GraphMol/Atropisomers.cpp" = "31a89e53044311a590576f635cb7e814d5a940cc"
