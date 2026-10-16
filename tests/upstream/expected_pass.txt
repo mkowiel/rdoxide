@@ -367,6 +367,9 @@ Code/GraphMol/MolChemicalFeatures/Wrap/testChemicalFeatures.py::TestCase::testIs
 Code/GraphMol/MolChemicalFeatures/Wrap/testChemicalFeatures.py::TestCase::testParseErrorHandling
 Code/GraphMol/MolChemicalFeatures/Wrap/testChemicalFeatures.py::TestCase::testStringParse
 Code/GraphMol/MolChemicalFeatures/Wrap/testChemicalFeatures.py::TestCase::testStringParse2
+Code/GraphMol/MolEnumerator/Wrap/rough_test.py::TestCase::testCombined
+Code/GraphMol/MolEnumerator/Wrap/rough_test.py::TestCase::testLinkNodes
+Code/GraphMol/MolEnumerator/Wrap/rough_test.py::TestCase::testPositionVariation
 Code/GraphMol/MolHash/Wrap/testMolHash.py::TestCase::test1
 Code/GraphMol/MolHash/Wrap/testMolHash.py::TestCase::testCxSmiles
 Code/GraphMol/MolHash/Wrap/testMolHash.py::TestCase::testProtomerV2

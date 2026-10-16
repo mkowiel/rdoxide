@@ -7,6 +7,7 @@ use crate::graphmol::romol::ROMol;
 use crate::rd_log_warning;
 use crate::rdgeneral::common_properties as cp;
 use crate::rdgeneral::{RDProps, RDValue};
+use std::collections::BTreeMap;
 
 /// `MolEnumerator::LinkNode`: the group of atoms between two bonds that may
 /// repeat `min_rep` to `max_rep` times.
@@ -34,6 +35,16 @@ fn reject(strict: bool, err: RDKitError) -> Result<()> {
 /// `molFileLinkNodes` property (`|`-separated records of space-separated
 /// numbers).
 pub fn get_mol_link_nodes(mol: &ROMol, strict: bool) -> Result<Vec<LinkNode>> {
+    get_mol_link_nodes_mapped(mol, strict, None)
+}
+
+/// `utils::getMolLinkNodes` with `atomIdxMap`: the (zero based) atom indices
+/// of the records are looked up in the map, which gives the indices in `mol`.
+pub fn get_mol_link_nodes_mapped(
+    mol: &ROMol,
+    strict: bool,
+    atom_idx_map: Option<&BTreeMap<u32, u32>>,
+) -> Result<Vec<LinkNode>> {
     let Some(text) = mol
         .get_prop(cp::molFileLinkNodes)
         .map(RDValue::to_rd_string)
@@ -90,8 +101,25 @@ pub fn get_mol_link_nodes(mol: &ROMol, strict: bool) -> Result<Vec<LinkNode>> {
             )?;
             continue;
         }
-        for v in &mut data[3..=6] {
-            *v = v.wrapping_sub(1);
+        match atom_idx_map {
+            Some(map) => {
+                for v in &mut data[3..=6] {
+                    match map.get(&v.wrapping_sub(1)) {
+                        Some(&idx) => *v = idx,
+                        None => reject(
+                            strict,
+                            RDKitError::Value(format!(
+                                "atom index {v} cannot be found in molecule for LINKNODE '{record}'"
+                            )),
+                        )?,
+                    }
+                }
+            }
+            None => {
+                for v in &mut data[3..=6] {
+                    *v = v.wrapping_sub(1);
+                }
+            }
         }
         let bonded = |a: u32, b: u32| {
             a < mol.num_atoms() && b < mol.num_atoms() && mol.bond_idx_between(a, b).is_some()

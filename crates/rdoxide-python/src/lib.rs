@@ -21,6 +21,7 @@ mod errors;
 mod geometry;
 mod geometry_grids;
 mod mol;
+mod molbundle;
 mod monomer_info;
 mod perception;
 mod props;
@@ -60,6 +61,7 @@ mod rdmoldescriptors_profiles;
 mod rdmoldescriptors_property;
 mod rdmoldescriptors_props;
 mod rdmoldescriptors_usr;
+mod rdmolenumerator;
 mod rdmolfiles;
 mod rdmolfiles_fwdsdsupplier;
 mod rdmolfiles_molblock;
@@ -168,6 +170,12 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
         "rdDeprotect",
         "rdkit.Chem.rdDeprotect",
         rddeprotect::init,
+    )?;
+    add_submodule(
+        m,
+        "rdMolEnumerator",
+        "rdkit.Chem.rdMolEnumerator",
+        rdmolenumerator::init,
     )?;
     add_submodule(m, "rdFMCS", "rdkit.Chem.rdFMCS", rdfmcs::init)?;
     add_submodule(
