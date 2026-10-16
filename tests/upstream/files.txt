@@ -29,3 +29,4 @@ Code/GraphMol/Wrap/testTrajectory.py
 Code/GraphMol/CIPLabeler/Wrap/pyCIPLabelWrapTest.py
 Code/GraphMol/Deprotect/Wrap/rough_test.py
 Code/GraphMol/MolEnumerator/Wrap/rough_test.py
+Code/GraphMol/ScaffoldNetwork/Wrap/testScaffoldNetwork.py

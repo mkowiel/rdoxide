@@ -1336,3 +1336,12 @@
 
 [module."rdoxide_python::molbundle".sources]
 "Code/GraphMol/Wrap/MolBundle.cpp" = "e25cbbac30311d5f6dafc84fd3c0d4957b03613d"
+
+[module."rdoxide::graphmol::scaffold_network".sources]
+"Code/GraphMol/ScaffoldNetwork/ScaffoldNetwork.cpp" = "730fc5e13fb12507ebeb7c8b08850651e9c58a1d"
+"Code/GraphMol/ScaffoldNetwork/ScaffoldNetwork.h" = "57845fd40c7157754e2cadb9ac93c071eefc7d32"
+"Code/GraphMol/ScaffoldNetwork/detail.h" = "ce4d7671bb2e7177878ff14430fe8b412d589e80"
+
+[module."rdoxide_python::rdscaffoldnetwork".sources]
+"Code/GraphMol/ScaffoldNetwork/Wrap/rdScaffoldNetwork.cpp" = "743cf198e5c2a97c892ba4dfc02d85398700ace1"
+"Code/GraphMol/ScaffoldNetwork/nbWrap/rdScaffoldNetwork.cpp" = "0558f429ec2c75e1fb97bd61599867ccf7ddba58"
