@@ -27,6 +27,7 @@ pub mod fingerprints;
 pub mod fmcs;
 pub mod forcefield_helpers;
 pub mod functional_group_hierarchy;
+pub mod generalized_substruct;
 pub mod kekulize;
 pub mod matrices;
 pub mod mmpa;

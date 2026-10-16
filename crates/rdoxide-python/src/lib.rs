@@ -45,6 +45,7 @@ mod rdfiltercatalog;
 mod rdfingerprintgenerator;
 mod rdfmcs;
 mod rdforcefield;
+mod rdgeneralizedsubstruct;
 mod rdinfotheory;
 mod rdmetricmatrixcalc;
 mod rdmhfpfingerprint;
@@ -183,6 +184,12 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
         "rdScaffoldNetwork",
         "rdkit.Chem.Scaffolds.rdScaffoldNetwork",
         rdscaffoldnetwork::init,
+    )?;
+    add_submodule(
+        m,
+        "rdGeneralizedSubstruct",
+        "rdkit.Chem.rdGeneralizedSubstruct",
+        rdgeneralizedsubstruct::init,
     )?;
     add_submodule(m, "rdFMCS", "rdkit.Chem.rdFMCS", rdfmcs::init)?;
     add_submodule(

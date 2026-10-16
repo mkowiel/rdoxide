@@ -1345,3 +1345,12 @@
 [module."rdoxide_python::rdscaffoldnetwork".sources]
 "Code/GraphMol/ScaffoldNetwork/Wrap/rdScaffoldNetwork.cpp" = "743cf198e5c2a97c892ba4dfc02d85398700ace1"
 "Code/GraphMol/ScaffoldNetwork/nbWrap/rdScaffoldNetwork.cpp" = "0558f429ec2c75e1fb97bd61599867ccf7ddba58"
+
+[module."rdoxide::graphmol::generalized_substruct".sources]
+"Code/GraphMol/GeneralizedSubstruct/XQMol.cpp" = "e16aaa603aaa2dfc29b915585c964d054688c947"
+"Code/GraphMol/GeneralizedSubstruct/XQMol.h" = "e727ea88218798b181b589a53cf92ac94f274400"
+"Code/GraphMol/GeneralizedSubstruct/TextIO.cpp" = "b1073230496689428aa662f25d21e9e8a7915cdd"
+
+[module."rdoxide_python::rdgeneralizedsubstruct".sources]
+"Code/GraphMol/GeneralizedSubstruct/Wrap/rdGeneralizedSubstruct.cpp" = "e918ac323db2a90f06126849f3f6eac7b096bb24"
+"Code/GraphMol/GeneralizedSubstruct/nbWrap/rdGeneralizedSubstruct.cpp" = "c4e9714e3dbc0a841b9293d699fd49a9317b925a"
