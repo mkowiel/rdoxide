@@ -50,6 +50,8 @@ LICENSES/Eigen-MPL-2.0.txt                                Eigen (numerics/eigen_
                                                          Copyright (C) Gael Guennebaud, Benoit Jacob, Jitse Niesen
 LICENSES/Boost-BSL-1.0.txt                                Boost.JSON (number parsing of rdgeneral/json.rs, boost/json/basic_parser_impl.hpp),
                                                          Copyright (c) 2019 Vinnie Falco, (c) 2020 Krystian Stasiowski
+LICENSES/SciPy-BSD-3-Clause.txt                           SciPy (linear assignment solver, graphmol/rascal_mces/lap.rs),
+                                                         Copyright (c) 2001-2002 Enthought, Inc., 2003-2023 SciPy Developers
 LICENSES/RingDecomposerLib-BSD-3-Clause.txt              RingDecomposerLib (ring families, SSSR),
                                                          Copyright (c) 2016 University of Hamburg,
                                                          ZBH - Center for Bioinformatics
