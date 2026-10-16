@@ -21,6 +21,7 @@ use crate::graphmol::matrices::{get_distance_mat, get_shortest_path};
 use crate::graphmol::romol::ROMol;
 use crate::graphmol::substruct::{SubstructMatchParameters, substruct_match};
 use crate::rdgeneral::fp::fmuladd;
+use crate::rdgeneral::random::with_global_generator;
 use crate::{RDKitError, Result};
 
 const NEIGH_RADIUS: f64 = 2.5;
@@ -1365,6 +1366,135 @@ impl<'a> EmbeddedFrag<'a> {
         trans.set_val(0, 1, eig1.y);
         trans.set_val(1, 1, eig1.x);
         self.transform(&trans);
+        Ok(())
+    }
+
+    /// `computeDistMat`: the packed lower triangle of the inter-atom
+    /// distances, indexed `i * (i - 1) / 2 + j` for `i > j`.
+    fn compute_dist_mat(&self) -> Vec<f64> {
+        let na = self.mol.num_atoms() as usize;
+        let mut dmat = vec![0.0; na * na.saturating_sub(1) / 2];
+        for (&ai, ei) in &self.eatoms {
+            for (&aj, ej) in self.eatoms.range(..ai) {
+                let (i, j) = (ai as usize, aj as usize);
+                dmat[i * (i - 1) / 2 + j] = (ej.loc - ei.loc).length();
+            }
+        }
+        dmat
+    }
+
+    /// `mimicDistMatAndDensityCostFunc`
+    fn mimic_dist_mat_and_density_cost(&self, dmat: Option<&[f64]>, mimic_dmat_wt: f64) -> f64 {
+        let na = self.mol.num_atoms() as usize;
+        if na < 2 {
+            return 0.0;
+        }
+        let dmat_2d = self.compute_dist_mat();
+        let (mut res1, mut res2) = (0.0, 0.0);
+        for (i, &d) in dmat_2d.iter().enumerate() {
+            let d2 = d * d;
+            res1 += if d2 > 1.0e-3 { 1.0 / d2 } else { 1000.0 };
+            if let Some(target) = dmat.map(|m| m[i]).filter(|&t| t >= 0.0) {
+                let dd = d - target;
+                res2 += dd * dd;
+            }
+        }
+        let wt = mimic_dmat_wt.clamp(0.0, 1.0);
+        (1.0 - wt) * res1 + wt * res2
+    }
+
+    /// `permuteBonds`: swaps the positions of the branches at `aid1` and
+    /// `aid2` by reflecting both through the line bisecting the angle they
+    /// make at `aid`.
+    fn permute_bonds(&mut self, aid: u32, aid1: u32, aid2: u32) -> Result<()> {
+        let rl1 = self.at(aid)?.loc;
+        let rl2 = (self.at(aid1)?.loc + self.at(aid2)?.loc) * 0.5;
+        let mut frag_a = Vec::new();
+        recurse_atom_one_side(aid1, aid, self.mol, &mut frag_a);
+        let mut frag_b = Vec::new();
+        recurse_atom_one_side(aid2, aid, self.mol, &mut frag_b);
+        for fi in frag_a.into_iter().chain(frag_b) {
+            self.ea(fi).reflect(&rl1, &rl2);
+        }
+        Ok(())
+    }
+
+    /// `randomSampleFlipsAndPermutations`: keeps the best of `n_samples`
+    /// random sets of `n_bonds_per_sample` rotatable-bond flips (and, with
+    /// `permute_deg4_nodes`, degree 4 permutations), scored by the density
+    /// and, when `dmat` is given, the distance to it.
+    pub fn random_sample_flips_and_permutations(
+        &mut self,
+        n_bonds_per_sample: u32,
+        n_samples: u32,
+        seed: i32,
+        dmat: Option<&[f64]>,
+        mimic_dmat_wt: f64,
+        permute_deg4_nodes: bool,
+    ) -> Result<()> {
+        let mol = self.mol;
+        let rot_bonds: Vec<u32> = get_all_rotatable_bonds(mol)
+            .into_iter()
+            .filter(|&bid| {
+                let b = mol.bond(bid);
+                self.has(b.begin_atom_idx()) && self.has(b.end_atom_idx())
+            })
+            .collect();
+        let nb = rot_bonds.len();
+        let mut deg4: Vec<(u32, Vec<u32>, Vec<u32>)> = Vec::new();
+        if permute_deg4_nodes {
+            for atom in 0..mol.num_atoms() {
+                if mol.atom_degree(atom) == 4 && mol.ring_info().num_atom_rings(atom)? == 0 {
+                    let (aids, bids) = get_nbr_atom_and_bond_ids(atom, mol)?;
+                    let all_in = aids
+                        .iter()
+                        .all(|&a| self.eatoms.get(&a).is_some_and(|e| !e.fixed));
+                    if all_in {
+                        deg4.push((atom, aids, bids));
+                    }
+                }
+            }
+        }
+        let nt = nb + deg4.len();
+        if nt == 0 {
+            return Ok(());
+        }
+        let per_sample = nt.min(n_bonds_per_sample as usize);
+        let snapshot = |f: &Self| -> BTreeMap<u32, Point2D> {
+            f.eatoms.iter().map(|(&k, e)| (k, e.loc)).collect()
+        };
+        let mut best_crd = snapshot(self);
+        let mut best_dens = self.mimic_dist_mat_and_density_cost(dmat, mimic_dmat_wt);
+        with_global_generator(seed, |rng| -> Result<()> {
+            for _ in 0..n_samples {
+                for _ in 0..per_sample {
+                    let ri = rng.uniform_int(0, nt as i32 - 1) as usize;
+                    if ri < nb {
+                        self.flip_about_bond(rot_bonds[ri], true)?;
+                        continue;
+                    }
+                    let (ai, aids, bids) = &deg4[ri - nb];
+                    let locs: Vec<Point2D> = aids
+                        .iter()
+                        .map(|&a| self.at(a).map(|e| e.loc))
+                        .collect::<Result<_>>()?;
+                    let pairs = find_bonds_pairs_to_permute_deg4(&self.at(*ai)?.loc, bids, &locs)?;
+                    let fbi = usize::from(rng.next_f64() > 0.5);
+                    let aid1 = mol.bond(pairs[fbi].0).other_atom_idx(*ai)?;
+                    let aid2 = mol.bond(pairs[fbi].1).other_atom_idx(*ai)?;
+                    self.permute_bonds(*ai, aid1, aid2)?;
+                }
+                let density = self.mimic_dist_mat_and_density_cost(dmat, mimic_dmat_wt);
+                if best_dens - density > 1.0e-4 {
+                    best_dens = density;
+                    best_crd = snapshot(self);
+                }
+            }
+            Ok(())
+        })?;
+        for (k, e) in self.eatoms.iter_mut() {
+            e.loc = best_crd[k];
+        }
         Ok(())
     }
 

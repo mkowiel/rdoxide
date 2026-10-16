@@ -436,3 +436,46 @@ pub fn compute_angle(center: &Point2D, loc1: &Point2D, loc2: &Point2D) -> Result
     let v2 = *loc2 - *center;
     v1.angle_to(&v2)
 }
+
+/// `getNbrAtomAndBondIds`: the neighbours of `aid` and the bonds to them.
+pub fn get_nbr_atom_and_bond_ids(aid: u32, mol: &ROMol) -> Result<(Vec<u32>, Vec<u32>)> {
+    if aid >= mol.num_atoms() {
+        return Err(RDKitError::Index(format!("atom index {aid} out of range")));
+    }
+    let mut aids = Vec::new();
+    let mut bids = Vec::new();
+    for nbr in mol.atom_neighbors(aid) {
+        let bid = mol
+            .bond_idx_between(aid, nbr)
+            .ok_or_else(|| RDKitError::invariant("neighbour without a bond"))?;
+        aids.push(nbr);
+        bids.push(bid);
+    }
+    Ok((aids, bids))
+}
+
+/// `findBondsPairsToPermuteDeg4`: the pairs of bonds at a non-ring degree 4
+/// node that cannot be permuted by flipping a rotatable bond (the first bond
+/// paired with the two bonds perpendicular to it).
+pub fn find_bonds_pairs_to_permute_deg4(
+    center: &Point2D,
+    nbr_bids: &[u32],
+    nbr_locs: &[Point2D],
+) -> Result<[(u32, u32); 2]> {
+    if nbr_bids.len() != 4 || nbr_locs.len() != 4 {
+        return Err(RDKitError::invariant("expected four neighbours"));
+    }
+    let pts: Vec<Point2D> = nbr_locs.iter().map(|l| *l - *center).collect();
+    if pts[0].dot_product(&pts[1]).abs() < 1.0e-3 {
+        // the first two vectors are perpendicular: b1 and b3 are known, b4
+        // is whichever of the others is perpendicular too
+        let second = if pts[0].dot_product(&pts[2]).abs() < 1.0e-3 {
+            nbr_bids[2]
+        } else {
+            nbr_bids[3]
+        };
+        Ok([(nbr_bids[0], nbr_bids[1]), (nbr_bids[0], second)])
+    } else {
+        Ok([(nbr_bids[0], nbr_bids[2]), (nbr_bids[0], nbr_bids[3])])
+    }
+}
