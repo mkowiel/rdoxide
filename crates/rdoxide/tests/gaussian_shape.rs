@@ -16,6 +16,11 @@ const DATA: &str = concat!(
     "/../../upstream/rdkit/Code/GraphMol/GaussianShape/test_data/test1.sdf"
 );
 
+/// The upstream test data is not present in every checkout.
+fn have_data() -> bool {
+    std::path::Path::new(DATA).exists()
+}
+
 fn mols() -> (RWMol, RWMol) {
     let mut s = SDMolSupplier::from_file(DATA, MolFileParserParams::default()).unwrap();
     (s.get(0).unwrap().unwrap(), s.get(1).unwrap().unwrap())
@@ -27,6 +32,9 @@ fn close(a: f64, b: f64, tol: f64) {
 
 #[test]
 fn defaults() {
+    if !have_data() {
+        return;
+    }
     let (r, mut p) = mols();
     let (s, _) = align_molecule(
         &r,
@@ -45,6 +53,9 @@ fn defaults() {
 
 #[test]
 fn no_color() {
+    if !have_data() {
+        return;
+    }
     let (r, mut p) = mols();
     let ov = ShapeOverlayOptions {
         optim_mode: OptimMode::ShapeOnly,
@@ -62,6 +73,9 @@ fn no_color() {
 
 #[test]
 fn from_shape() {
+    if !have_data() {
+        return;
+    }
     let (r, _) = mols();
     let shp = ShapeInput::new(
         &r,
@@ -78,6 +92,9 @@ fn from_shape() {
 
 #[test]
 fn fixed_score() {
+    if !have_data() {
+        return;
+    }
     let (r, p) = mols();
     let o = ShapeInputOptions::default();
     let ov = ShapeOverlayOptions::default();
@@ -93,6 +110,9 @@ fn fixed_score() {
 
 #[test]
 fn custom_atom_radii_and_subset() {
+    if !have_data() {
+        return;
+    }
     let (r, _) = mols();
     let ov = ShapeOverlayOptions::default();
     let opts = ShapeInputOptions {
@@ -116,6 +136,9 @@ fn custom_atom_radii_and_subset() {
 
 #[test]
 fn custom_features_are_used() {
+    if !have_data() {
+        return;
+    }
     let (r, _) = mols();
     let opts = ShapeInputOptions {
         custom_features: vec![vec![CustomFeature {
@@ -132,6 +155,9 @@ fn custom_features_are_used() {
 
 #[test]
 fn tversky() {
+    if !have_data() {
+        return;
+    }
     let (r, mut p) = mols();
     let o = ShapeInputOptions::default();
     let mut ov = ShapeOverlayOptions {
@@ -172,6 +198,9 @@ fn load_multi(file: &str) -> RWMol {
 
 #[test]
 fn multiple_conformers() {
+    if !have_data() {
+        return;
+    }
     let eso = load_multi("esomeprazole_multi.smi");
     let ran = load_multi("ranitidine_multi.smi");
     assert_eq!(eso.num_conformers(), 10);
