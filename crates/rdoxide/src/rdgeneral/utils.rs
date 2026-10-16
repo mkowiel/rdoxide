@@ -61,6 +61,44 @@ pub fn next_combination(comb: &mut [i32], tot: i32) -> i32 {
     celem
 }
 
+/// `NUM_PRIMES_AVAIL`
+pub const NUM_PRIMES_AVAIL: usize = 1000;
+
+/// `firstThousandPrimes`
+pub fn first_thousand_primes() -> &'static [u32; NUM_PRIMES_AVAIL] {
+    static PRIMES: std::sync::OnceLock<[u32; NUM_PRIMES_AVAIL]> = std::sync::OnceLock::new();
+    PRIMES.get_or_init(|| {
+        let mut res = [0u32; NUM_PRIMES_AVAIL];
+        let mut n = 0;
+        let mut cand = 2u32;
+        while n < NUM_PRIMES_AVAIL {
+            if res[..n]
+                .iter()
+                .take_while(|&&p| p * p <= cand)
+                .all(|&p| cand % p != 0)
+            {
+                res[n] = cand;
+                n += 1;
+            }
+            cand += 1;
+        }
+        res
+    })
+}
+
+/// `computeIntVectPrimesProduct`
+pub fn compute_int_vect_primes_product(vect: &[i32]) -> f64 {
+    let primes = first_thousand_primes();
+    vect.iter()
+        .map(|&ci| f64::from(primes[(ci % NUM_PRIMES_AVAIL as i32) as usize]))
+        .product()
+}
+
+/// `feq`
+pub fn feq(v1: f64, v2: f64, tol: f64) -> bool {
+    (v1 - v2).abs() <= tol
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

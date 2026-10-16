@@ -1377,3 +1377,22 @@
 [module."rdoxide_python::rdmolcatalog".sources]
 "Code/GraphMol/MolCatalog/Wrap/rdMolCatalog.cpp" = "ffb83925f43ac85bd6dbf7c0156e5c653ce61d8c"
 "Code/GraphMol/MolCatalog/nbWrap/rdMolCatalog.cpp" = "e182174a713d8642d22b44845fd3bdbfb1c253c5"
+
+[module."rdoxide::graphmol::frag_catalog".sources]
+"Code/GraphMol/FragCatalog/FragCatGenerator.cpp" = "b067e479cc406eb54cc99bff807ed0a0c6dc9538"
+"Code/GraphMol/FragCatalog/FragCatGenerator.h" = "578f990bf15e7d6a7793a26fea22b2f11bda230d"
+"Code/GraphMol/FragCatalog/FragCatParams.cpp" = "482e9c883b5c08805f2322cbbd0561baf20164e9"
+"Code/GraphMol/FragCatalog/FragCatParams.h" = "c23cb0dadc6849c545e2f00f715963a9389c9ed6"
+"Code/GraphMol/FragCatalog/FragCatalogEntry.cpp" = "6ca79160236a503d1531941740e1bb1e297e8cca"
+"Code/GraphMol/FragCatalog/FragCatalogEntry.h" = "a013da8123f918fcd27cc246de89e4327972818e"
+"Code/GraphMol/FragCatalog/FragCatalogUtils.cpp" = "3dba949b587e2894ebbd313f4f2c4c63251ce796"
+"Code/GraphMol/FragCatalog/FragCatalogUtils.h" = "635fe471c19887d3483c798f45c903f1fab50aed"
+"Code/GraphMol/FragCatalog/FragFPGenerator.cpp" = "5a80389b0534aaa63bb7a9716d2b36f45d1a3736"
+"Code/GraphMol/FragCatalog/FragFPGenerator.h" = "88126ab111aafa388e0a1789cbc2c0cb25d6cca9"
+
+[module."rdoxide_python::rdfragcatalog".sources]
+"Code/GraphMol/FragCatalog/Wrap/FragCatGenerator.cpp" = "9d99e5ba256094c32b9bba5bf5e05417e0bbf582"
+"Code/GraphMol/FragCatalog/Wrap/FragCatParams.cpp" = "157fb9a131c992223c2a41d6654f079d02e5b4da"
+"Code/GraphMol/FragCatalog/Wrap/FragCatalog.cpp" = "3917df26e13c2c94bd642f4777ca6c54a93c2296"
+"Code/GraphMol/FragCatalog/Wrap/FragFPGenerator.cpp" = "294a8390d2e6903c5deec8dfeb393fbd0f4b6e3c"
+"Code/GraphMol/FragCatalog/Wrap/rdfragcatalog.cpp" = "de26578c7361894e1b494dd2ccd4d9d474b53d35"

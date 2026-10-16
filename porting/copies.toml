@@ -366,3 +366,7 @@ to = "python/rdkit/Chem/FilterCatalog.py"
 [[copy]]
 from = "rdkit/Chem/MolCatalog.py"
 to = "python/rdkit/Chem/MolCatalog.py"
+
+[[copy]]
+from = "rdkit/Chem/FragmentCatalog.py"
+to = "python/rdkit/Chem/FragmentCatalog.py"

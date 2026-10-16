@@ -446,7 +446,11 @@ pub fn calc_path_discriminators(
     mol: &ROMol,
     path: &[i32],
     use_bo: bool,
+    extra_invars: Option<&[u32]>,
 ) -> Result<(u32, usize, usize)> {
+    if extra_invars.is_some_and(|e| e.len() != mol.num_atoms() as usize) {
+        return Err(RDKitError::invariant("bad extra invars"));
+    }
     let pt = PeriodicTable::get();
     let mut atoms_used = vec![-1i32; mol.num_atoms() as usize];
     let mut atoms: Vec<u32> = Vec::new();
@@ -474,6 +478,9 @@ pub fn calc_path_discriminators(
         hash_combine(&mut invar, delta_mass as u32);
         if atom.is_aromatic() {
             hash_combine(&mut invar, 1);
+        }
+        if let Some(extra) = extra_invars {
+            hash_combine(&mut invar, extra[a as usize]);
         }
         invars.push(invar);
     }
@@ -507,13 +514,27 @@ pub fn uniquify_paths(mol: &ROMol, paths: &[Path], use_bo: bool) -> Result<Vec<P
     let mut seen = Vec::new();
     let mut res = Vec::new();
     for p in paths {
-        let d = calc_path_discriminators(mol, p, use_bo)?;
+        let d = calc_path_discriminators(mol, p, use_bo, None)?;
         if !seen.contains(&d) {
             seen.push(d);
             res.push(p.clone());
         }
     }
     Ok(res)
+}
+
+/// `Subgraphs::bondListFromAtomList`: the bonds between the listed atoms
+/// (none for fewer than two atoms).
+pub fn bond_list_from_atom_list(mol: &ROMol, atom_ids: &[i32]) -> Path {
+    let mut bids = Vec::new();
+    for (i, &a) in atom_ids.iter().enumerate() {
+        for &b in &atom_ids[i + 1..] {
+            if let Some(bid) = mol.bond_idx_between(a as u32, b as u32) {
+                bids.push(bid as i32);
+            }
+        }
+    }
+    bids
 }
 
 /// `Subgraphs::pathToSubmol`: the molecule made of the bonds in `path` (and
