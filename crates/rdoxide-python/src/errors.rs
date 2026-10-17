@@ -2,7 +2,8 @@
 //! (see upstream `Code/RDBoost/Wrap/RDBase.cpp` exception translators).
 
 use pyo3::exceptions::{
-    PyIOError, PyIndexError, PyKeyError, PyRuntimeError, PyTypeError, PyValueError,
+    PyIOError, PyIndexError, PyKeyError, PyNotImplementedError, PyRuntimeError, PyTypeError,
+    PyValueError,
 };
 use pyo3::prelude::*;
 use pyo3::sync::PyOnceLock;
@@ -27,6 +28,7 @@ pub fn to_py(err: RDKitError) -> PyErr {
             PyValueError::new_err(format!("ChemicalReactionParserException: {m}"))
         }
         RDKitError::Sanitize(e) => crate::rdchem::sanitize_error(&e),
+        RDKitError::NotImplemented(m) => PyNotImplementedError::new_err(m),
     }
 }
 

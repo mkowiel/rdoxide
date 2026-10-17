@@ -50,6 +50,7 @@ mod rdforcefield;
 mod rdfragcatalog;
 mod rdgaussianshape;
 mod rdgeneralizedsubstruct;
+mod rdinchi;
 mod rdinfotheory;
 mod rdmetricmatrixcalc;
 mod rdmhfpfingerprint;
@@ -331,6 +332,7 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
         rdsubstructlibrary::init,
     )?;
     add_submodule(m, "rdSLNParse", "rdoxide.Chem.rdSLNParse", rdslnparse::init)?;
+    add_submodule(m, "rdinchi", "rdoxide.Chem.rdinchi", rdinchi::init)?;
     add_submodule(
         m,
         "rdStructChecker",

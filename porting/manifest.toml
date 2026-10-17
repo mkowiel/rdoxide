@@ -1777,3 +1777,15 @@
 
 [module."rdoxide_python::rdchemreactions_enumerate".sources]
 "Code/GraphMol/ChemReactions/Wrap/Enumerate.cpp" = "48b90a2bb0a837c6d0465791b85f3f8cadee806e"
+
+# InChI Software v1.07.3 is external (UPSTREAM.toml [external.InChI]); the
+# rdoxide::external::inchi modules name their C sources in their headers and
+# are re-ported when the pinned version/md5 changes (docs/INCHI_PORT.md).
+
+[module."rdoxide::external::inchi_api".sources]
+"External/INCHI-API/inchi.h" = "697a2f76559d4645c6ddd3829b4839cb7211b02b"
+"External/INCHI-API/inchi.cpp" = "d4f11e12c5cadaae91fd900dc4b256af2c4f1429"
+
+[module."rdoxide_python::rdinchi".sources]
+"External/INCHI-API/Wrap/pyInchi.cpp" = "82d8ab16d62210693245a02d84e12bb882524f9c"
+"External/INCHI-API/python/inchi.py" = "24fdb9e22a79b1ce8bc60af97d8d7ad190620cff"

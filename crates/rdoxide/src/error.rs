@@ -34,6 +34,9 @@ pub enum RDKitError {
     ChemicalReactionParser(String),
     /// Sanitization failures (`MolSanitizeException` hierarchy).
     Sanitize(SanitizeError),
+    /// Functionality that upstream provides but rdoxide has not ported yet
+    /// (no upstream counterpart) -> `NotImplementedError`.
+    NotImplemented(String),
 }
 
 /// `MolSanitizeException` and subclasses.
@@ -161,7 +164,8 @@ impl fmt::Display for RDKitError {
             | RDKitError::Conformer(m)
             | RDKitError::BadFile(m)
             | RDKitError::ChemicalReaction(m)
-            | RDKitError::ChemicalReactionParser(m) => f.write_str(m),
+            | RDKitError::ChemicalReactionParser(m)
+            | RDKitError::NotImplemented(m) => f.write_str(m),
             RDKitError::Sanitize(e) => match e {
                 SanitizeError::Generic { message }
                 | SanitizeError::AtomValence { message, .. }
