@@ -370,3 +370,63 @@ to = "python/rdoxide/Chem/MolCatalog.py"
 [[copy]]
 from = "rdkit/Chem/FragmentCatalog.py"
 to = "python/rdoxide/Chem/FragmentCatalog.py"
+
+# Pharmacophore packages (pure Python on top of ChemicalFeatures, DataStructs, Geometry, DistanceGeometry)
+[[copy]]
+from = "rdkit/Chem/Pharm2D"
+to = "python/rdoxide/Chem/Pharm2D"
+exclude = ["UnitTest*.py", "test_data", "__pycache__"]
+
+[[copy]]
+from = "rdkit/Chem/FeatMaps"
+to = "python/rdoxide/Chem/FeatMaps"
+exclude = ["UnitTest*.py", "test_data", "__pycache__"]
+
+[[copy]]
+from = "rdkit/Chem/Pharm3D"
+to = "python/rdoxide/Chem/Pharm3D"
+exclude = ["UnitTest*.py", "test_data", "__pycache__"]
+
+# Pure-Python machine-learning helpers and data access
+[[copy]]
+from = "rdkit/ML/Data"
+to = "python/rdoxide/ML/Data"
+exclude = ["UnitTest*.py", "test_data", "__pycache__"]
+
+[[copy]]
+from = "rdkit/ML/Scoring"
+to = "python/rdoxide/ML/Scoring"
+exclude = ["UnitTest*.py", "test_data", "__pycache__"]
+
+[[copy]]
+from = "rdkit/ML/Descriptors"
+to = "python/rdoxide/ML/Descriptors"
+exclude = ["UnitTest*.py", "test_data", "__pycache__"]
+
+[[copy]]
+from = "rdkit/ML/SLT"
+to = "python/rdoxide/ML/SLT"
+exclude = ["UnitTest*.py", "test_data", "__pycache__"]
+
+[[copy]]
+from = "rdkit/ML/MatOps.py"
+to = "python/rdoxide/ML/MatOps.py"
+
+[[copy]]
+from = "rdkit/ML/files.py"
+to = "python/rdoxide/ML/files.py"
+
+[[copy]]
+from = "rdkit/utils"
+to = "python/rdoxide/utils"
+exclude = ["UnitTest*.py", "retest.txt", "__pycache__"]
+
+[[copy]]
+from = "rdkit/Dbase"
+to = "python/rdoxide/Dbase"
+exclude = ["UnitTest*.py", "test_data", "__pycache__"]
+
+[[copy]]
+from = "rdkit/VLib"
+to = "python/rdoxide/VLib"
+exclude = ["UnitTest*.py", "__pycache__"]
