@@ -106,7 +106,7 @@ impl PySmilesMolSupplier {
     #[pyo3(signature = (data = None, delimiter = " ", smilesColumn = 0, nameColumn = 1, titleLine = None, sanitize = None))]
     #[allow(non_snake_case)]
     fn new(
-        data: Option<String>,
+        #[pyo3(from_py_with = crate::pyconv::path_like_opt)] data: Option<String>,
         delimiter: &str,
         smilesColumn: i32,
         nameColumn: i32,
@@ -196,7 +196,7 @@ impl PySmilesMolSupplier {
     #[allow(non_snake_case)]
     fn set_data(
         &mut self,
-        data: &str,
+        #[pyo3(from_py_with = crate::pyconv::text_bytes)] data: Vec<u8>,
         delimiter: &str,
         smilesColumn: i32,
         nameColumn: i32,
@@ -204,7 +204,7 @@ impl PySmilesMolSupplier {
         sanitize: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<()> {
         let p = params(delimiter, smilesColumn, nameColumn, titleLine, sanitize)?;
-        self.inner.set_data(data.as_bytes(), p);
+        self.inner.set_data(&data, p);
         Ok(())
     }
 

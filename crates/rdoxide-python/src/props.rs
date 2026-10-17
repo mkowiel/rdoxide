@@ -315,27 +315,27 @@ macro_rules! impl_props {
         impl $ty {
             /// Sets a property (string value).
             #[pyo3(name = "SetProp", signature = (key, val, computed = false))]
-            fn py_set_prop(&mut self, py: pyo3::Python<'_>, key: &str, val: String, computed: bool) -> pyo3::PyResult<()> {
+            fn py_set_prop(&mut self, py: pyo3::Python<'_>, key: &str, val: String, #[pyo3(from_py_with = crate::pyconv::truthy)] computed: bool) -> pyo3::PyResult<()> {
                 self.with_dict_mut(py, |d| $crate::props::set_prop(d, key, val.into(), computed))?
             }
             /// Sets a double valued property.
             #[pyo3(name = "SetDoubleProp", signature = (key, val, computed = false))]
-            fn py_set_double_prop(&mut self, py: pyo3::Python<'_>, key: &str, val: f64, computed: bool) -> pyo3::PyResult<()> {
+            fn py_set_double_prop(&mut self, py: pyo3::Python<'_>, key: &str, val: f64, #[pyo3(from_py_with = crate::pyconv::truthy)] computed: bool) -> pyo3::PyResult<()> {
                 self.with_dict_mut(py, |d| $crate::props::set_prop(d, key, val.into(), computed))?
             }
             /// Sets an integer valued property.
             #[pyo3(name = "SetIntProp", signature = (key, val, computed = false))]
-            fn py_set_int_prop(&mut self, py: pyo3::Python<'_>, key: &str, val: i32, computed: bool) -> pyo3::PyResult<()> {
+            fn py_set_int_prop(&mut self, py: pyo3::Python<'_>, key: &str, val: i32, #[pyo3(from_py_with = crate::pyconv::truthy)] computed: bool) -> pyo3::PyResult<()> {
                 self.with_dict_mut(py, |d| $crate::props::set_prop(d, key, val.into(), computed))?
             }
             /// Sets an unsigned integer valued property.
             #[pyo3(name = "SetUnsignedProp", signature = (key, val, computed = false))]
-            fn py_set_unsigned_prop(&mut self, py: pyo3::Python<'_>, key: &str, val: u32, computed: bool) -> pyo3::PyResult<()> {
+            fn py_set_unsigned_prop(&mut self, py: pyo3::Python<'_>, key: &str, val: u32, #[pyo3(from_py_with = crate::pyconv::truthy)] computed: bool) -> pyo3::PyResult<()> {
                 self.with_dict_mut(py, |d| $crate::props::set_prop(d, key, val.into(), computed))?
             }
             /// Sets a boolean valued property.
             #[pyo3(name = "SetBoolProp", signature = (key, val, computed = false))]
-            fn py_set_bool_prop(&mut self, py: pyo3::Python<'_>, key: &str, val: bool, computed: bool) -> pyo3::PyResult<()> {
+            fn py_set_bool_prop(&mut self, py: pyo3::Python<'_>, key: &str, #[pyo3(from_py_with = crate::pyconv::truthy)] val: bool, #[pyo3(from_py_with = crate::pyconv::truthy)] computed: bool) -> pyo3::PyResult<()> {
                 self.with_dict_mut(py, |d| $crate::props::set_prop(d, key, val.into(), computed))?
             }
         }

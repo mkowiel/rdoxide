@@ -82,9 +82,9 @@ impl PyMultithreadedSDMolSupplier {
     #[allow(non_snake_case)]
     fn new(
         fileName: &str,
-        sanitize: bool,
-        removeHs: bool,
-        strictParsing: bool,
+        #[pyo3(from_py_with = crate::pyconv::truthy)] sanitize: bool,
+        #[pyo3(from_py_with = crate::pyconv::truthy)] removeHs: bool,
+        #[pyo3(from_py_with = crate::pyconv::truthy)] strictParsing: bool,
         numWriterThreads: i32,
         sizeInputQueue: usize,
         sizeOutputQueue: usize,
@@ -227,8 +227,8 @@ impl PyMultithreadedSmilesMolSupplier {
         delimiter: &str,
         smilesColumn: i32,
         nameColumn: i32,
-        titleLine: bool,
-        sanitize: bool,
+        #[pyo3(from_py_with = crate::pyconv::truthy)] titleLine: bool,
+        #[pyo3(from_py_with = crate::pyconv::truthy)] sanitize: bool,
         numWriterThreads: i32,
         sizeInputQueue: usize,
         sizeOutputQueue: usize,

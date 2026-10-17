@@ -23,11 +23,13 @@ pub fn no_stream(site: Site) -> PyErr {
 }
 
 impl WriterSink {
-    /// A string names the output file (`"-"` is stdout); anything else is
+    /// A string (or path) names the output file (`"-"` is stdout); anything else is
     /// taken as a file-like object with a `write` method.
     pub fn open(target: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let Ok(name) = target.extract::<String>() else {
-            return Ok(WriterSink(Target::Py(target.clone().unbind())));
+        let name = match target.extract::<String>() {
+            Ok(name) => name,
+            Err(_) if target.hasattr("__fspath__")? => crate::pyconv::path_like(target)?,
+            Err(_) => return Ok(WriterSink(Target::Py(target.clone().unbind()))),
         };
         if name == "-" {
             return Ok(WriterSink(Target::Stdout));

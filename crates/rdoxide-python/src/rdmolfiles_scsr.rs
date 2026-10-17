@@ -165,8 +165,8 @@ fn scsr_params(params: Option<PyRef<'_, PyMolFromScsrParams>>) -> MolFromScsrPar
 fn mol_from_scsr_block_py(
     py: Python<'_>,
     molBlock: &str,
-    sanitize: bool,
-    removeHs: bool,
+    #[pyo3(from_py_with = crate::pyconv::truthy)] sanitize: bool,
+    #[pyo3(from_py_with = crate::pyconv::truthy)] removeHs: bool,
     molFromSCSRParams: Option<PyRef<'_, PyMolFromScsrParams>>,
 ) -> PyResult<Option<PyMol>> {
     let params = scsr_params(molFromSCSRParams);
@@ -201,8 +201,8 @@ fn mol_from_scsr_block_py(
 fn mol_from_scsr_file_py(
     py: Python<'_>,
     molFileName: String,
-    sanitize: bool,
-    removeHs: bool,
+    #[pyo3(from_py_with = crate::pyconv::truthy)] sanitize: bool,
+    #[pyo3(from_py_with = crate::pyconv::truthy)] removeHs: bool,
     molFromSCSRParams: Option<PyRef<'_, PyMolFromScsrParams>>,
 ) -> PyResult<Option<PyMol>> {
     let params = scsr_params(molFromSCSRParams);

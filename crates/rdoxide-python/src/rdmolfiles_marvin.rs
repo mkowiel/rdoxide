@@ -46,8 +46,8 @@ fn finish(res: rdoxide::Result<Option<rdoxide::graphmol::RWMol>>) -> PyResult<Op
 fn py_mol_from_mrv_file(
     py: Python<'_>,
     molFileName: &str,
-    sanitize: bool,
-    removeHs: bool,
+    #[pyo3(from_py_with = crate::pyconv::truthy)] sanitize: bool,
+    #[pyo3(from_py_with = crate::pyconv::truthy)] removeHs: bool,
 ) -> PyResult<Option<PyMol>> {
     let params = MrvParserParams {
         sanitize,
@@ -78,8 +78,8 @@ fn py_mol_from_mrv_file(
 fn py_mol_from_mrv_block(
     py: Python<'_>,
     mrvBlock: &Bound<'_, PyAny>,
-    sanitize: bool,
-    removeHs: bool,
+    #[pyo3(from_py_with = crate::pyconv::truthy)] sanitize: bool,
+    #[pyo3(from_py_with = crate::pyconv::truthy)] removeHs: bool,
 ) -> PyResult<Option<PyMol>> {
     // pyObjectToString accepts str or bytes
     let text = match mrvBlock.extract::<String>() {

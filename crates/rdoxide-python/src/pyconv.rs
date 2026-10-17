@@ -103,3 +103,36 @@ pub fn set_declared_attribute(
     descriptor.call_method1("__set__", (obj, value))?;
     Ok(())
 }
+
+/// `from_py_with` converter for `bool` arguments: boost::python (and so the
+/// upstream API) accepts any truthy/falsy object, such as `0` and `1`.
+pub fn truthy(obj: &Bound<'_, PyAny>) -> PyResult<bool> {
+    obj.is_truthy()
+}
+
+/// `from_py_with` converter for file names: a `str` or any `os.PathLike`.
+pub fn path_like(obj: &Bound<'_, PyAny>) -> PyResult<String> {
+    obj.py()
+        .import("os")?
+        .call_method1("fspath", (obj,))?
+        .extract::<String>()
+}
+
+/// `from_py_with` converter for optional file names (see [`path_like`]).
+pub fn path_like_opt(obj: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
+    if obj.is_none() {
+        Ok(None)
+    } else {
+        path_like(obj).map(Some)
+    }
+}
+
+/// `from_py_with` converter for text that may be given as `str` or `bytes`.
+pub fn text_bytes(obj: &Bound<'_, PyAny>) -> PyResult<Vec<u8>> {
+    if let Ok(b) = obj.extract::<Vec<u8>>() {
+        if obj.is_instance_of::<pyo3::types::PyBytes>() {
+            return Ok(b);
+        }
+    }
+    Ok(obj.extract::<String>()?.into_bytes())
+}
