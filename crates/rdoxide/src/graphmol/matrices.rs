@@ -427,7 +427,7 @@ mod tests {
     fn tie_prone_weights(n: usize, seed: u64) -> Vec<f64> {
         let mut d = vec![LOCAL_INF; n * n];
         let mut state = seed;
-        let mut edge = |d: &mut Vec<f64>, a: usize, b: usize| {
+        let edge = |d: &mut Vec<f64>, a: usize, b: usize| {
             if a != b {
                 d[a * n + b] = 1.0;
                 d[b * n + a] = 1.0;
