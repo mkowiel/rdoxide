@@ -47,6 +47,7 @@ def fetch_externals() -> None:
     import hashlib
     import tarfile
     import urllib.request
+    import zipfile
 
     base = ROOT / "upstream" / "external"
     base.mkdir(parents=True, exist_ok=True)
@@ -55,15 +56,22 @@ def fetch_externals() -> None:
         if dest.exists():
             print(f"external {name}: present")
             continue
-        archive = base / f"{name}.tar.gz"
+        is_zip = spec["url"].endswith(".zip")
+        archive = base / f"{name}.{'zip' if is_zip else 'tar.gz'}"
         urllib.request.urlretrieve(spec["url"], archive)
         digest = hashlib.md5(archive.read_bytes()).hexdigest()
         if digest != spec["md5"]:
             archive.unlink()
             sys.exit(f"external {name}: md5 mismatch ({digest} != {spec['md5']})")
-        with tarfile.open(archive) as tf:
-            top = tf.getnames()[0].split("/")[0]
-            tf.extractall(base, filter="data")
+        if is_zip:
+            # zipfile drops absolute paths and ".." components when extracting
+            with zipfile.ZipFile(archive) as zf:
+                top = zf.namelist()[0].split("/")[0]
+                zf.extractall(base)
+        else:
+            with tarfile.open(archive) as tf:
+                top = tf.getnames()[0].split("/")[0]
+                tf.extractall(base, filter="data")
         (base / top).rename(dest)
         archive.unlink()
         print(f"external {name}: fetched")

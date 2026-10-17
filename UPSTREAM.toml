@@ -12,3 +12,11 @@ commit = "fece8caa860bdf6c9c82bdb9253f22a0cf87150c"
 url = "https://github.com/rareylab/RingDecomposerLib/archive/v1.1.3_rdkit.tar.gz"
 md5 = "e9a0bcdda8b921a35e812b9888a9a874"
 license = "BSD-3-Clause"
+
+# InChI Software (External/INCHI-API, Code/cmake/Modules/FindInchi.cmake).
+# MIT since v1.07 (see docs/INCHI_PORT.md); tag v1.07.3 is commit
+# 0b3e941d29289f3e5024c9ecfd45186285319420.
+[external.InChI]
+url = "https://github.com/IUPAC-InChI/InChI/releases/download/v1.07.3/INCHI-1-SRC.zip"
+md5 = "b761f37a7d3a3ff8574daf6906993759"
+license = "MIT"

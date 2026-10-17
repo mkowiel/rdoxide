@@ -133,5 +133,7 @@ listed changes, `stamp`.
 ## License
 
 rdoxide is released under the BSD 3-Clause License; code, data and Python modules
-derived from RDKit remain under RDKit's BSD 3-Clause license. See [NOTICE](NOTICE),
+derived from RDKit remain under RDKit's BSD 3-Clause license. Ported third-party
+libraries keep their own licenses, e.g. the InChI support translates the InChI
+Software 1.07.3 (Copyright IUPAC and InChI Trust, MIT license). See [NOTICE](NOTICE),
 [LICENSE](LICENSE) and [LICENSES/](LICENSES/).
