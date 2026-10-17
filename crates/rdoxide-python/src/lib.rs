@@ -36,6 +36,7 @@ mod rdchemreactions;
 mod rdcip_labeler;
 mod rdclustering;
 mod rddepictor;
+mod rddepictor_constrained;
 mod rddeprotect;
 mod rddeterminebonds;
 mod rddistgeom;

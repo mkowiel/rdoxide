@@ -1229,3 +1229,72 @@ impl SubstructMatchParameters {
         Ok(())
     }
 }
+
+/// `isAtomTerminalRGroupOrQueryHydrogen`: a dummy atom with a single
+/// neighbour, or a query atom that matches hydrogen only.
+pub fn is_atom_terminal_r_group_or_query_hydrogen(mol: &ROMol, idx: u32) -> bool {
+    (mol.atom_degree(idx) == 1 && crate::graphmol::queries::is_atom_dummy(mol, idx))
+        || mol
+            .atom(idx)
+            .query()
+            .is_some_and(|q| q.describe(0).contains("AtomAtomicNum 1 = val"))
+}
+
+/// Scores the matches of a core by the degree of substitution (a penalty of
+/// 1.0 for each terminal dummy atom matching hydrogen; a fraction of 1.0
+/// based on the matched indices makes the order of ties deterministic).
+fn score_matches_by_core_substitution(
+    mol: &ROMol,
+    query: &ROMol,
+    matches: &[MatchVect],
+) -> Vec<(usize, f64)> {
+    assert!(!matches.is_empty(), "matches must not be empty");
+    let na = f64::from(mol.num_atoms());
+    let sum_indices = (na * (na + 1.0) / 2.0).max(1.0);
+    matches
+        .iter()
+        .enumerate()
+        .map(|(i, m)| {
+            let mut penalty = 0.0;
+            let mut idx_sum = 0.0;
+            for &(q, a) in m {
+                idx_sum += f64::from(a);
+                if mol.atom(a as u32).atomic_num() == 1
+                    && is_atom_terminal_r_group_or_query_hydrogen(query, q as u32)
+                {
+                    penalty += 1.0;
+                }
+            }
+            (i, penalty + idx_sum / sum_indices)
+        })
+        .collect()
+}
+
+/// `getMostSubstitutedCoreMatch`: the match with the lowest penalty.
+pub fn get_most_substituted_core_match<'a>(
+    mol: &ROMol,
+    core: &ROMol,
+    matches: &'a [MatchVect],
+) -> &'a MatchVect {
+    let scores = score_matches_by_core_substitution(mol, core, matches);
+    // std::min_element keeps the first of equivalent elements
+    let mut best = scores[0];
+    for s in &scores[1..] {
+        if s.1 < best.1 {
+            best = *s;
+        }
+    }
+    &matches[best.0]
+}
+
+/// `sortMatchesByDegreeOfCoreSubstitution`: the matches, least penalised
+/// first.
+pub fn sort_matches_by_degree_of_core_substitution(
+    mol: &ROMol,
+    core: &ROMol,
+    matches: &[MatchVect],
+) -> Vec<MatchVect> {
+    let mut scores = score_matches_by_core_substitution(mol, core, matches);
+    crate::rdgeneral::cxx_sort::libcxx_sort_by(&mut scores, |a, b| a.1 < b.1);
+    scores.iter().map(|&(i, _)| matches[i].clone()).collect()
+}

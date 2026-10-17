@@ -159,7 +159,14 @@ Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::test4SamplingSpread
 Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::test5SamplingMimic3D
 Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::test6ChangeBondLength
 Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::testAddRingSystemTemplates
+Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::testConstrainedCoords
+Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::testGenerate2DDepictionAllowRGroups
+Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::testGenerate2DDepictionRefPatternAtomMap
+Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::testGenerateAlignedCoordsAcceptFailure
+Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::testGenerateAlignedCoordsAlignOnly
+Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::testGenerateDepictionMatching2DStructureWithRingTemplates
 Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::testNormalizeStraighten
+Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::testRGroupMatchHeavyHydroNoneCharged
 Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::testSetBadRingSystemTemplates
 Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::testSetRingSystemTemplates
 Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::testUseMultipleTemplates

@@ -7,6 +7,7 @@
 //! Copyright (C) 2003-2025 Greg Landrum and other RDKit contributors.
 //! Licensed under the BSD 3-Clause license (see LICENSES/RDKit-BSD-3-Clause.txt).
 
+pub mod constrained;
 pub mod depict_utils;
 pub mod embedded_frag;
 pub mod templates;
