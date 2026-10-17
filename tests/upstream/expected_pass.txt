@@ -625,6 +625,7 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::test52MolFrags
 Code/GraphMol/Wrap/rough_test.py::TestCase::test53Matrices
 Code/GraphMol/Wrap/rough_test.py::TestCase::test55LayeredFingerprint
 Code/GraphMol/Wrap/rough_test.py::TestCase::test56LazySDMolSupplier
+Code/GraphMol/Wrap/rough_test.py::TestCase::test57AddRecursiveQuery
 Code/GraphMol/Wrap/rough_test.py::TestCase::test58Issue2983794
 Code/GraphMol/Wrap/rough_test.py::TestCase::test59Issue3007178
 Code/GraphMol/Wrap/rough_test.py::TestCase::test60SmilesWriterClose
@@ -645,7 +646,9 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::test75AllBondsExplicit
 Code/GraphMol/Wrap/rough_test.py::TestCase::test76VeryLargeMolecule
 Code/GraphMol/Wrap/rough_test.py::TestCase::test77MolFragmentToSmiles
 Code/GraphMol/Wrap/rough_test.py::TestCase::test78AtomAndBondProps
+Code/GraphMol/Wrap/rough_test.py::TestCase::test79AddRecursiveStructureQueries
 Code/GraphMol/Wrap/rough_test.py::TestCase::test7Atom
+Code/GraphMol/Wrap/rough_test.py::TestCase::test80ParseMolQueryDefFile
 Code/GraphMol/Wrap/rough_test.py::TestCase::test81Issue275
 Code/GraphMol/Wrap/rough_test.py::TestCase::test83GitHubIssue19
 Code/GraphMol/Wrap/rough_test.py::TestCase::test84PDBBasics
@@ -938,7 +941,9 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::test75AllBondsExplicit
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test76VeryLargeMolecule
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test77MolFragmentToSmiles
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test78AtomAndBondProps
+Code/GraphMol/nbWrap/rough_test.py::TestCase::test79AddRecursiveStructureQueries
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test7Atom
+Code/GraphMol/nbWrap/rough_test.py::TestCase::test80ParseMolQueryDefFile
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test81Issue275
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test83GitHubIssue19
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test84PDBBasics
