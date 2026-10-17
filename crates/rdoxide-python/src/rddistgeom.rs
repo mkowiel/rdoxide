@@ -53,6 +53,23 @@ macro_rules! simple_props {
     };
 }
 
+#[pymethods]
+#[allow(non_snake_case)]
+impl PyEmbedParameters {
+    /// The number of threads to use while embedding multiple conformers. It
+    /// reads 1 until set; untouched, the embedding uses all cores (or the
+    /// RDOXIDE_NUM_THREADS ceiling). 0 means the same, and a count never
+    /// exceeds that ceiling.
+    #[getter(numThreads)]
+    fn get_num_threads(&self) -> i32 {
+        self.params.num_threads
+    }
+    #[setter(numThreads)]
+    fn set_num_threads(&mut self, value: i32) {
+        self.params.set_num_threads(value);
+    }
+}
+
 simple_props!(
     (
         maxIterations,
@@ -60,13 +77,6 @@ simple_props!(
         set_max_iterations,
         max_iterations,
         u32
-    ),
-    (
-        numThreads,
-        get_num_threads,
-        set_num_threads,
-        num_threads,
-        i32
     ),
     (timeout, get_timeout, set_timeout, timeout, u32),
     (
@@ -485,7 +495,8 @@ fn keyword_params(
     );
     take!("enforceChirality", enforce_chirality, bool, true);
     if num_confs_pos.is_some() {
-        take!("numThreads", num_threads, i32, 1);
+        take!("numThreads", num_threads, i32, 0);
+        p.num_threads_is_default = false;
     }
     take!(
         "useExpTorsionAnglePrefs",

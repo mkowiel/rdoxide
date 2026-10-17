@@ -48,6 +48,31 @@ from rdoxide import Chem
 Chem.MolToSmiles(Chem.MolFromSmiles("c1ccccc1O"))
 ```
 
+## Threads
+
+rdoxide uses all cores by default wherever the work can be split without
+changing the result (conformer embedding, force-field optimisation of
+conformers, bulk fingerprints and similarities, substructure libraries,
+reaction runs, topological distance matrices, synthon search, ...). Parallel
+results are identical to single-threaded ones.
+
+The number of threads any operation may use is capped by the environment
+variable `RDOXIDE_NUM_THREADS`:
+
+```bash
+RDOXIDE_NUM_THREADS=4 python my_script.py     # at most 4 threads
+RDOXIDE_NUM_THREADS=-1 python my_script.py    # all cores but one
+RDOXIDE_NUM_THREADS=1 python my_script.py     # no parallelism
+```
+
+A positive number is that many threads, `0` or `all` (the default) all
+hardware threads, and a negative number all but that many. At run time use
+`rdBase.SetMaxThreads(n)` and `rdBase.GetMaxThreads()`. Functions and
+parameter objects that take `numThreads` keep their meaning: a positive value
+asks for that many threads (never more than the cap), `0` for the cap and a
+negative value for the cap minus that many. `EmbedParameters.numThreads` still
+reads `1` as upstream does, but embedding uses the cap until you set it.
+
 ## Building
 
 ```bash

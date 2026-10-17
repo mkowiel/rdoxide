@@ -278,7 +278,7 @@ struct LegacyKeys {
 fn legacy_params(a: &Args<'_, '_>, k: &LegacyKeys) -> PyResult<BestAlignmentParams> {
     let max_matches = a.int(k.max_matches, "maxMatches", 1_000_000)?;
     let symmetrize = a.flag(k.symmetrize, "symmetrizeConjugatedTerminalGroups", true)?;
-    let num_threads = a.int(k.num_threads, "numThreads", 1)?;
+    let num_threads = a.int(k.num_threads, "numThreads", 0)?;
     let map = a.get(k.map, "map")?;
     let weights = a.get(k.weights, "weights")?;
     PyBestAlignmentParams::from_parts(

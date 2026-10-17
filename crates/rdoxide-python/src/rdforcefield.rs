@@ -567,7 +567,7 @@ fn py_uff_optimize_molecule(
 ///  RETURNS: a list of (not_converged, energy) 2-tuples.
 ///      If not_converged is 0 the optimization converged for that conformer.
 #[pyfunction]
-#[pyo3(name = "UFFOptimizeMoleculeConfs", signature = (mol, numThreads = 1, maxIters = 200, vdwThresh = 10.0, ignoreInterfragInteractions = true))]
+#[pyo3(name = "UFFOptimizeMoleculeConfs", signature = (mol, numThreads = 0, maxIters = 200, vdwThresh = 10.0, ignoreInterfragInteractions = true))]
 #[allow(non_snake_case)]
 fn py_uff_optimize_molecule_confs(
     py: Python<'_>,
@@ -1204,7 +1204,7 @@ fn py_mmff_has_all_molecule_params(mol: &PyMol) -> PyResult<bool> {
 /// RETURNS: a list of (not_converged, energy) 2-tuples.
 ///     If not_converged is 0 the optimization converged for that conformer.
 #[pyfunction]
-#[pyo3(name = "MMFFOptimizeMoleculeConfs", signature = (mol, numThreads = 1, maxIters = 200, mmffVariant = "MMFF94", nonBondedThresh = 100.0, ignoreInterfragInteractions = true))]
+#[pyo3(name = "MMFFOptimizeMoleculeConfs", signature = (mol, numThreads = 0, maxIters = 200, mmffVariant = "MMFF94", nonBondedThresh = 100.0, ignoreInterfragInteractions = true))]
 #[allow(non_snake_case)]
 fn py_mmff_optimize_molecule_confs(
     py: Python<'_>,
@@ -1268,7 +1268,7 @@ fn py_optimize_molecule(
 ///  RETURNS: a list of (not_converged, energy) 2-tuples.
 ///      If not_converged is 0 the optimization converged for that conformer.
 #[pyfunction]
-#[pyo3(name = "OptimizeMoleculeConfs", signature = (mol, ff, numThreads = 1, maxIters = 200))]
+#[pyo3(name = "OptimizeMoleculeConfs", signature = (mol, ff, numThreads = 0, maxIters = 200))]
 #[allow(non_snake_case)]
 fn py_optimize_molecule_confs(
     py: Python<'_>,

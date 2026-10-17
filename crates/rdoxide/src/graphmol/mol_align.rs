@@ -48,7 +48,7 @@ impl Default for BestAlignmentParams {
             max_matches: 1_000_000,
             symmetrize_conjugated_terminal_groups: true,
             ignore_hs: true,
-            num_threads: 1,
+            num_threads: 0,
             map: Vec::new(),
             weights: None,
         }
