@@ -85,6 +85,7 @@ mod rdmolfiles_sequence;
 mod rdmolfiles_smarts;
 mod rdmolfiles_smisupplier;
 mod rdmolfiles_smiwriter;
+mod rdmolfiles_svg;
 mod rdmolfiles_tdtsupplier;
 mod rdmolfiles_tdtwriter;
 mod rdmolfiles_tpl;

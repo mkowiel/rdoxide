@@ -23,6 +23,7 @@ mod sgroup_parsing;
 pub(crate) mod sgroup_writing;
 pub mod smiles_mol_supplier;
 pub mod smiles_writer;
+pub mod svg_parser;
 pub mod tdt_mol_supplier;
 pub mod tdt_writer;
 pub mod tpl;
