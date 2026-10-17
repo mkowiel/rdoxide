@@ -308,6 +308,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     crate::rdmolops_fragments::add(m)?;
     crate::rdmolops_transforms::add(m)?;
     crate::rdmolops_wedging::add(m)?;
+    crate::rdmolops_core_match::add(m)?;
     crate::rdmolops_zip::add(m)?;
     m.add_function(wrap_pyfunction!(py_set_aromaticity, m)?)?;
     m.add_function(wrap_pyfunction!(py_set_conjugation, m)?)?;

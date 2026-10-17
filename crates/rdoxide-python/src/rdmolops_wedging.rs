@@ -6,6 +6,9 @@ use pyo3::prelude::*;
 use rdoxide::RDKitError;
 use rdoxide::graphmol::Conformer;
 use rdoxide::graphmol::chirality::remove_non_explicit_3d_chirality;
+use rdoxide::graphmol::file_parsers::mol_file_stereochem::{
+    StereoBondThresholds, add_wavy_bonds_for_stereo_any,
+};
 use rdoxide::graphmol::wedge_bonds::{
     BondWedgingParameters, reapply_mol_block_wedging, wedge_bond, wedge_mol_bonds,
 };
@@ -45,6 +48,47 @@ impl From<Option<PyRef<'_, PyBondWedgingParameters>>> for PyBondWedgingParameter
     fn from(params: Option<PyRef<'_, PyBondWedgingParameters>>) -> Self {
         params.map(|p| p.clone()).unwrap_or_default()
     }
+}
+
+/// Constants used to set the thresholds for which single bonds can be made wavy.
+#[pyclass(name = "StereoBondThresholds", module = "rdoxide.Chem.rdmolops")]
+#[derive(Debug)]
+pub struct PyStereoBondThresholds;
+
+#[pymethods]
+impl PyStereoBondThresholds {
+    /// neighboring double bond without stereo info
+    #[classattr]
+    const DBL_BOND_NO_STEREO: u32 = StereoBondThresholds::DBL_BOND_NO_STEREO;
+    /// neighboring double bond with stereo specified
+    #[classattr]
+    const DBL_BOND_SPECIFIED_STEREO: u32 = StereoBondThresholds::DBL_BOND_SPECIFIED_STEREO;
+    /// atom with specified chirality
+    #[classattr]
+    const CHIRAL_ATOM: u32 = StereoBondThresholds::CHIRAL_ATOM;
+    /// single bond with the direction already set
+    #[classattr]
+    const DIRECTION_SET: u32 = StereoBondThresholds::DIRECTION_SET;
+}
+
+/// set wavy bonds around double bonds with STEREOANY stereo
+///   ARGUMENTS :
+///     - molecule : the molecule to update
+///     - clearDoubleBondFlags : clear the STEREOANY flag of the double bonds
+///       that got a wavy neighbour
+///     - addWhenImpossible : if non-zero, a neighbouring single bond is made
+///       wavy even if it is attached to a chiral centre or to a double bond
+///       with specified stereo, as long as its penalty is not above this
+///       value (see StereoBondThresholds)
+#[pyfunction]
+#[pyo3(name = "AddWavyBondsForStereoAny", signature = (mol, clearDoubleBondFlags = true, addWhenImpossible = StereoBondThresholds::DBL_BOND_NO_STEREO))]
+#[allow(non_snake_case)]
+fn py_add_wavy_bonds_for_stereo_any(
+    mut mol: PyRefMut<'_, PyMol>,
+    clearDoubleBondFlags: bool,
+    addWhenImpossible: u32,
+) -> PyResult<()> {
+    add_wavy_bonds_for_stereo_any(&mut mol.mol, clearDoubleBondFlags, addWhenImpossible).py()
 }
 
 /// Set the wedging on single bonds in a molecule.
@@ -163,6 +207,8 @@ fn py_remove_non_explicit_3d_chirality(mut mol: PyRefMut<'_, PyMol>) {
 
 pub fn add(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyBondWedgingParameters>()?;
+    m.add_class::<PyStereoBondThresholds>()?;
+    m.add_function(wrap_pyfunction!(py_add_wavy_bonds_for_stereo_any, m)?)?;
     m.add_function(wrap_pyfunction!(py_wedge_mol_bonds, m)?)?;
     m.add_function(wrap_pyfunction!(py_wedge_bond, m)?)?;
     m.add_function(wrap_pyfunction!(py_reapply_mol_block_wedging, m)?)?;
