@@ -191,6 +191,49 @@ enum AtomInit<'py> {
 
 #[pymethods]
 impl PyAtom {
+    /// Sets an atomic property
+    ///
+    ///   ARGUMENTS:
+    ///     - key: the name of the property to be set (an ExplicitBitVect).
+    ///     - value: the property value (an ExplicitBitVect).
+    #[pyo3(name = "SetExplicitBitVectProp", signature = (key, val))]
+    fn set_explicit_bit_vect_prop(
+        &mut self,
+        py: Python<'_>,
+        key: &str,
+        val: PyRef<'_, crate::datastructs::PyExplicitBitVect>,
+    ) -> PyResult<()> {
+        let bv = val.bv.clone();
+        self.with_dict_mut(py, |d| crate::props::set_prop(d, key, bv.into(), false))?
+    }
+
+    /// Returns the value of the property.
+    ///
+    ///   ARGUMENTS:
+    ///     - key: the name of the property to return (a ExplicitBitVect).
+    ///
+    ///   RETURNS: an ExplicitBitVect
+    ///
+    ///   NOTE:
+    ///     - If the property has not been set, a KeyError exception will be raised.
+    #[pyo3(name = "GetExplicitBitVectProp", signature = (key))]
+    fn get_explicit_bit_vect_prop(
+        &self,
+        py: Python<'_>,
+        key: &str,
+    ) -> PyResult<Py<crate::datastructs::PyExplicitBitVect>> {
+        let found = self.with_dict(py, |d| d.get(key).cloned())?;
+        match found {
+            None => Err(pyo3::exceptions::PyKeyError::new_err(key.to_string())),
+            Some(rdoxide::rdgeneral::RDValue::BitVect(bv)) => {
+                Py::new(py, crate::datastructs::PyExplicitBitVect::wrap(bv))
+            }
+            Some(_) => Err(PyValueError::new_err(format!(
+                "key `{key}` exists but does not result in unregistered C++ type reason: bad any cast"
+            ))),
+        }
+    }
+
     #[new]
     #[pyo3(signature = (what))]
     fn py_new(py: Python<'_>, what: AtomInit<'_>) -> PyResult<Self> {

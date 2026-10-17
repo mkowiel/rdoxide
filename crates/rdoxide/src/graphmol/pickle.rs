@@ -301,7 +301,10 @@ impl R<'_> {
 // ================================================================== properties
 
 fn is_serializable(v: &RDValue) -> bool {
-    !matches!(v, RDValue::Int64(_) | RDValue::UInt64(_))
+    !matches!(
+        v,
+        RDValue::Int64(_) | RDValue::UInt64(_) | RDValue::BitVect(_)
+    )
 }
 
 /// `streamWriteProp`
@@ -360,7 +363,7 @@ fn write_prop(w: &mut W, key: &str, v: &RDValue) -> bool {
             w.u64(v.len() as u64);
             v.iter().for_each(|&x| w.u32(x));
         }
-        RDValue::Int64(_) | RDValue::UInt64(_) => unreachable!(),
+        RDValue::Int64(_) | RDValue::UInt64(_) | RDValue::BitVect(_) => unreachable!(),
     }
     true
 }
@@ -668,6 +671,11 @@ fn pickle_query<F: QueryTarget>(w: &mut W, q: &Query<F>) -> Result<()> {
                 PropValue::Float(f) => RDValue::Float(f),
                 PropValue::Double(d) => RDValue::Double(d),
                 PropValue::String(s) => RDValue::String(s),
+                PropValue::BitVect(_) => {
+                    return Err(pickle_error(
+                        "bit vector property queries cannot be pickled",
+                    ));
+                }
             };
             write_prop(w, &prop, &v);
         }
