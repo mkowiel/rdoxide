@@ -29,7 +29,16 @@ impl WriterSink {
         let name = match target.extract::<String>() {
             Ok(name) => name,
             Err(_) if target.hasattr("__fspath__")? => crate::pyconv::path_like(target)?,
-            Err(_) => return Ok(WriterSink(Target::Py(target.clone().unbind()))),
+            Err(_) => {
+                // upstream's streambuf insists on a text-mode file object
+                let text_base = target.py().import("io")?.getattr("TextIOBase")?;
+                if !target.is_instance(&text_base)? {
+                    return Err(pyo3::exceptions::PyValueError::new_err(
+                        "Need a text mode file object like StringIO or a file opened with mode 't'",
+                    ));
+                }
+                return Ok(WriterSink(Target::Py(target.clone().unbind())));
+            }
         };
         if name == "-" {
             return Ok(WriterSink(Target::Stdout));

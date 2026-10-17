@@ -173,13 +173,13 @@ impl PyMol {
     #[pyo3(name = "GetNumAtoms", signature = (onlyHeavy = -1, onlyExplicit = true))]
     #[allow(non_snake_case)]
     fn get_num_atoms(&self, onlyHeavy: i32, onlyExplicit: bool) -> PyResult<u32> {
+        let mut onlyExplicit = onlyExplicit;
         if onlyHeavy > -1 {
             rdoxide::rd_log_warning!(
                 "WARNING: the onlyHeavy argument to mol.GetNumAtoms() has been deprecated. Please use the onlyExplicit argument instead or mol.GetNumHeavyAtoms() if you want the heavy atom count."
             );
-            if onlyHeavy != 0 {
-                return Ok(self.mol.num_heavy_atoms());
-            }
+            // upstream passes the deprecated int on as `onlyExplicit`
+            onlyExplicit = onlyHeavy != 0;
         }
         if onlyExplicit {
             Ok(self.mol.num_atoms())

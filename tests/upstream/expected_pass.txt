@@ -613,6 +613,7 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::test31aChiralitySubstructs
 Code/GraphMol/Wrap/rough_test.py::TestCase::test33Issue65
 Code/GraphMol/Wrap/rough_test.py::TestCase::test34Issue124
 Code/GraphMol/Wrap/rough_test.py::TestCase::test35ChiralityPerception
+Code/GraphMol/Wrap/rough_test.py::TestCase::test36SubstructMatchStr
 Code/GraphMol/Wrap/rough_test.py::TestCase::test37SanitException
 Code/GraphMol/Wrap/rough_test.py::TestCase::test38Issue266
 Code/GraphMol/Wrap/rough_test.py::TestCase::test38TDTSuppliers
@@ -626,6 +627,7 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::test41SetStreamIndices
 Code/GraphMol/Wrap/rough_test.py::TestCase::test42LifeTheUniverseAndEverything
 Code/GraphMol/Wrap/rough_test.py::TestCase::test43TplFileParsing
 Code/GraphMol/Wrap/rough_test.py::TestCase::test44TplFileWriting
+Code/GraphMol/Wrap/rough_test.py::TestCase::test45RingInfo
 Code/GraphMol/Wrap/rough_test.py::TestCase::test46ReplaceCore
 Code/GraphMol/Wrap/rough_test.py::TestCase::test47RWMols
 Code/GraphMol/Wrap/rough_test.py::TestCase::test47SmartsPieces
@@ -642,6 +644,7 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::test56LazySDMolSupplier
 Code/GraphMol/Wrap/rough_test.py::TestCase::test57AddRecursiveQuery
 Code/GraphMol/Wrap/rough_test.py::TestCase::test58Issue2983794
 Code/GraphMol/Wrap/rough_test.py::TestCase::test59Issue3007178
+Code/GraphMol/Wrap/rough_test.py::TestCase::test5Smiles
 Code/GraphMol/Wrap/rough_test.py::TestCase::test60SmilesWriterClose
 Code/GraphMol/Wrap/rough_test.py::TestCase::test61PathToSubmol
 Code/GraphMol/Wrap/rough_test.py::TestCase::test62SmilesAndSmartsReplacements
@@ -749,6 +752,7 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub3198
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub4138
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub4144
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub4884
+Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub497
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub498
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub6945
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub8467
@@ -761,6 +765,7 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::testHasQueryHs
 Code/GraphMol/Wrap/rough_test.py::TestCase::testHasValenceViolation
 Code/GraphMol/Wrap/rough_test.py::TestCase::testIgnoreAtomMapNumbers
 Code/GraphMol/Wrap/rough_test.py::TestCase::testInsertMol
+Code/GraphMol/Wrap/rough_test.py::TestCase::testInvariantException
 Code/GraphMol/Wrap/rough_test.py::TestCase::testIsMarkedAttachmentPoint
 Code/GraphMol/Wrap/rough_test.py::TestCase::testIsRingFused
 Code/GraphMol/Wrap/rough_test.py::TestCase::testIssue1735
@@ -917,6 +922,7 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::test31aChiralitySubstructs
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test33Issue65
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test34Issue124
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test35ChiralityPerception
+Code/GraphMol/nbWrap/rough_test.py::TestCase::test36SubstructMatchStr
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test37SanitException
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test38Issue266
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test38TDTSuppliers
@@ -930,6 +936,7 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::test41SetStreamIndices
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test42LifeTheUniverseAndEverything
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test43TplFileParsing
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test44TplFileWriting
+Code/GraphMol/nbWrap/rough_test.py::TestCase::test45RingInfo
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test46ReplaceCore
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test47RWMols
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test47SmartsPieces
@@ -946,6 +953,7 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::test55PatternFingerprint
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test56LazySDMolSupplier
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test58Issue2983794
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test59Issue3007178
+Code/GraphMol/nbWrap/rough_test.py::TestCase::test5Smiles
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test60SmilesWriterClose
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test61PathToSubmol
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test62SmilesAndSmartsReplacements
@@ -1051,6 +1059,7 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::testGithub2611
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGithub3198
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGithub4144
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGithub4884
+Code/GraphMol/nbWrap/rough_test.py::TestCase::testGithub497
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGithub498
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGithub6945
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGithub8467
@@ -1064,6 +1073,7 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::testHasQueryHs
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testHasValenceViolation
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testIgnoreAtomMapNumbers
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testInsertMol
+Code/GraphMol/nbWrap/rough_test.py::TestCase::testInvariantException
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testIsRingFused
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testIssue1735
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testKekulizeIfPossible

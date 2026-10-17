@@ -157,8 +157,8 @@ impl PyRingInfo {
         tuples(py, &rings)
     }
     #[pyo3(name = "AreRingFamiliesInitialized")]
-    fn are_ring_families_initialized(&self) -> bool {
-        false
+    fn are_ring_families_initialized(&self, py: Python<'_>) -> PyResult<bool> {
+        self.with(py, |r| Ok(r.are_ring_families_initialized()))
     }
     /// Adds a ring to the set. Be very careful with this operation.
     #[pyo3(name = "AddRing")]

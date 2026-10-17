@@ -18,6 +18,7 @@
 """
 from rdoxide import DataStructs, RDConfig, rdBase
 from rdoxide.Chem import rdchem
+_HasSubstructMatchStr = rdchem._HasSubstructMatchStr
 from rdoxide.Chem.rdchem import *
 try:
   from rdoxide.Chem.rdCIPLabeler import *
