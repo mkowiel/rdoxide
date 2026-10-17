@@ -20,6 +20,34 @@ the RDKit project.
 > [docs/PLAN.md](docs/PLAN.md) and [docs/STATUS.md](docs/STATUS.md) for what
 > is available. Symbols that are not ported yet are absent rather than stubbed.
 
+## Installing from GitHub
+
+There are no PyPI releases yet, so install straight from the repository. This
+builds from source and needs a [Rust toolchain](https://rustup.rs) (no C/C++
+compiler); `maturin` is fetched automatically as the build backend.
+
+```bash
+# uv (into the active environment)
+uv pip install "git+https://github.com/mkowiel/rdoxide.git"
+
+# uv (add to a project)
+uv add "rdoxide @ git+https://github.com/mkowiel/rdoxide.git"
+
+# pip
+pip install "git+https://github.com/mkowiel/rdoxide.git"
+
+# a specific branch, tag or commit
+pip install "git+https://github.com/mkowiel/rdoxide.git@main"
+```
+
+Every CI run also uploads the built `abi3` wheel as an artifact (Actions tab),
+which installs without a Rust toolchain: `pip install rdoxide-*.whl`.
+
+```python
+from rdoxide import Chem
+Chem.MolToSmiles(Chem.MolFromSmiles("c1ccccc1O"))
+```
+
 ## Building
 
 ```bash
