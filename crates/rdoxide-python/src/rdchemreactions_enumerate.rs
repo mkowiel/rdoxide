@@ -199,14 +199,12 @@ impl PyEnumerationStrategyBase {
     }
 }
 
+// rustfmt re-indents the attribute inside the macro on every pass
+#[rustfmt::skip]
 macro_rules! strategy_class {
     ($rust:ident, $py:literal, $ctor:ident, $doc:literal) => {
         #[doc = $doc]
-        #[pyclass(
-                                                    name = $py,
-                                                    module = "rdoxide.Chem.rdChemReactions",
-                                                    extends = PyEnumerationStrategyBase
-                                                )]
+        #[pyclass(name = $py, module = "rdoxide.Chem.rdChemReactions", extends = PyEnumerationStrategyBase)]
         pub struct $rust;
 
         #[pymethods]
