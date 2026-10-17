@@ -1762,3 +1762,18 @@
 
 [module."rdoxide_python::rdmolfiles_svg".sources]
 "Code/GraphMol/Wrap/rdmolfiles.cpp" = "829058d8e8a382c358d2464cee762f8cff04f75f"
+
+[module."rdoxide::graphmol::chem_reactions::enumerate".sources]
+"Code/GraphMol/ChemReactions/Enumerate/CartesianProduct.h" = "bd13c92bb5e3e5ab300b2cb59dda32e3fea3706e"
+"Code/GraphMol/ChemReactions/Enumerate/Enumerate.cpp" = "7647130b5fbdb4ac580c79c57b919ee14eb1cee2"
+"Code/GraphMol/ChemReactions/Enumerate/Enumerate.h" = "28b0aab3b2ea4b6d556bfab9edb7094a2d0c8c88"
+"Code/GraphMol/ChemReactions/Enumerate/EnumerateBase.h" = "f0295fc16633bbfc9173c97b1e9e7aa0588a2823"
+"Code/GraphMol/ChemReactions/Enumerate/EnumerateTypes.h" = "5e8decc2317f0476ef5a6d1301e1db7b368ba680"
+"Code/GraphMol/ChemReactions/Enumerate/EnumerationStrategyBase.h" = "faa81d1f7dd3ef6dc9af74cb6d30c3222176d768"
+"Code/GraphMol/ChemReactions/Enumerate/EvenSamplePairs.cpp" = "9a8efb7e924a7b97145060abc66e8468bdf85982"
+"Code/GraphMol/ChemReactions/Enumerate/EvenSamplePairs.h" = "b3637bb945c4cd3e7a3e431bff2197562b5fc338"
+"Code/GraphMol/ChemReactions/Enumerate/RandomSample.h" = "5f925f97b71db6f69bfef9300e5df4565c41230a"
+"Code/GraphMol/ChemReactions/Enumerate/RandomSampleAllBBs.h" = "21c8d0cf0074cd9d7b7d72283263cc0f2d17513d"
+
+[module."rdoxide_python::rdchemreactions_enumerate".sources]
+"Code/GraphMol/ChemReactions/Wrap/Enumerate.cpp" = "48b90a2bb0a837c6d0465791b85f3f8cadee806e"

@@ -100,7 +100,7 @@ struct SharedTemplate {
 }
 
 impl PyChemicalReaction {
-    fn new(rxn: ChemicalReaction) -> Self {
+    pub(crate) fn new(rxn: ChemicalReaction) -> Self {
         PyChemicalReaction {
             rxn,
             params: None,
@@ -212,7 +212,9 @@ impl PyChemicalReaction {
 }
 
 /// Borrows the reaction after bringing it up to date with Python-side edits.
-fn synced<'py>(reaction: &Bound<'py, PyChemicalReaction>) -> PyRefMut<'py, PyChemicalReaction> {
+pub(crate) fn synced<'py>(
+    reaction: &Bound<'py, PyChemicalReaction>,
+) -> PyRefMut<'py, PyChemicalReaction> {
     let mut guard = reaction.borrow_mut();
     guard.sync_params(reaction.py());
     guard
@@ -225,11 +227,11 @@ fn template_index(which: u32, n: usize) -> PyResult<usize> {
     Ok(which as usize)
 }
 
-fn mol_ref<'a>(obj: &'a Bound<'_, PyAny>) -> PyResult<PyRef<'a, PyMol>> {
+pub(crate) fn mol_ref<'a>(obj: &'a Bound<'_, PyAny>) -> PyResult<PyRef<'a, PyMol>> {
     Ok(obj.extract::<PyRef<'_, PyMol>>()?)
 }
 
-fn products_to_py(py: Python<'_>, sets: Vec<Vec<ROMol>>) -> PyResult<Py<PyTuple>> {
+pub(crate) fn products_to_py(py: Python<'_>, sets: Vec<Vec<ROMol>>) -> PyResult<Py<PyTuple>> {
     let tuples = sets
         .into_iter()
         .map(|set| {
@@ -1397,6 +1399,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
         "Module containing classes and functions for working with chemical reactions.",
     )?;
     m.add_class::<PyChemicalReaction>()?;
+    crate::rdchemreactions_enumerate::init(m)?;
     add_enum(m, FINGERPRINT_TYPE, &fingerprint_type_members(), None)?;
     m.add_class::<PyReactionFingerprintParams>()?;
     m.add_function(wrap_pyfunction!(py_create_difference_fingerprint, m)?)?;
