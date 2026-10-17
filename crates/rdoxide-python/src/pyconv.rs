@@ -136,3 +136,9 @@ pub fn text_bytes(obj: &Bound<'_, PyAny>) -> PyResult<Vec<u8>> {
     }
     Ok(obj.extract::<String>()?.into_bytes())
 }
+
+/// `from_py_with` converter for text given as `str` or `bytes`
+/// (`pyObjectToString`).
+pub fn text_string(obj: &Bound<'_, PyAny>) -> PyResult<String> {
+    Ok(String::from_utf8_lossy(&text_bytes(obj)?).into_owned())
+}
