@@ -141,3 +141,72 @@ pub fn get_mol_frags_as_mols(
     }
     Ok((res, mapping))
 }
+
+/// `MolOps::getMolFragsWithQuery`: groups the atoms of `mol` by the value of
+/// `query` (optionally restricted to, or excluding, the values of
+/// `white_list`) and returns one molecule, with the bonds between its atoms
+/// and their coordinates, for each value.
+pub fn get_mol_frags_with_query<K: Ord + Clone>(
+    mol: &ROMol,
+    query: impl Fn(&ROMol, &crate::graphmol::atom::Atom) -> K,
+    sanitize_frags: bool,
+    white_list: Option<&[K]>,
+    negate_list: bool,
+) -> Result<std::collections::BTreeMap<K, RWMol>> {
+    use crate::graphmol::conformer::Conformer;
+    use std::collections::BTreeMap;
+
+    let n = mol.num_atoms();
+    let mut assignments: Vec<Option<K>> = vec![None; n as usize];
+    let mut ids: Vec<i32> = vec![-1; n as usize];
+    let mut res: BTreeMap<K, RWMol> = BTreeMap::new();
+    for i in 0..n {
+        let atom = mol.atom(i);
+        let key = query(mol, atom);
+        if let Some(list) = white_list {
+            let found = list.contains(&key);
+            if found == negate_list {
+                continue;
+            }
+        }
+        let frag = res.entry(key.clone()).or_default();
+        ids[i as usize] = frag.add_atom(atom.clone(), false) as i32;
+        assignments[i as usize] = Some(key.clone());
+        // bonds to the atoms already in the same fragment
+        for nbr in mol.atom_neighbors(i) {
+            if nbr < i && assignments[nbr as usize].as_ref() == Some(&key) {
+                let Some(bidx) = mol.bond_idx_between(i, nbr) else {
+                    continue;
+                };
+                let mut bond = mol.bond(bidx).clone();
+                let (b, e) = (bond.begin_atom_idx(), bond.end_atom_idx());
+                bond.set_begin_atom_idx_unchecked(ids[b as usize] as u32);
+                bond.set_end_atom_idx_unchecked(ids[e as usize] as u32);
+                frag.add_bond_object(bond)?;
+            }
+        }
+    }
+    // conformers
+    for conf in mol.conformers() {
+        for frag in res.values_mut() {
+            let mut c = Conformer::new(frag.num_atoms() as usize);
+            c.set_id(conf.id());
+            c.set_3d(conf.is_3d());
+            frag.add_conformer(c, false)?;
+        }
+        for i in 0..n {
+            let Some(key) = &assignments[i as usize] else {
+                continue;
+            };
+            let frag = res.get_mut(key).expect("fragment exists");
+            frag.conformer_mut(conf.id() as i32)?
+                .set_atom_pos(ids[i as usize] as u32, conf.atom_pos(i)?)?;
+        }
+    }
+    if sanitize_frags {
+        for frag in res.values_mut() {
+            sanitize_mol(frag, SANITIZE_ALL).map_err(|(_, e)| e)?;
+        }
+    }
+    Ok(res)
+}

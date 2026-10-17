@@ -8,6 +8,7 @@ use pyo3::types::PyTuple;
 use rdoxide::geometry::Point3D;
 use rdoxide::graphmol::chem_transforms::combine_mols;
 use rdoxide::graphmol::matrices::get_shortest_path;
+use rdoxide::graphmol::mol_ops::frags::get_mol_frags_with_query;
 use rdoxide::graphmol::mol_ops::haptic::{dative_bonds_to_haptic, haptic_bonds_to_dative};
 use rdoxide::graphmol::mol_ops::{
     get_formal_charge, get_mol_frags_as_mols, get_mol_frags_atoms, get_mol_frags_mapping,
@@ -164,6 +165,84 @@ fn py_dative_bonds_to_haptic(py: Python<'_>, mol: PyRef<'_, PyMol>) -> PyResult<
     Ok(PyMol { mol: res })
 }
 
+/// The PDB residue name (`pdb_residue_name`) or chain id of an atom, or "".
+fn pdb_field(atom: &rdoxide::graphmol::atom::Atom, residue: bool) -> String {
+    match atom.monomer_info() {
+        Some(info) if info.is_pdb_residue() => {
+            if residue {
+                info.residue_name.clone()
+            } else {
+                info.chain_id.clone()
+            }
+        }
+        _ => String::new(),
+    }
+}
+
+fn split_mol_by_pdb<'py>(
+    py: Python<'py>,
+    mol: &PyMol,
+    white_list: Option<Vec<String>>,
+    negate_list: bool,
+    residue: bool,
+) -> PyResult<Bound<'py, pyo3::types::PyDict>> {
+    let frags = get_mol_frags_with_query(
+        &mol.mol,
+        |_, a| pdb_field(a, residue),
+        false,
+        white_list.as_deref(),
+        negate_list,
+    )
+    .py()?;
+    let res = pyo3::types::PyDict::new(py);
+    for (key, mol) in frags {
+        res.set_item(key, Py::new(py, PyMol { mol })?)?;
+    }
+    Ok(res)
+}
+
+/// Splits a molecule into pieces based on PDB residue information.
+///
+///   ARGUMENTS:
+///
+///     - mol: the molecule to use
+///     - whiteList: only residues in this list will be returned
+///     - negateList: if set, negates the white list inclusion logic
+///
+///   RETURNS: a dictionary keyed by residue name with molecules as the values
+#[pyfunction]
+#[pyo3(name = "SplitMolByPDBResidues", signature = (mol, whiteList = None, negateList = false))]
+#[allow(non_snake_case)]
+fn py_split_mol_by_pdb_residues<'py>(
+    py: Python<'py>,
+    mol: PyRef<'py, PyMol>,
+    whiteList: Option<Vec<String>>,
+    #[pyo3(from_py_with = crate::pyconv::truthy)] negateList: bool,
+) -> PyResult<Bound<'py, pyo3::types::PyDict>> {
+    split_mol_by_pdb(py, &mol, whiteList, negateList, true)
+}
+
+/// Splits a molecule into pieces based on PDB chain information.
+///
+///   ARGUMENTS:
+///
+///     - mol: the molecule to use
+///     - whiteList: only residues in this list will be returned
+///     - negateList: if set, negates the white list inclusion logic
+///
+///   RETURNS: a dictionary keyed by chain id with molecules as the values
+#[pyfunction]
+#[pyo3(name = "SplitMolByPDBChainId", signature = (mol, whiteList = None, negateList = false))]
+#[allow(non_snake_case)]
+fn py_split_mol_by_pdb_chain_id<'py>(
+    py: Python<'py>,
+    mol: PyRef<'py, PyMol>,
+    whiteList: Option<Vec<String>>,
+    #[pyo3(from_py_with = crate::pyconv::truthy)] negateList: bool,
+) -> PyResult<Bound<'py, pyo3::types::PyDict>> {
+    split_mol_by_pdb(py, &mol, whiteList, negateList, false)
+}
+
 /// Returns a copy of a molecule with renumbered atoms
 ///
 ///   ARGUMENTS:
@@ -261,6 +340,8 @@ pub fn add(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_get_mol_frags, m)?)?;
     m.add_function(wrap_pyfunction!(py_combine_mols, m)?)?;
     m.add_function(wrap_pyfunction!(py_renumber_atoms, m)?)?;
+    m.add_function(wrap_pyfunction!(py_split_mol_by_pdb_residues, m)?)?;
+    m.add_function(wrap_pyfunction!(py_split_mol_by_pdb_chain_id, m)?)?;
     m.add_function(wrap_pyfunction!(py_haptic_bonds_to_dative, m)?)?;
     m.add_function(wrap_pyfunction!(py_dative_bonds_to_haptic, m)?)?;
     m.add_function(wrap_pyfunction!(py_get_formal_charge, m)?)?;

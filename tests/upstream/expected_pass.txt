@@ -792,6 +792,7 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::testSmilesProps
 Code/GraphMol/Wrap/rough_test.py::TestCase::testSmilesToAtom
 Code/GraphMol/Wrap/rough_test.py::TestCase::testSmilesWriteParams
 Code/GraphMol/Wrap/rough_test.py::TestCase::testSmilesWriteParamsForSMARTS
+Code/GraphMol/Wrap/rough_test.py::TestCase::testSplitMolByPDB
 Code/GraphMol/Wrap/rough_test.py::TestCase::testSubstructMatchAcetate
 Code/GraphMol/Wrap/rough_test.py::TestCase::testSubstructMatchAtomProperties
 Code/GraphMol/Wrap/rough_test.py::TestCase::testSubstructMatchBondProperties
@@ -1084,6 +1085,7 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::testSmilesProps
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testSmilesToAtom
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testSmilesWriteParams
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testSmilesWriteParamsForSMARTS
+Code/GraphMol/nbWrap/rough_test.py::TestCase::testSplitMolByPDB
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testSubstructMatchAtomProperties
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testSubstructMatchBondProperties
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testSubstructMatchDMAP

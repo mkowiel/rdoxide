@@ -234,6 +234,7 @@
 [module."rdoxide::graphmol::mol_ops::frags".sources]
 "Code/GraphMol/Subset.cpp" = "2cf759a4725b21574e4a9eb913047e6dbd373290"
 "Code/GraphMol/Subset.h" = "0ce93092d0a9bb0a2e3b31a81761f8b55e308afd"
+"Code/GraphMol/MolOps.cpp" = "86965b783ea65fab3ded49a13dc3cc8ddba9c315"
 
 [module."rdoxide::graphmol::smiles_parse::write".sources]
 "Code/GraphMol/SmilesParse/SmilesWrite.h" = "b0a648a8b05239ae2122852131ba1e06cc9d7191"
