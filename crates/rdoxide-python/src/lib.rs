@@ -92,6 +92,7 @@ mod rdmolinterchange;
 mod rdmolops;
 mod rdmolops_adjust_query;
 mod rdmolops_attachment_points;
+mod rdmolops_canon_stereo_groups;
 mod rdmolops_core_match;
 mod rdmolops_fingerprints;
 mod rdmolops_fragments;

@@ -3,6 +3,7 @@
 //! Copyright (C) 2001-2025 Greg Landrum and other RDKit contributors.
 //! Licensed under the BSD 3-Clause license (see LICENSES/RDKit-BSD-3-Clause.txt).
 
+pub mod canonicalize_stereo_groups;
 pub mod cx;
 pub mod cx_write;
 pub mod lexer;
