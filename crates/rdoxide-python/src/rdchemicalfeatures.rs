@@ -2,7 +2,7 @@
 //! chemical features that are not associated with a molecule.
 
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyTuple};
+use pyo3::types::{PyBytes, PyDict, PyTuple};
 use rdoxide::chemical_features::FreeChemicalFeature;
 
 use crate::errors::IntoPyResult;
@@ -14,7 +14,9 @@ use crate::geometry::PyPoint3D;
 #[pyclass(
     name = "FreeChemicalFeature",
     module = "rdoxide.Chem.rdChemicalFeatures",
-    skip_from_py_object
+    skip_from_py_object,
+    subclass,
+    dict
 )]
 #[derive(Debug, Clone)]
 struct PyFreeChemicalFeature {
@@ -23,6 +25,11 @@ struct PyFreeChemicalFeature {
 
 #[pymethods]
 impl PyFreeChemicalFeature {
+    /// Subclasses call `FreeChemicalFeature.__init__(self, ...)`; the feature is
+    /// built by `__new__`, so there is nothing left to do.
+    #[pyo3(signature = (*_args, **_kwargs))]
+    fn __init__(&self, _args: &Bound<'_, PyTuple>, _kwargs: Option<&Bound<'_, PyDict>>) {}
+
     /// `FreeChemicalFeature(pickle)`, `FreeChemicalFeature()`,
     /// `FreeChemicalFeature(family, loc)` or
     /// `FreeChemicalFeature(family, type, loc, id=-1)`
