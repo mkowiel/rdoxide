@@ -14,7 +14,7 @@ rdkit/Chem/**/UnitTest*.py
 rdkit/DataStructs/UnitTest*.py
 Code/SimDivPickers/Wrap/*test*.py
 Code/SimDivPickers/Wrap/*Test*.py
-rdkit/ML/Cluster/UnitTest*.py
+rdkit/ML/**/UnitTest*.py
 rdkit/SimDivFilters/UnitTest*.py
 Code/DataManip/**/Wrap/test*.py
 Code/GraphMol/MolHash/Wrap/testMolHash.py
@@ -35,3 +35,6 @@ Code/GraphMol/FragCatalog/Wrap/rough_test.py
 Code/GraphMol/MolProcessing/Wrap/testMolProcessing.py
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py
 Code/ML/InfoTheory/Wrap/testRanker.py
+rdkit/utils/UnitTest*.py
+rdkit/Dbase/UnitTest*.py
+rdkit/VLib/UnitTest*.py
