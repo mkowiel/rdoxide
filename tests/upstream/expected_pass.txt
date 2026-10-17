@@ -625,6 +625,7 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::test50Issue1968608
 Code/GraphMol/Wrap/rough_test.py::TestCase::test51RadicalHandling
 Code/GraphMol/Wrap/rough_test.py::TestCase::test52MolFrags
 Code/GraphMol/Wrap/rough_test.py::TestCase::test53Matrices
+Code/GraphMol/Wrap/rough_test.py::TestCase::test54Mol2Parser
 Code/GraphMol/Wrap/rough_test.py::TestCase::test55LayeredFingerprint
 Code/GraphMol/Wrap/rough_test.py::TestCase::test56LazySDMolSupplier
 Code/GraphMol/Wrap/rough_test.py::TestCase::test57AddRecursiveQuery
@@ -926,6 +927,7 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::test50Issue1968608
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test51RadicalHandling
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test52MolFrags
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test53Matrices
+Code/GraphMol/nbWrap/rough_test.py::TestCase::test54Mol2Parser
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test55LayeredFingerprint
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test55PatternFingerprint
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test56LazySDMolSupplier
