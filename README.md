@@ -20,6 +20,37 @@ the RDKit project.
 > [docs/PLAN.md](docs/PLAN.md) and [docs/STATUS.md](docs/STATUS.md) for what
 > is available. Symbols that are not ported yet are absent rather than stubbed.
 
+## What is ported
+
+Ported, with the same Python module and function names as RDKit (per-stage
+detail and test evidence in [docs/STATUS.md](docs/STATUS.md)):
+
+* **Core**: `rdchem` (atoms, bonds, molecules, conformers, rings, stereo and
+  substance groups), sanitization, aromaticity, stereo perception (legacy and
+  new, CIP labeler), canonical ranking, `rdmolops`, `rdqueries`.
+* **Formats**: SMILES/SMARTS/CXSMILES, mol blocks (V2000/V3000), SD/SMILES/TDT
+  suppliers and writers (incl. multithreaded), PDB, XYZ, Mol2, TPL, CML, MolJSON,
+  binary pickles compatible with RDKit's.
+* **Search**: substructure matching, `SubstructLibrary`, MolBundle, tautomer and
+  generalized queries, FMCS, RASCAL, R-group decomposition, MMPA, SynthonSpace.
+* **Descriptors and fingerprints**: `rdMolDescriptors`, `Descriptors`, Morgan,
+  RDKit, atom-pair, torsion, MACCS, pattern, MHFP, `DataStructs`, pickers,
+  clustering, filter catalogs, feature factories.
+* **Chemistry transforms**: reactions (incl. enumeration), standardization,
+  tautomers, scaffolds, hashing, resonance, stereoisomer enumeration.
+* **3D**: depiction, distance geometry/ETKDG, UFF/MMFF, alignment, shape
+  and Gaussian-shape tools, interaction fields, trajectories.
+* **Drawing**: `rdMolDraw2D` with the SVG back end.
+
+Not ported yet: InChI, Avalon, CoordGen, ChemDraw (CDXML/CDX) and Marvin
+readers, FreeSASA, YAeHMOP, PyMOL helpers, and the remaining gaps listed as
+partial in [docs/STATUS.md](docs/STATUS.md).
+
+Not planned: the C++ API and headers, the Java/C# wrappers, the PostgreSQL
+cartridge, the Cairo/Qt/FreeType drawing back ends (drawing is SVG only),
+`Contrib/` and the demos/GUI. Symbols that are not ported are absent rather
+than stubbed, so `hasattr` checks behave like an RDKit build without them.
+
 ## Installing from GitHub
 
 There are no PyPI releases yet, so install straight from the repository. This
