@@ -1737,3 +1737,10 @@
 
 [module."rdoxide_python::rdmolops_recursive_queries".sources]
 "Code/GraphMol/Wrap/MolOps.cpp" = "2dc7ae10c4ce7523938a4db10e31215cfe2162db"
+
+[module."rdoxide::graphmol::file_parsers::tpl".sources]
+"Code/GraphMol/FileParsers/TplFileParser.cpp" = "5fe3eacc0e852734df633d6a15ee192d8641a8be"
+"Code/GraphMol/FileParsers/TplFileWriter.cpp" = "1ac1f49acd949651027523e19ceaf59a7fa91720"
+
+[module."rdoxide_python::rdmolfiles_tpl".sources]
+"Code/GraphMol/Wrap/rdmolfiles.cpp" = "829058d8e8a382c358d2464cee762f8cff04f75f"

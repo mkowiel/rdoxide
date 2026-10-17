@@ -613,6 +613,8 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::test3dChiralMrvFile
 Code/GraphMol/Wrap/rough_test.py::TestCase::test40SmilesRootedAtAtom
 Code/GraphMol/Wrap/rough_test.py::TestCase::test41SetStreamIndices
 Code/GraphMol/Wrap/rough_test.py::TestCase::test42LifeTheUniverseAndEverything
+Code/GraphMol/Wrap/rough_test.py::TestCase::test43TplFileParsing
+Code/GraphMol/Wrap/rough_test.py::TestCase::test44TplFileWriting
 Code/GraphMol/Wrap/rough_test.py::TestCase::test46ReplaceCore
 Code/GraphMol/Wrap/rough_test.py::TestCase::test47RWMols
 Code/GraphMol/Wrap/rough_test.py::TestCase::test47SmartsPieces
@@ -663,6 +665,7 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::test90FragmentOnSomeBonds
 Code/GraphMol/Wrap/rough_test.py::TestCase::test91RankAtoms
 Code/GraphMol/Wrap/rough_test.py::TestCase::test92RankAtomsInFragment
 Code/GraphMol/Wrap/rough_test.py::TestCase::test93RWMolsAsROMol
+Code/GraphMol/Wrap/rough_test.py::TestCase::test94CopyWithConfs
 Code/GraphMol/Wrap/rough_test.py::TestCase::test9Smarts
 Code/GraphMol/Wrap/rough_test.py::TestCase::testAddStereoAnnotations
 Code/GraphMol/Wrap/rough_test.py::TestCase::testAddWavyBondsForStereoAny
@@ -911,6 +914,8 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::test3dChiralMrvFile
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test40SmilesRootedAtAtom
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test41SetStreamIndices
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test42LifeTheUniverseAndEverything
+Code/GraphMol/nbWrap/rough_test.py::TestCase::test43TplFileParsing
+Code/GraphMol/nbWrap/rough_test.py::TestCase::test44TplFileWriting
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test46ReplaceCore
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test47RWMols
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test47SmartsPieces
@@ -962,6 +967,7 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::test90FragmentOnSomeBonds
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test91RankAtoms
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test92RankAtomsInFragment
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test93RWMolsAsROMol
+Code/GraphMol/nbWrap/rough_test.py::TestCase::test94CopyWithConfs
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test9Smarts
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testAddStereoAnnotations
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testAddWavyBondsForStereoAny
