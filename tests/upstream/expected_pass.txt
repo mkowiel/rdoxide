@@ -98,6 +98,17 @@ Code/GraphMol/CIPLabeler/Wrap/pyCIPLabelWrapTest.py::TestCase::testAtropIsomer
 Code/GraphMol/CIPLabeler/Wrap/pyCIPLabelWrapTest.py::TestCase::testLabelAtomsList
 Code/GraphMol/CIPLabeler/Wrap/pyCIPLabelWrapTest.py::TestCase::testLabelAtomsSet
 Code/GraphMol/CIPLabeler/Wrap/pyCIPLabelWrapTest.py::TestCase::testLabelBondsList
+Code/GraphMol/ChemReactions/Wrap/testEnumerations.py::TestCase::testCartesianProduct
+Code/GraphMol/ChemReactions/Wrap/testEnumerations.py::TestCase::testEnumerateLibrary
+Code/GraphMol/ChemReactions/Wrap/testEnumerations.py::TestCase::testEvenPairsSampling
+Code/GraphMol/ChemReactions/Wrap/testEnumerations.py::TestCase::testRGroupState
+Code/GraphMol/ChemReactions/Wrap/testEnumerations.py::TestCase::testRandomEnumerateAllBBsLibrary
+Code/GraphMol/ChemReactions/Wrap/testEnumerations.py::TestCase::testRandomEnumerateLibrary
+Code/GraphMol/ChemReactions/Wrap/testEnumerations.py::TestCase::testRandomSample
+Code/GraphMol/ChemReactions/Wrap/testEnumerations.py::TestCase::testRandomSampleAllBBs
+Code/GraphMol/ChemReactions/Wrap/testEnumerations.py::TestCase::testRemoveInsaneReagents
+Code/GraphMol/ChemReactions/Wrap/testEnumerations.py::TestCase::testRemovingBadMatches
+Code/GraphMol/ChemReactions/Wrap/testEnumerations.py::TestCase::testTimings
 Code/GraphMol/ChemReactions/Wrap/testReactionWrapper.py::CXExtensionsTests::test_cxsmarts_reaction
 Code/GraphMol/ChemReactions/Wrap/testReactionWrapper.py::CXExtensionsTests::test_cxsmiles_reaction
 Code/GraphMol/ChemReactions/Wrap/testReactionWrapper.py::DocTestCase::runTest
@@ -898,6 +909,7 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::test25SDMolSupplier
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test26SmiMolSupplier
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test27SmilesWriter
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test28SmilesReverse
+Code/GraphMol/nbWrap/rough_test.py::TestCase::test29SDWriterLoop
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test2Atom
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test30Issues109and110
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test31ChiralitySmiles
@@ -934,6 +946,7 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::test55PatternFingerprint
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test56LazySDMolSupplier
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test58Issue2983794
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test59Issue3007178
+Code/GraphMol/nbWrap/rough_test.py::TestCase::test60SmilesWriterClose
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test61PathToSubmol
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test62SmilesAndSmartsReplacements
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test63Issue3313539

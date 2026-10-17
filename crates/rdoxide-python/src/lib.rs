@@ -33,6 +33,7 @@ mod rdchem_atom_funcs;
 mod rdchem_stereo_info;
 mod rdchemicalfeatures;
 mod rdchemreactions;
+mod rdchemreactions_enumerate;
 mod rdcip_labeler;
 mod rdclustering;
 mod rddepictor;

@@ -10,6 +10,7 @@
 //! boundary).
 
 pub mod daylight;
+pub mod enumerate;
 pub mod fingerprints;
 pub mod mdl;
 pub mod pickler;
