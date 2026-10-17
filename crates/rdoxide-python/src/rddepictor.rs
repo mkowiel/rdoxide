@@ -332,6 +332,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
         "__doc__",
         "Module containing the functionality to compute 2D coordinates for a molecule",
     )?;
+    crate::rddepictor_constrained::init(m)?;
     m.add_function(wrap_pyfunction!(compute_2d_coords_py, m)?)?;
     m.add_function(wrap_pyfunction!(compute_2d_coords_mimic_distmat_py, m)?)?;
     m.add_function(wrap_pyfunction!(straighten_depiction_py, m)?)?;
