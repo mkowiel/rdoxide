@@ -17,6 +17,8 @@ def main() -> None:
     ap.add_argument("--rdkit-version", default="")
     ap.add_argument("--rdoxide-version", default="")
     ap.add_argument("--solo", nargs="*", default=[], help="JSON files of files re-run alone (no parallel noise)")
+    ap.add_argument("--substruct", nargs=2, metavar=("RDKIT_JSON", "RDOXIDE_JSON"), help="tools/bench_substruct.py outputs")
+    ap.add_argument("--threads", nargs=2, metavar=("RDKIT_JSON", "RDOXIDE_JSON"), help="tools/bench_threads.py outputs")
     args = ap.parse_args()
     data = json.loads(Path(args.results).read_text())
     rows = []  # (test id, rdkit s, rdoxide s)
@@ -74,6 +76,41 @@ def main() -> None:
         )
         solo_html = f"<h2>The slowest files re-run alone (no parallel noise)</h2><table><tr><th>file</th><th>RDKit s</th><th>rdoxide s</th><th>rdoxide / RDKit</th></tr>{body}</table>"
 
+    sub_html = thr_html = ""
+    if args.substruct:
+        a, b = (json.loads(Path(x).read_text()) for x in args.substruct)
+        body = ""
+        for q, ra in a.items():
+            if q == "molecules":
+                continue
+            rb = b[q]
+            body += (
+                f"<tr><td>{html.escape(q)}</td><td>{ra['hits']}</td>"
+                f"<td>{ra['has']:.2f}</td><td>{rb['has']:.2f}</td><td>{rb['has'] / ra['has']:.2f}x</td>"
+                f"<td>{ra['matches']:.2f}</td><td>{rb['matches']:.2f}</td><td>{rb['matches'] / ra['matches']:.2f}x</td></tr>"
+            )
+        sub_html = (
+            f"<h2>Substructure micro-benchmark ({a['molecules']} molecules, ms per 1000 checks)</h2>"
+            "<table><tr><th>query</th><th>hits</th><th>Has RDKit</th><th>Has rdoxide</th><th>ratio</th>"
+            f"<th>Matches RDKit</th><th>Matches rdoxide</th><th>ratio</th></tr>{body}</table>"
+        )
+    if args.threads:
+        a, b = (json.loads(Path(x).read_text()) for x in args.threads)
+        body = ""
+        for op, ra in a.items():
+            if op == "cores":
+                continue
+            rb = b[op]
+            body += (
+                f"<tr><td>{html.escape(op)}</td><td>{ra['1']:.0f}</td><td>{rb['1']:.0f}</td>"
+                f"<td>{rb['all']:.0f}</td><td>{ra['1'] / rb['all']:.1f}x</td></tr>"
+            )
+        thr_html = (
+            f"<h2>Multicore scaling ({b['cores']} cores, ms; RDKit runs these single-threaded)</h2>"
+            "<table><tr><th>operation</th><th>RDKit</th><th>rdoxide, 1 thread</th><th>rdoxide, all cores</th>"
+            f"<th>RDKit / rdoxide all</th></tr>{body}</table>"
+        )
+
     page = f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>rdoxide vs RDKit speed</title>
@@ -104,6 +141,8 @@ td:nth-child(n+2),th:nth-child(n+2){{text-align:right;white-space:nowrap}}
 </div>
 {table('Tests that run slower on rdoxide (largest absolute loss)', slower)}
 {solo_html}
+{sub_html}
+{thr_html}
 {table('Tests where rdoxide gains most', faster)}
 <p class="note">Method: tools/bench_upstream_speed.py runs each upstream test file in its own process under both interpreters (4 files in parallel), timing every test; tools/bench_report.py builds this page. Parallel runs add noise to short tests; the timings of the slowest ones are worth re-running alone.</p>
 </main></body></html>"""
