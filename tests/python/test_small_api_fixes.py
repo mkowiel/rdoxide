@@ -34,7 +34,7 @@ def test_ring_families_are_initialized_by_sanitization():
 def test_has_substruct_match_str():
     query = Chem.MolFromSmarts("[n,p]1ccccc1")
     assert Chem._HasSubstructMatchStr(Chem.MolFromSmiles("n1ccccc1").ToBinary(), query)
-    assert not Chem._HasSubstructMatchStr(Chem.MolFromSmiles("s1ccccc1").ToBinary(), query)
+    assert not Chem._HasSubstructMatchStr(Chem.MolFromSmiles("S1=CC=CC=C1").ToBinary(), query)
     with pytest.raises(ValueError):
         Chem._HasSubstructMatchStr(b"not a pickle", query)
 
