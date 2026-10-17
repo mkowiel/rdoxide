@@ -33,3 +33,12 @@ map_entry = "allow"
 lto = "fat"
 codegen-units = 1
 panic = "unwind"
+
+# Pull-request CI: the same code as `release` (no debug assertions, overflow
+# checks off) but quick to build, and incremental so that a cached target
+# directory only recompiles what changed.
+[profile.ci]
+inherits = "release"
+lto = false
+codegen-units = 16
+incremental = true
