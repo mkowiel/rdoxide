@@ -39,6 +39,29 @@ impl MinStdRand {
         self.state
     }
 
+    /// `boost::uniform_int<int>(lo, hi)` driven by this engine
+    /// (`generate_uniform_int`'s bucket rejection, for ranges narrower than
+    /// the engine's).
+    pub fn uniform_int(&mut self, lo: i32, hi: i32) -> i32 {
+        assert!(lo <= hi, "uniform_int: empty range");
+        let range = (i64::from(hi) - i64::from(lo)) as u32;
+        let brange = Self::MAX - Self::MIN;
+        if range == 0 {
+            return lo;
+        }
+        if range == brange {
+            return lo + (self.next() - Self::MIN) as i32;
+        }
+        assert!(range < brange, "uniform_int: range wider than the engine's");
+        let bucket_size = (brange + 1) / (range + 1);
+        loop {
+            let r = (self.next() - Self::MIN) / bucket_size;
+            if r <= range {
+                return (i64::from(lo) + i64::from(r)) as i32;
+            }
+        }
+    }
+
     /// `boost::uniform_real<double>(0, 1)` driven by this engine.
     pub fn next_f64(&mut self) -> f64 {
         let range = f64::from(Self::MAX - Self::MIN) + 1.0;

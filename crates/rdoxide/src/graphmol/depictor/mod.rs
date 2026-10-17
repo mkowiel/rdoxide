@@ -447,6 +447,27 @@ fn shift_coords(efrags: &mut [EmbeddedFrag]) {
     }
 }
 
+/// `copyCoordinate`: adds a conformer holding the fragments' coordinates to
+/// `mol` and returns its id.
+fn copy_coordinate(mol: &mut ROMol, efrags: Vec<EmbeddedFrag>, clear_confs: bool) -> Result<u32> {
+    let mut conf = Conformer::new(mol.num_atoms() as usize);
+    conf.set_3d(false);
+    for f in &efrags {
+        for (&aid, e) in f.embedded_atoms() {
+            conf.set_atom_pos(aid, Point3D::new(e.loc.x, e.loc.y, 0.0))?;
+        }
+    }
+    drop(efrags);
+    if clear_confs {
+        mol.clear_conformers();
+        conf.set_id(0);
+        mol.add_conformer(conf, false)?;
+        Ok(0)
+    } else {
+        mol.add_conformer(conf, true)
+    }
+}
+
 /// `RDDepict::compute2DCoords(mol, params)`: returns the conformer id.
 pub fn compute_2d_coords(mol: &mut ROMol, params: &Compute2DCoordParameters) -> Result<u32> {
     if mol.needs_update_property_cache() {
@@ -471,12 +492,20 @@ pub fn compute_2d_coords(mol: &mut ROMol, params: &Compute2DCoordParameters) -> 
     };
     dump("initial", &efrags);
     for f in efrags.iter_mut() {
+        // either sample the 2D space by randomly flipping rotatable bonds
+        // or flip only the bonds between colliding atoms, not both
         if params.n_samples > 0 && params.n_flips_per_sample > 0 {
-            return Err(RDKitError::Runtime(
-                "random flip sampling in compute2DCoords is not supported by rdoxide yet".into(),
-            ));
+            f.random_sample_flips_and_permutations(
+                params.n_flips_per_sample,
+                params.n_samples,
+                params.sample_seed,
+                None,
+                0.0,
+                params.permute_deg4_nodes,
+            )?;
+        } else {
+            f.remove_collisions_bond_and_spiro_flip()?;
         }
-        f.remove_collisions_bond_and_spiro_flip()?;
     }
     dump("bondflip", &efrags);
     for i in 0..efrags.len() {
@@ -496,23 +525,7 @@ pub fn compute_2d_coords(mol: &mut ROMol, params: &Compute2DCoordParameters) -> 
     }
     shift_coords(&mut efrags);
 
-    // copyCoordinate
-    let mut conf = Conformer::new(mol.num_atoms() as usize);
-    conf.set_3d(false);
-    for f in &efrags {
-        for (&aid, e) in f.embedded_atoms() {
-            conf.set_atom_pos(aid, Point3D::new(e.loc.x, e.loc.y, 0.0))?;
-        }
-    }
-    drop(efrags);
-    let cid = if params.clear_confs {
-        mol.clear_conformers();
-        conf.set_id(0);
-        mol.add_conformer(conf, false)?;
-        0
-    } else {
-        mol.add_conformer(conf, true)?
-    };
+    let cid = copy_coordinate(mol, efrags, params.clear_confs)?;
     if let Some(cm) = params.coord_map
         && cm.len() == 1
     {
@@ -689,4 +702,43 @@ pub fn normalize_depiction(
     }
     transform_conformer(mol.conformer_mut(conf_id)?, &canon_trans);
     Ok(if sane { scale_factor } else { -1.0 })
+}
+
+/// `compute2DCoordsMimicDistMat`: 2D coordinates whose inter-atom distances
+/// mimic `dmat` (the packed lower triangle, negative entries are ignored),
+/// found by random sampling of the rotatable bonds. `weight_dist_mat` in
+/// [0, 1] balances mimicking `dmat` against spreading the structure out.
+#[allow(clippy::too_many_arguments)]
+pub fn compute_2d_coords_mimic_dist_mat(
+    mol: &mut ROMol,
+    dmat: &[f64],
+    canon_orient: bool,
+    clear_confs: bool,
+    weight_dist_mat: f64,
+    n_flips_per_sample: u32,
+    n_samples: u32,
+    sample_seed: i32,
+    permute_deg4_nodes: bool,
+) -> Result<u32> {
+    let mut cp = mol.clone();
+    let arings = symmetrize_sssr(&mut cp, SymmetrizeSSSRAlgorithm::Default, true, true, false)?;
+    assign_stereochemistry(&mut cp, false, false, false)?;
+    let mut efrags = compute_initial_coords(&cp, &arings, None, false)?;
+    for f in efrags.iter_mut() {
+        f.random_sample_flips_and_permutations(
+            n_flips_per_sample,
+            n_samples,
+            sample_seed,
+            Some(dmat),
+            weight_dist_mat,
+            permute_deg4_nodes,
+        )?;
+    }
+    if canon_orient {
+        for f in efrags.iter_mut() {
+            f.canonicalize_orientation()?;
+        }
+    }
+    shift_coords(&mut efrags);
+    copy_coordinate(mol, efrags, clear_confs)
 }

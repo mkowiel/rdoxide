@@ -8,7 +8,8 @@ use rdoxide::graphmol::depictor::templates::{
     add_ring_system_templates, load_default_ring_system_templates, set_ring_system_templates,
 };
 use rdoxide::graphmol::depictor::{
-    Compute2DCoordParameters, compute_2d_coords, normalize_depiction, straighten_depiction,
+    Compute2DCoordParameters, compute_2d_coords, compute_2d_coords_mimic_dist_mat,
+    normalize_depiction, straighten_depiction,
 };
 
 use crate::errors::IntoPyResult;
@@ -44,7 +45,7 @@ use crate::mol::PyMol;
 ///
 ///      ID of the conformation added to the molecule
 #[pyfunction]
-#[pyo3(name = "Compute2DCoords", signature = (mol, canonOrient = true, clearConfs = true, coordMap = None, nFlipsPerSample = 0, nSample = 0, sampleSeed = 0, permuteDeg4Nodes = false, bondLength = -1.0, forceRDKit = false, useRingTemplates = false, usePathAngleExpansion = true))]
+#[pyo3(name = "Compute2DCoords", signature = (mol, canonOrient = true, clearConfs = true, coordMap = None, nFlipsPerSample = 0, nSample = 0, sampleSeed = 0, permuteDeg4Nodes = 0, bondLength = -1.0, forceRDKit = false, useRingTemplates = false, usePathAngleExpansion = true))]
 #[allow(non_snake_case, clippy::too_many_arguments)]
 fn compute_2d_coords_py(
     py: Python<'_>,
@@ -55,7 +56,8 @@ fn compute_2d_coords_py(
     nFlipsPerSample: u32,
     nSample: u32,
     sampleSeed: i32,
-    permuteDeg4Nodes: bool,
+    // an int, as boost::python also accepts 0/1 for a bool
+    permuteDeg4Nodes: i64,
     bondLength: f64,
     forceRDKit: bool,
     useRingTemplates: bool,
@@ -83,13 +85,100 @@ fn compute_2d_coords_py(
         n_flips_per_sample: nFlipsPerSample,
         n_samples: nSample,
         sample_seed: sampleSeed,
-        permute_deg4_nodes: permuteDeg4Nodes,
+        permute_deg4_nodes: permuteDeg4Nodes != 0,
         force_rdkit: forceRDKit,
         use_ring_templates: useRingTemplates,
         use_path_angle_expansion: usePathAngleExpansion,
     };
     let m = &mut mol.mol;
     let res = py.detach(|| compute_2d_coords(m, &params));
+    if bondLength > 0.0 {
+        set_bond_len(old);
+    }
+    res.py()
+}
+
+/// Compute 2D coordinates for a molecule such that the inter-atom
+/// distances mimic those in a distance matrix.
+///
+/// This is done by randomly sampling (flipping) the rotatable bonds in the
+/// molecule and evaluating a cost function which contains two components.
+/// The first component is the sum of the inverse of the squared inter-atom
+/// distances, this helps in spreading the atoms far from each other. The
+/// second component is the sum of squares of the difference in distance
+/// between those in distMat and the generated structure. The user can
+/// adjust the relative importance of the two components via an adjustable
+/// parameter (see below).
+///
+///   ARGUMENTS:
+///
+///     - mol : the molecule of interest
+///     - distMat : distance matrix that we want the 2D structure to mimic
+///     - canonOrient : canonicalize the orientation so that the long axes
+///       align with the x-axis etc.
+///     - clearConfs : clear all existing conformations on the molecule
+///     - weightDistMat : weight assigned in the cost function to mimicking
+///       the distance matrix. This must be between (0.0,1.0). (1.0-weightDistMat)
+///       is then the weight assigned to improving the density of the 2D
+///       structure i.e. try to make it spread out
+///     - nFlipsPerSample : number of rotatable bonds that are flipped at
+///       random at a time.
+///     - nSample : Number of random samplings of rotatable bonds.
+///     - sampleSeed : seed for the random sampling process.
+///     - permuteDeg4Nodes : allow permutation of bonds at a degree 4
+///       node during the sampling process
+///     - bondLength : change the default bond length for depiction
+///     - forceRDKit : use RDKit to generate coordinates even if
+///       preferCoordGen is set to true
+///
+///   RETURNS:
+///
+///     ID of the conformation added to the molecule
+#[pyfunction]
+#[pyo3(name = "Compute2DCoordsMimicDistmat", signature = (mol, distMat, canonOrient = false, clearConfs = true, weightDistMat = 0.5, nFlipsPerSample = 3, nSample = 100, sampleSeed = 100, permuteDeg4Nodes = 1, bondLength = -1.0, forceRDKit = false))]
+#[allow(non_snake_case, clippy::too_many_arguments, unused_variables)]
+fn compute_2d_coords_mimic_distmat_py(
+    py: Python<'_>,
+    mut mol: PyRefMut<'_, PyMol>,
+    distMat: &Bound<'_, PyAny>,
+    canonOrient: bool,
+    clearConfs: bool,
+    weightDistMat: f64,
+    nFlipsPerSample: u32,
+    nSample: u32,
+    sampleSeed: i32,
+    // an int, as boost::python also accepts 0/1 for a bool
+    permuteDeg4Nodes: i64,
+    bondLength: f64,
+    forceRDKit: bool,
+) -> PyResult<u32> {
+    let dmat: Vec<f64> = distMat
+        .extract()
+        .map_err(|_| PyValueError::new_err("Argument isn't an array"))?;
+    let na = mol.mol.num_atoms() as usize;
+    if dmat.len() != na * na.saturating_sub(1) / 2 {
+        return Err(PyValueError::new_err(
+            "The array size does not match the number of atoms in the molecule",
+        ));
+    }
+    let old = bond_len();
+    if bondLength > 0.0 {
+        set_bond_len(bondLength);
+    }
+    let m = &mut mol.mol;
+    let res = py.detach(|| {
+        compute_2d_coords_mimic_dist_mat(
+            m,
+            &dmat,
+            canonOrient,
+            clearConfs,
+            weightDistMat,
+            nFlipsPerSample,
+            nSample,
+            sampleSeed,
+            permuteDeg4Nodes != 0,
+        )
+    });
     if bondLength > 0.0 {
         set_bond_len(old);
     }
@@ -244,6 +333,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
         "Module containing the functionality to compute 2D coordinates for a molecule",
     )?;
     m.add_function(wrap_pyfunction!(compute_2d_coords_py, m)?)?;
+    m.add_function(wrap_pyfunction!(compute_2d_coords_mimic_distmat_py, m)?)?;
     m.add_function(wrap_pyfunction!(straighten_depiction_py, m)?)?;
     m.add_function(wrap_pyfunction!(normalize_depiction_py, m)?)?;
     m.add_function(wrap_pyfunction!(set_ring_system_templates_py, m)?)?;

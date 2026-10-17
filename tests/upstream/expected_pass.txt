@@ -155,6 +155,8 @@ Code/GraphMol/ChemReactions/Wrap/testSanitize.py::TestCase::test_unused_rlabel_i
 Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::test1CisTrans
 Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::test2Coords
 Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::test3IssueSF1526844
+Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::test4SamplingSpread
+Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::test5SamplingMimic3D
 Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::test6ChangeBondLength
 Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::testAddRingSystemTemplates
 Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::testNormalizeStraighten
