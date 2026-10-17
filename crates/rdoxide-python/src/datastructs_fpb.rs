@@ -236,7 +236,7 @@ impl PyMultiFpbReader {
     }
 
     /// returns tanimoto similarities to and indices of all neighbors above the specified threshold
-    #[pyo3(name = "GetTanimotoNeighbors", signature = (bv, threshold = 0.7, numThreads = 1))]
+    #[pyo3(name = "GetTanimotoNeighbors", signature = (bv, threshold = 0.7, numThreads = 0))]
     #[allow(non_snake_case)]
     fn get_tanimoto_neighbors<'py>(
         &self,
@@ -256,7 +256,7 @@ impl PyMultiFpbReader {
     }
 
     /// returns Tversky similarities to and indices of all neighbors above the specified threshold
-    #[pyo3(name = "GetTverskyNeighbors", signature = (bv, ca, cb, threshold = 0.7, numThreads = 1))]
+    #[pyo3(name = "GetTverskyNeighbors", signature = (bv, ca, cb, threshold = 0.7, numThreads = 0))]
     #[allow(non_snake_case)]
     fn get_tversky_neighbors<'py>(
         &self,
@@ -278,7 +278,7 @@ impl PyMultiFpbReader {
     }
 
     /// returns indices of neighbors that contain this fingerprint (where all bits from this fingerprint are also set)
-    #[pyo3(name = "GetContainingNeighbors", signature = (bv, numThreads = 1))]
+    #[pyo3(name = "GetContainingNeighbors", signature = (bv, numThreads = 0))]
     #[allow(non_snake_case)]
     fn get_containing_neighbors<'py>(
         &self,

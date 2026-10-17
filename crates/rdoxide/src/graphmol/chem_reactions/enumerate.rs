@@ -273,6 +273,21 @@ impl EnumerationStrategy {
 
     /// `skip(count)`
     pub fn skip(&mut self, count: u64) -> Result<()> {
+        if matches!(self.kind, Kind::Cartesian) && self.num_permutations != ENUMERATION_OVERFLOW {
+            // the walk is arithmetic: jump to where `count` calls of `advance`
+            // would end (the position stops at the last permutation)
+            let total = self.processed.saturating_add(count);
+            if total > 0 && count > 0 {
+                let index = total.min(self.num_permutations).saturating_sub(1);
+                let mut rest = index;
+                for (p, &size) in self.permutation.iter_mut().zip(&self.sizes) {
+                    *p = if size == 0 { 0 } else { rest % size };
+                    rest = rest.checked_div(size).unwrap_or(rest);
+                }
+                self.processed = total;
+            }
+            return Ok(());
+        }
         for _ in 0..count {
             self.advance()?;
         }

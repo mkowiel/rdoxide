@@ -234,6 +234,9 @@ pub fn update_embed_parameters_from_json(params: &mut EmbedParameters, json: &st
         };
     }
     embed_params_fields!(get);
+    if pt.get_str("numThreads").is_some() {
+        params.num_threads_is_default = false;
+    }
 
     if let Some(entries) = pt.child("coordMap") {
         let mut map = std::collections::BTreeMap::new();

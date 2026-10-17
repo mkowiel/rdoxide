@@ -336,7 +336,7 @@ impl PySynthonSpace {
     }
 
     /// Reads binary database file.  Takes optional number of threads,default=1.
-    #[pyo3(name = "ReadDBFile", signature = (inFile, numThreads = 1))]
+    #[pyo3(name = "ReadDBFile", signature = (inFile, numThreads = 0))]
     #[allow(non_snake_case)]
     fn read_db_file(
         &mut self,

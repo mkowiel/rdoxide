@@ -107,3 +107,32 @@ fn library_enumerates_all_matching_reagents() {
     lib.reset_state().unwrap();
     assert!(lib.has_next().unwrap());
 }
+
+#[test]
+fn cartesian_skip_matches_stepping() {
+    for skip in [0u64, 1, 2, 5, 11, 12, 13, 40] {
+        let mut stepped = EnumerationStrategy::cartesian_product();
+        stepped.initialize(&[3, 2, 2]).unwrap();
+        for _ in 0..skip {
+            stepped.advance().unwrap();
+        }
+        let mut jumped = EnumerationStrategy::cartesian_product();
+        jumped.initialize(&[3, 2, 2]).unwrap();
+        jumped.skip(skip).unwrap();
+        assert_eq!(jumped.position(), stepped.position(), "skip {skip}");
+        assert_eq!(
+            jumped.permutation_idx(),
+            stepped.permutation_idx(),
+            "skip {skip}"
+        );
+        assert_eq!(jumped.has_next(), stepped.has_next(), "skip {skip}");
+        // and they keep agreeing afterwards
+        for _ in 0..3 {
+            assert_eq!(
+                jumped.advance().unwrap().to_vec(),
+                stepped.advance().unwrap().to_vec(),
+                "skip {skip}"
+            );
+        }
+    }
+}

@@ -864,7 +864,7 @@ fn py_can_serialize() -> bool {
 /// molecule matches no filter, the vector will be empty. If a smiles string
 /// can't be parsed, a 'Bad smiles' entry is returned.
 #[pyfunction]
-#[pyo3(name = "RunFilterCatalog", signature = (filterCatalog, smiles, numThreads = 1))]
+#[pyo3(name = "RunFilterCatalog", signature = (filterCatalog, smiles, numThreads = 0))]
 #[allow(non_snake_case)]
 fn py_run_filter_catalog(
     py: Python<'_>,

@@ -691,6 +691,15 @@ pub fn search_with_callback<'a, S: SynthonSearcher<'a>>(
     let num_hits_found = AtomicI64::new(0);
     let mut num_poss_hits_found = 0u64;
     let mut stop = false;
+    // chunks built on several threads can overshoot maxHits: hand out no more
+    // than maxHits in all, in the order a single thread would find them
+    let mut delivered: i64 = 0;
+    let cap = |part: &mut Vec<ROMol>, delivered: &mut i64| {
+        if params.max_hits != -1 {
+            part.truncate((params.max_hits - *delivered).max(0) as usize);
+        }
+        *delivered += part.len() as i64;
+    };
     let enough =
         |n: &AtomicI64| params.max_hits != -1 && n.load(Ordering::Relaxed) >= params.max_hits;
     'outer: for hitset in &all_hits {
@@ -707,6 +716,7 @@ pub fn search_with_callback<'a, S: SynthonSearcher<'a>>(
                     &num_hits_found,
                     &mut num_poss_hits_found,
                 )?;
+                cap(&mut part, &mut delivered);
                 stop = cb(&mut part)?;
                 to_try.clear();
                 if stop || enough(&num_hits_found) {
@@ -726,6 +736,7 @@ pub fn search_with_callback<'a, S: SynthonSearcher<'a>>(
             &num_hits_found,
             &mut num_poss_hits_found,
         )?;
+        cap(&mut part, &mut delivered);
         cb(&mut part)?;
     }
     Ok(())

@@ -133,6 +133,62 @@ fn linear_search(
     LineSearch::BadDirection
 }
 
+/// `out[i] = sum_j mat[i][j] * v[j]`, or `out[i] = 0 - sum_j mat[i][j] * v[j]`
+/// when `NEG`, accumulating each row in index order exactly like the scalar
+/// loop. Four rows are processed at a time: their sums are independent, so the
+/// processor overlaps the dependent additions, and every result stays
+/// bit-identical.
+fn mat_vec<const NEG: bool>(mat: &[f64], dim: usize, v: &[f64], out: &mut [f64]) {
+    #[inline(always)]
+    fn step<const NEG: bool>(acc: f64, p: f64) -> f64 {
+        if NEG { acc - p } else { acc + p }
+    }
+    let mut i = 0;
+    while i + 4 <= dim {
+        let r0 = &mat[i * dim..(i + 1) * dim];
+        let r1 = &mat[(i + 1) * dim..(i + 2) * dim];
+        let r2 = &mat[(i + 2) * dim..(i + 3) * dim];
+        let r3 = &mat[(i + 3) * dim..(i + 4) * dim];
+        let (mut a0, mut a1, mut a2, mut a3) = (0.0, 0.0, 0.0, 0.0);
+        for j in 0..dim {
+            let x = v[j];
+            a0 = step::<NEG>(a0, r0[j] * x);
+            a1 = step::<NEG>(a1, r1[j] * x);
+            a2 = step::<NEG>(a2, r2[j] * x);
+            a3 = step::<NEG>(a3, r3[j] * x);
+        }
+        out[i] = a0;
+        out[i + 1] = a1;
+        out[i + 2] = a2;
+        out[i + 3] = a3;
+        i += 4;
+    }
+    while i < dim {
+        let row = &mat[i * dim..(i + 1) * dim];
+        let mut a = 0.0;
+        for j in 0..dim {
+            a = step::<NEG>(a, row[j] * v[j]);
+        }
+        out[i] = a;
+        i += 1;
+    }
+}
+
+/// Copies the upper triangle of the square matrix onto its lower triangle,
+/// tile by tile so that the strided writes stay in cache.
+fn mirror_upper_to_lower(mat: &mut [f64], dim: usize) {
+    const TILE: usize = 16;
+    for bi in (0..dim).step_by(TILE) {
+        for bj in (bi..dim).step_by(TILE) {
+            for i in bi..(bi + TILE).min(dim) {
+                for j in bj.max(i + 1)..(bj + TILE).min(dim) {
+                    mat[j * dim + i] = mat[i * dim + j];
+                }
+            }
+        }
+    }
+}
+
 /// Result of [`minimize`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct Minimization {
@@ -256,13 +312,8 @@ pub fn minimize(
 
         // BFGS inverse Hessian update
         let (mut fac, mut fae, mut sum_d_grad, mut sum_xi) = (0.0, 0.0, 0.0, 0.0);
+        mat_vec::<false>(&inv_hessian, dim, &d_grad, &mut hess_d_grad);
         for i in 0..dim {
-            let row = &inv_hessian[i * dim..(i + 1) * dim];
-            let mut h = 0.0;
-            for j in 0..dim {
-                h += row[j] * d_grad[j];
-            }
-            hess_d_grad[i] = h;
             fac += d_grad[i] * xi[i];
             fae += d_grad[i] * hess_d_grad[i];
             sum_d_grad += d_grad[i] * d_grad[i];
@@ -274,27 +325,20 @@ pub fn minimize(
             for i in 0..dim {
                 d_grad[i] = fac * xi[i] - fad * hess_d_grad[i];
             }
-            // upper triangle, mirrored
+            // upper triangle (contiguous, so it vectorizes), then mirrored
             for i in 0..dim {
                 let pxi = fac * xi[i];
                 let hdgi = fad * hess_d_grad[i];
                 let dgi = fae * d_grad[i];
-                for j in i..dim {
-                    let v = inv_hessian[i * dim + j] + pxi * xi[j] - hdgi * hess_d_grad[j]
-                        + dgi * d_grad[j];
-                    inv_hessian[i * dim + j] = v;
-                    inv_hessian[j * dim + i] = v;
+                let row = &mut inv_hessian[i * dim + i..(i + 1) * dim];
+                for (k, h) in row.iter_mut().enumerate() {
+                    let j = i + k;
+                    *h = *h + pxi * xi[j] - hdgi * hess_d_grad[j] + dgi * d_grad[j];
                 }
             }
+            mirror_upper_to_lower(&mut inv_hessian, dim);
         }
-        for i in 0..dim {
-            let row = &inv_hessian[i * dim..(i + 1) * dim];
-            let mut x = 0.0;
-            for j in 0..dim {
-                x -= row[j] * grad[j];
-            }
-            xi[i] = x;
-        }
+        mat_vec::<true>(&inv_hessian, dim, &grad, &mut xi);
         if snapshot_freq != 0 && iter % snapshot_freq == 0 {
             snapshots.push(Snapshot {
                 coords: new_pos.clone(),

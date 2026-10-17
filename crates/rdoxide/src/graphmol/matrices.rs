@@ -13,29 +13,40 @@ use std::collections::VecDeque;
 
 use crate::graphmol::romol::ROMol;
 use crate::rdgeneral::dict::{RDProps, RDValue};
+use crate::rdgeneral::threads::{par_row_blocks_mut, par_row_blocks_mut2};
 use crate::{RDKitError, Result};
 
 const LOCAL_INF: f64 = 1e8;
+
+/// Rows of a distance matrix a worker thread must have to be worth starting.
+const PAR_MIN_ROWS: usize = 64;
+
+/// Rows per worker thread in a Floyd-Warshall pass: the threads are started
+/// again for every pass, so they need enough rows to pay for that.
+const FW_MIN_ROWS: usize = 128;
 
 /// `getDistanceMat(mol)` (no bond orders, no atom weights): row-major
 /// `n x n` matrix of bond-count distances.
 pub fn get_distance_mat(mol: &ROMol) -> Vec<f64> {
     let n = mol.num_atoms() as usize;
     let mut d = vec![LOCAL_INF; n * n];
-    for i in 0..n {
-        d[i * n + i] = 0.0;
-        let mut q = VecDeque::from([i as u32]);
-        while let Some(a) = q.pop_front() {
-            let da = d[i * n + a as usize];
-            for nb in mol.atom_neighbors(a) {
-                let k = i * n + nb as usize;
-                if d[k] == LOCAL_INF {
-                    d[k] = da + 1.0;
-                    q.push_back(nb);
+    // every row is a breadth-first search from its own atom
+    par_row_blocks_mut(&mut d, n, PAR_MIN_ROWS, |first, block| {
+        for (r, row) in block.chunks_mut(n).enumerate() {
+            let i = first + r;
+            row[i] = 0.0;
+            let mut q = VecDeque::from([i as u32]);
+            while let Some(a) = q.pop_front() {
+                let da = row[a as usize];
+                for nb in mol.atom_neighbors(a) {
+                    if row[nb as usize] == LOCAL_INF {
+                        row[nb as usize] = da + 1.0;
+                        q.push_back(nb);
+                    }
                 }
             }
         }
-    }
+    });
     d
 }
 
@@ -45,7 +56,7 @@ pub fn get_distance_mat(mol: &ROMol) -> Vec<f64> {
 /// Returns the predecessor matrix (`-1` on the diagonal and for unreachable
 /// pairs).
 fn floyd_warshall(n: usize, d: &mut [f64]) -> Vec<i32> {
-    let mut paths: Vec<i32> = (0..n * n)
+    let mut cur_p: Vec<i32> = (0..n * n)
         .map(|k| {
             let (i, j) = (k / n, k % n);
             if i == j || d[k] == LOCAL_INF {
@@ -55,27 +66,39 @@ fn floyd_warshall(n: usize, d: &mut [f64]) -> Vec<i32> {
             }
         })
         .collect();
-    let mut next_d = d.to_vec();
-    let mut next_p = paths.clone();
+    let mut cur_d = d.to_vec();
+    let mut next_d = cur_d.clone();
+    let mut next_p = cur_p.clone();
     for k in 0..n {
-        for i in 0..n {
-            for j in 0..n {
-                let v1 = d[i * n + j];
-                let v2 = d[i * n + k] + d[k * n + j];
-                if v1 <= v2 {
-                    next_d[i * n + j] = v1;
-                    next_p[i * n + j] = paths[i * n + j];
-                } else {
-                    next_d[i * n + j] = v2;
-                    next_p[i * n + j] = paths[k * n + j];
+        // each pass reads the previous one only, so its rows are independent
+        let (prev_d, prev_p) = (&cur_d, &cur_p);
+        let (k_row_d, k_row_p) = (&prev_d[k * n..(k + 1) * n], &prev_p[k * n..(k + 1) * n]);
+        par_row_blocks_mut2(&mut next_d, &mut next_p, n, FW_MIN_ROWS, |first, nd, np| {
+            for (r, (row_d, row_p)) in nd.chunks_mut(n).zip(np.chunks_mut(n)).enumerate() {
+                let i = first + r;
+                let (old_d, old_p) = (&prev_d[i * n..(i + 1) * n], &prev_p[i * n..(i + 1) * n]);
+                let dik = old_d[k];
+                // branch-free so that the loop vectorizes; ties keep the old path
+                for ((((out_d, out_p), &v1), (&p1, &p2)), &dkj) in row_d
+                    .iter_mut()
+                    .zip(row_p.iter_mut())
+                    .zip(old_d)
+                    .zip(old_p.iter().zip(k_row_p))
+                    .zip(k_row_d)
+                {
+                    let v2 = dik + dkj;
+                    let keep = v1 <= v2;
+                    *out_d = if keep { v1 } else { v2 };
+                    *out_p = if keep { p1 } else { p2 };
                 }
             }
-        }
-        // each pass reads the previous one only
-        d.copy_from_slice(&next_d);
-        paths.copy_from_slice(&next_p);
+        });
+        // the pass just written becomes the one the next pass reads
+        std::mem::swap(&mut cur_d, &mut next_d);
+        std::mem::swap(&mut cur_p, &mut next_p);
     }
-    paths
+    d.copy_from_slice(&cur_d);
+    cur_p
 }
 
 /// The bond-weight matrix `getDistanceMat` starts from: `1 / bond order`

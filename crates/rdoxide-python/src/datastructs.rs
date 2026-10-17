@@ -18,6 +18,7 @@ use rdoxide::datastructs::{
 use crate::datastructs_siv as siv;
 use crate::errors::IntoPyResult;
 use pyo3::IntoPyObjectExt;
+use rdoxide::rdgeneral::threads::par_map;
 
 /// Accepts str or bytes like `std::string` arguments of the wrappers.
 pub(crate) fn bytes_arg(o: &Bound<'_, PyAny>) -> PyResult<Vec<u8>> {
@@ -330,8 +331,8 @@ macro_rules! metric_fns {
                     return Ok(r);
                 }
                 bulk(bv1, bvList, returnDistance, |p| match p {
-                    Pair::E(a, b) => similarity($metric, &a, &b),
-                    Pair::S(a, b) => similarity($metric, &a, &b),
+                    Pair::E(a, b) => similarity($metric, a, b),
+                    Pair::S(a, b) => similarity($metric, a, b),
                 })
             }
 
@@ -368,46 +369,62 @@ fn bulk(
     bv1: &Bound<'_, PyAny>,
     list: &Bound<'_, PyAny>,
     dist: bool,
-    f: impl Fn(Pair) -> rdoxide::Result<f64>,
+    f: impl Fn(&Pair) -> rdoxide::Result<f64> + Sync,
 ) -> PyResult<Vec<f64>> {
-    let mut res = Vec::new();
+    let mut pairs = Vec::new();
     for item in list.try_iter()? {
-        let item = item?;
-        let mut s = f(extract_pair(bv1, &item, false)?).py()?;
-        if dist {
-            s = 1.0 - s;
-        }
-        res.push(s);
+        pairs.push(extract_pair(bv1, &item?, false)?);
     }
-    Ok(res)
+    // comparisons of short lists are not worth a thread
+    let target = if pairs.len() >= PAR_MIN_COMPARISONS {
+        0
+    } else {
+        1
+    };
+    let scores = bv1.py().detach(|| par_map(&pairs, target, |p| f(p)));
+    scores
+        .into_iter()
+        .map(|s| s.map(|s| if dist { 1.0 - s } else { s }).py())
+        .collect()
 }
 
+/// Comparisons below which similarity loops stay on the calling thread.
+const PAR_MIN_COMPARISONS: usize = 2_000_000;
+
 /// `NeighborWrapper`
-fn neighbors<P: pyo3::PyClass, T>(
+fn neighbors<P: pyo3::PyClass, T: Send + Sync>(
     queries: &Bound<'_, PyAny>,
     bvs: &Bound<'_, PyAny>,
-    metric: impl Fn(&T, &T) -> rdoxide::Result<f64>,
+    metric: impl Fn(&T, &T) -> rdoxide::Result<f64> + Sync,
     get: impl Fn(&P) -> T,
 ) -> PyResult<Vec<(u32, f64)>> {
     let pool: Vec<T> = bvs
         .try_iter()?
         .map(|o| o.and_then(|o| Ok(get(&*o.cast::<P>()?.borrow()))))
         .collect::<PyResult<_>>()?;
-    let mut res = Vec::new();
-    for q in queries.try_iter()? {
-        let q = get(&*q?.cast::<P>()?.borrow());
+    let queries: Vec<T> = queries
+        .try_iter()?
+        .map(|q| q.and_then(|q| Ok(get(&*q.cast::<P>()?.borrow()))))
+        .collect::<PyResult<_>>()?;
+    let target = if queries.len() * pool.len() >= PAR_MIN_COMPARISONS {
+        0
+    } else {
+        1
+    };
+    let nearest = |q: &T| -> rdoxide::Result<(u32, f64)> {
         let mut closest = -1.0;
         let mut nbr = 0u32;
         for (j, b) in pool.iter().enumerate() {
-            let s = metric(&q, b).py()?;
+            let s = metric(q, b)?;
             if s > closest {
                 closest = s;
                 nbr = j as u32;
             }
         }
-        res.push((nbr, closest));
-    }
-    Ok(res)
+        Ok((nbr, closest))
+    };
+    let found = bvs.py().detach(|| par_map(&queries, target, nearest));
+    found.into_iter().map(|r| r.py()).collect()
 }
 
 metric_fns! {
@@ -534,8 +551,8 @@ fn bulk_tversky(
         return Ok(r);
     }
     bulk(bv1, bvList, returnDistance, |p| match p {
-        Pair::E(x, y) => tversky(&x, &y, a, b),
-        Pair::S(x, y) => tversky(&x, &y, a, b),
+        Pair::E(x, y) => tversky(x, y, a, b),
+        Pair::S(x, y) => tversky(x, y, a, b),
     })
 }
 

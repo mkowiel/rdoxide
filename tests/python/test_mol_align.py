@@ -145,7 +145,7 @@ def test_weights_must_match_the_map():
         params.weights = [1.0] * 3
     params.weights = [1.0] * 10
     assert params.weights == (1.0,) * 10 and params.map == (amap,)
-    assert (params.maxMatches, params.numThreads) == (1000000, 1)
+    assert (params.maxMatches, params.numThreads) == (1000000, 0)
     with pytest.raises(AttributeError):
         params.bogus = 1
 

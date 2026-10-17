@@ -400,7 +400,7 @@ impl PyFPGen {
         numpy_array(py, vals, "uint32")
     }
 
-    #[pyo3(name = "GetFingerprints", signature = (mols, numThreads = 1))]
+    #[pyo3(name = "GetFingerprints", signature = (mols, numThreads = 0))]
     #[allow(non_snake_case)]
     fn get_fingerprints<'py>(
         &self,
@@ -414,7 +414,7 @@ impl PyFPGen {
             ))
         })
     }
-    #[pyo3(name = "GetCountFingerprints", signature = (mols, numThreads = 1))]
+    #[pyo3(name = "GetCountFingerprints", signature = (mols, numThreads = 0))]
     #[allow(non_snake_case)]
     fn get_count_fingerprints<'py>(
         &self,
@@ -428,7 +428,7 @@ impl PyFPGen {
             ))
         })
     }
-    #[pyo3(name = "GetSparseFingerprints", signature = (mols, numThreads = 1))]
+    #[pyo3(name = "GetSparseFingerprints", signature = (mols, numThreads = 0))]
     #[allow(non_snake_case)]
     fn get_sparse_fingerprints<'py>(
         &self,
@@ -442,7 +442,7 @@ impl PyFPGen {
             ))
         })
     }
-    #[pyo3(name = "GetSparseCountFingerprints", signature = (mols, numThreads = 1))]
+    #[pyo3(name = "GetSparseCountFingerprints", signature = (mols, numThreads = 0))]
     #[allow(non_snake_case)]
     fn get_sparse_count_fingerprints<'py>(
         &self,

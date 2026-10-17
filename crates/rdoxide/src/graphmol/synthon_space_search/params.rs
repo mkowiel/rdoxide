@@ -98,7 +98,7 @@ impl Default for SynthonSpaceSearchParams {
                 random_seed: 0xdac,
             },
             time_out: 600,
-            num_threads: 1,
+            num_threads: 0,
             use_progress_bar: 0,
             user_conformer_generator: None,
             excluded_volume: None,
@@ -135,7 +135,7 @@ impl Default for ShapeBuildParams {
             num_confs: 100,
             rms_threshold: 0.5,
             shape_sim_threshold: 0.95,
-            num_threads: 1,
+            num_threads: 0,
             random_seed: 0xdac,
             stereo_enum_opts: StereoEnumerationOptions {
                 try_embedding: true,

@@ -27,7 +27,12 @@ pub enum EmbedFF {
 #[derive(Debug, Clone)]
 pub struct EmbedParameters {
     pub max_iterations: u32,
+    /// reads and serializes as 1 until set (upstream's default), but while
+    /// [`num_threads_is_default`](Self::num_threads_is_default) holds the
+    /// embedding uses the default thread count (all cores, or
+    /// `RDOXIDE_NUM_THREADS`)
     pub num_threads: i32,
+    pub num_threads_is_default: bool,
     pub random_seed: i32,
     pub clear_confs: bool,
     pub use_random_coords: bool,
@@ -66,11 +71,29 @@ pub struct EmbedParameters {
     pub embed_force_field: EmbedFF,
 }
 
+impl EmbedParameters {
+    /// The thread target handed to `num_threads_to_use`.
+    pub fn thread_target(&self) -> i32 {
+        if self.num_threads_is_default {
+            0
+        } else {
+            self.num_threads
+        }
+    }
+
+    /// Sets an explicit thread count.
+    pub fn set_num_threads(&mut self, n: i32) {
+        self.num_threads = n;
+        self.num_threads_is_default = false;
+    }
+}
+
 impl Default for EmbedParameters {
     fn default() -> Self {
         EmbedParameters {
             max_iterations: 0,
             num_threads: 1,
+            num_threads_is_default: true,
             random_seed: -1,
             clear_confs: true,
             use_random_coords: false,

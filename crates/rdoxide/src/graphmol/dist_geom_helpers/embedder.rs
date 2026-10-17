@@ -1002,7 +1002,7 @@ fn embed_fragments(
             params.basin_thresh = 1e8;
         }
 
-        let num_threads = num_threads_to_use(params.num_threads);
+        let num_threads = num_threads_to_use(params.thread_target());
         let thread_ids: Vec<usize> = (0..num_threads).collect();
         let snapshot = confs_ok.clone();
         let params_ref: &EmbedParameters = params;

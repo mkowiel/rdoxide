@@ -219,6 +219,28 @@ impl PyCaptureErrorLog {
     }
 }
 
+/// Returns the maximum number of threads any rdoxide operation uses.
+///
+/// It comes from the RDOXIDE_NUM_THREADS environment variable (a number, or
+/// "all"; a negative number means all but that many) and defaults to all
+/// hardware threads. Functions with a numThreads argument use the maximum
+/// when it is 0 and never exceed it.
+#[pyfunction]
+#[pyo3(name = "GetMaxThreads")]
+fn get_max_threads() -> usize {
+    rdoxide::rdgeneral::threads::max_threads()
+}
+
+/// Sets the maximum number of threads any rdoxide operation uses: a positive
+/// number is that many threads, 0 all hardware threads and a negative number
+/// all but that many.
+#[pyfunction]
+#[pyo3(name = "SetMaxThreads", signature = (numThreads))]
+#[allow(non_snake_case)]
+fn set_max_threads(numThreads: i32) {
+    rdoxide::rdgeneral::threads::set_max_threads(numThreads);
+}
+
 pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add(
         "__doc__",
@@ -246,6 +268,8 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("_iostreamsEnabled", false)?;
     m.add("_multithreadedEnabled", true)?;
     m.add_function(wrap_pyfunction!(version, m)?)?;
+    m.add_function(wrap_pyfunction!(get_max_threads, m)?)?;
+    m.add_function(wrap_pyfunction!(set_max_threads, m)?)?;
     m.add_function(wrap_pyfunction!(log_to_cpp_streams, m)?)?;
     m.add_function(wrap_pyfunction!(log_to_python_logger, m)?)?;
     m.add_function(wrap_pyfunction!(log_to_python_stderr, m)?)?;
