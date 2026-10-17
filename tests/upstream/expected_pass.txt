@@ -698,6 +698,7 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::testContextManagers
 Code/GraphMol/Wrap/rough_test.py::TestCase::testCountAtomElec
 Code/GraphMol/Wrap/rough_test.py::TestCase::testCrambin
 Code/GraphMol/Wrap/rough_test.py::TestCase::testCustomSubstructMatchCheck
+Code/GraphMol/Wrap/rough_test.py::TestCase::testDetectChemistryProblems
 Code/GraphMol/Wrap/rough_test.py::TestCase::testDisableNontetrahedralStereo
 Code/GraphMol/Wrap/rough_test.py::TestCase::testEnhancedStereoDoesNotExceedsLimit
 Code/GraphMol/Wrap/rough_test.py::TestCase::testEnhancedStereoExceedsLimit
@@ -788,6 +789,7 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::testSimpleAromaticity
 Code/GraphMol/Wrap/rough_test.py::TestCase::testSmartsParseParams
 Code/GraphMol/Wrap/rough_test.py::TestCase::testSmilesParseParams
 Code/GraphMol/Wrap/rough_test.py::TestCase::testSmilesProps
+Code/GraphMol/Wrap/rough_test.py::TestCase::testSmilesToAtom
 Code/GraphMol/Wrap/rough_test.py::TestCase::testSmilesWriteParams
 Code/GraphMol/Wrap/rough_test.py::TestCase::testSmilesWriteParamsForSMARTS
 Code/GraphMol/Wrap/rough_test.py::TestCase::testSubstructMatchAcetate
@@ -1079,6 +1081,7 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::testSimpleAromaticity
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testSmartsParseParams
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testSmilesParseParams
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testSmilesProps
+Code/GraphMol/nbWrap/rough_test.py::TestCase::testSmilesToAtom
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testSmilesWriteParams
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testSmilesWriteParamsForSMARTS
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testSubstructMatchAtomProperties

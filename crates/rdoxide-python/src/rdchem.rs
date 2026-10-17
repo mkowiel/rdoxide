@@ -203,34 +203,47 @@ impl SanitizeCause {
     }
 }
 
+/// The Python-visible description of a sanitization failure.
+pub fn sanitize_cause(err: &rdoxide::SanitizeError) -> SanitizeCause {
+    use rdoxide::SanitizeError as S;
+    let (kind, message, atom_idx, atom_indices) = match err {
+        S::Generic { message } => ("MolSanitizeException", message.clone(), None, vec![]),
+        S::AtomValence { atom_idx, message } => (
+            "AtomValenceException",
+            message.clone(),
+            Some(*atom_idx),
+            vec![],
+        ),
+        S::AtomKekulize { atom_idx, message } => (
+            "AtomKekulizeException",
+            message.clone(),
+            Some(*atom_idx),
+            vec![],
+        ),
+        S::Kekulize {
+            atom_indices,
+            message,
+        } => (
+            "KekulizeException",
+            message.clone(),
+            None,
+            atom_indices.clone(),
+        ),
+    };
+    SanitizeCause {
+        kind,
+        message,
+        atom_idx,
+        atom_indices,
+    }
+}
+
 /// Build the Python exception for a sanitization failure.
 pub fn sanitize_error(err: &rdoxide::SanitizeError) -> PyErr {
     use rdoxide::SanitizeError as S;
     Python::attach(|py| {
-        let (kind, message, atom_idx, atom_indices) = match err {
-            S::Generic { message } => ("MolSanitizeException", message.clone(), None, vec![]),
-            S::AtomValence { atom_idx, message } => (
-                "AtomValenceException",
-                message.clone(),
-                Some(*atom_idx),
-                vec![],
-            ),
-            S::AtomKekulize { atom_idx, message } => (
-                "AtomKekulizeException",
-                message.clone(),
-                Some(*atom_idx),
-                vec![],
-            ),
-            S::Kekulize {
-                atom_indices,
-                message,
-            } => (
-                "KekulizeException",
-                message.clone(),
-                None,
-                atom_indices.clone(),
-            ),
-        };
+        let cause = sanitize_cause(err);
+        let message = cause.message.clone();
         let exc_type = match err {
             S::Generic { .. } => py.get_type::<MolSanitizeException>(),
             S::AtomValence { .. } => py.get_type::<AtomValenceException>(),
@@ -238,15 +251,7 @@ pub fn sanitize_error(err: &rdoxide::SanitizeError) -> PyErr {
             S::Kekulize { .. } => py.get_type::<KekulizeException>(),
         };
         let build = || -> PyResult<PyErr> {
-            let cause = Py::new(
-                py,
-                SanitizeCause {
-                    kind,
-                    message: message.clone(),
-                    atom_idx,
-                    atom_indices,
-                },
-            )?;
+            let cause = Py::new(py, cause)?;
             let inst = exc_type.call1((message.clone(),))?;
             inst.setattr("cause", &cause)?;
             // upstream sets `cause` on the exception type as well

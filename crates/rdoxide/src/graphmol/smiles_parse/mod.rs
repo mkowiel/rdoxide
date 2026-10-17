@@ -249,6 +249,23 @@ pub fn mol_from_smiles(smiles: &str, params: &SmilesParserParams) -> Result<Opti
     Ok(Some(res))
 }
 
+/// `AtomFromSmiles`: the atom of a SMILES atom expression such as `[13CH3]`;
+/// `None` (with a logged error) if it cannot be parsed.
+pub fn atom_from_smiles(smiles: &str) -> Option<crate::graphmol::atom::Atom> {
+    if smiles.is_empty() {
+        return None;
+    }
+    SmilesParser::new(smiles).parse_atom().ok()
+}
+
+/// `BondFromSmiles`: the bond of a SMILES bond symbol such as `=`.
+pub fn bond_from_smiles(smiles: &str) -> Option<crate::graphmol::bond::Bond> {
+    if smiles.is_empty() {
+        return None;
+    }
+    SmilesParser::new(smiles).parse_bond().ok()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
