@@ -2,7 +2,8 @@
 RDKit and under rdoxide; tools/differential/compare.py diffs the outputs.
 
 usage: python -I dump.py MODE INPUT.smi > out.jsonl
-  MODE: parse (sanitize=False) | rings | sanitize (SanitizeMol) | molfromsmiles | smiles (SMILES writer) | smarts (MolFromSmarts)
+  MODE: inchi (rdinchi.MolToInchi) | inchikey (INPUT: tests/data/inchi_corpus.jsonl) |
+        parse (sanitize=False) | rings | sanitize (SanitizeMol) | molfromsmiles | smiles (SMILES writer) | smarts (MolFromSmarts)
 """
 import json
 import sys
@@ -954,7 +955,19 @@ def _tautomers(ms, m):
             "score": te.ScoreTautomer(m)}
 
 
+def inchi_record(smi, options=""):
+    """rdinchi.MolToInchi (InChI, return code, message, AuxInfo) + InChIKey."""
+    from rdkit.Chem import rdinchi
+    m = Chem.MolFromSmiles(smi)
+    if m is None:
+        return None
+    inchi, retcode, message, _log, aux = rdinchi.MolToInchi(m, options)
+    return [inchi, retcode, message, aux, rdinchi.InchiToInchiKey(inchi)]
+
+
 def dump(mode, smi):
+    if mode == "inchi":
+        return inchi_record(smi)
     if mode == "standardize":
         return standardize_record(smi)
     if mode == "lipinski":
@@ -1252,6 +1265,13 @@ def main():
     if mode == "sdwrite":
         for rec in sdwrite_records(path):
             print(json.dumps(rec, default=list))
+        return
+    if mode == "inchikey":
+        # INPUT is tests/data/inchi_corpus.jsonl: InchiToInchiKey of every InChI in it
+        from rdkit.Chem import rdinchi
+        for line in open(path, encoding="utf-8"):
+            inchi = json.loads(line)["inchi"]
+            print(json.dumps([inchi, rdinchi.InchiToInchiKey(inchi)]))
         return
     if mode == "sdf":
         for rec in sdf_records(path):

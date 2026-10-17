@@ -1,0 +1,49 @@
+International Chemical Identifier (InChI)
+Version 1
+Software version 1.07
+
+MIT License
+
+Copyright (c) 2024 IUPAC and InChI Trust
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+The InChI library and programs are free software developed under the
+auspices of the International Union of Pure and Applied Chemistry (IUPAC).
+Originally developed at NIST.
+Modifications and additions by IUPAC and the InChI Trust.
+Some portions of code were developed/changed by external contributors
+(either contractor or volunteer) which are listed in the file
+'External-contributors' included in this distribution.
+
+info@inchi-trust.org
+
+----------------------------------------------------------------------------
+Source: the header of every C source file of INCHI-1-SRC.zip, InChI release
+v1.07.3 (https://github.com/IUPAC-InChI/InChI/releases/download/v1.07.3/INCHI-1-SRC.zip,
+md5 b761f37a7d3a3ff8574daf6906993759; tag v1.07.3, commit
+0b3e941d29289f3e5024c9ecfd45186285319420), the version RDKit 2026.09.1 builds
+against. The repository's LICENSE file at that tag carries the same MIT text
+with the notice "Copyright (c) 2024 InChI Project".
+
+Exception: INCHI_BASE/src/sha2.c and sha2.h (SHA-256, Copyright (C) 2010
+Paul Bakker, originally written by Christophe Devine) are MIT-licensed "only
+in combination with the InChI software package". rdoxide does not translate
+them; its SHA-256 (crates/rdoxide/src/external/inchi/sha256.rs) is original
+code written from FIPS 180-4.

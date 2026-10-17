@@ -27,7 +27,7 @@ Licensing summary
 
 The combined work is therefore distributed under "BSD-3-Clause AND MIT AND
 Apache-2.0 WITH LLVM-exception AND MPL-2.0 AND BSL-1.0 AND OFL-1.1" (MIT applies only to the
-files derived from linchemin and xyz2mol, MPL-2.0 only to the files translated
+files derived from linchemin, xyz2mol and InChI, MPL-2.0 only to the files translated
 from Eigen, BSL-1.0 only to the number reader translated from Boost.JSON).
 Redistributions (source or binary) must retain this NOTICE file and the
 license texts in LICENSE and LICENSES/.
@@ -52,6 +52,9 @@ LICENSES/Boost-BSL-1.0.txt                                Boost.JSON (number par
                                                          Copyright (c) 2019 Vinnie Falco, (c) 2020 Krystian Stasiowski
 LICENSES/SciPy-BSD-3-Clause.txt                           SciPy (linear assignment solver, graphmol/rascal_mces/lap.rs),
                                                          Copyright (c) 2001-2002 Enthought, Inc., 2003-2023 SciPy Developers
+LICENSES/InChI-MIT.txt                                    InChI Software v1.07.3 (crates/rdoxide/src/external/inchi/),
+                                                         Copyright (c) 2024 IUPAC and InChI Trust; originally
+                                                         developed at NIST
 LICENSES/RingDecomposerLib-BSD-3-Clause.txt              RingDecomposerLib (ring families, SSSR),
                                                          Copyright (c) 2016 University of Hamburg,
                                                          ZBH - Center for Bioinformatics

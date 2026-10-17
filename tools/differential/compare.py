@@ -32,14 +32,15 @@ def run(python, mode, path):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("mode", choices=["parse", "rings", "sanitize", "ranks", "molfromsmiles", "smiles", "smarts", "substruct", "pickle", "picklesmarts", "molblock", "sdf", "molwrite", "depict", "sdwrite", "morgan", "atompair", "subgraphs", "torsion", "rdkitfp", "rdkfingerprint", "patternfp", "layeredfp", "erg", "molhash", "cxsmiles", "cxmolblock", "moldescfp", "maccs", "crippen", "addhs", "addhs3d", "lipinski", "molprops", "molsurf", "gasteiger", "connectivity", "matrices", "transforms", "descriptors", "standardize"])
+    ap.add_argument("mode", choices=["parse", "rings", "sanitize", "ranks", "molfromsmiles", "smiles", "smarts", "substruct", "pickle", "picklesmarts", "molblock", "sdf", "molwrite", "depict", "sdwrite", "morgan", "atompair", "subgraphs", "torsion", "rdkitfp", "rdkfingerprint", "patternfp", "layeredfp", "erg", "molhash", "cxsmiles", "cxmolblock", "moldescfp", "maccs", "crippen", "addhs", "addhs3d", "lipinski", "molprops", "molsurf", "gasteiger", "connectivity", "matrices", "transforms", "descriptors", "standardize", "inchi", "inchikey"])
     ap.add_argument("files", nargs="*")
     ap.add_argument("--limit", type=int, default=20, help="number of differences to print")
     ap.add_argument("--ref-python", default=os.environ.get("RDOXIDE_REF_PYTHON", str(ROOT / ".venv-ref/bin/python")),
                     help="interpreter with the official RDKit of the ported version (env RDOXIDE_REF_PYTHON)")
     ap.add_argument("--test-python", default=str(ROOT / ".venv/bin/python"))
     args = ap.parse_args()
-    files = [Path(f) for f in (args.files or [ROOT / f for f in DEFAULT_CORPUS])]
+    default = [ROOT / "tests/data/inchi_corpus.jsonl"] if args.mode == "inchikey" else [ROOT / f for f in DEFAULT_CORPUS]
+    files = [Path(f) for f in (args.files or default)]
     total = ndiff = 0
     for f in files:
         ref = run(args.ref_python, args.mode, f)

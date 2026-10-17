@@ -201,6 +201,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 91 | Reaction enumeration (`chem_reactions::enumerate`: Cartesian, random, random-all-BBs and even-pairs strategies with libc++/boost-faithful `minstd_rand` sampling, `removeNonmatchingReagents`, `EnumerateLibrary`); Python `EnumerateLibrary[Base]`, `EnumerationParams`, `*Strategy` classes. Boost-archive serialization (`Serialize`, `GetState`, `SetState`) not ported: `EnumerateLibraryCanSerialize()` is False | 🟡 | `tests/reaction_enumeration.rs`; upstream `testEnumerations.py` 11/11 |
 | 92 | small API details: `GetNumAtoms(onlyHeavy)` hand-over to `onlyExplicit`, `ROMol.cpp` source/line in range errors, `RingInfo.AreRingFamiliesInitialized`, `_HasSubstructMatchStr`, text-mode check for writer streams | ✅ | `tests/python/test_small_api_fixes.py`; upstream `rough_test.py` +10 |
 | 93 | `ExplicitBitVect` atom properties (`RDValue::BitVect`, `Atom.SetExplicitBitVectProp`/`GetExplicitBitVectProp`) and `HasBitVectPropWithValueQueryAtom` (Tanimoto-distance tolerance); not picklable, as upstream | ✅ | `tests/python/test_bitvect_props.py`; upstream `rough_test.py` +3 |
+| 94 | InChI foundations (`external::inchi`, port of InChI 1.07.3, MIT; `external::inchi_api`, RDKit `External/INCHI-API`): license audit and port plan (docs/INCHI_PORT.md), InChIKey (`GetINCHIKeyFromINCHI`, `CheckINCHIKey`, base-26, own SHA-256), `InchiToInchiKey`, `GetInchiVersion`; Python `rdinchi` (full surface; `MolToInchi`, `MolBlockToInchi`, `InchiToMol`, `MolToInchiKey` raise `NotImplementedError`) and provisional `Chem.inchi` (`INCHI_AVAILABLE = False`) | 🟡 | `tests/inchi.rs`, `tests/python/test_inchi.py`, fixture `tests/data/inchi_corpus.jsonl`; differential `inchikey` 588/588; upstream `testMolStandardize.py` now imports (+40), ratchet +41 |
 | 48 | MolBundle substructure matching (`graphmol::mol_bundle::substruct_match_*` for bundle subjects and queries); Python `MolBundle.HasSubstructMatch/GetSubstructMatch(es)` and `Mol.*SubstructMatch*` with a bundle query (also with `SubstructMatchParameters`), `FixedMolSizeMolBundle`, `MolBundleCanSerialize` (False: no Boost serialization, so no pickles / `ToBinary`) | ✅ | upstream `rough_test.py` testMolBundles1-3, testSubstructParametersBundles(2) |
 | 47c | SynthonSpaceSearch shape search and shape building (`synthon_space_search::{shape, shape_build, shape_input}`): `SynthonShapeInput` with dummy volumes and Boost-text (de)serialisation of `ShapeInput` (byte-exact for upstream `.spc` files), sample-molecule trimming, stereoisomer + conformer generation (default ETKDGv3 or user generator), per-synthon shapes built on several threads with resume and interim files, fragment/synthon pre-computed overlays, shape hit building and verification (excluded volumes, conformer expansion); `StereoisomerEnumerator` now supports `tryEmbedding`; Python `ShapeSearch` (+ possible-hits lines), `BuildSynthonShapes`, `ConvertTextToDBFile` with fingerprints and shapes | ✅ | upstream `testSynthonSpaceSearch.py`: 17 pass, `testExcludedVolume` is Linux-only upstream (skipped); catch test "Shape Small test" ported |
 | 47b | SynthonSpaceSearch fingerprint search (synthon fingerprints built on demand, add/subtract fingerprints, approximate similarity) and RASCAL search; Python `FingerprintSearch`, `RascalSearch` (+ `Incremental` and possible-hits line variants), `BuildSynthonFingerprints` | ✅ | upstream `testSynthonSpaceSearch.py`: 13 of 16 pass (rest need shapes) |
@@ -224,6 +225,8 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | `rdoxide/Chem/__init__.py`, `rdoxide/Geometry/__init__.py` | provisional (until rdmolfiles/rdmolops/DataStructs exist) |
 | `rdoxide/Chem/MolStandardize/__init__.py` | verbatim upstream |
 | `rdoxide/Chem/MolStandardize/rdMolStandardize.py` | shim → `rdoxide._rdoxide` |
+| `rdoxide/Chem/rdinchi.py` | shim → `rdoxide._rdoxide` |
+| `rdoxide/Chem/inchi.py` | provisional (upstream `External/INCHI-API/python/inchi.py` once MolToInchi/MolFromInchi are ported; see docs/INCHI_PORT.md) |
 
 ## Iteration log
 
@@ -277,6 +280,9 @@ interpreter (NCI 2D with wedges/explicit Hs, embedded 3D, upstream FileParsers t
 `molfromsmiles` (atoms, bonds, stereo props `_CIPCode`/`_CIPRank`/`_ringStereoAtoms`/
 `_ChiralityPossible`) also matches on 35140 molecules from the stereo-rich upstream
 corpora (zinc, ChEMBL, idorsia enumeration, MMFF) and on `tests/data/stereo_edge_cases.smi`.
+`inchikey`: 588/588 (InChIs of `tests/data/inchi_corpus.jsonl`, default for the mode; also
+20558/20558 on the standard and `/FixedH /RecMet` InChIs of the default SMILES corpora). `inchi`
+(`MolToInchi`) is wired up but fails until the generation pipeline is ported.
 New Python test files are also run against the official wheel to validate expectations.
 
 ## Known deviations (to revisit)
@@ -285,8 +291,8 @@ New Python test files are also run against the official wheel to validate expect
 
 * MolStandardize: the multi-molecule `*InPlace(mols, numThreads)` overloads treat
   `numThreads <= 0` as "all (but |n|) cores"; upstream strides its loop by `numThreads` and
-  never ends for 0 (and repeats molecules for negative values). Upstream tests that need
-  `rdCIPLabeler` or InChI are not run.
+  never ends for 0 (and repeats molecules for negative values). The upstream InChI test of
+  `testMolStandardize.py` is skipped (`inchi.MolToInchi` is not ported yet).
 
 * Floating-point results follow the native RDKit build of the platform: on aarch64 rdoxide fuses
   multiply-adds exactly where clang does (`rdgeneral::fp::fmuladd`), on x86-64 it does not. The
@@ -469,4 +475,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-18 — Stage 92: small rough_test fixes. Next: bit-vector atom props, SetEnhancedStereoGroup checks, test_cdxml.py queries.
 * 2026-10-18 — Stage 93: bit-vector atom properties and query. Next: SetEnhancedStereoGroup checks, test_cdxml.py queries.
 * 2026-10-18 — Performance: HasSubstructMatch and SubstructLibrary screening use an existence-only search (`substruct_exists`: rarest atom first, element-count prefilter, cached atom/bond tests; idea from mkowiel/roaring-substructure); unit-weight Floyd–Warshall in 16-bit integers and the weighted one in place (single-thread topological distance matrix 2.2 s → 0.74 s for 1500 atoms, RDKit 1.8 s).
-* 2026-10-18 — Stages 94–96: pure-Python packages copied from upstream (Pharm2D/3D, FeatMaps, ML helpers, utils, Dbase, VLib); ratchet 1551/1711 → 1709/1860. Next: Subshape (needs `Numerics.Alignment`), Fraggle, MolKey, BRICS/Recap, Suppliers, SetEnhancedStereoGroup checks.
+* 2026-10-18 — Stages 94–96: pure-Python packages copied from upstream (Pharm2D/3D, FeatMaps, ML helpers, utils, Dbase, VLib); ratchet 1551/1711 → 1709/1860. Next: Subshape (needs `Numerics.Alignment`), Fraggle, MolKey, BRICS/Recap, Suppliers, SetEnhancedStereoGroup checks. InChI foundations (license audit: InChI 1.07.3 is MIT; plan in docs/INCHI_PORT.md), InChIKey byte-identical to RDKit, `rdinchi`/`Chem.inchi` surface. Ratchet +41. Next: InChI stage I1 (data model and utilities), then the MolToInchi pipeline (I2–I8).
