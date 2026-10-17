@@ -196,6 +196,34 @@ fn py_sanitize_mol(
     crate::enums::to_py(py, "SanitizeFlags", i64::from(failed))
 }
 
+/// Returns a list of the chemistry problems (as sanitization exceptions)
+/// found in a molecule, instead of stopping at the first one.
+///
+///   ARGUMENTS:
+///
+///     - mol: the molecule to check
+///     - sanitizeOps: (optional) sanitization operations to be carried out.
+///       These should be constructed by or'ing together the
+///       operations in rdkit.Chem.SanitizeFlags
+///
+///   RETURNS: a tuple of the problems found
+#[pyfunction]
+#[pyo3(name = "DetectChemistryProblems", signature = (mol, sanitizeOps = None))]
+#[allow(non_snake_case)]
+fn py_detect_chemistry_problems<'py>(
+    py: Python<'py>,
+    mol: PyRef<'py, PyMol>,
+    sanitizeOps: Option<u64>,
+) -> PyResult<Bound<'py, pyo3::types::PyTuple>> {
+    let ops = sanitizeOps.map_or(sf::SANITIZE_ALL, |v| v as u32);
+    let problems = mol_ops::detect_chemistry_problems(&mol.mol, ops);
+    let causes = problems
+        .iter()
+        .map(|p| Py::new(py, crate::rdchem::sanitize_cause(p)))
+        .collect::<PyResult<Vec<_>>>()?;
+    pyo3::types::PyTuple::new(py, causes)
+}
+
 /// Does aromaticity perception
 ///
 ///   ARGUMENTS:
@@ -295,6 +323,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_kekulize, m)?)?;
     m.add_function(wrap_pyfunction!(py_kekulize_if_possible, m)?)?;
     m.add_function(wrap_pyfunction!(py_sanitize_mol, m)?)?;
+    m.add_function(wrap_pyfunction!(py_detect_chemistry_problems, m)?)?;
     crate::rdmolops_subgraphs::add(m)?;
     crate::rdmolops_fingerprints::add(m)?;
     crate::rdmolops_matrices::add(m)?;

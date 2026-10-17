@@ -388,6 +388,31 @@ impl<'a> SmilesParser<'a> {
         }
     }
 
+    /// `meta_start: START_ATOM atomd EOS_TOKEN`
+    pub fn parse_atom(&mut self) -> PResult<Atom> {
+        let a = self.atomd()?;
+        if self.look != Tok::Eos {
+            return Err(self.syntax_error());
+        }
+        Ok(a)
+    }
+
+    /// `meta_start: START_BOND bondd EOS_TOKEN`
+    pub fn parse_bond(&mut self) -> PResult<Bond> {
+        // `bondd: BOND_TOKEN | MINUS_TOKEN`
+        let b = if self.look == Tok::Minus {
+            Bond::new(BondType::Single)
+        } else {
+            self.bond_from_token(&self.look)
+                .ok_or_else(|| self.syntax_error())?
+        };
+        self.bump();
+        if self.look != Tok::Eos {
+            return Err(self.syntax_error());
+        }
+        Ok(b)
+    }
+
     fn active_atom(mol: &RWMol) -> u32 {
         mol.get_atom_with_bookmark(CI_RIGHTMOST_ATOM)
             .unwrap_or_else(|_| mol.num_atoms().saturating_sub(1))

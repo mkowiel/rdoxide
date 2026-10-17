@@ -9,6 +9,7 @@ use pyo3::types::{PyDict, PyTuple};
 use rdoxide::graphmol::smiles_parse::smarts::{
     SmartsParserParams, atom_from_smarts, bond_from_smarts, mol_from_smarts,
 };
+use rdoxide::graphmol::smiles_parse::{atom_from_smiles, bond_from_smiles};
 
 use crate::atom::PyAtom;
 use crate::bond::PyBond;
@@ -154,6 +155,26 @@ fn py_mol_from_smarts(
     Ok(parse(py, &smarts, &params))
 }
 
+/// Construct an atom from a SMILES string
+#[pyfunction]
+#[pyo3(name = "AtomFromSmiles")]
+#[allow(non_snake_case)]
+fn py_atom_from_smiles(py: Python<'_>, SMILES: &str) -> PyResult<Option<Py<PyAtom>>> {
+    atom_from_smiles(SMILES)
+        .map(|a| PyAtom::owned(py, a))
+        .transpose()
+}
+
+/// Construct a bond from a SMILES string
+#[pyfunction]
+#[pyo3(name = "BondFromSmiles")]
+#[allow(non_snake_case)]
+fn py_bond_from_smiles(py: Python<'_>, SMILES: &str) -> PyResult<Option<Py<PyBond>>> {
+    bond_from_smiles(SMILES)
+        .map(|b| PyBond::owned(py, b))
+        .transpose()
+}
+
 /// Construct an atom from a SMARTS string
 #[pyfunction]
 #[pyo3(name = "AtomFromSmarts")]
@@ -177,6 +198,8 @@ fn py_bond_from_smarts(py: Python<'_>, SMILES: &str) -> PyResult<Option<Py<PyBon
 pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PySmartsParserParams>()?;
     m.add_function(wrap_pyfunction!(py_mol_from_smarts, m)?)?;
+    m.add_function(wrap_pyfunction!(py_atom_from_smiles, m)?)?;
+    m.add_function(wrap_pyfunction!(py_bond_from_smiles, m)?)?;
     m.add_function(wrap_pyfunction!(py_atom_from_smarts, m)?)?;
     m.add_function(wrap_pyfunction!(py_bond_from_smarts, m)?)?;
     Ok(())

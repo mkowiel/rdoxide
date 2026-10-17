@@ -582,6 +582,41 @@ fn kekulize_for_sanitize(mol: &mut RWMol) -> Result<()> {
     Ok(())
 }
 
+/// `MolOps::detectChemistryProblems`: the sanitization errors of the
+/// selected operations (valence problems of every atom, and a failed
+/// kekulization), instead of stopping at the first one.
+pub fn detect_chemistry_problems(imol: &ROMol, sanitize_ops: u32) -> Vec<crate::SanitizeError> {
+    let mut mol = imol.clone();
+    let mut res = Vec::new();
+    let mut record = |e: RDKitError| {
+        if let RDKitError::Sanitize(s) = e {
+            res.push(s);
+        }
+    };
+    mol.clear_computed_props(true);
+    if sanitize_ops & SANITIZE_CLEANUP != 0 {
+        // clean up things like nitro groups
+        if let Err(e) = clean_up(&mut mol) {
+            record(e);
+        }
+    }
+    if sanitize_ops & SANITIZE_PROPERTIES != 0 {
+        for idx in 0..mol.num_atoms() {
+            if let Err(e) = mol.update_atom_property_cache(idx, true) {
+                record(e);
+            }
+        }
+    } else if let Err(e) = mol.update_property_cache(false) {
+        record(e);
+    }
+    if sanitize_ops & SANITIZE_KEKULIZE != 0
+        && let Err(e) = kekulize_for_sanitize(&mut mol)
+    {
+        record(e);
+    }
+    res
+}
+
 /// `MolOps::sanitizeMol(mol, operationThatFailed, sanitizeOps)`. On error,
 /// returns the failing operation flag together with the error.
 pub fn sanitize_mol(mol: &mut RWMol, ops: u32) -> std::result::Result<(), (u32, RDKitError)> {
