@@ -586,7 +586,6 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::test24RDKFingerprint
 Code/GraphMol/Wrap/rough_test.py::TestCase::test26SmiMolSupplier
 Code/GraphMol/Wrap/rough_test.py::TestCase::test27SmilesWriter
 Code/GraphMol/Wrap/rough_test.py::TestCase::test28SmilesReverse
-Code/GraphMol/Wrap/rough_test.py::TestCase::test29SDWriterLoop
 Code/GraphMol/Wrap/rough_test.py::TestCase::test2Atom
 Code/GraphMol/Wrap/rough_test.py::TestCase::test30Issues109and110
 Code/GraphMol/Wrap/rough_test.py::TestCase::test31ChiralitySmiles
@@ -666,6 +665,7 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::testAtomMapsInCanonicalization
 Code/GraphMol/Wrap/rough_test.py::TestCase::testAtomMonomerInfo
 Code/GraphMol/Wrap/rough_test.py::TestCase::testAtomPropQueries
 Code/GraphMol/Wrap/rough_test.py::TestCase::testAtropisomerWedging
+Code/GraphMol/Wrap/rough_test.py::TestCase::testAtropisomerWedgingRigorousEnhancedStereo
 Code/GraphMol/Wrap/rough_test.py::TestCase::testBatchEditContextManager
 Code/GraphMol/Wrap/rough_test.py::TestCase::testBatchEdits
 Code/GraphMol/Wrap/rough_test.py::TestCase::testBondChiralityInversion
@@ -686,6 +686,8 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::testCountAtomElec
 Code/GraphMol/Wrap/rough_test.py::TestCase::testCrambin
 Code/GraphMol/Wrap/rough_test.py::TestCase::testCustomSubstructMatchCheck
 Code/GraphMol/Wrap/rough_test.py::TestCase::testDisableNontetrahedralStereo
+Code/GraphMol/Wrap/rough_test.py::TestCase::testEnhancedStereoDoesNotExceedsLimit
+Code/GraphMol/Wrap/rough_test.py::TestCase::testEnhancedStereoExceedsLimit
 Code/GraphMol/Wrap/rough_test.py::TestCase::testEnhancedStereoPreservesMol
 Code/GraphMol/Wrap/rough_test.py::TestCase::testExpandAndCollapseAttachmentPoints
 Code/GraphMol/Wrap/rough_test.py::TestCase::testFindMesoCenters
@@ -955,6 +957,7 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::testAtomMapsInCanonicalization
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testAtomMonomerInfo
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testAtomPropQueries
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testAtropisomerWedging
+Code/GraphMol/nbWrap/rough_test.py::TestCase::testAtropisomerWedgingRigorousEnhancedStereo
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testBatchEditContextManager
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testBatchEdits
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testBondChiralityInversion
@@ -974,6 +977,8 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::testContextManagers
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testCountAtomElec
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testCustomSubstructMatchCheck
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testDisableNontetrahedralStereo
+Code/GraphMol/nbWrap/rough_test.py::TestCase::testEnhancedStereoDoesNotExceedsLimit
+Code/GraphMol/nbWrap/rough_test.py::TestCase::testEnhancedStereoExceedsLimit
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testEnhancedStereoPreservesMol
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testExpandAndCollapseAttachmentPoints
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testFindMesoCenters

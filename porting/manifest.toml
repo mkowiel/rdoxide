@@ -1726,3 +1726,10 @@
 
 [module."rdoxide_python::rdmolops_core_match".sources]
 "Code/GraphMol/Wrap/MolOps.cpp" = "2dc7ae10c4ce7523938a4db10e31215cfe2162db"
+
+[module."rdoxide::graphmol::smiles_parse::canonicalize_stereo_groups".sources]
+"Code/GraphMol/SmilesParse/CanonicalizeStereoGroups.h" = "e5e8a898ec51eeaab731b642c50c147f939025a5"
+"Code/GraphMol/SmilesParse/CanonicalizeStereoGroups.cpp" = "670c24204a767bf11a14d0fd66d7092ee0d7539e"
+
+[module."rdoxide_python::rdmolops_canon_stereo_groups".sources]
+"Code/GraphMol/Wrap/MolOps.cpp" = "2dc7ae10c4ce7523938a4db10e31215cfe2162db"
