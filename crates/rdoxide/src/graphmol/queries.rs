@@ -63,6 +63,8 @@ pub enum PropValue {
     Float(f32),
     Double(f64),
     String(String),
+    /// matches when the Tanimoto distance to the property is within the tolerance
+    BitVect(crate::datastructs::ExplicitBitVect),
 }
 
 /// The query molecule of a recursive (`$(...)`) query; compared by identity.
@@ -345,6 +347,8 @@ impl<F: QueryTarget> Query<F> {
     }
 }
 
+use crate::datastructs::bit_ops::{Metric, similarity};
+
 fn prop_value_matches(v: &RDValue, target: &PropValue, tol: f64) -> bool {
     match target {
         PropValue::String(s) => match v {
@@ -362,6 +366,12 @@ fn prop_value_matches(v: &RDValue, target: &PropValue, tol: f64) -> bool {
             .as_double()
             .is_some_and(|x| query_cmp_f(x, *t as f64, tol) == 0),
         PropValue::Double(t) => v.as_double().is_some_and(|x| query_cmp_f(x, *t, tol) == 0),
+        PropValue::BitVect(t) => match v {
+            RDValue::BitVect(x) => {
+                similarity(Metric::Tanimoto, t, x).is_ok_and(|tanimoto| 1.0 - tanimoto <= tol)
+            }
+            _ => false,
+        },
     }
 }
 

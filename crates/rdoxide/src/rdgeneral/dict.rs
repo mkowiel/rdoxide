@@ -26,6 +26,8 @@ pub enum RDValue {
     VecDouble(Vec<f64>),
     VecFloat(Vec<f32>),
     VecString(Vec<String>),
+    /// an `ExplicitBitVect` property (`Atom::SetExplicitBitVectProp`)
+    BitVect(crate::datastructs::ExplicitBitVect),
 }
 
 /// Error returned when a value cannot be converted to the requested type
@@ -70,6 +72,8 @@ impl RDValue {
             RDValue::VecInt(v) => vect_to_string(v, |x| x.to_string()),
             RDValue::VecUnsignedInt(v) => vect_to_string(v, |x| x.to_string()),
             RDValue::VecString(v) => vect_to_string(v, |x| x.clone()),
+            // not convertible to a string upstream either
+            RDValue::BitVect(_) => String::new(),
         }
     }
 
@@ -131,6 +135,7 @@ impl_from!(Vec<u32>, VecUnsignedInt);
 impl_from!(Vec<f64>, VecDouble);
 impl_from!(Vec<f32>, VecFloat);
 impl_from!(Vec<String>, VecString);
+impl_from!(crate::datastructs::ExplicitBitVect, BitVect);
 
 impl From<&str> for RDValue {
     fn from(x: &str) -> Self {

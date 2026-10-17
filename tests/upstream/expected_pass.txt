@@ -699,6 +699,8 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::testAtropisomerWedging
 Code/GraphMol/Wrap/rough_test.py::TestCase::testAtropisomerWedgingRigorousEnhancedStereo
 Code/GraphMol/Wrap/rough_test.py::TestCase::testBatchEditContextManager
 Code/GraphMol/Wrap/rough_test.py::TestCase::testBatchEdits
+Code/GraphMol/Wrap/rough_test.py::TestCase::testBitVectProp
+Code/GraphMol/Wrap/rough_test.py::TestCase::testBitVectQuery
 Code/GraphMol/Wrap/rough_test.py::TestCase::testBondChiralityInversion
 Code/GraphMol/Wrap/rough_test.py::TestCase::testBondExpandQuery
 Code/GraphMol/Wrap/rough_test.py::TestCase::testBondPropQueries
@@ -1009,6 +1011,7 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::testAtropisomerWedging
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testAtropisomerWedgingRigorousEnhancedStereo
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testBatchEditContextManager
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testBatchEdits
+Code/GraphMol/nbWrap/rough_test.py::TestCase::testBitVectProp
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testBondChiralityInversion
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testBondExpandQuery
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testBondPropQueries

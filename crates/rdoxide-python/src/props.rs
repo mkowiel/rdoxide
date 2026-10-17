@@ -114,6 +114,9 @@ pub fn rdvalue_to_py(
     auto_convert_strings: bool,
 ) -> PyResult<Py<PyAny>> {
     Ok(match v {
+        RDValue::BitVect(bv) => {
+            Py::new(py, crate::datastructs::PyExplicitBitVect::wrap(bv.clone()))?.into_any()
+        }
         RDValue::Int(i) => i.into_pyobject(py)?.into_any().unbind(),
         RDValue::UnsignedInt(u) => u.into_pyobject(py)?.into_any().unbind(),
         RDValue::Int64(i) => i.into_pyobject(py)?.into_any().unbind(),

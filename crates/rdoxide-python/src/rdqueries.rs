@@ -42,6 +42,7 @@ enum Kind {
     Bool,
     Double,
     Str,
+    BitVect,
 }
 
 impl Kind {
@@ -51,6 +52,7 @@ impl Kind {
             Kind::Bool => "bool",
             Kind::Double => "double",
             Kind::Str => STRING_TYPE,
+            Kind::BitVect => "ExplicitBitVect",
         }
     }
 }
@@ -62,6 +64,7 @@ enum Value {
     Bool(bool),
     Double(f64),
     Str(String),
+    BitVect(rdoxide::datastructs::ExplicitBitVect),
 }
 
 /// One parameter of a factory: its name, converter and default (if any).
@@ -95,6 +98,7 @@ impl Param {
             Some(Value::Int(i)) => format!("={i}"),
             Some(Value::Double(d)) => format!("={d:?}"),
             Some(Value::Str(s)) => format!("={s}"),
+            Some(Value::BitVect(_)) => String::new(),
         };
         format!("{} {}{default}", self.kind.cpp(), self.name)
     }
@@ -116,6 +120,10 @@ impl Param {
                 Some(Value::Double(obj.extract()?))
             }
             Kind::Str if obj.is_instance_of::<PyString>() => Some(Value::Str(obj.extract()?)),
+            Kind::BitVect => obj
+                .extract::<PyRef<'_, crate::datastructs::PyExplicitBitVect>>()
+                .ok()
+                .map(|bv| Value::BitVect(bv.bv.clone())),
             _ => None,
         })
     }
@@ -138,6 +146,12 @@ impl Parsed {
         match self.0[i] {
             Value::Double(v) => v,
             _ => unreachable!("parameter {i} is not a double"),
+        }
+    }
+    fn bit_vect(&self, i: usize) -> rdoxide::datastructs::ExplicitBitVect {
+        match &self.0[i] {
+            Value::BitVect(v) => v.clone(),
+            _ => unreachable!("parameter {i} is not a bit vector"),
         }
     }
     fn str(&self, i: usize) -> String {
@@ -496,6 +510,24 @@ fn def_property_queries(m: &Bound<'_, PyModule>) -> PyResult<()> {
             |a| (PropValue::Double(a.double(1)), a.double(3)),
         ),
     ];
+    def_factory(
+        m,
+        "HasBitVectPropWithValueQueryAtom".into(),
+        "Returns a QueryAtom that matches when the property 'propname' has the specified explicit bit vector value.  The Tolerance is the allowed Tanimoto difference".into(),
+        vec![
+            Param::required("propname", Kind::Str),
+            Param::required("val", Kind::BitVect),
+            negate_param(),
+            Param::optional("tolerance", Kind::Double, self::Value::Double(0.0)),
+        ],
+        |py, a| {
+            atom_object(
+                py,
+                make_prop_query::<AtomFn>(&a.str(0), PropValue::BitVect(a.bit_vect(1)), a.double(3)),
+                a.bool(2),
+            )
+        },
+    )?;
     for (name, doc, kind, tolerance, value) in kinds {
         for target in ["Atom", "Bond"] {
             let mut params = vec![
