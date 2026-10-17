@@ -245,6 +245,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     crate::rdmolfiles_molblock::init(m)?;
     crate::rdmolfiles_scsr::init(m)?;
     crate::rdmolfiles_xyz::init(m)?;
+    crate::rdmolfiles_cml::init(m)?;
     crate::rdmolfiles_mol2::init(m)?;
     crate::rdmolfiles_tpl::init(m)?;
     crate::rdmolfiles_marvin::init(m)?;
