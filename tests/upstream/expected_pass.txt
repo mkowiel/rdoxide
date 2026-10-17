@@ -782,6 +782,7 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::testReplaceAtomWithQueryAtom
 Code/GraphMol/Wrap/rough_test.py::TestCase::testReplaceBond
 Code/GraphMol/Wrap/rough_test.py::TestCase::testResMolSupplier
 Code/GraphMol/Wrap/rough_test.py::TestCase::testSDProps
+Code/GraphMol/Wrap/rough_test.py::TestCase::testSVGParsing
 Code/GraphMol/Wrap/rough_test.py::TestCase::testSanitizationExceptionBasics
 Code/GraphMol/Wrap/rough_test.py::TestCase::testSanitizationExceptionHierarchy
 Code/GraphMol/Wrap/rough_test.py::TestCase::testSequenceBasics
@@ -933,7 +934,6 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::test55PatternFingerprint
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test56LazySDMolSupplier
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test58Issue2983794
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test59Issue3007178
-Code/GraphMol/nbWrap/rough_test.py::TestCase::test60SmilesWriterClose
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test61PathToSubmol
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test62SmilesAndSmartsReplacements
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test63Issue3313539
@@ -1080,6 +1080,7 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::testRemoveHsParams
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testReplaceBond
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testResMolSupplier
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testSDProps
+Code/GraphMol/nbWrap/rough_test.py::TestCase::testSVGParsing
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testSanitizationExceptionBasics
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testSanitizationExceptionHierarchy
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testSequenceBasics
