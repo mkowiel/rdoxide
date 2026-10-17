@@ -39,6 +39,7 @@ use sanitize_flags::*;
 
 pub mod add_hs;
 pub mod frags;
+pub mod haptic;
 pub mod query_hs;
 pub mod structure;
 use crate::rdgeneral::RDProps;

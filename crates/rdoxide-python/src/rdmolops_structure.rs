@@ -8,6 +8,7 @@ use pyo3::types::PyTuple;
 use rdoxide::geometry::Point3D;
 use rdoxide::graphmol::chem_transforms::combine_mols;
 use rdoxide::graphmol::matrices::get_shortest_path;
+use rdoxide::graphmol::mol_ops::haptic::{dative_bonds_to_haptic, haptic_bonds_to_dative};
 use rdoxide::graphmol::mol_ops::{
     get_formal_charge, get_mol_frags_as_mols, get_mol_frags_atoms, get_mol_frags_mapping,
     remove_stereochemistry, renumber_atoms,
@@ -122,6 +123,47 @@ fn py_combine_mols(
     Ok(PyMol { mol: res })
 }
 
+/// One way of showing haptic bonds (such as cyclopentadiene to
+/// iron in ferrocene) is to use a dummy atom with a dative bond to the
+/// iron atom with the bond labelled with the atoms involved in the
+/// organic end of the bond.  Another way is to have explicit dative
+/// bonds from the atoms of the haptic group to the metal atom.  This
+/// function converts the former representation to the latter.
+///
+/// ARGUMENTS:
+///
+///   - mol: the molecule to use
+///
+/// RETURNS:
+///   a modified copy of the molecule
+#[pyfunction]
+#[pyo3(name = "HapticBondsToDative", signature = (mol))]
+fn py_haptic_bonds_to_dative(py: Python<'_>, mol: PyRef<'_, PyMol>) -> PyResult<PyMol> {
+    let mut res = mol.mol.clone();
+    py.detach(|| haptic_bonds_to_dative(&mut res)).py()?;
+    Ok(PyMol { mol: res })
+}
+
+/// Does the reverse of hapticBondsToDative.  If there are multiple
+/// contiguous atoms attached by dative bonds to an atom (probably a metal
+/// atom), the dative bonds will be replaced by a dummy atom in their
+/// centre attached to the (metal) atom by a dative bond, which is
+/// labelled with ENDPTS of the atoms that had the original dative bonds.
+///
+/// ARGUMENTS:
+///
+///   - mol: the molecule to use
+///
+/// RETURNS:
+///   a modified copy of the molecule
+#[pyfunction]
+#[pyo3(name = "DativeBondsToHaptic", signature = (mol))]
+fn py_dative_bonds_to_haptic(py: Python<'_>, mol: PyRef<'_, PyMol>) -> PyResult<PyMol> {
+    let mut res = mol.mol.clone();
+    py.detach(|| dative_bonds_to_haptic(&mut res)).py()?;
+    Ok(PyMol { mol: res })
+}
+
 /// Returns a copy of a molecule with renumbered atoms
 ///
 ///   ARGUMENTS:
@@ -219,6 +261,8 @@ pub fn add(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_get_mol_frags, m)?)?;
     m.add_function(wrap_pyfunction!(py_combine_mols, m)?)?;
     m.add_function(wrap_pyfunction!(py_renumber_atoms, m)?)?;
+    m.add_function(wrap_pyfunction!(py_haptic_bonds_to_dative, m)?)?;
+    m.add_function(wrap_pyfunction!(py_dative_bonds_to_haptic, m)?)?;
     m.add_function(wrap_pyfunction!(py_get_formal_charge, m)?)?;
     m.add_function(wrap_pyfunction!(py_get_shortest_path, m)?)?;
     m.add_function(wrap_pyfunction!(py_remove_stereochemistry, m)?)?;

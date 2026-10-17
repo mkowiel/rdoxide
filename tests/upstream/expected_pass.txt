@@ -653,6 +653,7 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::test92RankAtomsInFragment
 Code/GraphMol/Wrap/rough_test.py::TestCase::test93RWMolsAsROMol
 Code/GraphMol/Wrap/rough_test.py::TestCase::test9Smarts
 Code/GraphMol/Wrap/rough_test.py::TestCase::testAddStereoAnnotations
+Code/GraphMol/Wrap/rough_test.py::TestCase::testAddWavyBondsForStereoAny
 Code/GraphMol/Wrap/rough_test.py::TestCase::testAdjustQueryProperties
 Code/GraphMol/Wrap/rough_test.py::TestCase::testAdjustQueryPropertiesFiveRings
 Code/GraphMol/Wrap/rough_test.py::TestCase::testAdjustQueryPropertiesgithubIssue1474
@@ -741,6 +742,7 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::testMolFragmentSmarts
 Code/GraphMol/Wrap/rough_test.py::TestCase::testMolHasQuery
 Code/GraphMol/Wrap/rough_test.py::TestCase::testMolToV2KMolBlock
 Code/GraphMol/Wrap/rough_test.py::TestCase::testMolzip
+Code/GraphMol/Wrap/rough_test.py::TestCase::testMostSubstitutedCoreMatch
 Code/GraphMol/Wrap/rough_test.py::TestCase::testMrvHandling
 Code/GraphMol/Wrap/rough_test.py::TestCase::testNeedsHs
 Code/GraphMol/Wrap/rough_test.py::TestCase::testNewFindMolChiralCenters
@@ -792,6 +794,8 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::testValidationSmiles
 Code/GraphMol/Wrap/rough_test.py::TestCase::testVerifyWedges
 Code/GraphMol/Wrap/rough_test.py::TestCase::testWriteCXSmiles
 Code/GraphMol/Wrap/rough_test.py::TestCase::testXYZ
+Code/GraphMol/Wrap/rough_test.py::TestCase::test_DativeBondsToHaptic
+Code/GraphMol/Wrap/rough_test.py::TestCase::test_HapticBondsToDative
 Code/GraphMol/Wrap/rough_test.py::TestCase::test_get_set_positions
 Code/GraphMol/Wrap/rough_test.py::TestCase::test_get_set_positions_stride
 Code/GraphMol/Wrap/rough_test.py::TestCase::test_github1631
@@ -878,6 +882,7 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::test34Issue124
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test35ChiralityPerception
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test37SanitException
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test38Issue266
+Code/GraphMol/nbWrap/rough_test.py::TestCase::test38TDTSuppliers
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test39Issue273
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test3Bond
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test3dChiralCxsmiles
@@ -889,6 +894,7 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::test42LifeTheUniverseAndEverything
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test46ReplaceCore
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test47RWMols
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test47SmartsPieces
+Code/GraphMol/nbWrap/rough_test.py::TestCase::test48Issue1928819
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test49Issue1932365
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test4Mol
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test50Issue1968608
@@ -911,6 +917,7 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::test67StreamSupplierStringIO
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test68ForwardSupplierUsingFilename
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test70StreamSDWriter
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test71StreamSmilesWriter
+Code/GraphMol/nbWrap/rough_test.py::TestCase::test72StreamTDTWriter
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test73SanitizationOptions
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test74Issue3510149
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test75AllBondsExplicit
@@ -935,6 +942,7 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::test92RankAtomsInFragment
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test93RWMolsAsROMol
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test9Smarts
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testAddStereoAnnotations
+Code/GraphMol/nbWrap/rough_test.py::TestCase::testAddWavyBondsForStereoAny
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testAdjustQueryProperties
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testAdjustQueryPropertiesFiveRings
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testAdjustQueryPropertiesgithubIssue1474
@@ -962,10 +970,12 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::testCXSMILESErrors
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testCXSmilesOptions
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testClearPropertyCache
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testConjGrpPerception
+Code/GraphMol/nbWrap/rough_test.py::TestCase::testContextManagers
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testCountAtomElec
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testCustomSubstructMatchCheck
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testDisableNontetrahedralStereo
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testEnhancedStereoPreservesMol
+Code/GraphMol/nbWrap/rough_test.py::TestCase::testExpandAndCollapseAttachmentPoints
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testFindMesoCenters
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testFindPotentialStereo
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testFindPotentialStereoBonds
@@ -1019,6 +1029,7 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::testMolFragmentSmarts
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testMolHasQuery
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testMolToV2KMolBlock
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testMolzip
+Code/GraphMol/nbWrap/rough_test.py::TestCase::testMostSubstitutedCoreMatch
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testMrvHandling
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testNeedsHs
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testNewFindMolChiralCenters
@@ -1050,6 +1061,7 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::testSmilesWriteParamsForSMARTS
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testSubstructMatchAtomProperties
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testSubstructMatchBondProperties
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testSubstructMatchDMAP
+Code/GraphMol/nbWrap/rough_test.py::TestCase::testSuppliersReadingDirectories
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testTranslateChiralFlag
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testUnfoldedRDKFingerprint
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testValidationMol
@@ -1062,6 +1074,8 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::testValidationSmiles
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testVerifyWedges
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testWriteCXSmiles
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testXYZ
+Code/GraphMol/nbWrap/rough_test.py::TestCase::test_DativeBondsToHaptic
+Code/GraphMol/nbWrap/rough_test.py::TestCase::test_HapticBondsToDative
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test_get_set_positions
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test_get_set_positions_stride
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test_github1631
