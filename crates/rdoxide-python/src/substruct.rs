@@ -8,10 +8,12 @@ use std::sync::{Arc, Mutex};
 use pyo3::exceptions::{PyRuntimeError, PyTypeError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple};
+use rdoxide::graphmol::romol::ROMol;
 use rdoxide::graphmol::substruct::{
     AtomCoordsMatcher, FinalMatchCheck, MatchCheck, MatchVect, SubstructMatchParameters,
     substruct_match,
 };
+use rdoxide::graphmol::substruct_exists::substruct_has_match;
 
 use crate::atom::{AtomHandle, PyAtom};
 use crate::bond::{BondHandle, PyBond};
@@ -475,6 +477,26 @@ fn run(
     query: &Bound<'_, PyMol>,
     params: Params<'_>,
 ) -> PyResult<Vec<MatchVect>> {
+    run_with(py, mol, query, params, substruct_match)
+}
+
+/// Whether `query` matches `mol` (the existence-only search).
+fn run_has(
+    py: Python<'_>,
+    mol: &Bound<'_, PyMol>,
+    query: &Bound<'_, PyMol>,
+    params: Params<'_>,
+) -> PyResult<bool> {
+    run_with(py, mol, query, params, substruct_has_match)
+}
+
+fn run_with<T: Send>(
+    py: Python<'_>,
+    mol: &Bound<'_, PyMol>,
+    query: &Bound<'_, PyMol>,
+    params: Params<'_>,
+    search: impl Fn(&ROMol, &ROMol, &SubstructMatchParameters) -> rdoxide::Result<T> + Send + Sync,
+) -> PyResult<T> {
     let errors = ErrorSlot::default();
     let ps = match params {
         Params::User(p) => p.borrow().to_core(py, mol, query, &errors),
@@ -483,12 +505,29 @@ fn run(
     let result = {
         let (mol, query) = (mol.borrow(), query.borrow());
         let (m, q) = (&mol.mol, &query.mol);
-        py.detach(|| substruct_match(m, q, &ps))
+        py.detach(|| search(m, q, &ps))
     };
     if let Some(e) = errors.lock().unwrap_or_else(|p| p.into_inner()).take() {
         return Err(e);
     }
     result.py()
+}
+
+fn run_any_has(
+    py: Python<'_>,
+    subject: &Molecules<'_>,
+    query: &Molecules<'_>,
+    params: Params<'_>,
+) -> PyResult<bool> {
+    let queries = query.mols(py)?;
+    for mol in subject.mols(py)? {
+        for q in &queries {
+            if run_has(py, &mol, q, params.clone())? {
+                return Ok(true);
+            }
+        }
+    }
+    Ok(false)
 }
 
 fn match_tuple<'py>(py: Python<'py>, m: &MatchVect) -> PyResult<Bound<'py, PyTuple>> {
@@ -517,7 +556,7 @@ pub(crate) fn has_substruct_match_impl<'py>(
             ..SubstructMatchParameters::default()
         }),
     };
-    Ok(!run_any(py, subject, &query, ps)?.is_empty())
+    run_any_has(py, subject, &query, ps)
 }
 
 pub(crate) fn get_substruct_match_impl<'py>(

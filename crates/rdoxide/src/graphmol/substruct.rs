@@ -563,9 +563,9 @@ fn property_compat(p1: &impl RDProps, p2: &impl RDProps, properties: &[String]) 
     true
 }
 
-struct Ctx<'a> {
-    query: &'a ROMol,
-    mol: &'a ROMol,
+pub(super) struct Ctx<'a> {
+    pub(super) query: &'a ROMol,
+    pub(super) mol: &'a ROMol,
     ps: &'a SubstructMatchParameters,
     rec: &'a RecursionSets,
 }
@@ -574,7 +574,21 @@ fn has_chiral_label(t: ChiralType) -> bool {
     matches!(t, ChiralType::TetrahedralCW | ChiralType::TetrahedralCCW)
 }
 
-impl Ctx<'_> {
+impl<'a> Ctx<'a> {
+    pub(super) fn new(
+        query: &'a ROMol,
+        mol: &'a ROMol,
+        ps: &'a SubstructMatchParameters,
+        rec: &'a RecursionSets,
+    ) -> Self {
+        Ctx {
+            query,
+            mol,
+            ps,
+            rec,
+        }
+    }
+
     /// `atomCompat`
     fn atom_compat(&self, qi: u32, mi: u32) -> Result<bool> {
         let (qa, ma) = (self.query.atom(qi), self.mol.atom(mi));
@@ -604,7 +618,7 @@ impl Ctx<'_> {
     }
 
     /// `AtomLabelFunctor`
-    fn atom_label(&self, qi: u32, mi: u32) -> Result<bool> {
+    pub(super) fn atom_label(&self, qi: u32, mi: u32) -> Result<bool> {
         if self.ps.use_chirality
             && has_chiral_label(self.query.atom(qi).chiral_tag())
             && !self.ps.specified_stereo_query_matches_unspecified
@@ -685,7 +699,7 @@ impl Ctx<'_> {
     }
 
     /// `BondLabelFunctor`
-    fn bond_label(&self, qb: u32, mb: u32) -> Result<bool> {
+    pub(super) fn bond_label(&self, qb: u32, mb: u32) -> Result<bool> {
         if self.ps.use_chirality {
             let q = self.query.bond(qb);
             if q.bond_type() == BondType::Double && q.stereo() > BondStereo::StereoAny {
@@ -1139,7 +1153,7 @@ fn run_vf2(
     )
 }
 
-fn prepare_recursion(
+pub(super) fn prepare_recursion(
     mol: &ROMol,
     query: &ROMol,
     ps: &SubstructMatchParameters,

@@ -72,6 +72,7 @@ pub mod subgraphs;
 pub mod subset;
 pub mod substance_group;
 pub mod substruct;
+pub mod substruct_exists;
 pub mod substruct_library;
 pub mod synthon_space_search;
 pub mod tautomer_query;
