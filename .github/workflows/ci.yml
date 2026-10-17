@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
 
+# a new push to a pull request supersedes the runs still going for it
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
   CARGO_TERM_COLOR: always
 
@@ -30,8 +35,37 @@ jobs:
       - name: Dependency licenses
         run: python3 tools/check_licenses.py
 
+  # One wheel for everything: the extension uses the stable ABI (abi3-py310),
+  # so the same file installs on every supported Python.
+  wheel:
+    name: Build wheel
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          # also keep the artifacts of the workspace crates, so that the
+          # incremental build only recompiles what changed
+          cache-workspace-crates: true
+      - name: Build wheel (quick CI profile)
+        uses: PyO3/maturin-action@v1
+        env:
+          CARGO_INCREMENTAL: "1"
+        with:
+          args: --profile ci --out dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel
+          path: dist/*.whl
+          if-no-files-found: error
+
   python:
     name: Python ${{ matrix.python }} (${{ matrix.os }})
+    needs: wheel
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -46,12 +80,10 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
           allow-prereleases: true
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - name: Build wheel
-        uses: PyO3/maturin-action@v1
+      - uses: actions/download-artifact@v4
         with:
-          args: --release --out dist
+          name: wheel
+          path: dist
       - name: Install and test
         shell: bash
         run: |
@@ -61,6 +93,34 @@ jobs:
 
   upstream-ratchet:
     name: Upstream RDKit test-suite (ratchet)
+    needs: wheel
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python tools/sync_upstream.py fetch
+      - name: Check data tables are up to date with upstream
+        run: |
+          python tools/sync_upstream.py regen
+          git diff --exit-code
+      - run: python tools/sync_upstream.py diff
+      - uses: actions/download-artifact@v4
+        with:
+          name: wheel
+          path: dist
+      - name: Install
+        run: |
+          python -m pip install pytest numpy
+          python -m pip install --no-index --find-links dist rdoxide
+      - run: python tools/run_upstream_tests.py -v
+
+  # On main only: the fat-LTO release build that gets shipped, to catch
+  # problems that only show up with it.
+  release-wheel:
+    name: Release wheel (fat LTO)
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -69,15 +129,12 @@ jobs:
           python-version: "3.13"
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - run: python tools/sync_upstream.py fetch
-      - name: Check data tables are up to date with upstream
+      - name: Build wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          args: --release --out dist
+      - name: Install and test
         run: |
-          python tools/sync_upstream.py regen
-          git diff --exit-code
-      - run: python tools/sync_upstream.py diff
-      - name: Build and install
-        run: |
-          python -m pip install maturin pytest numpy
-          maturin build --release --out dist
+          python -m pip install pytest numpy
           python -m pip install --no-index --find-links dist rdoxide
-      - run: python tools/run_upstream_tests.py -v
+          python -m pytest tests/python
