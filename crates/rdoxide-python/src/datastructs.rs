@@ -389,7 +389,7 @@ fn bulk(
 }
 
 /// Comparisons below which similarity loops stay on the calling thread.
-const PAR_MIN_COMPARISONS: usize = 20_000;
+const PAR_MIN_COMPARISONS: usize = 2_000_000;
 
 /// `NeighborWrapper`
 fn neighbors<P: pyo3::PyClass, T: Send + Sync>(

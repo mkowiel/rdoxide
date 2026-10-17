@@ -17,6 +17,7 @@ use crate::Result;
 use crate::graphmol::find_rings::{SymmetrizeSSSRAlgorithm, get_mol_frags, symmetrize_sssr};
 use crate::graphmol::romol::ROMol;
 use crate::graphmol::smiles_parse::smarts::{SmartsParserParams, mol_from_smarts};
+use crate::rdgeneral::threads::par_map;
 
 /// `TEMPLATE_SMARTS`
 const DEFAULT_TEMPLATES: &str = include_str!("template_smarts.txt");
@@ -69,13 +70,17 @@ impl CoordinateTemplates {
     /// Replaces the templates with the default ones.
     pub fn load_default_templates(&mut self) {
         self.templates.clear();
-        for smarts in DEFAULT_TEMPLATES.lines() {
-            if let Some(mol) = parse_template(smarts) {
-                self.templates
-                    .entry(mol.num_atoms())
-                    .or_default()
-                    .push(Arc::new(mol));
-            }
+        // the templates are independent, so they parse on all cores; the
+        // order within a size (which decides the template used) is kept
+        let lines: Vec<&str> = DEFAULT_TEMPLATES.lines().collect();
+        for mol in par_map(&lines, 0, |smarts| parse_template(smarts))
+            .into_iter()
+            .flatten()
+        {
+            self.templates
+                .entry(mol.num_atoms())
+                .or_default()
+                .push(Arc::new(mol));
         }
     }
 
@@ -123,8 +128,9 @@ impl CoordinateTemplates {
             lines.pop(); // a final newline does not start another line
         }
         let mut templates = TemplatesBySize::new();
-        for line in lines {
-            let mol = parse_template(line).ok_or_else(|| {
+        let parsed = par_map(&lines, 0, |line| parse_template(line));
+        for (line, mol) in lines.into_iter().zip(parsed) {
+            let mol = mol.ok_or_else(|| {
                 depict_error(format!(
                     "Could not load templates from {template_path}: Invalid smarts"
                 ))

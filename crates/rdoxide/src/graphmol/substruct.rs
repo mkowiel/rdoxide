@@ -14,6 +14,7 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fmt;
+use std::hash::{BuildHasherDefault, Hasher};
 use std::sync::Arc;
 
 use crate::graphmol::atom::{Atom, ChiralType};
@@ -710,13 +711,89 @@ fn ez_to_cis_trans(s: BondStereo) -> BondStereo {
     }
 }
 
+/// A fast multiplicative hasher (the Fx hash) for the small integer keys of
+/// [`MatchesSeen`]; the keys are not attacker controlled, so SipHash's
+/// protection is not worth its cost here.
+#[derive(Default)]
+struct FxHasher(u64);
+
+impl Hasher for FxHasher {
+    fn write(&mut self, bytes: &[u8]) {
+        for chunk in bytes.chunks(8) {
+            let mut word = [0u8; 8];
+            word[..chunk.len()].copy_from_slice(chunk);
+            self.write_u64(u64::from_le_bytes(word));
+        }
+    }
+    fn write_u64(&mut self, v: u64) {
+        self.0 = (self.0.rotate_left(5) ^ v).wrapping_mul(0x51_7c_c1_b7_27_22_0a_95);
+    }
+    fn write_usize(&mut self, v: usize) {
+        self.write_u64(v as u64);
+    }
+    fn finish(&self) -> u64 {
+        self.0
+    }
+}
+
+type FxBuild = BuildHasherDefault<FxHasher>;
+
+/// The molecule atom sets of the matches kept so far (`matchesSeen`): a match
+/// is a duplicate when it covers the same atoms as an earlier one. The atom
+/// set is a bit set, held in one word for molecules of up to 64 atoms.
+pub(crate) struct MatchesSeen {
+    num_atoms: usize,
+    small: HashSet<u64, FxBuild>,
+    large: HashSet<Vec<u64>, FxBuild>,
+}
+
+impl MatchesSeen {
+    pub(crate) fn new(num_atoms: usize) -> Self {
+        MatchesSeen {
+            num_atoms,
+            small: HashSet::default(),
+            large: HashSet::default(),
+        }
+    }
+
+    fn words(&self, atoms: impl Iterator<Item = u32>) -> Vec<u64> {
+        let mut key = vec![0u64; self.num_atoms.div_ceil(64)];
+        for a in atoms {
+            key[a as usize / 64] |= 1 << (a % 64);
+        }
+        key
+    }
+
+    fn small_key(atoms: impl Iterator<Item = u32>) -> u64 {
+        atoms.fold(0u64, |key, a| key | 1 << a)
+    }
+
+    pub(crate) fn contains(&self, atoms: &[u32]) -> bool {
+        if self.num_atoms <= 64 {
+            self.small.contains(&Self::small_key(atoms.iter().copied()))
+        } else {
+            self.large.contains(&self.words(atoms.iter().copied()))
+        }
+    }
+
+    /// Records the atom set; `false` if it was there already.
+    pub(crate) fn insert(&mut self, atoms: &[u32]) -> bool {
+        if self.num_atoms <= 64 {
+            self.small.insert(Self::small_key(atoms.iter().copied()))
+        } else {
+            let key = self.words(atoms.iter().copied());
+            self.large.insert(key)
+        }
+    }
+}
+
 /// `MolMatchFinalCheckFunctor`
 pub(crate) struct FinalCheck<'a> {
     query: &'a ROMol,
     mol: &'a ROMol,
     ps: &'a SubstructMatchParameters,
     mol_stereo_groups: BTreeMap<u32, usize>,
-    matches_seen: HashSet<Vec<bool>>,
+    matches_seen: MatchesSeen,
 }
 
 impl<'a> FinalCheck<'a> {
@@ -737,7 +814,7 @@ impl<'a> FinalCheck<'a> {
             mol,
             ps,
             mol_stereo_groups,
-            matches_seen: HashSet::new(),
+            matches_seen: MatchesSeen::new(mol.num_atoms() as usize),
         }
     }
 
@@ -751,19 +828,12 @@ impl<'a> FinalCheck<'a> {
                 return Ok(false);
             }
         }
-        let mut seen_key = Vec::new();
-        if self.ps.uniquify {
-            seen_key = vec![false; self.mol.num_atoms() as usize];
-            for &m in &m_c[..nq] {
-                seen_key[m as usize] = true;
-            }
-            if self.matches_seen.contains(&seen_key) {
-                return Ok(false);
-            }
+        if self.ps.uniquify && self.matches_seen.contains(&m_c[..nq]) {
+            return Ok(false);
         }
         if !self.ps.use_chirality {
             if self.ps.uniquify {
-                self.matches_seen.insert(seen_key);
+                self.matches_seen.insert(&m_c[..nq]);
             }
             return Ok(true);
         }
@@ -882,7 +952,7 @@ impl<'a> FinalCheck<'a> {
             }
         }
         if self.ps.uniquify {
-            self.matches_seen.insert(seen_key);
+            self.matches_seen.insert(&m_c[..nq]);
         }
         Ok(true)
     }
@@ -1160,13 +1230,12 @@ pub fn substruct_match_count(
 
 /// `removeDuplicates(matches, nAtoms)`
 pub fn remove_duplicates(matches: &mut Vec<MatchVect>, n_atoms: u32) {
-    let mut seen: HashSet<Vec<bool>> = HashSet::new();
+    let mut seen = MatchesSeen::new(n_atoms as usize);
+    let mut atoms = Vec::new();
     matches.retain(|m| {
-        let mut v = vec![false; n_atoms as usize];
-        for &(_, a) in m {
-            v[a as usize] = true;
-        }
-        seen.insert(v)
+        atoms.clear();
+        atoms.extend(m.iter().map(|&(_, a)| a as u32));
+        seen.insert(&atoms)
     });
 }
 
