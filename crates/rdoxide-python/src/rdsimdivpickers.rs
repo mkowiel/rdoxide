@@ -15,6 +15,7 @@ use rdoxide::sim_div_pickers::{hierarchical, leader, max_min};
 use crate::datastructs::PyExplicitBitVect;
 use crate::enums::add_enum_exported;
 use crate::errors::IntoPyResult;
+use crate::pyconv::float64_flat;
 use crate::vects::{PyVectI, PyVectVectI};
 
 /// A Python function `f(i, j) -> float` as a pool distance. The first
@@ -140,15 +141,13 @@ impl PyMaxMinPicker {
                 "distance mat argument must be a numpy matrix",
             ));
         }
-        let flat = np
-            .call_method1("ascontiguousarray", (distMat, "float64"))?
-            .call_method0("ravel")?;
+        let flat = np.call_method1("ascontiguousarray", (distMat, "float64"))?;
         if distMat.getattr("ndim")?.extract::<usize>()? != 1 {
             return Err(PyValueError::new_err(
                 "distance mat argument must be one-dimensional",
             ));
         }
-        let mat: Vec<f64> = flat.call_method0("tolist")?.extract()?;
+        let mat = float64_flat(&flat)?;
         let first = firstPicks.as_ref().map_or(Ok(Vec::new()), first_picks)?;
         let picks = py
             .detach(|| max_min::pick(&mat, poolSize, pickSize, &first, seed))
@@ -410,9 +409,7 @@ fn copied_distance_matrix(py: Python<'_>, dist_mat: &Bound<'_, PyAny>) -> PyResu
             "distance mat argument must be one-dimensional",
         ));
     }
-    np.call_method1("array", (dist_mat, "float64"))?
-        .call_method0("tolist")?
-        .extract()
+    float64_flat(&np.call_method1("ascontiguousarray", (dist_mat, "float64"))?)
 }
 
 /// A class for diversity picking of items using Hierarchical Clustering

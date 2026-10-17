@@ -3,7 +3,7 @@
 
 use pyo3::exceptions::{PyAttributeError, PyOverflowError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::PyInt;
+use pyo3::types::{PyBytes, PyInt};
 
 /// Boost's `unsigned int` converter: an int, or the errors Boost raises for
 /// negative numbers and for objects that are not integers.
@@ -63,6 +63,17 @@ pub fn float64_array<'py>(py: Python<'py>, values: &[f64]) -> PyResult<Bound<'py
     np.call_method1("frombuffer", (buffer, np.getattr("float64")?))
 }
 
+/// The elements of a C-contiguous `float64` array, flattened, read from its
+/// raw bytes (`tolist()` would build a Python float per element).
+pub fn float64_flat(array: &Bound<'_, PyAny>) -> PyResult<Vec<f64>> {
+    let bytes = array.call_method0("tobytes")?.cast_into::<PyBytes>()?;
+    Ok(bytes
+        .as_bytes()
+        .chunks_exact(8)
+        .map(|c| f64::from_ne_bytes([c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7]]))
+        .collect())
+}
+
 /// The values of `array` converted to `float64`, in C order, and its shape.
 pub fn float64_values(
     py: Python<'_>,
@@ -71,12 +82,7 @@ pub fn float64_values(
     let np = py.import("numpy")?;
     let contiguous = np.call_method1("ascontiguousarray", (array, "float64"))?;
     let shape: Vec<usize> = contiguous.getattr("shape")?.extract()?;
-    let bytes: Vec<u8> = contiguous.call_method0("tobytes")?.extract()?;
-    let values = bytes
-        .chunks_exact(8)
-        .map(|c| f64::from_ne_bytes([c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7]]))
-        .collect();
-    Ok((values, shape))
+    Ok((float64_flat(&contiguous)?, shape))
 }
 
 /// Sets the declared attribute `name` of `obj` through its data descriptor on

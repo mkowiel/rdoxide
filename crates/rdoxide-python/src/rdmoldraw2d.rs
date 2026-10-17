@@ -1848,10 +1848,7 @@ fn contour_and_draw_grid_py(
     let &[n_x, n_y] = shape.as_slice() else {
         return Err(PyValueError::new_err("could not convert data argument"));
     };
-    let values: Vec<f64> = arr
-        .call_method0("ravel")?
-        .call_method0("tolist")?
-        .extract()?;
+    let values = crate::pyconv::float64_flat(&arr)?;
     let xs = float_list(Some(xcoords), "xcoords")?;
     let ys = float_list(Some(ycoords), "ycoords")?;
     let mut levels = match given(levels)? {

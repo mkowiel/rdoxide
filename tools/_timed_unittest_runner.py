@@ -26,6 +26,12 @@ def main(path: str, out: str, alias: bool) -> None:
         multiprocessing.set_start_method("fork", force=True)
     except (ValueError, RuntimeError):
         pass
+    # RDKit's array-returning modules import numpy when they load; rdoxide does it on the
+    # first array it returns. Load it up front so that import does not land in a test's time.
+    try:
+        import numpy  # noqa: F401
+    except ImportError:
+        pass
     results: dict[str, list] = {}
     import_seconds = 0.0
     try:

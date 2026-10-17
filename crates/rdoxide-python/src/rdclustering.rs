@@ -7,6 +7,7 @@ use pyo3::types::PyTuple;
 use rdoxide::ml::cluster::murtagh::{Dendrogram, Linkage, cluster_points, hierarchical_cluster};
 
 use crate::errors::IntoPyResult;
+use crate::pyconv::float64_flat;
 
 /// A float64 C-contiguous copy of the numpy array `data`, flattened, its shape
 /// and whether `data` itself was such an array. Anything that is not a numpy array is rejected like upstream.
@@ -28,13 +29,7 @@ fn float_array<'py>(
     }
     // when no conversion was needed the clustering works on the caller's array
     let is_argument = arr.is(data);
-    Ok((
-        arr.call_method0("ravel")?
-            .call_method0("tolist")?
-            .extract()?,
-        shape,
-        is_argument,
-    ))
+    Ok((float64_flat(&arr)?, shape, is_argument))
 }
 
 fn linkage(option: i64) -> PyResult<Linkage> {
