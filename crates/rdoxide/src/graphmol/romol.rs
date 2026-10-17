@@ -143,7 +143,13 @@ impl ROMol {
 
     fn check_atom(&self, idx: u32) -> Result<()> {
         if idx >= self.num_atoms() {
-            return Err(RDKitError::range("idx", idx, self.num_atoms()));
+            return Err(RDKitError::range_at(
+                "idx",
+                idx,
+                self.num_atoms(),
+                "Code/GraphMol/ROMol.cpp",
+                202,
+            ));
         }
         Ok(())
     }
@@ -199,13 +205,25 @@ impl ROMol {
     /// `getBondWithIdx` with upstream's range check.
     pub fn get_bond(&self, idx: u32) -> Result<&Bond> {
         if idx >= self.num_bonds() {
-            return Err(RDKitError::range("idx", idx, self.num_bonds()));
+            return Err(RDKitError::range_at(
+                "idx",
+                idx,
+                self.num_bonds(),
+                "Code/GraphMol/ROMol.cpp",
+                322,
+            ));
         }
         Ok(&self.bonds[idx as usize])
     }
     pub fn get_bond_mut(&mut self, idx: u32) -> Result<&mut Bond> {
         if idx >= self.num_bonds() {
-            return Err(RDKitError::range("idx", idx, self.num_bonds()));
+            return Err(RDKitError::range_at(
+                "idx",
+                idx,
+                self.num_bonds(),
+                "Code/GraphMol/ROMol.cpp",
+                322,
+            ));
         }
         Ok(&mut self.bonds[idx as usize])
     }

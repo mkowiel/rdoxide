@@ -668,7 +668,51 @@ impl PyMol {
     }
 }
 
+/// This function is included to speed substructure queries from databases,
+/// it's probably not of general interest.
+///
+///   ARGUMENTS:
+///     - pkl: a Molecule pickle
+///
+///     - query: a Molecule
+///
+///     - recursionPossible: (optional)
+///
+///     - useChirality: (optional)
+///
+///     - useQueryQueryMatches: use query-query matching logic
+///
+///   RETURNS: True or False
+#[pyfunction]
+#[pyo3(name = "_HasSubstructMatchStr", signature = (pkl, query, recursionPossible = true, useChirality = false, useQueryQueryMatches = false))]
+#[allow(non_snake_case)]
+fn has_substruct_match_str(
+    py: Python<'_>,
+    #[pyo3(from_py_with = crate::pyconv::text_bytes)] pkl: Vec<u8>,
+    query: PyRef<'_, PyMol>,
+    #[pyo3(from_py_with = crate::pyconv::truthy)] recursionPossible: bool,
+    #[pyo3(from_py_with = crate::pyconv::truthy)] useChirality: bool,
+    #[pyo3(from_py_with = crate::pyconv::truthy)] useQueryQueryMatches: bool,
+) -> PyResult<bool> {
+    let ps = SubstructMatchParameters {
+        recursion_possible: recursionPossible,
+        use_chirality: useChirality,
+        use_query_query_matches: useQueryQueryMatches,
+        max_matches: 1,
+        ..SubstructMatchParameters::default()
+    };
+    let query = &query.mol;
+    py.detach(|| {
+        let mol = rdoxide::graphmol::pickle::mol_from_pickle(&pkl, 0)
+            .map_err(|_| pyo3::exceptions::PyValueError::new_err("Null Molecule"))?;
+        substruct_match(&mol, query, &ps)
+            .map(|m| !m.is_empty())
+            .map_err(crate::errors::to_py)
+    })
+}
+
 pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(has_substruct_match_str, m)?)?;
     m.add_class::<PySubstructMatchParameters>()?;
     m.add_class::<PyAtomCoordsMatcher>()?;
     Ok(())
