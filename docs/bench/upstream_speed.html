@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>rdoxide vs RDKit speed</title>
+<style>
+:root{--bg:#fff;--fg:#1c1c1e;--mut:#6b6b70;--line:#e3e3e6;--acc:#0b6bcb;--card:#f6f7f9}
+@media (prefers-color-scheme:dark){:root{--bg:#16171a;--fg:#ececef;--mut:#9b9ba3;--line:#2c2d33;--acc:#5aa9ff;--card:#1f2024}}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,sans-serif}
+main{max-width:900px;margin:0 auto;padding:24px 16px}
+h1{font-size:22px;margin:0 0 4px} h2{font-size:16px;margin:28px 0 8px}
+p.sub{color:var(--mut);margin:0 0 20px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px}
+.card b{display:block;font-size:22px;color:var(--acc)} .card span{color:var(--mut);font-size:13px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);word-break:break-word}
+td:nth-child(n+2),th:nth-child(n+2){text-align:right;white-space:nowrap}
+.note{color:var(--mut);font-size:13px}
+</style></head><body><main>
+<h1>rdoxide vs original RDKit: upstream test-suite speed</h1>
+<p class="sub">Same Python 3.13.15, same machine. RDKit 2026.9.1 (PyPI wheel) vs rdoxide 2026.9.1 (stage 93) (release build). Only tests that pass on both are compared.</p>
+<div class="cards">
+<div class="card"><b>28.9 s → 23.7 s</b><span>summed test time, 1543 common passing tests</span></div>
+<div class="card"><b>1.22x</b><span>rdoxide speed-up on that sum (RDKit time / rdoxide time)</span></div>
+<div class="card"><b>0.63x</b><span>median per-test time ratio, rdoxide / RDKit (below 1 = rdoxide faster)</span></div>
+<div class="card"><b>83 s → 29 s</b><span>file wall time incl. imports, 108 files with common passing tests</span></div>
+<div class="card"><b>6 / 1543</b><span>tests clearly slower on rdoxide (&gt;20 ms and &gt;20 %)</span></div>
+<div class="card"><b>1551 / 1861</b><span>tests passing: rdoxide / RDKit (318 pass only on RDKit)</span></div>
+</div>
+<h2>Tests that run slower on rdoxide (largest absolute loss)</h2><table><tr><th>test</th><th>RDKit s</th><th>rdoxide s</th><th>rdoxide / RDKit</th></tr><tr><td>Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::testAddRingSystemTemplates</td><td>0.075</td><td>0.138</td><td>1.8x</td></tr><tr><td>Code/GraphMol/ReducedGraphs/Wrap/testReducedGraphs.py::TestCase::test2</td><td>0.000</td><td>0.059</td><td>365.4x</td></tr><tr><td>Code/GraphMol/ChemReactions/Wrap/testEnumerations.py::TestCase::testTimings</td><td>0.167</td><td>0.204</td><td>1.2x</td></tr><tr><td>Code/SimDivPickers/Wrap/testPickers.py::TestCase::test0MaxMin</td><td>0.011</td><td>0.043</td><td>4.0x</td></tr><tr><td>Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::testSetRingSystemTemplates</td><td>0.040</td><td>0.069</td><td>1.7x</td></tr><tr><td>Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::testSetBadRingSystemTemplates</td><td>0.042</td><td>0.068</td><td>1.6x</td></tr></table>
+<h2>The slowest files re-run alone (no parallel noise)</h2><table><tr><th>file</th><th>RDKit s</th><th>rdoxide s</th><th>rdoxide / RDKit</th></tr><tr><td>UnitTestMol3D.py (27 tests)</td><td>3.85</td><td>4.07</td><td>1.06x</td></tr><tr><td>testDepictor.py (19 tests)</td><td>0.21</td><td>0.32</td><td>1.53x</td></tr><tr><td>testDistGeom.py (30 tests)</td><td>4.57</td><td>4.89</td><td>1.07x</td></tr><tr><td>testSynthonSpaceSearch.py (17 tests)</td><td>6.64</td><td>6.29</td><td>0.95x</td></tr></table>
+<h2>Tests where rdoxide gains most</h2><table><tr><th>test</th><th>RDKit s</th><th>rdoxide s</th><th>rdoxide / RDKit</th></tr><tr><td>rdkit/Chem/Draw/UnitTestDraw.py::TestCase::testMolsMatrixToGridImage</td><td>0.615</td><td>0.050</td><td>0.1x</td></tr><tr><td>rdkit/Chem/UnitTestDescriptors.py::TestCase::testMQNDetails</td><td>0.550</td><td>0.309</td><td>0.6x</td></tr><tr><td>Code/GraphMol/Wrap/test_lazy_numpy.py::TestLazyNumpy::test_datastructs_convert_loads_numpy</td><td>0.305</td><td>0.089</td><td>0.3x</td></tr><tr><td>Code/SimDivPickers/Wrap/testPickers.py::TestCase::testNonUniqueCrash</td><td>0.261</td><td>0.049</td><td>0.2x</td></tr><tr><td>Code/GraphMol/Wrap/test_lazy_numpy.py::TestLazyNumpy::test_conformer_positions_loads_numpy</td><td>0.299</td><td>0.092</td><td>0.3x</td></tr><tr><td>Code/GraphMol/Wrap/test_lazy_numpy.py::TestLazyNumpy::test_numpy_loads_on_demand</td><td>0.300</td><td>0.094</td><td>0.3x</td></tr><tr><td>Code/GraphMol/Wrap/test_lazy_numpy.py::TestLazyNumpy::test_adjacency_matrix_loads_numpy</td><td>0.301</td><td>0.104</td><td>0.3x</td></tr><tr><td>rdkit/Chem/UnitTestMol3D.py::TestCase::testEnumerateStereoisomersLargeRandomSample</td><td>0.933</td><td>0.754</td><td>0.8x</td></tr><tr><td>rdkit/Chem/UnitTestChem.py::TestCase::testGithub4144</td><td>0.164</td><td>0.002</td><td>0.0x</td></tr><tr><td>rdkit/Chem/UnitTestDescriptors.py::TestCase::testMQN</td><td>0.328</td><td>0.167</td><td>0.5x</td></tr></table>
+<p class="note">Method: tools/bench_upstream_speed.py runs each upstream test file in its own process under both interpreters (4 files in parallel), timing every test; tools/bench_report.py builds this page. Parallel runs add noise to short tests; the timings of the slowest ones are worth re-running alone.</p>
+</main></body></html>
