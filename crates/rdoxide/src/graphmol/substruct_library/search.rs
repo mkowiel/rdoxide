@@ -16,7 +16,8 @@ use crate::graphmol::find_rings::{SymmetrizeSSSRAlgorithm, symmetrize_sssr};
 use crate::graphmol::generalized_substruct::{ExtendedQueryMol, has_substruct_match_xq};
 use crate::graphmol::queries::QueryKind;
 use crate::graphmol::romol::ROMol;
-use crate::graphmol::substruct::{SubstructMatchParameters, substruct_match};
+use crate::graphmol::substruct::SubstructMatchParameters;
+use crate::graphmol::substruct_exists::substruct_has_match;
 use crate::graphmol::tautomer_query::TautomerQuery;
 use crate::rdgeneral::threads::{num_threads_to_use, par_map};
 
@@ -113,7 +114,7 @@ impl Search<'_> {
         };
         Ok(match self.query {
             QueryRef::Tautomer(tq) => !tq.substruct_of(&mol, &self.params)?.0.is_empty(),
-            QueryRef::Mol(q) => !substruct_match(&mol, q, &self.params)?.is_empty(),
+            QueryRef::Mol(q) => substruct_has_match(&mol, q, &self.params)?,
             QueryRef::Extended(x) => has_substruct_match_xq(&mol, x, &self.params)?,
         })
     }

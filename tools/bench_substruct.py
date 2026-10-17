@@ -38,6 +38,12 @@ QUERIES = {
     "no-match dibenzofuran": "c1ccc2c(c1)oc1ccccc12",
     "any atom *": "*",
     "halogen-substituted aryl c[F,Cl,Br,I]": "c[F,Cl,Br,I]",
+    "rare element first [Cl]c1ccccc1": "[#6]1:[#6]:[#6]:[#6]:[#6]:[#6]:1[Cl]",
+    "rare atom last C-C-C-C-C-C-S": "[#6]-[#6]-[#6]-[#6]-[#6]-[#6]-[#16]",
+    "7-atom any chain *~*~*~*~*~*~*": "*~*~*~*~*~*~*",
+    "no-match rare N~[#6]~[#6]~[#6]~[#6]~[#6]~P": "[#7]~[#6]~[#6]~[#6]~[#6]~[#6]~[#15]",
+    "biaryl c1ccccc1-c1ccccc1": "c1ccccc1-c1ccccc1",
+    "ester O=C(C)Oc": "[#6]C(=O)O[#6]",
 }
 
 

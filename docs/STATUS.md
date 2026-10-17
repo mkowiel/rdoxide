@@ -465,3 +465,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-18 — Stage 91: reaction enumeration library. Next: boost-archive compatible EnumerateLibrary state, bit-vector atom props, test_cdxml.py gaps.
 * 2026-10-18 — Stage 92: small rough_test fixes. Next: bit-vector atom props, SetEnhancedStereoGroup checks, test_cdxml.py queries.
 * 2026-10-18 — Stage 93: bit-vector atom properties and query. Next: SetEnhancedStereoGroup checks, test_cdxml.py queries.
+* 2026-10-18 — Performance: HasSubstructMatch and SubstructLibrary screening use an existence-only search (`substruct_exists`: rarest atom first, element-count prefilter, cached atom/bond tests; idea from mkowiel/roaring-substructure); unit-weight Floyd–Warshall in 16-bit integers and the weighted one in place (single-thread topological distance matrix 2.2 s → 0.74 s for 1500 atoms, RDKit 1.8 s).

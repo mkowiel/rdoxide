@@ -56,7 +56,16 @@ pub fn get_distance_mat(mol: &ROMol) -> Vec<f64> {
 /// Returns the predecessor matrix (`-1` on the diagonal and for unreachable
 /// pairs).
 fn floyd_warshall(n: usize, d: &mut [f64]) -> Vec<i32> {
-    let mut cur_p: Vec<i32> = (0..n * n)
+    // unit bond weights fit 16 bits, which cuts the memory traffic of the n
+    // passes over the matrices to a third and doubles the SIMD width
+    if n < usize::from(NO_PATH) && d.iter().all(|&w| w == 0.0 || w == 1.0 || w == LOCAL_INF) {
+        return floyd_warshall_unit(n, d);
+    }
+    floyd_warshall_f64(n, d)
+}
+
+fn floyd_warshall_f64(n: usize, d: &mut [f64]) -> Vec<i32> {
+    let mut pred: Vec<i32> = (0..n * n)
         .map(|k| {
             let (i, j) = (k / n, k % n);
             if i == j || d[k] == LOCAL_INF {
@@ -66,39 +75,93 @@ fn floyd_warshall(n: usize, d: &mut [f64]) -> Vec<i32> {
             }
         })
         .collect();
-    let mut cur_d = d.to_vec();
-    let mut next_d = cur_d.clone();
-    let mut next_p = cur_p.clone();
+    let (mut k_dist, mut k_pred) = (vec![0.0; n], vec![0; n]);
     for k in 0..n {
-        // each pass reads the previous one only, so its rows are independent
-        let (prev_d, prev_p) = (&cur_d, &cur_p);
-        let (k_row_d, k_row_p) = (&prev_d[k * n..(k + 1) * n], &prev_p[k * n..(k + 1) * n]);
-        par_row_blocks_mut2(&mut next_d, &mut next_p, n, FW_MIN_ROWS, |first, nd, np| {
-            for (r, (row_d, row_p)) in nd.chunks_mut(n).zip(np.chunks_mut(n)).enumerate() {
-                let i = first + r;
-                let (old_d, old_p) = (&prev_d[i * n..(i + 1) * n], &prev_p[i * n..(i + 1) * n]);
-                let dik = old_d[k];
+        // row `k` does not change in pass `k`, so a copy of it is all a pass
+        // has to read besides the row it writes
+        k_dist.copy_from_slice(&d[k * n..(k + 1) * n]);
+        k_pred.copy_from_slice(&pred[k * n..(k + 1) * n]);
+        let (k_dist, k_pred) = (&k_dist[..], &k_pred[..]);
+        par_row_blocks_mut2(d, &mut pred, n, FW_MIN_ROWS, |_, bd, bp| {
+            for (row_d, row_p) in bd.chunks_mut(n).zip(bp.chunks_mut(n)) {
+                let dik = row_d[k];
                 // branch-free so that the loop vectorizes; ties keep the old path
-                for ((((out_d, out_p), &v1), (&p1, &p2)), &dkj) in row_d
+                for (((d, p), &dkj), &pkj) in row_d
                     .iter_mut()
                     .zip(row_p.iter_mut())
-                    .zip(old_d)
-                    .zip(old_p.iter().zip(k_row_p))
-                    .zip(k_row_d)
+                    .zip(k_dist)
+                    .zip(k_pred)
                 {
-                    let v2 = dik + dkj;
-                    let keep = v1 <= v2;
-                    *out_d = if keep { v1 } else { v2 };
-                    *out_p = if keep { p1 } else { p2 };
+                    let via_k = dik + dkj;
+                    let keep = *d <= via_k;
+                    *d = if keep { *d } else { via_k };
+                    *p = if keep { *p } else { pkj };
                 }
             }
         });
-        // the pass just written becomes the one the next pass reads
-        std::mem::swap(&mut cur_d, &mut next_d);
-        std::mem::swap(&mut cur_p, &mut next_p);
     }
-    d.copy_from_slice(&cur_d);
-    cur_p
+    pred
+}
+
+/// "Unreachable" distance and "no predecessor" in [`floyd_warshall_unit`].
+const NO_PATH: u16 = u16::MAX;
+
+/// [`floyd_warshall`] for weights 0, 1 and `LOCAL_INF`: integer distances and
+/// predecessors in `u16`, updated in place (row `k` does not change in pass
+/// `k`, so a copy of it is all a pass has to read besides the row it writes).
+fn floyd_warshall_unit(n: usize, d: &mut [f64]) -> Vec<i32> {
+    let mut dist: Vec<u16> = d
+        .iter()
+        .map(|&w| if w == LOCAL_INF { NO_PATH } else { w as u16 })
+        .collect();
+    let mut pred: Vec<u16> = dist
+        .iter()
+        .enumerate()
+        .map(|(k, &w)| {
+            let (i, j) = (k / n, k % n);
+            if i == j || w == NO_PATH {
+                NO_PATH
+            } else {
+                i as u16
+            }
+        })
+        .collect();
+    let (mut k_dist, mut k_pred) = (vec![0u16; n], vec![0u16; n]);
+    for k in 0..n {
+        k_dist.copy_from_slice(&dist[k * n..(k + 1) * n]);
+        k_pred.copy_from_slice(&pred[k * n..(k + 1) * n]);
+        let (k_dist, k_pred) = (&k_dist[..], &k_pred[..]);
+        par_row_blocks_mut2(&mut dist, &mut pred, n, FW_MIN_ROWS, |_, bd, bp| {
+            for (row_d, row_p) in bd.chunks_mut(n).zip(bp.chunks_mut(n)) {
+                let dik = row_d[k];
+                if dik == NO_PATH {
+                    continue;
+                }
+                // branch-free so that the loop vectorizes; ties keep the old path
+                for (((d, p), &dkj), &pkj) in row_d
+                    .iter_mut()
+                    .zip(row_p.iter_mut())
+                    .zip(k_dist)
+                    .zip(k_pred)
+                {
+                    let via_k = dik.saturating_add(dkj);
+                    let better = via_k < *d;
+                    *d = if better { via_k } else { *d };
+                    *p = if better { pkj } else { *p };
+                }
+            }
+        });
+    }
+    for (out, &v) in d.iter_mut().zip(&dist) {
+        *out = if v == NO_PATH {
+            LOCAL_INF
+        } else {
+            f64::from(v)
+        };
+    }
+    pred.iter()
+        .map(|&p| if p == NO_PATH { -1 } else { i32::from(p) })
+        .collect()
 }
 
 /// The bond-weight matrix `getDistanceMat` starts from: `1 / bond order`
@@ -346,4 +409,53 @@ pub fn get_3d_distance_mat_weighted(
         }
     }
     Ok(d)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A graph with many equal-length shortest paths (rings, chords and a
+    /// disconnected piece), where tie handling decides the predecessors.
+    fn tie_prone_weights(n: usize, seed: u64) -> Vec<f64> {
+        let mut d = vec![LOCAL_INF; n * n];
+        let mut state = seed;
+        let edge = |d: &mut Vec<f64>, a: usize, b: usize| {
+            if a != b {
+                d[a * n + b] = 1.0;
+                d[b * n + a] = 1.0;
+            }
+        };
+        for i in 0..n {
+            d[i * n + i] = 0.0;
+            if i + 1 < n - 3 {
+                edge(&mut d, i, i + 1);
+            }
+        }
+        for _ in 0..n / 2 {
+            state = state
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            let a = (state >> 33) as usize % (n - 3);
+            state = state
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            let b = (state >> 33) as usize % (n - 3);
+            edge(&mut d, a, b);
+        }
+        d
+    }
+
+    #[test]
+    fn unit_weight_floyd_warshall_matches_the_float_version() {
+        for (n, seed) in [(1, 1), (5, 2), (12, 3), (40, 4), (150, 5), (300, 6)] {
+            let w = tie_prone_weights(n.max(4), seed);
+            let n = n.max(4);
+            let (mut a, mut b) = (w.clone(), w);
+            let pa = floyd_warshall_unit(n, &mut a);
+            let pb = floyd_warshall_f64(n, &mut b);
+            assert_eq!(a, b, "distances, n={n}");
+            assert_eq!(pa, pb, "predecessors, n={n}");
+        }
+    }
 }
