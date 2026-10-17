@@ -67,9 +67,9 @@ fn params(sanitize: bool, remove_hs: bool, strict_parsing: bool) -> MolFileParse
 fn mol_from_mol_block(
     py: Python<'_>,
     molBlock: &Bound<'_, PyAny>,
-    sanitize: bool,
-    removeHs: bool,
-    strictParsing: bool,
+    #[pyo3(from_py_with = crate::pyconv::truthy)] sanitize: bool,
+    #[pyo3(from_py_with = crate::pyconv::truthy)] removeHs: bool,
+    #[pyo3(from_py_with = crate::pyconv::truthy)] strictParsing: bool,
 ) -> PyResult<Option<PyMol>> {
     let data = py_object_to_bytes(molBlock)?;
     let p = params(sanitize, removeHs, strictParsing);
@@ -102,9 +102,9 @@ fn mol_from_mol_block(
 fn mol_from_mol_file_py(
     py: Python<'_>,
     molFileName: String,
-    sanitize: bool,
-    removeHs: bool,
-    strictParsing: bool,
+    #[pyo3(from_py_with = crate::pyconv::truthy)] sanitize: bool,
+    #[pyo3(from_py_with = crate::pyconv::truthy)] removeHs: bool,
+    #[pyo3(from_py_with = crate::pyconv::truthy)] strictParsing: bool,
 ) -> PyResult<Option<PyMol>> {
     let p = params(sanitize, removeHs, strictParsing);
     finish(py.detach(|| mol_from_mol_file(&molFileName, &p)))

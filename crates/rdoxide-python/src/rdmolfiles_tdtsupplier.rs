@@ -73,7 +73,7 @@ impl PyTdtMolSupplier {
         nameRecord: &str,
         confId2D: i32,
         confId3D: i32,
-        sanitize: bool,
+        #[pyo3(from_py_with = crate::pyconv::truthy)] sanitize: bool,
     ) -> PyResult<Self> {
         let inner = match fileName {
             None => TdtMolSupplier::new(),
@@ -160,7 +160,7 @@ impl PyTdtMolSupplier {
         nameRecord: &str,
         confId2D: i32,
         confId3D: i32,
-        sanitize: bool,
+        #[pyo3(from_py_with = crate::pyconv::truthy)] sanitize: bool,
     ) {
         self.inner.set_data(
             data.as_bytes(),

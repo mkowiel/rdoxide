@@ -18,7 +18,7 @@ fn find_all_subgraphs_of_length_n(
     py: Python<'_>,
     mol: PyRef<'_, PyMol>,
     length: u32,
-    useHs: bool,
+    #[pyo3(from_py_with = crate::pyconv::truthy)] useHs: bool,
     rootedAtAtom: i32,
 ) -> PyResult<Py<PyAny>> {
     let r = subgraphs::find_all_subgraphs_of_length_n(&mol.mol, length, useHs, rootedAtAtom, None)
@@ -35,7 +35,7 @@ fn find_all_subgraphs_of_length_m_to_n<'py>(
     mol: PyRef<'_, PyMol>,
     min: u32,
     max: u32,
-    useHs: bool,
+    #[pyo3(from_py_with = crate::pyconv::truthy)] useHs: bool,
     rootedAtAtom: i32,
 ) -> PyResult<Bound<'py, PyTuple>> {
     if min > max {
@@ -70,7 +70,7 @@ fn find_unique_subgraphs_of_length_n(
     py: Python<'_>,
     mol: PyRef<'_, PyMol>,
     length: u32,
-    useHs: bool,
+    #[pyo3(from_py_with = crate::pyconv::truthy)] useHs: bool,
     useBO: bool,
     rootedAtAtom: i32,
 ) -> PyResult<Py<PyAny>> {
@@ -94,8 +94,8 @@ fn find_all_paths_of_length_n(
     py: Python<'_>,
     mol: PyRef<'_, PyMol>,
     length: u32,
-    useBonds: bool,
-    useHs: bool,
+    #[pyo3(from_py_with = crate::pyconv::truthy)] useBonds: bool,
+    #[pyo3(from_py_with = crate::pyconv::truthy)] useHs: bool,
     rootedAtAtom: i32,
     onlyShortestPaths: bool,
 ) -> PyResult<Py<PyAny>> {
@@ -121,7 +121,7 @@ fn find_atom_environment_of_radius_n(
     mol: PyRef<'_, PyMol>,
     radius: u32,
     rootedAtAtom: u32,
-    useHs: bool,
+    #[pyo3(from_py_with = crate::pyconv::truthy)] useHs: bool,
     enforceSize: bool,
     atomMap: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<Py<PyAny>> {

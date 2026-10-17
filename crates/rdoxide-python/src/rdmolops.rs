@@ -127,7 +127,7 @@ fn get_use_legacy_ring_finding() -> bool {
 #[allow(non_snake_case)]
 fn py_kekulize(
     mut mol: PyRefMut<'_, PyMol>,
-    clearAromaticFlags: bool,
+    #[pyo3(from_py_with = crate::pyconv::truthy)] clearAromaticFlags: bool,
     canonical: bool,
 ) -> PyResult<()> {
     kekulize::kekulize(
@@ -145,7 +145,7 @@ fn py_kekulize(
 #[allow(non_snake_case)]
 fn py_kekulize_if_possible(
     mut mol: PyRefMut<'_, PyMol>,
-    clearAromaticFlags: bool,
+    #[pyo3(from_py_with = crate::pyconv::truthy)] clearAromaticFlags: bool,
     canonical: bool,
 ) -> PyResult<()> {
     kekulize::kekulize_if_possible(

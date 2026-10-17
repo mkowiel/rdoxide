@@ -90,9 +90,9 @@ impl PyForwardSDMolSupplier {
     fn new(
         py: Python<'_>,
         fileobj: &Bound<'_, PyAny>,
-        sanitize: bool,
-        removeHs: bool,
-        strictParsing: bool,
+        #[pyo3(from_py_with = crate::pyconv::truthy)] sanitize: bool,
+        #[pyo3(from_py_with = crate::pyconv::truthy)] removeHs: bool,
+        #[pyo3(from_py_with = crate::pyconv::truthy)] strictParsing: bool,
     ) -> PyResult<Self> {
         let params = MolFileParserParams {
             sanitize,

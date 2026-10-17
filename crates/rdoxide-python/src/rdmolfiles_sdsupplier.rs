@@ -80,10 +80,10 @@ impl PySDMolSupplier {
     #[pyo3(signature = (fileName = None, sanitize = true, removeHs = true, strictParsing = true))]
     #[allow(non_snake_case)]
     fn new(
-        fileName: Option<String>,
-        sanitize: bool,
-        removeHs: bool,
-        strictParsing: bool,
+        #[pyo3(from_py_with = crate::pyconv::path_like_opt)] fileName: Option<String>,
+        #[pyo3(from_py_with = crate::pyconv::truthy)] sanitize: bool,
+        #[pyo3(from_py_with = crate::pyconv::truthy)] removeHs: bool,
+        #[pyo3(from_py_with = crate::pyconv::truthy)] strictParsing: bool,
     ) -> PyResult<Self> {
         let inner = match fileName {
             None => SDMolSupplier::default(),
@@ -164,9 +164,15 @@ impl PySDMolSupplier {
     /// Sets the text to be parsed
     #[pyo3(name = "SetData", signature = (data, sanitize = true, removeHs = true, strictParsing = true))]
     #[allow(non_snake_case)]
-    fn set_data(&mut self, data: &str, sanitize: bool, removeHs: bool, strictParsing: bool) {
+    fn set_data(
+        &mut self,
+        #[pyo3(from_py_with = crate::pyconv::text_bytes)] data: Vec<u8>,
+        #[pyo3(from_py_with = crate::pyconv::truthy)] sanitize: bool,
+        #[pyo3(from_py_with = crate::pyconv::truthy)] removeHs: bool,
+        #[pyo3(from_py_with = crate::pyconv::truthy)] strictParsing: bool,
+    ) {
         self.inner
-            .set_data(data.as_bytes(), params(sanitize, removeHs, strictParsing));
+            .set_data(&data, params(sanitize, removeHs, strictParsing));
     }
 
     /// Sets the locations of mol beginnings in the input stream. Be *very* careful with this method.

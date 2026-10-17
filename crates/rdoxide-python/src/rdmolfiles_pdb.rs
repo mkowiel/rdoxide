@@ -83,10 +83,10 @@ fn params(
 fn py_mol_from_pdb_file(
     py: Python<'_>,
     pdbFileName: &str,
-    sanitize: bool,
-    removeHs: bool,
+    #[pyo3(from_py_with = crate::pyconv::truthy)] sanitize: bool,
+    #[pyo3(from_py_with = crate::pyconv::truthy)] removeHs: bool,
     flavor: u32,
-    proximityBonding: bool,
+    #[pyo3(from_py_with = crate::pyconv::truthy)] proximityBonding: bool,
 ) -> PyResult<Option<PyMol>> {
     let ps = params(sanitize, removeHs, flavor, proximityBonding);
     finish(py.detach(|| mol_from_pdb_file(pdbFileName, &ps)))
@@ -118,10 +118,10 @@ fn py_mol_from_pdb_file(
 fn py_mol_from_pdb_block(
     py: Python<'_>,
     molBlock: &Bound<'_, PyAny>,
-    sanitize: bool,
-    removeHs: bool,
+    #[pyo3(from_py_with = crate::pyconv::truthy)] sanitize: bool,
+    #[pyo3(from_py_with = crate::pyconv::truthy)] removeHs: bool,
     flavor: u32,
-    proximityBonding: bool,
+    #[pyo3(from_py_with = crate::pyconv::truthy)] proximityBonding: bool,
 ) -> PyResult<Option<PyMol>> {
     // pyObjectToString accepts str or bytes
     let text = match molBlock.extract::<String>() {

@@ -161,7 +161,7 @@ impl PyStereoInfo {
 #[allow(non_snake_case)]
 fn py_find_potential_stereo(
     mut mol: PyRefMut<'_, PyMol>,
-    cleanIt: bool,
+    #[pyo3(from_py_with = crate::pyconv::truthy)] cleanIt: bool,
     flagPossible: bool,
 ) -> PyResult<Vec<PyStereoInfo>> {
     let infos = find_potential_stereo(&mut mol.mol, cleanIt, flagPossible).py()?;

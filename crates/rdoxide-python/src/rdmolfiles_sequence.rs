@@ -61,7 +61,7 @@ pub(crate) fn text_arg(obj: &Bound<'_, PyAny>) -> PyResult<String> {
 fn py_mol_from_sequence(
     py: Python<'_>,
     text: &Bound<'_, PyAny>,
-    sanitize: bool,
+    #[pyo3(from_py_with = crate::pyconv::truthy)] sanitize: bool,
     flavor: i32,
 ) -> PyResult<Option<PyMol>> {
     let text = text_arg(text)?;
@@ -114,7 +114,7 @@ fn py_mol_to_sequence(mol: PyRef<'_, PyMol>) -> String {
 fn py_mol_from_fasta(
     py: Python<'_>,
     text: &Bound<'_, PyAny>,
-    sanitize: bool,
+    #[pyo3(from_py_with = crate::pyconv::truthy)] sanitize: bool,
     flavor: i32,
 ) -> PyResult<Option<PyMol>> {
     let text = text_arg(text)?;
@@ -154,7 +154,7 @@ fn py_mol_to_fasta(mol: PyRef<'_, PyMol>) -> String {
 fn py_mol_from_helm(
     py: Python<'_>,
     text: &Bound<'_, PyAny>,
-    sanitize: bool,
+    #[pyo3(from_py_with = crate::pyconv::truthy)] sanitize: bool,
 ) -> PyResult<Option<PyMol>> {
     let text = text_arg(text)?;
     Ok(finish(py.detach(|| helm_to_mol(&text, sanitize))))

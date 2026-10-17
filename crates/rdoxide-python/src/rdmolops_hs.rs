@@ -241,9 +241,9 @@ fn py_remove_all_hs(mol: PyRef<'_, PyMol>, sanitize: bool) -> PyResult<PyMol> {
 #[allow(non_snake_case)]
 fn py_assign_stereochemistry(
     mut mol: PyRefMut<'_, PyMol>,
-    cleanIt: bool,
-    force: bool,
-    flagPossibleStereoCenters: bool,
+    #[pyo3(from_py_with = crate::pyconv::truthy)] cleanIt: bool,
+    #[pyo3(from_py_with = crate::pyconv::truthy)] force: bool,
+    #[pyo3(from_py_with = crate::pyconv::truthy)] flagPossibleStereoCenters: bool,
 ) -> PyResult<()> {
     legacy::assign_stereochemistry(&mut mol.mol, cleanIt, force, flagPossibleStereoCenters).py()
 }
