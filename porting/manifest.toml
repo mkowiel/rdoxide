@@ -1750,3 +1750,9 @@
 
 [module."rdoxide_python::rdmolfiles_mol2".sources]
 "Code/GraphMol/Wrap/rdmolfiles.cpp" = "829058d8e8a382c358d2464cee762f8cff04f75f"
+
+[module."rdoxide::graphmol::file_parsers::cml_writer".sources]
+"Code/GraphMol/FileParsers/CMLWriter.cpp" = "80af0a4b2576ad4c4d1768871f0df64b2d61baad"
+
+[module."rdoxide_python::rdmolfiles_cml".sources]
+"Code/GraphMol/Wrap/rdmolfiles.cpp" = "829058d8e8a382c358d2464cee762f8cff04f75f"
