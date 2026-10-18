@@ -430,3 +430,31 @@ exclude = ["UnitTest*.py", "test_data", "__pycache__"]
 from = "rdkit/VLib"
 to = "python/rdoxide/VLib"
 exclude = ["UnitTest*.py", "__pycache__"]
+
+[[copy]]
+from = "rdkit/Chem/BRICS.py"
+to = "python/rdoxide/Chem/BRICS.py"
+
+[[copy]]
+from = "rdkit/Chem/Recap.py"
+to = "python/rdoxide/Chem/Recap.py"
+
+[[copy]]
+from = "rdkit/Chem/EnumerateHeterocycles.py"
+to = "python/rdoxide/Chem/EnumerateHeterocycles.py"
+
+[[copy]]
+from = "rdkit/Chem/BuildFragmentCatalog.py"
+to = "python/rdoxide/Chem/BuildFragmentCatalog.py"
+
+[[copy]]
+from = "rdkit/Chem/MCS.py"
+to = "python/rdoxide/Chem/MCS.py"
+
+[[copy]]
+from = "rdkit/Chem/TemplateAlign.py"
+to = "python/rdoxide/Chem/TemplateAlign.py"
+
+[[copy]]
+from = "rdkit/Chem/FeatFinderCLI.py"
+to = "python/rdoxide/Chem/FeatFinderCLI.py"
