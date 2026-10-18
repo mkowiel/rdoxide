@@ -711,6 +711,7 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::test83GitHubIssue19
 Code/GraphMol/Wrap/rough_test.py::TestCase::test84PDBBasics
 Code/GraphMol/Wrap/rough_test.py::TestCase::test85AtomCopying
 Code/GraphMol/Wrap/rough_test.py::TestCase::test85MolCopying
+Code/GraphMol/Wrap/rough_test.py::TestCase::test85MolCopying2
 Code/GraphMol/Wrap/rough_test.py::TestCase::test86MolRenumbering
 Code/GraphMol/Wrap/rough_test.py::TestCase::test87FragmentOnBonds
 Code/GraphMol/Wrap/rough_test.py::TestCase::test88QueryAtoms
@@ -1025,6 +1026,7 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::test83GitHubIssue19
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test84PDBBasics
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test85AtomCopying
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test85MolCopying
+Code/GraphMol/nbWrap/rough_test.py::TestCase::test85MolCopying2
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test86MolRenumbering
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test87FragmentOnBonds
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test88AromaticAtoms
