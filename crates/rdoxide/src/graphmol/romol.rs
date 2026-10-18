@@ -1013,6 +1013,20 @@ impl ROMol {
         &self.stereo_groups
     }
 
+    /// `forwardStereoGroupIds`: every group exports the id it was read with.
+    pub fn forward_stereo_group_ids(&mut self) {
+        for group in &mut self.stereo_groups {
+            group.set_write_id(group.read_id());
+        }
+    }
+
+    /// `StereoGroup::setWriteId` on the group at `index` of this molecule.
+    pub fn set_stereo_group_write_id(&mut self, index: usize, id: u32) {
+        if let Some(group) = self.stereo_groups.get_mut(index) {
+            group.set_write_id(id);
+        }
+    }
+
     /// `setStereoGroups`: multiple ABSOLUTE groups are merged into one.
     pub fn set_stereo_groups(&mut self, groups: Vec<StereoGroup>) -> Result<()> {
         let num_abs = groups

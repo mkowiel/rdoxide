@@ -217,6 +217,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 101 | Atom and bond sequence iterators check for modification before reporting the end, so removing an atom or bond mid-iteration raises `RuntimeError` (upstream `testGithub1366`) | ✅ | `tests/python/test_iterators.py`; rough_test +2 |
 | 102 | `Atom::atom_map_num`, the SMILES writer and the canonical ranker read `molAtomMapNumber` like `getPropIfPresent<int>`, so `SetProp('molAtomMapNumber', '30')` works (upstream `test82Issue288`) | ✅ | `tests/python/test_atom_map_property.py`; rough_test +2 |
 | 103 | `CachedTrustedSmilesMolHolder.GetMol` parses with neither sanitization nor hydrogen removal, as `SmilesToMol(smiles, 0, false)` does, so ring queries on the bare molecule raise while library searches still work (upstream `testRingSmartsWithTrustedSmiles`) | ✅ | `tests/python/test_trusted_smiles_holder.py`; SubstructLibrary rough_test +1 |
+| 104 | `StereoGroup.SetWriteId`/`GetWriteId` of a group taken from a molecule read and write the molecule's group, `CreateStereoGroup` rejects empty groups and out-of-range indices with `ValueError`, new `ForwardStereoGroupIds` | ✅ | `tests/python/test_stereo_group_api.py`; rough_test +3 (+2 nbWrap) |
 
 ## Python package files
 
@@ -490,3 +491,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-19 — Stage 101: iterator invalidation raises RuntimeError at the end of the sequence too.
 * 2026-10-19 — Stage 102: string atom-map property converts to int.
 * 2026-10-19 — Stage 103: trusted-SMILES holder no longer perceives rings.
+* 2026-10-19 — Stage 104: stereo group live write ids, argument checks, ForwardStereoGroupIds.

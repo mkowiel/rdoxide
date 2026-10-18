@@ -432,9 +432,11 @@ impl PyMol {
         m.mol
             .stereo_groups()
             .iter()
-            .map(|g| PyStereoGroup {
+            .enumerate()
+            .map(|(index, g)| PyStereoGroup {
                 group: g.clone(),
                 mol: Some(slf.clone().unbind()),
+                index: Some(index),
             })
             .collect()
     }
