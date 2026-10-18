@@ -210,6 +210,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 94 | Pharmacophore packages copied from upstream (`Chem.Pharm2D`, `Chem.FeatMaps`, `Chem.Pharm3D`: pure Python on the native ChemicalFeatures, DataStructs, Geometry and DistanceGeometry); `FreeChemicalFeature` is a subclassable class with a `__dict__` (`FeatMapPoint` derives from it) | ✅ | upstream `UnitTest*` of the three packages 51/53 (`Pharm3D/UnitTestEmbed` needs stage 95) |
 | 95 | Pure-Python `ML` helpers copied from upstream: `ML.Data` (Stats, Quantize, SplitData, MLData, ...), `ML.Scoring`, `ML.Descriptors`, `ML.SLT`, `MatOps`, `files` | ✅ | upstream `rdkit/ML/**/UnitTest*.py` 67/71 (the rest skip) |
 | 96 | Pure-Python `utils` (list, file and chem helpers), `Dbase` (DB connection, results, storage utils on sqlite) and `VLib` (node pipeline) copied from upstream | ✅ | upstream `UnitTest*` of the three packages 43/43; `UnitTestBitRanker` now runs |
+| 97 | Pure-Python `Chem.BRICS`, `Recap`, `EnumerateHeterocycles`, `BuildFragmentCatalog`, `MCS`, `TemplateAlign` and `FeatFinderCLI` copied from upstream | ✅ | upstream `UnitTestDocTestsChem`, `UnitTestEnumerateHeterocycles`, `UnitTestCatalog`, `UnitTestMCS`, `UnitTestFeatFinderCLI` pass |
 
 ## Python package files
 
@@ -476,3 +477,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-18 — Stage 93: bit-vector atom properties and query. Next: SetEnhancedStereoGroup checks, test_cdxml.py queries.
 * 2026-10-18 — Performance: HasSubstructMatch and SubstructLibrary screening use an existence-only search (`substruct_exists`: rarest atom first, element-count prefilter, cached atom/bond tests; idea from mkowiel/roaring-substructure); unit-weight Floyd–Warshall in 16-bit integers and the weighted one in place (single-thread topological distance matrix 2.2 s → 0.74 s for 1500 atoms, RDKit 1.8 s).
 * 2026-10-18 — Stages 94–96: pure-Python packages copied from upstream (Pharm2D/3D, FeatMaps, ML helpers, utils, Dbase, VLib); ratchet 1551/1711 → 1709/1860. Next: Subshape (needs `Numerics.Alignment`), Fraggle, MolKey, BRICS/Recap, Suppliers, SetEnhancedStereoGroup checks. InChI foundations (license audit: InChI 1.07.3 is MIT; plan in docs/INCHI_PORT.md), InChIKey byte-identical to RDKit, `rdinchi`/`Chem.inchi` surface. Ratchet +41. Next: InChI stage I1 (data model and utilities), then the MolToInchi pipeline (I2–I8).
+* 2026-10-19 — Stage 97: pure-Python BRICS/Recap/EnumerateHeterocycles/BuildFragmentCatalog/MCS/TemplateAlign/FeatFinderCLI copied from upstream.
