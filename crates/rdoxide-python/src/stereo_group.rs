@@ -1,5 +1,6 @@
 //! `rdchem.StereoGroup` — port of upstream `Code/GraphMol/Wrap/StereoGroup.cpp`.
 
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use rdoxide::graphmol::stereo_group::{StereoGroup, StereoGroupType};
 
@@ -18,6 +19,9 @@ use crate::mol::PyMol;
 pub struct PyStereoGroup {
     pub group: StereoGroup,
     pub mol: Option<Py<PyMol>>,
+    /// position in the molecule's list when the group was taken from it; changes
+    /// of the write id then reach the molecule (upstream hands out references)
+    pub index: Option<usize>,
 }
 
 #[pymethods]
@@ -60,13 +64,25 @@ impl PyStereoGroup {
     /// return the StereoGroup's ID that will be exported.
     /// Note that the ID only makes sense for AND/OR groups.
     #[pyo3(name = "GetWriteId")]
-    fn get_write_id(&self) -> u32 {
+    fn get_write_id(&self, py: Python<'_>) -> u32 {
+        // a group taken from a molecule reflects the molecule's current state
+        if let (Some(mol), Some(index)) = (&self.mol, self.index) {
+            if let Some(group) = mol.bind(py).borrow().mol.stereo_groups().get(index) {
+                return group.write_id();
+            }
+        }
         self.group.write_id()
     }
     /// return the StereoGroup's ID that will be exported.
     #[pyo3(name = "SetWriteId")]
-    fn set_write_id(&mut self, id: u32) {
+    fn set_write_id(&mut self, py: Python<'_>, id: u32) {
         self.group.set_write_id(id);
+        if let (Some(mol), Some(index)) = (&self.mol, self.index) {
+            mol.bind(py)
+                .borrow_mut()
+                .mol
+                .set_stereo_group_write_id(index, id);
+        }
     }
 }
 
@@ -82,18 +98,34 @@ pub fn create_stereo_group(
     readId: u32,
 ) -> PyResult<PyStereoGroup> {
     let t: StereoGroupType = PyStereoGroupType::extract(stereoGroupType)?;
+    if atomIds.is_empty() && bondIds.is_empty() {
+        return Err(PyValueError::new_err(
+            "a StereoGroup needs at least one atom or bond",
+        ));
+    }
     {
         let m = mol.borrow();
+        let out_of_range = |what: &str, idx: u32| {
+            PyValueError::new_err(format!("{what} index {idx} out of range"))
+        };
         for &a in &atomIds {
-            m.mol.get_atom(a).py()?;
+            m.mol.get_atom(a).map_err(|_| out_of_range("atom", a))?;
         }
         for &b in &bondIds {
-            m.mol.get_bond(b).py()?;
+            m.mol.get_bond(b).map_err(|_| out_of_range("bond", b))?;
         }
     }
     let group = StereoGroup::new(t, atomIds, bondIds, readId).py()?;
     Ok(PyStereoGroup {
         group,
         mol: Some(mol.clone().unbind()),
+        index: None,
     })
+}
+
+/// Forward the original Stereo Group IDs when exporting the Mol.
+#[pyfunction]
+#[pyo3(name = "ForwardStereoGroupIds", signature = (mol))]
+pub fn forward_stereo_group_ids(mol: &Bound<'_, PyMol>) {
+    mol.borrow_mut().mol.forward_stereo_group_ids();
 }

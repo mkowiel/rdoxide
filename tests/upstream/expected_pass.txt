@@ -772,6 +772,7 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::testFindMesoCenters
 Code/GraphMol/Wrap/rough_test.py::TestCase::testFindPotentialStereo
 Code/GraphMol/Wrap/rough_test.py::TestCase::testFindPotentialStereoBonds
 Code/GraphMol/Wrap/rough_test.py::TestCase::testFindPotentialStereoBondsShouldNotFindThisDoubleBondAsStereo
+Code/GraphMol/Wrap/rough_test.py::TestCase::testForwardEnhancedStereoGroupIds
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGetEnhancedStereo
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGetEnhancedStereoAtrop
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGetQueryType
@@ -851,7 +852,9 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::testSequenceBasics
 Code/GraphMol/Wrap/rough_test.py::TestCase::testSetBondDirFromStereo
 Code/GraphMol/Wrap/rough_test.py::TestCase::testSetBondStereoFromDirections
 Code/GraphMol/Wrap/rough_test.py::TestCase::testSetCoordsTerminalAtom
+Code/GraphMol/Wrap/rough_test.py::TestCase::testSetEnhancedStereoGroup
 Code/GraphMol/Wrap/rough_test.py::TestCase::testSetEnhancedStereoGroupOwnershipCheck
+Code/GraphMol/Wrap/rough_test.py::TestCase::testSetEnhancedStereoTypeChecking
 Code/GraphMol/Wrap/rough_test.py::TestCase::testSetQuery
 Code/GraphMol/Wrap/rough_test.py::TestCase::testSimpleAromaticity
 Code/GraphMol/Wrap/rough_test.py::TestCase::testSmartsParseParams
@@ -1086,6 +1089,7 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::testFindMesoCenters
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testFindPotentialStereo
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testFindPotentialStereoBonds
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testFindPotentialStereoBondsShouldNotFindThisDoubleBondAsStereo
+Code/GraphMol/nbWrap/rough_test.py::TestCase::testForwardEnhancedStereoGroupIds
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGetEnhancedStereo
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGetEnhancedStereoAtrop
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGetQueryType
@@ -1162,6 +1166,7 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::testSequenceBasics
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testSetBondDirFromStereo
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testSetBondStereoFromDirections
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testSetCoordsTerminalAtom
+Code/GraphMol/nbWrap/rough_test.py::TestCase::testSetEnhancedStereoGroup
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testSetQuery
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testSimpleAromaticity
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testSmartsParseParams

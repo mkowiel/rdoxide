@@ -398,6 +398,10 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
         crate::stereo_group::create_stereo_group,
         m
     )?)?;
+    m.add_function(wrap_pyfunction!(
+        crate::stereo_group::forward_stereo_group_ids,
+        m
+    )?)?;
     crate::substance_group::add(m)?;
     m.add_function(wrap_pyfunction!(tossit, m)?)?;
     Ok(())
