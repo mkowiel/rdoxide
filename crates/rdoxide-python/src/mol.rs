@@ -564,10 +564,11 @@ impl AtomSeq {
         slf
     }
     fn __next__(&mut self, py: Python<'_>) -> PyResult<Option<Py<PyAtom>>> {
+        // a molecule edited during the iteration is an error even at the end
+        self.check_modified(py)?;
         if self.pos >= self.current_len(py) {
             return Ok(None);
         }
-        self.check_modified(py)?;
         let r = self.item(py, self.pos)?;
         self.pos += 1;
         Ok(Some(r))
@@ -628,10 +629,11 @@ impl BondSeq {
         slf
     }
     fn __next__(&mut self, py: Python<'_>) -> PyResult<Option<Py<PyBond>>> {
+        // a molecule edited during the iteration is an error even at the end
+        self.check_modified(py)?;
         if self.pos >= self.current_len(py) {
             return Ok(None);
         }
-        self.check_modified(py)?;
         let r = self.item(py, self.pos)?;
         self.pos += 1;
         Ok(Some(r))
