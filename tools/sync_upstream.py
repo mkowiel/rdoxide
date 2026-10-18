@@ -415,6 +415,25 @@ def regen_filtercatalog() -> None:
     print(f"filtercatalog.txt: {len(entries)} catalogs, {sum(map(len, entries.values()))} entries")
 
 
+def regen_dclv_dots() -> None:
+    """The 320 standard dots of the double cubic lattice volume method
+    (`DCLV_dots.h`) as `crates/rdoxide/data/dclv_dots.tsv`; the values are the
+    `float` literals of the header, widened to `double` when loaded."""
+    src = (UPSTREAM_DIR / "Code/GraphMol/Descriptors/DCLV_dots.h").read_text()
+    body = src[src.index("standardDots[NUMDOTS]") :]
+    rows = re.findall(r"\{\s*(-?[\d.]+)f,\s*(-?[\d.]+)f,\s*(-?[\d.]+)f\s*\}", body)
+    consts = dict(re.findall(r"double (standardArea|dotArea) = ([\d.]+);", src))
+    (DATA / "dclv_dots.tsv").write_text(
+        "# Extracted from RDKit Code/GraphMol/Descriptors/DCLV_dots.h by tools/sync_upstream.py.\n"
+        "# Copyright (C) 2024 Greg Landrum and other RDKit contributors, contributed by NextMove\n"
+        "# Software (BSD-3-Clause). DO NOT EDIT - regenerate with `python3 tools/sync_upstream.py regen`.\n"
+        f"# standard_area\t{consts['standardArea']}\n"
+        f"# dot_area\t{consts['dotArea']}\n"
+        + "".join("\t".join(r) + "\n" for r in rows)
+    )
+    print(f"dclv_dots.tsv: {len(rows)} dots")
+
+
 def regen_crystalff() -> None:
     """The experimental torsion-angle preferences of CrystalFF/ETKDG as
     `crates/rdoxide/data/crystalff/*.txt`: SMARTS and cosine-series constants
@@ -555,6 +574,7 @@ def cmd_regen(_args) -> None:
     regen_atomic_data()
     regen_molstandardize()
     regen_uff_params()
+    regen_dclv_dots()
     regen_mmff_params()
     regen_crystalff()
     regen_filtercatalog()

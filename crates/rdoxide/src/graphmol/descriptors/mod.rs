@@ -7,6 +7,7 @@ pub mod connectivity;
 pub mod coulomb_mat;
 pub mod crippen;
 pub mod data_3d;
+pub mod dclv;
 pub mod eem;
 pub mod getaway;
 pub mod lipinski;

@@ -1789,3 +1789,11 @@
 [module."rdoxide_python::rdinchi".sources]
 "External/INCHI-API/Wrap/pyInchi.cpp" = "82d8ab16d62210693245a02d84e12bb882524f9c"
 "External/INCHI-API/python/inchi.py" = "24fdb9e22a79b1ce8bc60af97d8d7ad190620cff"
+
+[module."rdoxide::graphmol::descriptors::dclv".sources]
+"Code/GraphMol/Descriptors/DCLV.cpp" = "221e9480b2ba88291dfb40ef015f0e41428b4bda"
+"Code/GraphMol/Descriptors/DCLV.h" = "e1bcd3726324bcb9299e1dde52afc5b835c6ddce"
+"Code/GraphMol/Descriptors/DCLV_dots.h" = "3389ce57d92f3b9a465437ce442fe542bdbd6e8a"
+
+[module."rdoxide_python::rdmoldescriptors_dclv".sources]
+"Code/GraphMol/Descriptors/Wrap/rdMolDescriptors.cpp" = "4d3c2e1d6315579af9f3bf02b1564224fe48b82e"

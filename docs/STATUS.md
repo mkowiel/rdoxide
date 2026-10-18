@@ -219,6 +219,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 103 | `CachedTrustedSmilesMolHolder.GetMol` parses with neither sanitization nor hydrogen removal, as `SmilesToMol(smiles, 0, false)` does, so ring queries on the bare molecule raise while library searches still work (upstream `testRingSmartsWithTrustedSmiles`) | ✅ | `tests/python/test_trusted_smiles_holder.py`; SubstructLibrary rough_test +1 |
 | 104 | `StereoGroup.SetWriteId`/`GetWriteId` of a group taken from a molecule read and write the molecule's group, `CreateStereoGroup` rejects empty groups and out-of-range indices with `ValueError`, new `ForwardStereoGroupIds` | ✅ | `tests/python/test_stereo_group_api.py`; rough_test +3 (+2 nbWrap) |
 | 105 | Native `rdoxide.Numerics.rdAlignment.GetAlignmentTransform` (points as arrays, sequences or `Point3D`), pure-Python `sping` and `Chem.Subshape` copied from upstream | ✅ | upstream `testAlignment.py` 5/5, `UnitTestSubshape` 2/2; `testMolAlign.py` now loads (O3A functions are missing: 8/20) |
+| 106 | `graphmol::descriptors::dclv` (Shrake-Rupley surface area, volume, polar and partial variants, compactness, packing density, surface points) with the 320 standard dots generated from `DCLV_dots.h`; Python `rdMolDescriptors.DoubleCubicLatticeVolume` | ✅ | upstream `testMolDescriptors.py` `testDCLV` (1mup protein, ligand, TZL model: all values); `tests/python/test_dclv.py` closed-form sphere |
 
 ## Python package files
 
@@ -494,3 +495,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-19 — Stage 103: trusted-SMILES holder no longer perceives rings.
 * 2026-10-19 — Stage 104: stereo group live write ids, argument checks, ForwardStereoGroupIds.
 * 2026-10-19 — Stage 105: rdAlignment, sping, Subshape.
+* 2026-10-19 — Stage 106: double cubic lattice volume (testDCLV).

@@ -206,6 +206,7 @@ Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testBCUTUserProp
 Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testBitInfo
 Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testCrippen
 Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testCustomVSA
+Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testDCLV
 Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testGithub1749
 Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testGithub1761
 Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testGithub1973
