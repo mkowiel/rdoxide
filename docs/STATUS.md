@@ -212,6 +212,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 96 | Pure-Python `utils` (list, file and chem helpers), `Dbase` (DB connection, results, storage utils on sqlite) and `VLib` (node pipeline) copied from upstream | ✅ | upstream `UnitTest*` of the three packages 43/43; `UnitTestBitRanker` now runs |
 | 97 | Pure-Python `Chem.BRICS`, `Recap`, `EnumerateHeterocycles`, `BuildFragmentCatalog`, `MCS`, `TemplateAlign` and `FeatFinderCLI` copied from upstream | ✅ | upstream `UnitTestDocTestsChem`, `UnitTestEnumerateHeterocycles`, `UnitTestCatalog`, `UnitTestMCS`, `UnitTestFeatFinderCLI` pass |
 | 98 | Pure-Python `Chem.Fraggle`, `Chem.Suppliers`, `Chem.MolDb`, `Fingerprints.DbFpSupplier`, `ClusterMols` and `MolSimilarity` copied from upstream | ✅ | upstream `UnitTestFraggle`, `UnitTest*MolSupplier`, `UnitTestDbFpSupplier` pass |
+| 99 | Upstream-test alias (`tools/rdkit_alias.py`) maps `logging.getLogger('rdkit')` to rdoxide's own `rdoxide` logger, so the `LogToPythonLogger` tests configure the logger rdoxide writes to | ✅ | upstream `UnitTestLogging.py` 32/32 |
 
 ## Python package files
 
@@ -480,3 +481,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-18 — Stages 94–96: pure-Python packages copied from upstream (Pharm2D/3D, FeatMaps, ML helpers, utils, Dbase, VLib); ratchet 1551/1711 → 1709/1860. Next: Subshape (needs `Numerics.Alignment`), Fraggle, MolKey, BRICS/Recap, Suppliers, SetEnhancedStereoGroup checks. InChI foundations (license audit: InChI 1.07.3 is MIT; plan in docs/INCHI_PORT.md), InChIKey byte-identical to RDKit, `rdinchi`/`Chem.inchi` surface. Ratchet +41. Next: InChI stage I1 (data model and utilities), then the MolToInchi pipeline (I2–I8).
 * 2026-10-19 — Stage 97: pure-Python BRICS/Recap/EnumerateHeterocycles/BuildFragmentCatalog/MCS/TemplateAlign/FeatFinderCLI copied from upstream.
 * 2026-10-19 — Stage 98: pure-Python Fraggle/Suppliers/MolDb/DbFpSupplier copied from upstream.
+* 2026-10-19 — Stage 99: alias maps the rdkit logger name to rdoxide's (UnitTestLogging 32/32).
