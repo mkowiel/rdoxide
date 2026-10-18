@@ -36,6 +36,24 @@ class _Finder(importlib.abc.MetaPathFinder):
         return None
 
 
+def _alias_logger_name() -> None:
+    """rdoxide logs to the `rdoxide` logger; tests written for RDKit configure `rdkit`."""
+    import logging
+
+    if getattr(logging.getLogger, "_rdoxide_alias", False):
+        return
+    original = logging.getLogger
+
+    def get_logger(name=None):
+        if name == "rdkit" or (isinstance(name, str) and name.startswith("rdkit.")):
+            name = "rdoxide" + name[len("rdkit"):]
+        return original(name)
+
+    get_logger._rdoxide_alias = True
+    logging.getLogger = get_logger
+
+
 def install() -> None:
+    _alias_logger_name()
     if not any(isinstance(f, _Finder) for f in sys.meta_path):
         sys.meta_path.insert(0, _Finder())

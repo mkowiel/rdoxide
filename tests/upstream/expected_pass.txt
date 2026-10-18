@@ -879,6 +879,7 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::testWriteCXSmiles
 Code/GraphMol/Wrap/rough_test.py::TestCase::testXYZ
 Code/GraphMol/Wrap/rough_test.py::TestCase::test_DativeBondsToHaptic
 Code/GraphMol/Wrap/rough_test.py::TestCase::test_HapticBondsToDative
+Code/GraphMol/Wrap/rough_test.py::TestCase::test_blocklogs
 Code/GraphMol/Wrap/rough_test.py::TestCase::test_get_set_positions
 Code/GraphMol/Wrap/rough_test.py::TestCase::test_get_set_positions_stride
 Code/GraphMol/Wrap/rough_test.py::TestCase::test_github1631
@@ -1182,6 +1183,7 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::testWriteCXSmiles
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testXYZ
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test_DativeBondsToHaptic
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test_HapticBondsToDative
+Code/GraphMol/nbWrap/rough_test.py::TestCase::test_blocklogs
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test_get_set_positions
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test_get_set_positions_stride
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test_github1631
@@ -1763,7 +1765,12 @@ rdkit/UnitTestLogging.py::TestLogToCppStreams::testError
 rdkit/UnitTestLogging.py::TestLogToCppStreams::testInfo
 rdkit/UnitTestLogging.py::TestLogToCppStreams::testSynchronous
 rdkit/UnitTestLogging.py::TestLogToCppStreams::testWarning
+rdkit/UnitTestLogging.py::TestLogToPythonLogger::testAsynchronous1
+rdkit/UnitTestLogging.py::TestLogToPythonLogger::testAsynchronous2
+rdkit/UnitTestLogging.py::TestLogToPythonLogger::testDebug
 rdkit/UnitTestLogging.py::TestLogToPythonLogger::testError
+rdkit/UnitTestLogging.py::TestLogToPythonLogger::testInfo
+rdkit/UnitTestLogging.py::TestLogToPythonLogger::testSynchronous
 rdkit/UnitTestLogging.py::TestLogToPythonLogger::testWarning
 rdkit/UnitTestLogging.py::TestLogToPythonStderr::testAsynchronous1
 rdkit/UnitTestLogging.py::TestLogToPythonStderr::testAsynchronous2
