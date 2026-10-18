@@ -215,6 +215,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 99 | Upstream-test alias (`tools/rdkit_alias.py`) maps `logging.getLogger('rdkit')` to rdoxide's own `rdoxide` logger, so the `LogToPythonLogger` tests configure the logger rdoxide writes to | ✅ | upstream `UnitTestLogging.py` 32/32 |
 | 100 | `Mol`/`RWMol` `__copy__` shares and `__deepcopy__` copies the instance `__dict__` (upstream `test85MolCopying2`) | ✅ | `tests/python/test_mol_copy_attributes.py`; rough_test +2 |
 | 101 | Atom and bond sequence iterators check for modification before reporting the end, so removing an atom or bond mid-iteration raises `RuntimeError` (upstream `testGithub1366`) | ✅ | `tests/python/test_iterators.py`; rough_test +2 |
+| 102 | `Atom::atom_map_num`, the SMILES writer and the canonical ranker read `molAtomMapNumber` like `getPropIfPresent<int>`, so `SetProp('molAtomMapNumber', '30')` works (upstream `test82Issue288`) | ✅ | `tests/python/test_atom_map_property.py`; rough_test +2 |
 
 ## Python package files
 
@@ -486,3 +487,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-19 — Stage 99: alias maps the rdkit logger name to rdoxide's (UnitTestLogging 32/32).
 * 2026-10-19 — Stage 100: Mol/RWMol copies carry Python attributes.
 * 2026-10-19 — Stage 101: iterator invalidation raises RuntimeError at the end of the sequence too.
+* 2026-10-19 — Stage 102: string atom-map property converts to int.

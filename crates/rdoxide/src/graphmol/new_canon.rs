@@ -449,7 +449,11 @@ impl<'a> AtomCompareFunctor<'a> {
         self.mol
             .atom(atom)
             .get_prop(key)
-            .and_then(RDValue::as_int)
+            .and_then(|v| match v {
+                // like `getPropIfPresent<int>`, a string property converts
+                RDValue::String(s) => s.trim().parse().ok(),
+                v => v.as_int(),
+            })
             .unwrap_or(0)
     }
 

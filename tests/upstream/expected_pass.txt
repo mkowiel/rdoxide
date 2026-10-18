@@ -707,6 +707,7 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::test79AddRecursiveStructureQueries
 Code/GraphMol/Wrap/rough_test.py::TestCase::test7Atom
 Code/GraphMol/Wrap/rough_test.py::TestCase::test80ParseMolQueryDefFile
 Code/GraphMol/Wrap/rough_test.py::TestCase::test81Issue275
+Code/GraphMol/Wrap/rough_test.py::TestCase::test82Issue288
 Code/GraphMol/Wrap/rough_test.py::TestCase::test83GitHubIssue19
 Code/GraphMol/Wrap/rough_test.py::TestCase::test84PDBBasics
 Code/GraphMol/Wrap/rough_test.py::TestCase::test85AtomCopying
@@ -1022,6 +1023,7 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::test79AddRecursiveStructureQueries
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test7Atom
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test80ParseMolQueryDefFile
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test81Issue275
+Code/GraphMol/nbWrap/rough_test.py::TestCase::test82Issue288
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test83GitHubIssue19
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test84PDBBasics
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test85AtomCopying

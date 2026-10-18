@@ -438,12 +438,19 @@ impl Atom {
         Ok(())
     }
 
+    /// The atom map number if the property is present and converts to an `int`
+    /// like upstream's `getPropIfPresent<int>`, which also reads a string such
+    /// as `'30'` set with `SetProp`.
+    pub fn atom_map_num_prop(&self) -> Option<i32> {
+        self.props.get(cp::molAtomMapNumber).and_then(|v| match v {
+            RDValue::String(s) => s.trim().parse().ok(),
+            v => v.as_int(),
+        })
+    }
+
     /// `getAtomMapNum`
     pub fn atom_map_num(&self) -> i32 {
-        self.props
-            .get(cp::molAtomMapNumber)
-            .and_then(RDValue::as_int)
-            .unwrap_or(0)
+        self.atom_map_num_prop().unwrap_or(0)
     }
 
     /// `invertChirality()`
