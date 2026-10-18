@@ -216,6 +216,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 100 | `Mol`/`RWMol` `__copy__` shares and `__deepcopy__` copies the instance `__dict__` (upstream `test85MolCopying2`) | ✅ | `tests/python/test_mol_copy_attributes.py`; rough_test +2 |
 | 101 | Atom and bond sequence iterators check for modification before reporting the end, so removing an atom or bond mid-iteration raises `RuntimeError` (upstream `testGithub1366`) | ✅ | `tests/python/test_iterators.py`; rough_test +2 |
 | 102 | `Atom::atom_map_num`, the SMILES writer and the canonical ranker read `molAtomMapNumber` like `getPropIfPresent<int>`, so `SetProp('molAtomMapNumber', '30')` works (upstream `test82Issue288`) | ✅ | `tests/python/test_atom_map_property.py`; rough_test +2 |
+| 103 | `CachedTrustedSmilesMolHolder.GetMol` parses with neither sanitization nor hydrogen removal, as `SmilesToMol(smiles, 0, false)` does, so ring queries on the bare molecule raise while library searches still work (upstream `testRingSmartsWithTrustedSmiles`) | ✅ | `tests/python/test_trusted_smiles_holder.py`; SubstructLibrary rough_test +1 |
 
 ## Python package files
 
@@ -488,3 +489,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-19 — Stage 100: Mol/RWMol copies carry Python attributes.
 * 2026-10-19 — Stage 101: iterator invalidation raises RuntimeError at the end of the sequence too.
 * 2026-10-19 — Stage 102: string atom-map property converts to int.
+* 2026-10-19 — Stage 103: trusted-SMILES holder no longer perceives rings.

@@ -593,6 +593,7 @@ Code/GraphMol/SubstructLibrary/Wrap/rough_test.py::TestCase::testBinaryCache
 Code/GraphMol/SubstructLibrary/Wrap/rough_test.py::TestCase::testMolBundles
 Code/GraphMol/SubstructLibrary/Wrap/rough_test.py::TestCase::testOptions
 Code/GraphMol/SubstructLibrary/Wrap/rough_test.py::TestCase::testPropHolder
+Code/GraphMol/SubstructLibrary/Wrap/rough_test.py::TestCase::testRingSmartsWithTrustedSmiles
 Code/GraphMol/SubstructLibrary/Wrap/rough_test.py::TestCase::testSearchOrder
 Code/GraphMol/SubstructLibrary/Wrap/rough_test.py::TestCase::testSearchOrder2
 Code/GraphMol/SubstructLibrary/Wrap/rough_test.py::TestCase::testSmilesCache
