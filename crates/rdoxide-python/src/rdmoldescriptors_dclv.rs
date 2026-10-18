@@ -165,7 +165,7 @@ impl PyDoubleCubicLatticeVolume {
     ) -> PyResult<BTreeMap<u32, Vec<PyPoint3D>>> {
         let inner = &mut self.inner;
         let points = py
-            .detach(|| inner.surface_points(allPoints).map(|p| p.clone()))
+            .detach(|| inner.surface_points(allPoints).cloned())
             .py()?;
         Ok(points
             .into_iter()
