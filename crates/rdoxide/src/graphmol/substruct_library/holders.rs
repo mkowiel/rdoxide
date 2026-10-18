@@ -91,8 +91,11 @@ impl MolHolder {
                 .flatten()
                 .map(Arc::new),
             MolHolder::TrustedSmiles(v) => {
+                // `SmilesToMol(smiles, 0, false)`: neither sanitized nor stripped of
+                // hydrogens, which would perceive the rings
                 let params = SmilesParserParams {
                     sanitize: false,
+                    remove_hs: false,
                     ..Default::default()
                 };
                 match mol_from_smiles(&v[i], &params)? {
