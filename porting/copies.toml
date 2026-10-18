@@ -458,3 +458,30 @@ to = "python/rdoxide/Chem/TemplateAlign.py"
 [[copy]]
 from = "rdkit/Chem/FeatFinderCLI.py"
 to = "python/rdoxide/Chem/FeatFinderCLI.py"
+
+[[copy]]
+from = "rdkit/Chem/Fraggle"
+to = "python/rdoxide/Chem/Fraggle"
+exclude = ["UnitTest*.py", "__pycache__"]
+
+[[copy]]
+from = "rdkit/Chem/Suppliers"
+to = "python/rdoxide/Chem/Suppliers"
+exclude = ["UnitTest*.py", "__pycache__"]
+
+[[copy]]
+from = "rdkit/Chem/MolDb"
+to = "python/rdoxide/Chem/MolDb"
+exclude = ["UnitTest*.py", "__pycache__"]
+
+[[copy]]
+from = "rdkit/Chem/Fingerprints/DbFpSupplier.py"
+to = "python/rdoxide/Chem/Fingerprints/DbFpSupplier.py"
+
+[[copy]]
+from = "rdkit/Chem/Fingerprints/ClusterMols.py"
+to = "python/rdoxide/Chem/Fingerprints/ClusterMols.py"
+
+[[copy]]
+from = "rdkit/Chem/Fingerprints/MolSimilarity.py"
+to = "python/rdoxide/Chem/Fingerprints/MolSimilarity.py"
