@@ -65,6 +65,7 @@ mod rdmoldescriptors_3d;
 mod rdmoldescriptors_autocorr;
 mod rdmoldescriptors_bcut;
 mod rdmoldescriptors_connectivity;
+mod rdmoldescriptors_dclv;
 mod rdmoldescriptors_molsurf;
 mod rdmoldescriptors_profiles;
 mod rdmoldescriptors_property;
