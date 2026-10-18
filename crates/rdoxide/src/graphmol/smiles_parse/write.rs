@@ -216,10 +216,7 @@ pub fn get_atom_smiles(mol: &ROMol, idx: u32, params: &SmilesWriteParams) -> Res
                 res.push('-');
             }
         }
-        if let Some(map) = atom
-            .get_prop(cp::molAtomMapNumber)
-            .and_then(RDValue::as_int)
-        {
+        if let Some(map) = atom.atom_map_num_prop() {
             res.push(':');
             res += &map.to_string();
         }
