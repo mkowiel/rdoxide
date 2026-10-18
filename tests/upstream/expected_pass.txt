@@ -412,6 +412,14 @@ Code/GraphMol/MMPA/Wrap/testMMPA.py::TestCase::test6
 Code/GraphMol/MMPA/Wrap/testMMPA.py::TestCase::test7
 Code/GraphMol/MMPA/Wrap/testMMPA.py::TestCase::test8
 Code/GraphMol/MMPA/Wrap/testMMPA.py::TestCase::test9
+Code/GraphMol/MolAlign/Wrap/testMolAlign.py::TestCase::test17GetBestRMS
+Code/GraphMol/MolAlign/Wrap/testMolAlign.py::TestCase::test18GetBestRMSAndConjugatedGroups
+Code/GraphMol/MolAlign/Wrap/testMolAlign.py::TestCase::test19GetAllConformerBestRMS
+Code/GraphMol/MolAlign/Wrap/testMolAlign.py::TestCase::test1Basic
+Code/GraphMol/MolAlign/Wrap/testMolAlign.py::TestCase::test20GetAllConformerBestRMSToRef
+Code/GraphMol/MolAlign/Wrap/testMolAlign.py::TestCase::test2AtomMap
+Code/GraphMol/MolAlign/Wrap/testMolAlign.py::TestCase::test3Weights
+Code/GraphMol/MolAlign/Wrap/testMolAlign.py::TestCase::test4AlignConfs
 Code/GraphMol/MolCatalog/Wrap/rough_test.py::TestCase::test1
 Code/GraphMol/MolCatalog/Wrap/rough_test.py::TestCase::test2
 Code/GraphMol/MolCatalog/Wrap/rough_test.py::TestCase::test3
@@ -1212,6 +1220,11 @@ Code/ML/InfoTheory/Wrap/testRanker.py::TestCase::test2ranker
 Code/ML/InfoTheory/Wrap/testRanker.py::TestCase::test3Issue140
 Code/ML/InfoTheory/Wrap/testRanker.py::TestCase::test4Issue237
 Code/ML/InfoTheory/Wrap/testRanker.py::TestCase::testGainFunDtypes
+Code/Numerics/Alignment/Wrap/testAlignment.py::TestCase::test1Basic
+Code/Numerics/Alignment/Wrap/testAlignment.py::TestCase::test2Weights
+Code/Numerics/Alignment/Wrap/testAlignment.py::TestCase::test3tetra
+Code/Numerics/Alignment/Wrap/testAlignment.py::TestCase::test4points
+Code/Numerics/Alignment/Wrap/testAlignment.py::TestCase::test5errorHandling
 Code/SimDivPickers/Wrap/testPickers.py::TestCase::test0MaxMin
 Code/SimDivPickers/Wrap/testPickers.py::TestCase::test1HierarchPick
 Code/SimDivPickers/Wrap/testPickers.py::TestCase::testBitVectorLeader1
@@ -1354,6 +1367,8 @@ rdkit/Chem/Scaffolds/UnitTestMurckoScaffold.py::TestCase::test_ReferenceImplemen
 rdkit/Chem/SimpleEnum/UnitTestEnumerator.py::DocTestCase::runTest
 rdkit/Chem/SimpleEnum/UnitTestEnumerator.py::TestCase::test_EnumerateReactionException
 rdkit/Chem/SimpleEnum/UnitTestEnumerator.py::TestCase::test_UniquifyingEnhancedStereo
+rdkit/Chem/Subshape/UnitTestSubshape.py::TestCase::test1
+rdkit/Chem/Subshape/UnitTestSubshape.py::TestSubshapeObjects::test_SubshapeShape
 rdkit/Chem/Suppliers/UnitTestDbMolSupplier.py::TestCase::test_ForwardDbMolSupplier
 rdkit/Chem/Suppliers/UnitTestDbMolSupplier.py::TestCase::test_MolSupplier
 rdkit/Chem/Suppliers/UnitTestDbMolSupplier.py::TestCase::test_RandomAccessDbMolSupplier

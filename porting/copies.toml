@@ -485,3 +485,17 @@ to = "python/rdoxide/Chem/Fingerprints/ClusterMols.py"
 [[copy]]
 from = "rdkit/Chem/Fingerprints/MolSimilarity.py"
 to = "python/rdoxide/Chem/Fingerprints/MolSimilarity.py"
+
+[[copy]]
+from = "rdkit/Numerics/__init__.py"
+to = "python/rdoxide/Numerics/__init__.py"
+
+[[copy]]
+from = "rdkit/sping"
+to = "python/rdoxide/sping"
+exclude = ["tests", "examples", "__pycache__"]
+
+[[copy]]
+from = "rdkit/Chem/Subshape"
+to = "python/rdoxide/Chem/Subshape"
+exclude = ["UnitTest*.py", "test_data", "__pycache__", "demoCombined.py"]

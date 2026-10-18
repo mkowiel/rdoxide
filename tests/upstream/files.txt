@@ -38,3 +38,4 @@ Code/ML/InfoTheory/Wrap/testRanker.py
 rdkit/utils/UnitTest*.py
 rdkit/Dbase/UnitTest*.py
 rdkit/VLib/UnitTest*.py
+Code/Numerics/Alignment/Wrap/testAlignment.py

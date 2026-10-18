@@ -27,6 +27,7 @@ mod perception;
 mod props;
 mod pyconv;
 mod rdabbreviations;
+mod rdalignment;
 mod rdbase;
 mod rdchem;
 mod rdchem_atom_funcs;
@@ -407,6 +408,12 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
         "rdPartialCharges",
         "rdoxide.Chem.rdPartialCharges",
         rdpartialcharges::init,
+    )?;
+    add_submodule(
+        m,
+        "rdAlignment",
+        "rdoxide.Numerics.rdAlignment",
+        rdalignment::init,
     )?;
     add_submodule(
         m,
