@@ -90,7 +90,14 @@ impl PyMol {
     }
 
     fn __copy__(slf: &Bound<'_, Self>) -> PyResult<Py<PyAny>> {
-        copy_same_type(slf)
+        let res = copy_same_type(slf)?;
+        // the instance __dict__ of the copy shares the attribute values
+        if let Ok(d) = slf.getattr("__dict__") {
+            res.bind(slf.py())
+                .getattr("__dict__")?
+                .call_method1("update", (d,))?;
+        }
+        Ok(res)
     }
 
     /// Returns a binary string representation of the molecule.
@@ -664,13 +671,25 @@ impl PyRWMol {
     }
 
     fn __copy__(slf: &Bound<'_, Self>) -> PyResult<Py<PyAny>> {
-        Ok(slf.get_type().call1((slf,))?.unbind())
+        let res = slf.get_type().call1((slf,))?;
+        // the instance __dict__ of the copy shares the attribute values
+        if let Ok(d) = slf.getattr("__dict__") {
+            res.getattr("__dict__")?.call_method1("update", (d,))?;
+        }
+        Ok(res.unbind())
     }
 
     #[pyo3(signature = (memo))]
     fn __deepcopy__(slf: &Bound<'_, Self>, memo: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
-        let _ = memo;
-        Ok(slf.get_type().call1((slf,))?.unbind())
+        let res = slf.get_type().call1((slf,))?;
+        if let Ok(d) = slf.getattr("__dict__") {
+            let nd = slf
+                .py()
+                .import("copy")?
+                .call_method1("deepcopy", (d, memo))?;
+            res.getattr("__dict__")?.call_method1("update", (nd,))?;
+        }
+        Ok(res.unbind())
     }
 
     fn __enter__(slf: &Bound<'_, Self>) -> PyResult<Py<Self>> {
