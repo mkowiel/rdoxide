@@ -1264,6 +1264,8 @@ rdkit/Chem/Features/UnitTestFeatDirUtilsRD.py::TestCase::test1_GetDonor2FeatVect
 rdkit/Chem/Features/UnitTestFeatDirUtilsRD.py::TestCase::test2_1_GetDonor2FeatVects
 rdkit/Chem/Features/UnitTestFeatDirUtilsRD.py::TestCase::test2_2_GetDonor2FeatVects
 rdkit/Chem/Features/UnitTestFeatDirUtilsRD.py::TestCase::test3_GetDonor2FeatVects
+rdkit/Chem/Fingerprints/UnitTestDbFpSupplier.py::DocTestCase::runTest
+rdkit/Chem/Fingerprints/UnitTestDbFpSupplier.py::TestCase::test_ForwardDbFpSupplier
 rdkit/Chem/Fingerprints/UnitTestFingerprints.py::TestCase::test1
 rdkit/Chem/Fingerprints/UnitTestFingerprints.py::TestCase::test2
 rdkit/Chem/Fingerprints/UnitTestFingerprints.py::TestCase::test3
@@ -1275,6 +1277,15 @@ rdkit/Chem/Fingerprints/UnitTestSimScreener.py::TestCase::test1_TopNScreener
 rdkit/Chem/Fingerprints/UnitTestSimScreener.py::TestCase::test2_ThresholdScreener
 rdkit/Chem/Fingerprints/UnitTestSimScreener.py::TestCase::test3_ThresholdScreener_folding
 rdkit/Chem/Fingerprints/UnitTestSimScreener.py::TestCase::test_SimilarityScreener
+rdkit/Chem/Fraggle/UnitTestFraggle.py::DocTestCase::runTest
+rdkit/Chem/Fraggle/UnitTestFraggle.py::TestCase::testFragmentation2
+rdkit/Chem/Fraggle/UnitTestFraggle.py::TestCase::test_GetFraggleSimilarity
+rdkit/Chem/Fraggle/UnitTestFraggle.py::TestCase::test_generate_fraggle_fragmentation
+rdkit/Chem/Fraggle/UnitTestFraggle.py::TestCase::test_isValidRingCut
+rdkit/Chem/Fraggle/UnitTestFraggle.py::TestCase::test_select_fragments
+rdkit/Chem/Fraggle/UnitTestFraggle.py::TestCase::test_select_fragments_acyclic
+rdkit/Chem/Fraggle/UnitTestFraggle.py::TestCase::test_select_fragments_cyclic
+rdkit/Chem/Fraggle/UnitTestFraggle.py::TestCase::test_select_fragments_cyclic_acyclic
 rdkit/Chem/MolStandardize/UnitTestMolStandardize.py::TestCase::testBasic
 rdkit/Chem/MolStandardize/UnitTestMolStandardize.py::TestCase::testLength
 rdkit/Chem/MolStandardize/UnitTestMolStandardize.py::TestCase::testNoUnassignedStereoAfterCanonicalize
@@ -1329,6 +1340,10 @@ rdkit/Chem/Scaffolds/UnitTestMurckoScaffold.py::TestCase::test_ReferenceImplemen
 rdkit/Chem/SimpleEnum/UnitTestEnumerator.py::DocTestCase::runTest
 rdkit/Chem/SimpleEnum/UnitTestEnumerator.py::TestCase::test_EnumerateReactionException
 rdkit/Chem/SimpleEnum/UnitTestEnumerator.py::TestCase::test_UniquifyingEnhancedStereo
+rdkit/Chem/Suppliers/UnitTestDbMolSupplier.py::TestCase::test_ForwardDbMolSupplier
+rdkit/Chem/Suppliers/UnitTestDbMolSupplier.py::TestCase::test_MolSupplier
+rdkit/Chem/Suppliers/UnitTestDbMolSupplier.py::TestCase::test_RandomAccessDbMolSupplier
+rdkit/Chem/Suppliers/UnitTestDbMolSupplier.py::TestCase::test_general
 rdkit/Chem/Suppliers/UnitTestSDMolSupplier.py::TestCase::test_SDMolSupplier
 rdkit/Chem/Suppliers/UnitTestSDMolSupplier.py::TestCase::test_SDWriter
 rdkit/Chem/Suppliers/UnitTestSDMolSupplier.py::TestCase::test_pathlib_compatibility
