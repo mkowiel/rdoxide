@@ -83,6 +83,39 @@ fn type_name(kind: &str) -> &'static str {
     }
 }
 
+/// A property name; anything but `str` fails the way a Boost.Python overload mismatch does.
+pub struct PropKey(pub String);
+
+impl<'a, 'py> pyo3::FromPyObject<'a, 'py> for PropKey {
+    type Error = PyErr;
+
+    fn extract(obj: pyo3::Borrowed<'a, 'py, PyAny>) -> Result<Self, Self::Error> {
+        match obj.extract::<String>() {
+            Ok(s) => Ok(Self(s)),
+            Err(_) => Err(pyo3::exceptions::PyTypeError::new_err(format!(
+                "Python argument types did not match C++ signature: property name must be str, got {}",
+                crate::errors::boost_type_name(&obj)
+            ))),
+        }
+    }
+}
+
+/// Why a stored number does not fit the requested integer type: boost's
+/// `bad_numeric_cast` text for out-of-range numbers, `bad any cast` otherwise.
+fn cast_failure_reason(v: &RDValue, kind: &str) -> &'static str {
+    let wide = match v {
+        RDValue::Int(i) => Some(i64::from(*i)),
+        RDValue::UnsignedInt(u) => Some(i64::from(*u)),
+        RDValue::Int64(i) => Some(*i),
+        _ => None,
+    };
+    match (kind, wide) {
+        ("uint", Some(x)) if x < 0 => "bad numeric conversion: negative overflow",
+        ("int", Some(x)) if x > i64::from(i32::MAX) => "bad numeric conversion: positive overflow",
+        _ => "bad any cast",
+    }
+}
+
 /// Typed getter (`GetIntProp` & co.).
 pub fn get_typed<'py, T: IntoPyObject<'py>>(
     py: Python<'py>,
@@ -100,8 +133,9 @@ pub fn get_typed<'py, T: IntoPyObject<'py>>(
         Some(v) => match conv(v) {
             Some(x) => Ok(x.into_pyobject(py).map_err(Into::into)?.into_any().unbind()),
             None => Err(PyValueError::new_err(format!(
-                "key `{key}` exists but does not result in {} reason: bad any cast",
-                type_name(kind)
+                "key `{key}` exists but does not result in {} reason: {}",
+                type_name(kind),
+                cast_failure_reason(v, kind)
             ))),
         },
     }
@@ -230,16 +264,16 @@ macro_rules! impl_props {
         impl $ty {
             /// Queries a molecule to see if a particular property has been assigned.
             #[pyo3(name = "HasProp")]
-            fn py_has_prop(&self, py: pyo3::Python<'_>, key: &str) -> pyo3::PyResult<$has> {
-                self.with_dict(py, |d| <$has>::from(d.has_val(key)))
+            fn py_has_prop(&self, py: pyo3::Python<'_>, key: $crate::props::PropKey) -> pyo3::PyResult<$has> {
+                self.with_dict(py, |d| <$has>::from(d.has_val(&key.0)))
             }
 
             /// Removes a particular property (does nothing if not already set).
             #[pyo3(name = "ClearProp")]
-            fn py_clear_prop(&mut self, py: pyo3::Python<'_>, key: &str) -> pyo3::PyResult<()> {
+            fn py_clear_prop(&mut self, py: pyo3::Python<'_>, key: $crate::props::PropKey) -> pyo3::PyResult<()> {
                 self.with_dict_mut(py, |d| {
-                    if d.has_val(key) {
-                        rdoxide::rdgeneral::RDProps::clear_prop(d, key);
+                    if d.has_val(&key.0) {
+                        rdoxide::rdgeneral::RDProps::clear_prop(d, &key.0);
                     }
                 })
             }
@@ -249,7 +283,7 @@ macro_rules! impl_props {
             fn py_get_prop(
                 &self,
                 py: pyo3::Python<'_>,
-                key: &str,
+                key: $crate::props::PropKey,
                 args: &pyo3::Bound<'_, pyo3::types::PyTuple>,
                 kwargs: Option<&pyo3::Bound<'_, pyo3::types::PyDict>>,
             ) -> pyo3::PyResult<pyo3::Py<pyo3::PyAny>> {
@@ -259,35 +293,35 @@ macro_rules! impl_props {
                     None => false,
                 };
                 let default = $crate::props::opt_arg(args, kwargs, 1, "default")?;
-                self.with_dict(py, |d| $crate::props::get_py_prop(py, d, key, auto_convert, default))?
+                self.with_dict(py, |d| $crate::props::get_py_prop(py, d, &key.0, auto_convert, default))?
             }
 
             /// Returns the integer value of the property if possible.
             #[pyo3(name = "GetIntProp", signature = (key, *args, **kwargs))]
-            fn py_get_int_prop(&self, py: pyo3::Python<'_>, key: &str, args: &pyo3::Bound<'_, pyo3::types::PyTuple>, kwargs: Option<&pyo3::Bound<'_, pyo3::types::PyDict>>) -> pyo3::PyResult<pyo3::Py<pyo3::PyAny>> {
+            fn py_get_int_prop(&self, py: pyo3::Python<'_>, key: $crate::props::PropKey, args: &pyo3::Bound<'_, pyo3::types::PyTuple>, kwargs: Option<&pyo3::Bound<'_, pyo3::types::PyDict>>) -> pyo3::PyResult<pyo3::Py<pyo3::PyAny>> {
                 let default = $crate::props::opt_arg(args, kwargs, 0, "default")?;
-                self.with_dict(py, |d| $crate::props::get_typed(py, d, key, "int", $crate::props::as_int, default))?
+                self.with_dict(py, |d| $crate::props::get_typed(py, d, &key.0, "int", $crate::props::as_int, default))?
             }
 
             /// Returns the unsigned int value of the property if possible.
             #[pyo3(name = "GetUnsignedProp", signature = (key, *args, **kwargs))]
-            fn py_get_unsigned_prop(&self, py: pyo3::Python<'_>, key: &str, args: &pyo3::Bound<'_, pyo3::types::PyTuple>, kwargs: Option<&pyo3::Bound<'_, pyo3::types::PyDict>>) -> pyo3::PyResult<pyo3::Py<pyo3::PyAny>> {
+            fn py_get_unsigned_prop(&self, py: pyo3::Python<'_>, key: $crate::props::PropKey, args: &pyo3::Bound<'_, pyo3::types::PyTuple>, kwargs: Option<&pyo3::Bound<'_, pyo3::types::PyDict>>) -> pyo3::PyResult<pyo3::Py<pyo3::PyAny>> {
                 let default = $crate::props::opt_arg(args, kwargs, 0, "default")?;
-                self.with_dict(py, |d| $crate::props::get_typed(py, d, key, "uint", $crate::props::as_uint, default))?
+                self.with_dict(py, |d| $crate::props::get_typed(py, d, &key.0, "uint", $crate::props::as_uint, default))?
             }
 
             /// Returns the double value of the property if possible.
             #[pyo3(name = "GetDoubleProp", signature = (key, *args, **kwargs))]
-            fn py_get_double_prop(&self, py: pyo3::Python<'_>, key: &str, args: &pyo3::Bound<'_, pyo3::types::PyTuple>, kwargs: Option<&pyo3::Bound<'_, pyo3::types::PyDict>>) -> pyo3::PyResult<pyo3::Py<pyo3::PyAny>> {
+            fn py_get_double_prop(&self, py: pyo3::Python<'_>, key: $crate::props::PropKey, args: &pyo3::Bound<'_, pyo3::types::PyTuple>, kwargs: Option<&pyo3::Bound<'_, pyo3::types::PyDict>>) -> pyo3::PyResult<pyo3::Py<pyo3::PyAny>> {
                 let default = $crate::props::opt_arg(args, kwargs, 0, "default")?;
-                self.with_dict(py, |d| $crate::props::get_typed(py, d, key, "double", $crate::props::as_double, default))?
+                self.with_dict(py, |d| $crate::props::get_typed(py, d, &key.0, "double", $crate::props::as_double, default))?
             }
 
             /// Returns the Bool value of the property if possible.
             #[pyo3(name = "GetBoolProp", signature = (key, *args, **kwargs))]
-            fn py_get_bool_prop(&self, py: pyo3::Python<'_>, key: &str, args: &pyo3::Bound<'_, pyo3::types::PyTuple>, kwargs: Option<&pyo3::Bound<'_, pyo3::types::PyDict>>) -> pyo3::PyResult<pyo3::Py<pyo3::PyAny>> {
+            fn py_get_bool_prop(&self, py: pyo3::Python<'_>, key: $crate::props::PropKey, args: &pyo3::Bound<'_, pyo3::types::PyTuple>, kwargs: Option<&pyo3::Bound<'_, pyo3::types::PyDict>>) -> pyo3::PyResult<pyo3::Py<pyo3::PyAny>> {
                 let default = $crate::props::opt_arg(args, kwargs, 0, "default")?;
-                self.with_dict(py, |d| $crate::props::get_typed(py, d, key, "bool", $crate::props::as_bool, default))?
+                self.with_dict(py, |d| $crate::props::get_typed(py, d, &key.0, "bool", $crate::props::as_bool, default))?
             }
 
             /// Returns a list of the properties set.
@@ -318,28 +352,28 @@ macro_rules! impl_props {
         impl $ty {
             /// Sets a property (string value).
             #[pyo3(name = "SetProp", signature = (key, val, computed = false))]
-            fn py_set_prop(&mut self, py: pyo3::Python<'_>, key: &str, val: String, #[pyo3(from_py_with = crate::pyconv::truthy)] computed: bool) -> pyo3::PyResult<()> {
-                self.with_dict_mut(py, |d| $crate::props::set_prop(d, key, val.into(), computed))?
+            fn py_set_prop(&mut self, py: pyo3::Python<'_>, key: $crate::props::PropKey, val: String, #[pyo3(from_py_with = crate::pyconv::truthy)] computed: bool) -> pyo3::PyResult<()> {
+                self.with_dict_mut(py, |d| $crate::props::set_prop(d, &key.0, val.into(), computed))?
             }
             /// Sets a double valued property.
             #[pyo3(name = "SetDoubleProp", signature = (key, val, computed = false))]
-            fn py_set_double_prop(&mut self, py: pyo3::Python<'_>, key: &str, val: f64, #[pyo3(from_py_with = crate::pyconv::truthy)] computed: bool) -> pyo3::PyResult<()> {
-                self.with_dict_mut(py, |d| $crate::props::set_prop(d, key, val.into(), computed))?
+            fn py_set_double_prop(&mut self, py: pyo3::Python<'_>, key: $crate::props::PropKey, val: f64, #[pyo3(from_py_with = crate::pyconv::truthy)] computed: bool) -> pyo3::PyResult<()> {
+                self.with_dict_mut(py, |d| $crate::props::set_prop(d, &key.0, val.into(), computed))?
             }
             /// Sets an integer valued property.
             #[pyo3(name = "SetIntProp", signature = (key, val, computed = false))]
-            fn py_set_int_prop(&mut self, py: pyo3::Python<'_>, key: &str, val: i32, #[pyo3(from_py_with = crate::pyconv::truthy)] computed: bool) -> pyo3::PyResult<()> {
-                self.with_dict_mut(py, |d| $crate::props::set_prop(d, key, val.into(), computed))?
+            fn py_set_int_prop(&mut self, py: pyo3::Python<'_>, key: $crate::props::PropKey, val: i32, #[pyo3(from_py_with = crate::pyconv::truthy)] computed: bool) -> pyo3::PyResult<()> {
+                self.with_dict_mut(py, |d| $crate::props::set_prop(d, &key.0, val.into(), computed))?
             }
             /// Sets an unsigned integer valued property.
             #[pyo3(name = "SetUnsignedProp", signature = (key, val, computed = false))]
-            fn py_set_unsigned_prop(&mut self, py: pyo3::Python<'_>, key: &str, val: u32, #[pyo3(from_py_with = crate::pyconv::truthy)] computed: bool) -> pyo3::PyResult<()> {
-                self.with_dict_mut(py, |d| $crate::props::set_prop(d, key, val.into(), computed))?
+            fn py_set_unsigned_prop(&mut self, py: pyo3::Python<'_>, key: $crate::props::PropKey, val: u32, #[pyo3(from_py_with = crate::pyconv::truthy)] computed: bool) -> pyo3::PyResult<()> {
+                self.with_dict_mut(py, |d| $crate::props::set_prop(d, &key.0, val.into(), computed))?
             }
             /// Sets a boolean valued property.
             #[pyo3(name = "SetBoolProp", signature = (key, val, computed = false))]
-            fn py_set_bool_prop(&mut self, py: pyo3::Python<'_>, key: &str, #[pyo3(from_py_with = crate::pyconv::truthy)] val: bool, #[pyo3(from_py_with = crate::pyconv::truthy)] computed: bool) -> pyo3::PyResult<()> {
-                self.with_dict_mut(py, |d| $crate::props::set_prop(d, key, val.into(), computed))?
+            fn py_set_bool_prop(&mut self, py: pyo3::Python<'_>, key: $crate::props::PropKey, #[pyo3(from_py_with = crate::pyconv::truthy)] val: bool, #[pyo3(from_py_with = crate::pyconv::truthy)] computed: bool) -> pyo3::PyResult<()> {
+                self.with_dict_mut(py, |d| $crate::props::set_prop(d, &key.0, val.into(), computed))?
             }
         }
     };
@@ -348,28 +382,28 @@ macro_rules! impl_props {
         impl $ty {
             /// Sets a property (string value).
             #[pyo3(name = "SetProp")]
-            fn py_set_prop(&mut self, py: pyo3::Python<'_>, key: &str, val: String) -> pyo3::PyResult<()> {
-                self.with_dict_mut(py, |d| $crate::props::set_prop(d, key, val.into(), false))?
+            fn py_set_prop(&mut self, py: pyo3::Python<'_>, key: $crate::props::PropKey, val: String) -> pyo3::PyResult<()> {
+                self.with_dict_mut(py, |d| $crate::props::set_prop(d, &key.0, val.into(), false))?
             }
             /// Sets a double valued property.
             #[pyo3(name = "SetDoubleProp")]
-            fn py_set_double_prop(&mut self, py: pyo3::Python<'_>, key: &str, val: f64) -> pyo3::PyResult<()> {
-                self.with_dict_mut(py, |d| $crate::props::set_prop(d, key, val.into(), false))?
+            fn py_set_double_prop(&mut self, py: pyo3::Python<'_>, key: $crate::props::PropKey, val: f64) -> pyo3::PyResult<()> {
+                self.with_dict_mut(py, |d| $crate::props::set_prop(d, &key.0, val.into(), false))?
             }
             /// Sets an integer valued property.
             #[pyo3(name = "SetIntProp")]
-            fn py_set_int_prop(&mut self, py: pyo3::Python<'_>, key: &str, val: i32) -> pyo3::PyResult<()> {
-                self.with_dict_mut(py, |d| $crate::props::set_prop(d, key, val.into(), false))?
+            fn py_set_int_prop(&mut self, py: pyo3::Python<'_>, key: $crate::props::PropKey, val: i32) -> pyo3::PyResult<()> {
+                self.with_dict_mut(py, |d| $crate::props::set_prop(d, &key.0, val.into(), false))?
             }
             /// Sets an unsigned integer valued property.
             #[pyo3(name = "SetUnsignedProp")]
-            fn py_set_unsigned_prop(&mut self, py: pyo3::Python<'_>, key: &str, val: u32) -> pyo3::PyResult<()> {
-                self.with_dict_mut(py, |d| $crate::props::set_prop(d, key, val.into(), false))?
+            fn py_set_unsigned_prop(&mut self, py: pyo3::Python<'_>, key: $crate::props::PropKey, val: u32) -> pyo3::PyResult<()> {
+                self.with_dict_mut(py, |d| $crate::props::set_prop(d, &key.0, val.into(), false))?
             }
             /// Sets a boolean valued property.
             #[pyo3(name = "SetBoolProp")]
-            fn py_set_bool_prop(&mut self, py: pyo3::Python<'_>, key: &str, val: bool) -> pyo3::PyResult<()> {
-                self.with_dict_mut(py, |d| $crate::props::set_prop(d, key, val.into(), false))?
+            fn py_set_bool_prop(&mut self, py: pyo3::Python<'_>, key: $crate::props::PropKey, val: bool) -> pyo3::PyResult<()> {
+                self.with_dict_mut(py, |d| $crate::props::set_prop(d, &key.0, val.into(), false))?
             }
         }
     };

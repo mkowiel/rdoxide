@@ -787,6 +787,7 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::testGetEnhancedStereo
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGetEnhancedStereoAtrop
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGetQueryType
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGetSDText
+Code/GraphMol/Wrap/rough_test.py::TestCase::testGetSetProps
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGetShortestPath
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGitHub1166
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGitHub1985
@@ -808,11 +809,13 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub2611
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub3198
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub4138
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub4144
+Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub4570
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub4884
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub497
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub498
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub6945
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub8467
+Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub8877
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub9101
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub9125
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub955
@@ -917,6 +920,11 @@ Code/GraphMol/Wrap/testMultithreadedMolSupplier.py::TestCase::testMultiSDMolSupp
 Code/GraphMol/Wrap/testMultithreadedMolSupplier.py::TestCase::testMultiSDMolSupplierThrow
 Code/GraphMol/Wrap/testMultithreadedMolSupplier.py::TestCase::testMultiSmiMolSupplier
 Code/GraphMol/Wrap/testMultithreadedMolSupplier.py::TestCase::testMultiSmiMolSupplierThrow
+Code/GraphMol/Wrap/testPropertyLists.py::TestCase::testCreateLists
+Code/GraphMol/Wrap/testPropertyLists.py::TestCase::testForwardSupplier
+Code/GraphMol/Wrap/testPropertyLists.py::TestCase::testGithubPR4160
+Code/GraphMol/Wrap/testPropertyLists.py::TestCase::testSetProps
+Code/GraphMol/Wrap/testPropertyLists.py::TestCase::testSupplier
 Code/GraphMol/Wrap/testSCSR.py::TestCase::testSCSR
 Code/GraphMol/Wrap/testSCSR.py::TestCase::testSCSRRna
 Code/GraphMol/Wrap/testSCSR.py::TestCase::testThreeLetterCodes
@@ -1104,6 +1112,7 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::testGetEnhancedStereo
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGetEnhancedStereoAtrop
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGetQueryType
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGetSDText
+Code/GraphMol/nbWrap/rough_test.py::TestCase::testGetSetProps
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGetShortestPath
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGitHub1166
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGitHub1985
@@ -1129,7 +1138,6 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::testGithub497
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGithub498
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGithub6945
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGithub8467
-Code/GraphMol/nbWrap/rough_test.py::TestCase::testGithub8877
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGithub9101
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGithub9125
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGithub955
