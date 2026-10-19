@@ -19,6 +19,7 @@ use rdoxide::graphmol::mol_ops::add_hs::{needs_hs, set_terminal_atom_coords};
 use rdoxide::graphmol::mol_ops::{
     clean_up_organometallics, cleanup_atropisomers, cleanup_chirality,
 };
+use rdoxide::rdgeneral::dict::RDProps;
 
 use crate::atom::{AtomHandle, PyAtom};
 use crate::conformer::{ConfHandle, PyConformer};
@@ -206,6 +207,45 @@ fn py_cleanup_organometallics(mut mol: PyRefMut<'_, PyMol>) -> PyResult<()> {
     clean_up_organometallics(&mut mol.mol).py()
 }
 
+/// Sets one property of each supported type, to test that they read back correctly.
+#[allow(clippy::approx_constant)] // the tests expect exactly 3.14159
+fn set_test_props(props: &mut impl RDProps, prefix: &str) -> PyResult<()> {
+    let key = |name: &str| format!("{prefix}{name}");
+    props.set_prop(&key("bool"), true, false).py()?;
+    props.set_prop(&key("uint"), u32::MAX, false).py()?;
+    props.set_prop(&key("double"), 3.14159_f64, false).py()?;
+    props
+        .set_prop(&key("svint"), vec![0_i32, 1, 2, -2], false)
+        .py()?;
+    props
+        .set_prop(&key("svuint"), vec![0_u32, 1, 2, u32::MAX - 1], false)
+        .py()?;
+    props
+        .set_prop(&key("svdouble"), vec![0.0_f64, 1.0, 2.0], false)
+        .py()?;
+    let words = vec!["The".to_string(), "RDKit".to_string()];
+    props.set_prop(&key("svstring"), words, false).py()?;
+    Ok(())
+}
+
+/// (test helper) sets properties of every type on a molecule, its atoms, bonds and conformers
+#[pyfunction]
+#[pyo3(name = "_TestSetProps", signature = (mol))]
+fn py_test_set_props(mut mol: PyRefMut<'_, PyMol>) -> PyResult<()> {
+    let mol = &mut mol.mol;
+    set_test_props(mol, "mol_")?;
+    for i in 0..mol.num_atoms() {
+        set_test_props(mol.atom_mut(i), &format!("atom_{i}"))?;
+    }
+    for i in 0..mol.num_bonds() {
+        set_test_props(mol.bond_mut(i), &format!("bond_{i}"))?;
+    }
+    for (i, conf) in mol.conformers_mut().iter_mut().enumerate() {
+        set_test_props(conf, &format!("conf_{i}"))?;
+    }
+    Ok(())
+}
+
 /// returns whether or not the molecule needs to have Hs added
 #[pyfunction]
 #[pyo3(name = "NeedsHs", signature = (mol))]
@@ -255,6 +295,7 @@ pub fn add(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_cleanup_atropisomers, m)?)?;
     m.add_function(wrap_pyfunction!(py_cleanup_organometallics, m)?)?;
     m.add_function(wrap_pyfunction!(py_needs_hs, m)?)?;
+    m.add_function(wrap_pyfunction!(py_test_set_props, m)?)?;
     m.add_function(wrap_pyfunction!(py_count_atom_elec, m)?)?;
     m.add_function(wrap_pyfunction!(py_atom_has_conjugated_bond, m)?)?;
     Ok(())
