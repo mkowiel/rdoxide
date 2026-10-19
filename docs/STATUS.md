@@ -227,6 +227,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 111 | rdBase.streambuf wrapper for Python file objects (test69) | done |
 | 112 | Chem.HasChemDrawCDXSupport() (reports False; test_cdxml test_formats) | done |
 | 113 | ScaffoldNetwork pickle compatible with upstream's Boost text archive (testPickleScaffoldNetwork) | done |
+| 114 | O3A (`mol_align_o3a`: MolHistogram, LAP, SDM, O3A; MMFF and Crippen schemes) and Python GetO3A, GetCrippenO3A, GetO3AForProbeConfs, GetCrippenO3AForProbeConfs, O3A | done |
 
 ## Python package files
 
@@ -510,3 +511,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-19 — Stage 111: streambuf forwards to the wrapped file.
 * 2026-10-19 — Stage 112: CDX support flag.
 * 2026-10-19 — Stage 113: ScaffoldNetwork to_archive/from_archive.
+* 2026-10-19 — Stage 114: O3A port; testMolAlign 20/20.

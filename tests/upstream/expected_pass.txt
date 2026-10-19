@@ -413,6 +413,13 @@ Code/GraphMol/MMPA/Wrap/testMMPA.py::TestCase::test6
 Code/GraphMol/MMPA/Wrap/testMMPA.py::TestCase::test7
 Code/GraphMol/MMPA/Wrap/testMMPA.py::TestCase::test8
 Code/GraphMol/MMPA/Wrap/testMMPA.py::TestCase::test9
+Code/GraphMol/MolAlign/Wrap/testMolAlign.py::TestCase::test10CrippenO3A
+Code/GraphMol/MolAlign/Wrap/testMolAlign.py::TestCase::test11CrippenO3A
+Code/GraphMol/MolAlign/Wrap/testMolAlign.py::TestCase::test12CrippenO3A
+Code/GraphMol/MolAlign/Wrap/testMolAlign.py::TestCase::test13CrippenO3A
+Code/GraphMol/MolAlign/Wrap/testMolAlign.py::TestCase::test14Github385
+Code/GraphMol/MolAlign/Wrap/testMolAlign.py::TestCase::test15MultiConfs
+Code/GraphMol/MolAlign/Wrap/testMolAlign.py::TestCase::test16MultithreadBug
 Code/GraphMol/MolAlign/Wrap/testMolAlign.py::TestCase::test17GetBestRMS
 Code/GraphMol/MolAlign/Wrap/testMolAlign.py::TestCase::test18GetBestRMSAndConjugatedGroups
 Code/GraphMol/MolAlign/Wrap/testMolAlign.py::TestCase::test19GetAllConformerBestRMS
@@ -421,6 +428,11 @@ Code/GraphMol/MolAlign/Wrap/testMolAlign.py::TestCase::test20GetAllConformerBest
 Code/GraphMol/MolAlign/Wrap/testMolAlign.py::TestCase::test2AtomMap
 Code/GraphMol/MolAlign/Wrap/testMolAlign.py::TestCase::test3Weights
 Code/GraphMol/MolAlign/Wrap/testMolAlign.py::TestCase::test4AlignConfs
+Code/GraphMol/MolAlign/Wrap/testMolAlign.py::TestCase::test5MMFFO3A
+Code/GraphMol/MolAlign/Wrap/testMolAlign.py::TestCase::test6MMFFO3A
+Code/GraphMol/MolAlign/Wrap/testMolAlign.py::TestCase::test7MMFFO3A
+Code/GraphMol/MolAlign/Wrap/testMolAlign.py::TestCase::test8MMFFO3A
+Code/GraphMol/MolAlign/Wrap/testMolAlign.py::TestCase::test9MMFFO3A
 Code/GraphMol/MolCatalog/Wrap/rough_test.py::TestCase::test1
 Code/GraphMol/MolCatalog/Wrap/rough_test.py::TestCase::test2
 Code/GraphMol/MolCatalog/Wrap/rough_test.py::TestCase::test3
@@ -985,7 +997,6 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::test25SDMolSupplier
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test26SmiMolSupplier
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test27SmilesWriter
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test28SmilesReverse
-Code/GraphMol/nbWrap/rough_test.py::TestCase::test29SDWriterLoop
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test2Atom
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test30Issues109and110
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test31ChiralitySmiles
@@ -1025,7 +1036,6 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::test56LazySDMolSupplier
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test58Issue2983794
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test59Issue3007178
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test5Smiles
-Code/GraphMol/nbWrap/rough_test.py::TestCase::test60SmilesWriterClose
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test61PathToSubmol
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test62SmilesAndSmartsReplacements
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test63Issue3313539
