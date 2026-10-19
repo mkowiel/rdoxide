@@ -86,7 +86,9 @@ impl Lap {
         self.row_sol[i] as usize
     }
 
-    /// `LAP::computeMinCostPath`
+    /// `LAP::computeMinCostPath`. The scan loops start at the value `up` has on
+    /// entry while `up` itself keeps growing, exactly as in the C original.
+    #[allow(clippy::mut_range_bound)]
     pub fn compute_min_cost_path(&mut self, dim: usize) {
         let n = self.dim;
         let c = |cost: &Vec<i32>, i: usize, j: usize| cost[i * n + j];
