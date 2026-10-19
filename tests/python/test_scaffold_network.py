@@ -24,5 +24,4 @@ def test_bad_inputs():
     with pytest.raises(Exception):
         rdScaffoldNetwork.ScaffoldNetworkParams(["[C:1]>>[C:1]"])
     net = rdScaffoldNetwork.CreateScaffoldNetwork([Chem.MolFromSmiles("c1ccccc1C")], ps)
-    with pytest.raises(RuntimeError):
-        pickle.dumps(net)
+    assert list(pickle.loads(pickle.dumps(net)).nodes) == list(net.nodes)
