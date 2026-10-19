@@ -83,6 +83,22 @@ fn type_name(kind: &str) -> &'static str {
     }
 }
 
+/// Why a stored number does not fit the requested integer type: boost's
+/// `bad_numeric_cast` text for out-of-range numbers, `bad any cast` otherwise.
+fn cast_failure_reason(v: &RDValue, kind: &str) -> &'static str {
+    let wide = match v {
+        RDValue::Int(i) => Some(i64::from(*i)),
+        RDValue::UnsignedInt(u) => Some(i64::from(*u)),
+        RDValue::Int64(i) => Some(*i),
+        _ => None,
+    };
+    match (kind, wide) {
+        ("uint", Some(x)) if x < 0 => "bad numeric conversion: negative overflow",
+        ("int", Some(x)) if x > i64::from(i32::MAX) => "bad numeric conversion: positive overflow",
+        _ => "bad any cast",
+    }
+}
+
 /// Typed getter (`GetIntProp` & co.).
 pub fn get_typed<'py, T: IntoPyObject<'py>>(
     py: Python<'py>,
@@ -100,8 +116,9 @@ pub fn get_typed<'py, T: IntoPyObject<'py>>(
         Some(v) => match conv(v) {
             Some(x) => Ok(x.into_pyobject(py).map_err(Into::into)?.into_any().unbind()),
             None => Err(PyValueError::new_err(format!(
-                "key `{key}` exists but does not result in {} reason: bad any cast",
-                type_name(kind)
+                "key `{key}` exists but does not result in {} reason: {}",
+                type_name(kind),
+                cast_failure_reason(v, kind)
             ))),
         },
     }
