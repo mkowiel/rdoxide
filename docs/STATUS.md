@@ -223,6 +223,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 107 | `file_parsers::property_lists` (`createAtom/Bond{Int,Double,Bool,String}PropertyList` with missing-value marker and line wrapping) and the `rdmolops._TestSetProps` test helper; Python `Create*PropertyList` | ✅ | upstream `testPropertyLists.py` 5/5; `tests/python/test_property_lists.py` |
 | 108 | SetQuery/ExpandQuery(None) ValueError (testGithub8877) | done |
 | 109 | Boost numeric-overflow text in Get{Int,Unsigned}Prop errors (testGetSetProps) | done |
+| 110 | Non-str property names raise TypeError 'Python argument types' (testGithub4570) | done |
 
 ## Python package files
 
@@ -502,3 +503,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-19 — Stage 107: property list writers and _TestSetProps.
 * 2026-10-19 — Stage 108: QueryAtom/QueryBond reject None with ValueError.
 * 2026-10-19 — Stage 109: Typed prop getters report negative/positive overflow.
+* 2026-10-19 — Stage 110: PropKey extractor for property accessors.

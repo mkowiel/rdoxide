@@ -808,6 +808,7 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub2611
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub3198
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub4138
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub4144
+Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub4570
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub4884
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub497
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub498
