@@ -786,6 +786,7 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::testGetEnhancedStereo
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGetEnhancedStereoAtrop
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGetQueryType
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGetSDText
+Code/GraphMol/Wrap/rough_test.py::TestCase::testGetSetProps
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGetShortestPath
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGitHub1166
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGitHub1985
@@ -1109,6 +1110,7 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::testGetEnhancedStereo
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGetEnhancedStereoAtrop
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGetQueryType
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGetSDText
+Code/GraphMol/nbWrap/rough_test.py::TestCase::testGetSetProps
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGetShortestPath
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGitHub1166
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGitHub1985
