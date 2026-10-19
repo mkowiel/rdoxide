@@ -14,17 +14,21 @@ use crate::mol::PyMol;
 use crate::rdmoldescriptors::bool_arg;
 
 /// A row-major `n x n` buffer as a NumPy array of the given dtype.
-fn square_array<'py, T: IntoPyObject<'py>>(
+fn square_array<'py>(
     py: Python<'py>,
-    data: Vec<T>,
+    bytes: Vec<u8>,
     n: usize,
     dtype: &str,
 ) -> PyResult<Bound<'py, PyAny>> {
+    // raw bytes in a bytearray give a writable array without Python lists
+    let buffer = pyo3::types::PyByteArray::new(py, &bytes);
     let np = py.import("numpy")?;
-    let arr = np
-        .call_method1("array", (data,))?
-        .call_method1("astype", (dtype,))?;
-    arr.call_method1("reshape", ((n, n),))
+    np.call_method1("frombuffer", (buffer, dtype))?
+        .call_method1("reshape", ((n, n),))
+}
+
+fn f64_bytes(values: &[f64]) -> Vec<u8> {
+    values.iter().flat_map(|v| v.to_ne_bytes()).collect()
 }
 
 /// Returns the molecule's topological distance matrix.
@@ -69,7 +73,7 @@ fn get_distance_matrix<'py>(
             .py()?;
         (m.mol.num_atoms() as usize, d)
     };
-    square_array(py, d, n, "float64")
+    square_array(py, f64_bytes(&d), n, "float64")
 }
 
 /// Returns the molecule's 3D distance matrix.
@@ -114,7 +118,7 @@ fn get_3d_distance_matrix<'py>(
                 .map_err(|_| PyValueError::new_err("Bad Conformer Id"))?;
         (m.mol.num_atoms() as usize, d)
     };
-    square_array(py, d, n, "float64")
+    square_array(py, f64_bytes(&d), n, "float64")
 }
 
 /// Returns the molecule's adjacency matrix.
@@ -157,10 +161,13 @@ fn get_adjacency_matrix<'py>(
         (m.mol.num_atoms() as usize, a)
     };
     if use_bo {
-        square_array(py, a, n, "float64")
+        square_array(py, f64_bytes(&a), n, "float64")
     } else {
         // `std::round` of each entry, as an int array
-        let ints: Vec<i32> = a.iter().map(|v| v.round() as i32).collect();
+        let ints: Vec<u8> = a
+            .iter()
+            .flat_map(|v| (v.round() as i32).to_ne_bytes())
+            .collect();
         square_array(py, ints, n, "intc")
     }
 }
