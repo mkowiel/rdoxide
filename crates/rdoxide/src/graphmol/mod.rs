@@ -36,6 +36,7 @@ pub mod kekulize;
 pub mod matrices;
 pub mod mmpa;
 pub mod mol_align;
+pub mod mol_align_o3a;
 pub mod mol_bundle;
 pub mod mol_catalog;
 pub mod mol_chemical_features;

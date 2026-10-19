@@ -704,7 +704,7 @@ fn py_uff_vdw_params(py: Python<'_>, mol: &PyMol, idx1: u32, idx2: u32) -> PyRes
 /// MMFF molecular properties
 #[pyclass(name = "MMFFMolProperties", module = "rdoxide.ForceField.rdForceField")]
 pub struct PyMmffMolProperties {
-    props: MmffMolProperties,
+    pub(crate) props: MmffMolProperties,
 }
 
 fn mmff_atom_index(mol: &PyMol, indices: &[u32]) -> PyResult<()> {

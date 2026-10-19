@@ -58,6 +58,7 @@ mod rdmhfpfingerprint;
 mod rdmif;
 mod rdmmpa;
 mod rdmolalign;
+mod rdmolalign_o3a;
 mod rdmolcatalog;
 mod rdmolchemicalfeatures;
 mod rdmoldescriptors;

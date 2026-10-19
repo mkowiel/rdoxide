@@ -1,9 +1,10 @@
 //! `rdoxide.Chem.Scaffolds.rdScaffoldNetwork` (upstream
-//! `GraphMol/ScaffoldNetwork/Wrap/rdScaffoldNetwork.cpp`). Pickling of
-//! networks is not supported (upstream needs Boost serialization).
+//! `GraphMol/ScaffoldNetwork/Wrap/rdScaffoldNetwork.cpp`). Networks pickle as
+//! the Boost text archive upstream writes.
 
-use pyo3::exceptions::{PyRuntimeError, PyValueError};
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use pyo3::types::{PyBytes, PyTuple};
 use rdoxide::graphmol::romol::ROMol;
 use rdoxide::graphmol::scaffold_network::{
     self, EdgeType, NetworkEdge, ScaffoldNetwork, ScaffoldNetworkParams,
@@ -139,8 +140,16 @@ struct PyScaffoldNetwork {
 #[pymethods]
 impl PyScaffoldNetwork {
     #[new]
-    fn new() -> Self {
-        Self::default()
+    #[pyo3(signature = (pkl = None))]
+    fn new(pkl: Option<&[u8]>) -> PyResult<Self> {
+        let Some(pkl) = pkl else {
+            return Ok(Self::default());
+        };
+        let text = std::str::from_utf8(pkl)
+            .map_err(|_| PyValueError::new_err("invalid ScaffoldNetwork pickle"))?;
+        Ok(Self {
+            network: ScaffoldNetwork::from_archive(text).map_err(crate::errors::to_py)?,
+        })
     }
 
     /// the sequence of SMILES defining the nodes
@@ -171,10 +180,21 @@ impl PyScaffoldNetwork {
             .collect()
     }
 
-    fn __reduce__(&self) -> PyResult<()> {
-        Err(PyRuntimeError::new_err(
-            "Pickling of ScaffoldNetwork instances is not enabled",
-        ))
+    /// Pickles written by the Boost.Python wrappers carry an (empty) state tuple.
+    fn __setstate__(&self, state: &Bound<'_, PyAny>) {
+        let _ = state;
+    }
+
+    fn __reduce__<'py>(slf: &Bound<'py, Self>) -> PyResult<Bound<'py, PyTuple>> {
+        let py = slf.py();
+        let archive = PyBytes::new(py, slf.borrow().network.to_archive().as_bytes());
+        PyTuple::new(
+            py,
+            [
+                slf.get_type().into_any(),
+                PyTuple::new(py, [archive])?.into_any(),
+            ],
+        )
     }
 }
 
