@@ -15,3 +15,10 @@ def test_integer_overflow_messages():
         ob.SetDoubleProp("foo", 2.0)
         with pytest.raises(ValueError, match="bad any cast"):
             ob.GetIntProp("foo")
+
+
+def test_none_property_name_is_an_argument_error():
+    m = Chem.Mol()
+    for name, extra in [("HasProp", ()), ("GetProp", ()), ("SetProp", ("",)), ("SetIntProp", (1,))]:
+        with pytest.raises(TypeError, match="Python argument types"):
+            getattr(m, name)(None, *extra)
