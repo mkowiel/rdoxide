@@ -241,7 +241,31 @@ fn set_max_threads(numThreads: i32) {
     rdoxide::rdgeneral::threads::set_max_threads(numThreads);
 }
 
+/// Wraps a Python file object (upstream `rdBase.streambuf`); suppliers and
+/// writers only need its `read`/`write`/`flush`, which are forwarded.
+#[pyclass(name = "streambuf", module = "rdoxide.rdBase")]
+pub struct PyStreambuf {
+    file: Py<PyAny>,
+}
+
+#[pymethods]
+impl PyStreambuf {
+    #[new]
+    #[pyo3(signature = (python_file_obj, buffer_size = 0))]
+    fn new(python_file_obj: Py<PyAny>, buffer_size: usize) -> Self {
+        let _ = buffer_size;
+        Self {
+            file: python_file_obj,
+        }
+    }
+
+    fn __getattr__(&self, py: Python<'_>, name: &str) -> PyResult<Py<PyAny>> {
+        Ok(self.file.bind(py).getattr(name)?.unbind())
+    }
+}
+
 pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<PyStreambuf>()?;
     m.add(
         "__doc__",
         "Module containing basic definitions for wrapped C++ code\n\n",

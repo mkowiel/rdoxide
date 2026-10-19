@@ -704,6 +704,7 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::test65StreamSupplier
 Code/GraphMol/Wrap/rough_test.py::TestCase::test66StreamSupplierIter
 Code/GraphMol/Wrap/rough_test.py::TestCase::test67StreamSupplierStringIO
 Code/GraphMol/Wrap/rough_test.py::TestCase::test68ForwardSupplierUsingFilename
+Code/GraphMol/Wrap/rough_test.py::TestCase::test69StreamSupplierStreambuf
 Code/GraphMol/Wrap/rough_test.py::TestCase::test70StreamSDWriter
 Code/GraphMol/Wrap/rough_test.py::TestCase::test71StreamSmilesWriter
 Code/GraphMol/Wrap/rough_test.py::TestCase::test72StreamTDTWriter

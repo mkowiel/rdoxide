@@ -220,6 +220,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 104 | `StereoGroup.SetWriteId`/`GetWriteId` of a group taken from a molecule read and write the molecule's group, `CreateStereoGroup` rejects empty groups and out-of-range indices with `ValueError`, new `ForwardStereoGroupIds` | ✅ | `tests/python/test_stereo_group_api.py`; rough_test +3 (+2 nbWrap) |
 | 105 | Native `rdoxide.Numerics.rdAlignment.GetAlignmentTransform` (points as arrays, sequences or `Point3D`), pure-Python `sping` and `Chem.Subshape` copied from upstream | ✅ | upstream `testAlignment.py` 5/5, `UnitTestSubshape` 2/2; `testMolAlign.py` now loads (O3A functions are missing: 8/20) |
 | 106 | `graphmol::descriptors::dclv` (Shrake-Rupley surface area, volume, polar and partial variants, compactness, packing density, surface points) with the 320 standard dots generated from `DCLV_dots.h`; Python `rdMolDescriptors.DoubleCubicLatticeVolume` | ✅ | upstream `testMolDescriptors.py` `testDCLV` (1mup protein, ligand, TZL model: all values); `tests/python/test_dclv.py` closed-form sphere |
+| 107 | rdBase.streambuf wrapper for Python file objects (test69) | done |
 
 ## Python package files
 
@@ -496,3 +497,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-19 — Stage 104: stereo group live write ids, argument checks, ForwardStereoGroupIds.
 * 2026-10-19 — Stage 105: rdAlignment, sping, Subshape.
 * 2026-10-19 — Stage 106: double cubic lattice volume (testDCLV).
+* 2026-10-19 — Stage 107: streambuf forwards to the wrapped file.
