@@ -455,6 +455,9 @@ fn other_query(
     extra: &[Bound<'_, PyAny>],
 ) -> PyResult<Option<BondQuery>> {
     let py = slf.py();
+    if other.is_none() {
+        return Err(PyValueError::new_err("other Bond is null"));
+    }
     let Ok(other) = other.cast::<PyQueryBond>() else {
         let mut got = vec![
             "QueryBond".to_string(),
