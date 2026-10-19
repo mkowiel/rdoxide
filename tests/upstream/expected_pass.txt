@@ -916,6 +916,11 @@ Code/GraphMol/Wrap/testMultithreadedMolSupplier.py::TestCase::testMultiSDMolSupp
 Code/GraphMol/Wrap/testMultithreadedMolSupplier.py::TestCase::testMultiSDMolSupplierThrow
 Code/GraphMol/Wrap/testMultithreadedMolSupplier.py::TestCase::testMultiSmiMolSupplier
 Code/GraphMol/Wrap/testMultithreadedMolSupplier.py::TestCase::testMultiSmiMolSupplierThrow
+Code/GraphMol/Wrap/testPropertyLists.py::TestCase::testCreateLists
+Code/GraphMol/Wrap/testPropertyLists.py::TestCase::testForwardSupplier
+Code/GraphMol/Wrap/testPropertyLists.py::TestCase::testGithubPR4160
+Code/GraphMol/Wrap/testPropertyLists.py::TestCase::testSetProps
+Code/GraphMol/Wrap/testPropertyLists.py::TestCase::testSupplier
 Code/GraphMol/Wrap/testSCSR.py::TestCase::testSCSR
 Code/GraphMol/Wrap/testSCSR.py::TestCase::testSCSRRna
 Code/GraphMol/Wrap/testSCSR.py::TestCase::testThreeLetterCodes
