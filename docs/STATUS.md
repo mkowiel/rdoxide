@@ -228,6 +228,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 112 | Chem.HasChemDrawCDXSupport() (reports False; test_cdxml test_formats) | done |
 | 113 | ScaffoldNetwork pickle compatible with upstream's Boost text archive (testPickleScaffoldNetwork) | done |
 | 114 | O3A (`mol_align_o3a`: MolHistogram, LAP, SDM, O3A; MMFF and Crippen schemes) and Python GetO3A, GetCrippenO3A, GetO3AForProbeConfs, GetCrippenO3AForProbeConfs, O3A | done |
+| 115 | CDXML reading (`file_parsers::cdxml`: XML reader, fragments, fusing, stereo groups, queries, schemes) with Python MolsFromCDXML/MolsFromCDXMLFile/CDXMLParserParams/CDXMLFormat/MolToCDXMLBlock and ReactionsFromCDXMLFile/Block (CDX binary and writing not supported) | done |
 
 ## Python package files
 
@@ -512,3 +513,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-19 — Stage 112: CDX support flag.
 * 2026-10-19 — Stage 113: ScaffoldNetwork to_archive/from_archive.
 * 2026-10-19 — Stage 114: O3A port; testMolAlign 20/20.
+* 2026-10-19 — Stage 115: CDXML parser; test_cdxml 10/10.

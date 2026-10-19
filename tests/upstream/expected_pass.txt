@@ -112,6 +112,7 @@ Code/GraphMol/ChemReactions/Wrap/testEnumerations.py::TestCase::testTimings
 Code/GraphMol/ChemReactions/Wrap/testReactionWrapper.py::CXExtensionsTests::test_cxsmarts_reaction
 Code/GraphMol/ChemReactions/Wrap/testReactionWrapper.py::CXExtensionsTests::test_cxsmiles_reaction
 Code/GraphMol/ChemReactions/Wrap/testReactionWrapper.py::DocTestCase::runTest
+Code/GraphMol/ChemReactions/Wrap/testReactionWrapper.py::StereoGroupTests::testCDXML
 Code/GraphMol/ChemReactions/Wrap/testReactionWrapper.py::StereoGroupTests::testGithub4651
 Code/GraphMol/ChemReactions/Wrap/testReactionWrapper.py::StereoGroupTests::testGithub6138
 Code/GraphMol/ChemReactions/Wrap/testReactionWrapper.py::StereoGroupTests::testGithub6211
@@ -806,6 +807,7 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::testGitHub1166
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGitHub1985
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGitHub2082
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGitHub2082_2
+Code/GraphMol/Wrap/rough_test.py::TestCase::testGitHub2597
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub1041
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub1051
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub1320
@@ -967,6 +969,14 @@ Code/GraphMol/Wrap/testTrajectory.py::TestCase::testSnapshot
 Code/GraphMol/Wrap/testTrajectory.py::TestCase::testTrajectory2D
 Code/GraphMol/Wrap/testTrajectory.py::TestCase::testTrajectory3D
 Code/GraphMol/Wrap/test_cdxml.py::TestCase::test_cdxml
+Code/GraphMol/Wrap/test_cdxml.py::TestCase::test_cdxml_atom_restriction_queries
+Code/GraphMol/Wrap/test_cdxml.py::TestCase::test_cdxml_bond_queries
+Code/GraphMol/Wrap/test_cdxml.py::TestCase::test_cdxml_explicit_hydrogen_minimum_queries
+Code/GraphMol/Wrap/test_cdxml.py::TestCase::test_cdxml_external_connection_fragment_query
+Code/GraphMol/Wrap/test_cdxml.py::TestCase::test_cdxml_hydrogen_bond_query
+Code/GraphMol/Wrap/test_cdxml.py::TestCase::test_cdxml_multiattachment_query
+Code/GraphMol/Wrap/test_cdxml.py::TestCase::test_cdxml_query_api
+Code/GraphMol/Wrap/test_cdxml.py::TestCase::test_cdxml_spiro_ring_bond_count_query
 Code/GraphMol/Wrap/test_cdxml.py::TestCase::test_formats
 Code/GraphMol/Wrap/test_lazy_numpy.py::TestLazyNumpy::test_adjacency_matrix_loads_numpy
 Code/GraphMol/Wrap/test_lazy_numpy.py::TestLazyNumpy::test_basic_smiles_roundtrip_without_numpy
@@ -1130,6 +1140,7 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::testGitHub1166
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGitHub1985
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGitHub2082
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGitHub2082_2
+Code/GraphMol/nbWrap/rough_test.py::TestCase::testGitHub2597
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGithub1041
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGithub1051
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGithub1320
