@@ -74,6 +74,7 @@ mod rdmoldescriptors_usr;
 mod rdmoldraw2d;
 mod rdmolenumerator;
 mod rdmolfiles;
+mod rdmolfiles_cdxml;
 mod rdmolfiles_cml;
 mod rdmolfiles_fwdsdsupplier;
 mod rdmolfiles_marvin;

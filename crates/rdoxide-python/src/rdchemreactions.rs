@@ -1005,6 +1005,64 @@ fn py_reaction_from_rxn_block(
     Ok(PyChemicalReaction::new(rxn))
 }
 
+/// Construct reactions from the scheme steps of a CDXML file.
+#[pyfunction]
+#[pyo3(name = "ReactionsFromCDXMLFile", signature = (filename, sanitize = false, removeHs = false))]
+#[allow(non_snake_case)]
+fn py_reactions_from_cdxml_file<'py>(
+    py: Python<'py>,
+    filename: &str,
+    sanitize: bool,
+    removeHs: bool,
+) -> PyResult<Bound<'py, PyTuple>> {
+    reactions_tuple(
+        py,
+        rdoxide::graphmol::chem_reactions::cdxml::cdxml_file_to_chemical_reactions(
+            filename, sanitize, removeHs,
+        ),
+    )
+}
+
+/// Construct reactions from the scheme steps of a CDXML block.
+#[pyfunction]
+#[pyo3(name = "ReactionsFromCDXMLBlock", signature = (cdxml, sanitize = false, removeHs = false))]
+#[allow(non_snake_case)]
+fn py_reactions_from_cdxml_block<'py>(
+    py: Python<'py>,
+    cdxml: &Bound<'py, PyAny>,
+    sanitize: bool,
+    removeHs: bool,
+) -> PyResult<Bound<'py, PyTuple>> {
+    let text = crate::rdmolfiles_sequence::text_arg(cdxml)?;
+    reactions_tuple(
+        py,
+        rdoxide::graphmol::chem_reactions::cdxml::cdxml_to_chemical_reactions(
+            &text, sanitize, removeHs,
+        ),
+    )
+}
+
+/// Upstream logs parse failures as warnings and returns what it has.
+fn reactions_tuple<'py>(
+    py: Python<'py>,
+    res: rdoxide::Result<Vec<ChemicalReaction>>,
+) -> PyResult<Bound<'py, PyTuple>> {
+    let rxns = match res {
+        Ok(r) => r,
+        Err(rdoxide::RDKitError::FileParse(m)) => {
+            rdoxide::rd_log_warning!("{m}");
+            Vec::new()
+        }
+        Err(_) => Vec::new(),
+    };
+    PyTuple::new(
+        py,
+        rxns.into_iter()
+            .map(|r| Py::new(py, PyChemicalReaction::new(r)))
+            .collect::<PyResult<Vec<_>>>()?,
+    )
+}
+
 /// construct a string in MDL rxn format for a ChemicalReaction
 #[pyfunction]
 #[pyo3(name = "ReactionToRxnBlock", signature = (reaction, separateAgents = false, forceV3000 = false))]
@@ -1399,6 +1457,8 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
         "Module containing classes and functions for working with chemical reactions.",
     )?;
     m.add_class::<PyChemicalReaction>()?;
+    m.add_function(wrap_pyfunction!(py_reactions_from_cdxml_file, m)?)?;
+    m.add_function(wrap_pyfunction!(py_reactions_from_cdxml_block, m)?)?;
     crate::rdchemreactions_enumerate::init(m)?;
     add_enum(m, FINGERPRINT_TYPE, &fingerprint_type_members(), None)?;
     m.add_class::<PyReactionFingerprintParams>()?;

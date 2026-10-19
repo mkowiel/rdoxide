@@ -1,5 +1,6 @@
 //! Port of RDKit `Code/GraphMol/FileParsers`.
 
+pub mod cdxml;
 pub mod cml_writer;
 pub mod helm_parser;
 pub mod helm_writer;

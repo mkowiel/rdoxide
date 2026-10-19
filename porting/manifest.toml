@@ -1803,3 +1803,10 @@
 
 [module."rdoxide_python::rdmolfiles_proplists".sources]
 "Code/GraphMol/Wrap/rdmolfiles.cpp" = "829058d8e8a382c358d2464cee762f8cff04f75f"
+
+[module."rdoxide::graphmol::file_parsers::cdxml".sources]
+"Code/GraphMol/FileParsers/CDXMLParser.cpp" = "62c1595324e45c66cfc2936a73ed62040b5d6c98"
+"Code/GraphMol/FileParsers/CDXMLParser.h" = "a0d87ba90a133951b3b99e5bcc8e6e6963aa469e"
+
+[module."rdoxide::graphmol::chem_reactions::cdxml".sources]
+"Code/GraphMol/ChemReactions/CDXMLParser.cpp" = "47d19d71357aa3b568ff3fc7bc48e1bd10601443"

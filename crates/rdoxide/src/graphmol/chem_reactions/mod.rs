@@ -9,6 +9,7 @@
 //! pointers, the accessors return references (or copies at the Python
 //! boundary).
 
+pub mod cdxml;
 pub mod daylight;
 pub mod enumerate;
 pub mod fingerprints;

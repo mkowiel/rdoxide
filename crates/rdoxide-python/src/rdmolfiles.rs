@@ -101,13 +101,6 @@ fn parse(py: Python<'_>, smiles: &str, params: &SmilesParserParams) -> Option<Py
 ///     a Mol object, None on failure.
 ///
 /// Alternatively: MolFromSmiles(SMILES, params) with a SmilesParserParams object.
-/// Returns whether ChemDraw CDX (binary) parsing is available (never, here).
-#[pyfunction]
-#[pyo3(name = "HasChemDrawCDXSupport")]
-fn has_chem_draw_cdx_support() -> bool {
-    false
-}
-
 #[pyfunction]
 #[pyo3(name = "MolFromSmiles", signature = (SMILES, sanitize = None, replacements = None, params = None))]
 #[allow(non_snake_case)]
@@ -269,7 +262,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     crate::rdmolfiles_smiwriter::init(m)?;
     crate::rdmolfiles_tdtsupplier::init(m)?;
     crate::rdmolfiles_tdtwriter::init(m)?;
-    m.add_function(wrap_pyfunction!(has_chem_draw_cdx_support, m)?)?;
+    crate::rdmolfiles_cdxml::init(m)?;
     m.add_function(wrap_pyfunction!(mol_from_smiles, m)?)?;
     m.add_function(wrap_pyfunction!(canonical_rank_atoms, m)?)?;
     m.add_function(wrap_pyfunction!(canonical_rank_atoms_in_fragment, m)?)?;
