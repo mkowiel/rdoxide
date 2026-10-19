@@ -225,6 +225,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 109 | Boost numeric-overflow text in Get{Int,Unsigned}Prop errors (testGetSetProps) | done |
 | 110 | Non-str property names raise TypeError 'Python argument types' (testGithub4570) | done |
 | 111 | rdBase.streambuf wrapper for Python file objects (test69) | done |
+| 112 | Chem.HasChemDrawCDXSupport() (reports False; test_cdxml test_formats) | done |
 
 ## Python package files
 
@@ -506,3 +507,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-19 — Stage 109: Typed prop getters report negative/positive overflow.
 * 2026-10-19 — Stage 110: PropKey extractor for property accessors.
 * 2026-10-19 — Stage 111: streambuf forwards to the wrapped file.
+* 2026-10-19 — Stage 112: CDX support flag.
