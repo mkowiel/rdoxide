@@ -954,6 +954,7 @@ Code/GraphMol/Wrap/testTrajectory.py::TestCase::testSnapshot
 Code/GraphMol/Wrap/testTrajectory.py::TestCase::testTrajectory2D
 Code/GraphMol/Wrap/testTrajectory.py::TestCase::testTrajectory3D
 Code/GraphMol/Wrap/test_cdxml.py::TestCase::test_cdxml
+Code/GraphMol/Wrap/test_cdxml.py::TestCase::test_formats
 Code/GraphMol/Wrap/test_lazy_numpy.py::TestLazyNumpy::test_adjacency_matrix_loads_numpy
 Code/GraphMol/Wrap/test_lazy_numpy.py::TestLazyNumpy::test_basic_smiles_roundtrip_without_numpy
 Code/GraphMol/Wrap/test_lazy_numpy.py::TestLazyNumpy::test_chem_import_does_not_load_numpy
