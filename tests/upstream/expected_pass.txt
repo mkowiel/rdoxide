@@ -586,6 +586,7 @@ Code/GraphMol/ReducedGraphs/Wrap/testReducedGraphs.py::TestCase::test4
 Code/GraphMol/ReducedGraphs/Wrap/testReducedGraphs.py::TestCase::testCanRetrieveProp
 Code/GraphMol/SLNParse/Wrap/testSLN.py::TestCase::test1Basics
 Code/GraphMol/SLNParse/Wrap/testSLN.py::TestCase::test2Queries
+Code/GraphMol/ScaffoldNetwork/Wrap/testPickleScaffoldNetwork.py::TestScaffoldNetwork::test1Pickle
 Code/GraphMol/ScaffoldNetwork/Wrap/testScaffoldNetwork.py::TestScaffoldNetwork::test1Basics
 Code/GraphMol/ScaffoldNetwork/Wrap/testScaffoldNetwork.py::TestScaffoldNetwork::test2Basics
 Code/GraphMol/ScaffoldNetwork/Wrap/testScaffoldNetwork.py::TestScaffoldNetwork::test3Update
