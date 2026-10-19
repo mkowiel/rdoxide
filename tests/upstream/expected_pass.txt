@@ -812,6 +812,7 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub497
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub498
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub6945
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub8467
+Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub8877
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub9101
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub9125
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub955
@@ -1128,7 +1129,6 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::testGithub497
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGithub498
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGithub6945
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGithub8467
-Code/GraphMol/nbWrap/rough_test.py::TestCase::testGithub8877
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGithub9101
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGithub9125
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGithub955

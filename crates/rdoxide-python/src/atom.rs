@@ -720,6 +720,9 @@ fn other_query(
     extra: &[Bound<'_, PyAny>],
 ) -> PyResult<Option<AtomQuery>> {
     let py = slf.py();
+    if other.is_none() {
+        return Err(PyValueError::new_err("other Atom is null"));
+    }
     let Ok(other) = other.cast::<PyQueryAtom>() else {
         let mut got = vec![
             "QueryAtom".to_string(),
