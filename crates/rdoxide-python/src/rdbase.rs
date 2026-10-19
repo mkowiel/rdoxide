@@ -244,6 +244,7 @@ fn set_max_threads(numThreads: i32) {
 /// Wraps a Python file object (upstream `rdBase.streambuf`); suppliers and
 /// writers only need its `read`/`write`/`flush`, which are forwarded.
 #[pyclass(name = "streambuf", module = "rdoxide.rdBase")]
+#[derive(Debug)]
 pub struct PyStreambuf {
     file: Py<PyAny>,
 }
