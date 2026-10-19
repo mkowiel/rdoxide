@@ -9,6 +9,7 @@ use crate::error::{RDKitError, Result};
 use crate::graphmol::romol::ROMol;
 use crate::graphmol::smiles_parse::smarts::{SmartsParserParams, mol_from_smarts};
 use crate::graphmol::substruct::{SubstructMatchParameters, substruct_match};
+use crate::graphmol::substruct_exists::substruct_has_match;
 
 /// (bit, SMARTS) of the substructure-based keys
 pub const PATTERNS: &[(u32, &str)] = &[
@@ -194,7 +195,7 @@ pub fn get_fingerprint_as_bit_vect(mol: &ROMol) -> Result<ExplicitBitVect> {
     };
     let all = SubstructMatchParameters::default();
     let query = |b: u32| pats[b as usize].as_ref().expect("pattern defined");
-    let has = |b: u32| -> Result<bool> { Ok(!substruct_match(mol, query(b), &one)?.is_empty()) };
+    let has = |b: u32| -> Result<bool> { substruct_has_match(mol, query(b), &one) };
     let count = |b: u32| -> Result<usize> { Ok(substruct_match(mol, query(b), &all)?.len()) };
     let mut bits: Vec<u32> = Vec::new();
     let mut set = |b: u32| bits.push(b);
