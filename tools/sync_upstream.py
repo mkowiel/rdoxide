@@ -434,6 +434,26 @@ def regen_dclv_dots() -> None:
     print(f"dclv_dots.tsv: {len(rows)} dots")
 
 
+def regen_o3a_similarity() -> None:
+    """The 99x99 MMFF atom type similarity matrix of O3A
+    (`mmffSimMatrix` in `O3AAlignMolecules.cpp`) as
+    `crates/rdoxide/data/o3a_mmff_similarity.tsv`, one row per line."""
+    src = (UPSTREAM_DIR / "Code/GraphMol/MolAlign/O3AAlignMolecules.cpp").read_text()
+    start = src.index("mmffSimMatrix[99][99] = {")
+    body = src[start : src.index("};", start)]
+    values = [int(v) for v in re.findall(r"\b\d+\b", body[body.index("{") :])]
+    assert len(values) == 99 * 99, len(values)
+    (DATA / "o3a_mmff_similarity.tsv").write_text(
+        "# Extracted from RDKit Code/GraphMol/MolAlign/O3AAlignMolecules.cpp by tools/sync_upstream.py.\n"
+        "# Copyright (C) 2013-2018 Paolo Tosco, Greg Landrum (BSD-3-Clause).\n"
+        "# DO NOT EDIT - regenerate with `python3 tools/sync_upstream.py regen`.\n"
+        + "".join(
+            "\t".join(map(str, values[i * 99 : (i + 1) * 99])) + "\n" for i in range(99)
+        )
+    )
+    print("o3a_mmff_similarity.tsv: 99 rows")
+
+
 def regen_crystalff() -> None:
     """The experimental torsion-angle preferences of CrystalFF/ETKDG as
     `crates/rdoxide/data/crystalff/*.txt`: SMARTS and cosine-series constants
@@ -575,6 +595,7 @@ def cmd_regen(_args) -> None:
     regen_molstandardize()
     regen_uff_params()
     regen_dclv_dots()
+    regen_o3a_similarity()
     regen_mmff_params()
     regen_crystalff()
     regen_filtercatalog()

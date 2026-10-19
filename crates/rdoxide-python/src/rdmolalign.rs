@@ -1,6 +1,6 @@
 //! `rdoxide.Chem.rdMolAlign` (upstream `MolAlign/Wrap/rdMolAlign.cpp`):
-//! alignment of molecules and conformers. The O3A functions need MMFF and
-//! Crippen parameters and are not provided.
+//! alignment of molecules and conformers; the O3A functions are in
+//! [`crate::rdmolalign_o3a`].
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -19,7 +19,7 @@ const DEFAULT_MAX_ITERS: u32 = 50;
 
 /// `translateAtomMap`: a sequence of `(probe, reference)` pairs; empty is
 /// "no map".
-fn atom_map(obj: &Bound<'_, PyAny>) -> PyResult<Option<MatchVect>> {
+pub(crate) fn atom_map(obj: &Bound<'_, PyAny>) -> PyResult<Option<MatchVect>> {
     if obj.is_none() || obj.len()? == 0 {
         return Ok(None);
     }
@@ -42,7 +42,7 @@ fn atom_map_seq(obj: &Bound<'_, PyAny>) -> PyResult<Vec<MatchVect>> {
 }
 
 /// `translateDoubleSeq`: the values, or `None` for an empty sequence.
-fn doubles(obj: &Bound<'_, PyAny>) -> PyResult<Option<Vec<f64>>> {
+pub(crate) fn doubles(obj: &Bound<'_, PyAny>) -> PyResult<Option<Vec<f64>>> {
     if obj.is_none() || obj.len()? == 0 {
         return Ok(None);
     }
@@ -65,7 +65,7 @@ fn unsigneds(obj: Option<&Bound<'_, PyAny>>) -> PyResult<Option<Vec<u32>>> {
 }
 
 /// `generateRmsdTransMatchPyTuple`: `(rmsd, 4x4 matrix[, match])`.
-fn result_tuple<'py>(
+pub(crate) fn result_tuple<'py>(
     py: Python<'py>,
     rmsd: f64,
     trans: &Transform3D,
@@ -726,5 +726,5 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(calc_rms, m)?)?;
     m.add_function(wrap_pyfunction!(align_mol_conformers, m)?)?;
     m.add_function(wrap_pyfunction!(random_transform, m)?)?;
-    Ok(())
+    crate::rdmolalign_o3a::init(m)
 }

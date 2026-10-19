@@ -120,6 +120,19 @@ impl EdgeType {
     }
 }
 
+impl EdgeType {
+    fn from_code(code: u32) -> Option<Self> {
+        Some(match code {
+            1 => EdgeType::Fragment,
+            2 => EdgeType::Generic,
+            3 => EdgeType::GenericBond,
+            4 => EdgeType::RemoveAttachment,
+            5 => EdgeType::Initialize,
+            _ => return None,
+        })
+    }
+}
+
 /// `NetworkEdge`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NetworkEdge {
@@ -150,6 +163,113 @@ pub struct ScaffoldNetwork {
     /// number of molecules each scaffold was found in
     pub mol_counts: Vec<u32>,
     pub edges: Vec<NetworkEdge>,
+}
+
+/// Header of a Boost text archive (library archive version 19).
+const ARCHIVE_HEADER: &str = "22 serialization::archive 19";
+/// Archive layout of `ScaffoldNetwork` (class version 1) and of the first
+/// `NetworkEdge` element, as written by `boost::archive::text_oarchive`.
+const NETWORK_PREFIX: &str = "0 1 0 0";
+const EDGE_VECTOR_PREFIX: &str = "0 0";
+const EDGE_ITEM_PREFIX: &str = "0 0";
+
+impl ScaffoldNetwork {
+    /// The network as the Boost text archive upstream pickles.
+    pub fn to_archive(&self) -> String {
+        use std::fmt::Write;
+        let mut out = format!("{ARCHIVE_HEADER} {NETWORK_PREFIX} {} 0", self.nodes.len());
+        for n in &self.nodes {
+            let _ = write!(out, " {} {n}", n.len());
+        }
+        for counts in [&self.counts, &self.mol_counts] {
+            let _ = write!(out, " {} 0", counts.len());
+            for c in counts {
+                let _ = write!(out, " {c}");
+            }
+        }
+        let _ = write!(out, " {EDGE_VECTOR_PREFIX} {} 0", self.edges.len());
+        if !self.edges.is_empty() {
+            let _ = write!(out, " {EDGE_ITEM_PREFIX}");
+        }
+        for e in &self.edges {
+            let _ = write!(out, " {} {} {}", e.begin_idx, e.end_idx, e.edge_type as u32);
+        }
+        out
+    }
+
+    /// Reads a Boost text archive written by [`Self::to_archive`] or upstream.
+    pub fn from_archive(text: &str) -> Result<Self> {
+        let bad = || RDKitError::Value("invalid ScaffoldNetwork archive".into());
+        let rest = text.strip_prefix(ARCHIVE_HEADER).ok_or_else(bad)?;
+        let mut cur = ArchiveReader { rest };
+        // object id / class info, class version
+        let _ = cur.number()?;
+        let version = cur.number()?;
+        cur.number()?;
+        cur.number()?;
+        let mut net = ScaffoldNetwork::default();
+        let n = cur.number()?;
+        cur.number()?; // item version
+        for _ in 0..n {
+            net.nodes.push(cur.string()?);
+        }
+        let n = cur.number()?;
+        cur.number()?;
+        for _ in 0..n {
+            net.counts.push(cur.number()?);
+        }
+        if version > 0 {
+            let n = cur.number()?;
+            cur.number()?;
+            for _ in 0..n {
+                net.mol_counts.push(cur.number()?);
+            }
+        }
+        cur.number()?;
+        cur.number()?;
+        let n = cur.number()?;
+        cur.number()?;
+        if n > 0 {
+            cur.number()?;
+            cur.number()?;
+        }
+        for _ in 0..n {
+            let (b, e, t) = (cur.number()?, cur.number()?, cur.number()?);
+            net.edges.push(NetworkEdge {
+                begin_idx: b as usize,
+                end_idx: e as usize,
+                edge_type: EdgeType::from_code(t).ok_or_else(bad)?,
+            });
+        }
+        Ok(net)
+    }
+}
+
+/// Whitespace-separated token reader for [`ScaffoldNetwork::from_archive`].
+struct ArchiveReader<'a> {
+    rest: &'a str,
+}
+
+impl ArchiveReader<'_> {
+    fn number(&mut self) -> Result<u32> {
+        let t = self.rest.trim_start();
+        let end = t.find(char::is_whitespace).unwrap_or(t.len());
+        self.rest = &t[end..];
+        t[..end]
+            .parse()
+            .map_err(|_| RDKitError::Value("invalid ScaffoldNetwork archive".into()))
+    }
+
+    /// A length-prefixed string.
+    fn string(&mut self) -> Result<String> {
+        let len = self.number()? as usize;
+        let t = self.rest.strip_prefix(' ').unwrap_or(self.rest);
+        let s = t
+            .get(..len)
+            .ok_or_else(|| RDKitError::Value("invalid ScaffoldNetwork archive".into()))?;
+        self.rest = &t[len..];
+        Ok(s.to_string())
+    }
 }
 
 fn smiles(mol: &ROMol) -> Result<String> {
@@ -492,4 +612,31 @@ pub fn get_brics_network_params() -> Result<ScaffoldNetworkParams> {
     let mut res = ScaffoldNetworkParams::new(BRICS_DEFINITIONS)?;
     res.keep_only_first_fragment = false;
     Ok(res)
+}
+
+#[cfg(test)]
+mod archive_tests {
+    use super::*;
+
+    /// Written by upstream's Boost.Serialization (from `testPickleScaffoldNetwork.py`).
+    const UPSTREAM: &str = "22 serialization::archive 19 0 1 0 0 7 0 21 O=C1CCCC(Cc2ccccc2)N1 9 *c1ccccc1 15 **1:*:*:*:*:*:1 13 *C1CCCC(=O)N1 13 **1****(=*)*1 21 O=C1CCCC(Cc2ccccn2)N1 9 *c1ccccn1 7 0 1 1 2 2 2 1 1 7 0 1 1 2 2 2 1 1 0 0 7 0 0 0 0 1 1 1 2 2 0 3 1 3 4 2 5 6 1 6 2 2 5 3 1";
+
+    #[test]
+    fn upstream_archive_round_trips() {
+        let net = ScaffoldNetwork::from_archive(UPSTREAM).unwrap();
+        assert_eq!(net.nodes.len(), 7);
+        assert_eq!(net.edges.len(), 7);
+        assert_eq!(net.nodes[2], "**1:*:*:*:*:*:1");
+        assert_eq!(net.edges[3].edge_type, EdgeType::Generic);
+        assert_eq!(net.to_archive(), UPSTREAM);
+    }
+
+    #[test]
+    fn empty_network_round_trips() {
+        let net = ScaffoldNetwork::default();
+        assert_eq!(
+            ScaffoldNetwork::from_archive(&net.to_archive()).unwrap(),
+            net
+        );
+    }
 }
