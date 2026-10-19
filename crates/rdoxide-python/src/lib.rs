@@ -82,6 +82,7 @@ mod rdmolfiles_molblock;
 mod rdmolfiles_molwrite;
 mod rdmolfiles_mtsupplier;
 mod rdmolfiles_pdb;
+mod rdmolfiles_proplists;
 mod rdmolfiles_scsr;
 mod rdmolfiles_sdsupplier;
 mod rdmolfiles_sdwriter;
