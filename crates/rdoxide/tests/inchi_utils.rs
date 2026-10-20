@@ -543,3 +543,122 @@ fn io_streams_match_the_c_code() {
         }
     }
 }
+
+#[test]
+fn common_options_match_the_c_code() {
+    use rdoxide::external::inchi::ichiparm::*;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_parm.json")).unwrap();
+    let cases = data.as_array().unwrap();
+    assert!(cases.len() >= 500);
+    for c in cases {
+        let ints = |v: &serde_json::Value| -> Vec<i64> {
+            v.as_array()
+                .unwrap()
+                .iter()
+                .map(|x| x.as_i64().unwrap())
+                .collect()
+        };
+        let v = ints(&c["v"]);
+        let mut o = CommonOptions {
+            b_ver1_default_mode: c["vm"].as_u64().unwrap(),
+            n_mode: c["nm"].as_u64().unwrap(),
+            b_inchi_output_options: v[0] as i32,
+            b_inchi_output_options2: v[1] as i32,
+            b_std_format: v[2] as i32,
+            b_hash_key: v[3] as i32,
+            b_hash_xtra1: v[4] as i32,
+            b_hash_xtra2: v[5] as i32,
+            b_fix_sp3_bug: v[6] as i32,
+            b_fix_fb2: v[7] as i32,
+            b_add_phosphine_stereo: v[8] as i32,
+            b_add_arsine_stereo: v[9] as i32,
+            b_no_struct_labels: v[10] as i32,
+            b_pointed_edge_stereo: v[11] as i32,
+            b_do_not_add_h: v[12] as i32,
+            b_forced_chiral_flag: v[13] as i32,
+            b_reconnect_coord: v[14] as i32,
+            b_keto_enol_taut: v[15] as i32,
+            b15_taut_non_ring: v[16] as i32,
+            b_pt_06_00_taut: v[17] as i32,
+            b_pt_13_00_taut: v[18] as i32,
+            b_pt_16_00_taut: v[19] as i32,
+            b_pt_18_00_taut: v[20] as i32,
+            b_pt_22_00_taut: v[21] as i32,
+            b_pt_39_00_taut: v[22] as i32,
+            b_loose_tsa_check: v[23] as i32,
+            b_large_molecules: v[24] as i32,
+            b_polymers: v[25] as i32,
+            b_fold_polymer_sru: v[26] as i32,
+            b_frame_shift_scheme: v[27] as i32,
+            b_stereo_at_zz: v[28] as i32,
+            b_np_zz: v[29] as i32,
+            b_no_warnings: v[30] as i32,
+            b_merge_hash: v[31] as i32,
+            b_hide_inchi: v[32] as i32,
+        };
+        let mut ip = InputParms {
+            n_input_type: v[33] as i32,
+            ..Default::default()
+        };
+        let got = set_common_options_by_parg(
+            c["arg"].as_str().unwrap(),
+            c["dev"].as_i64().unwrap() != 0,
+            &mut ip,
+            &mut o,
+        );
+        let out = ints(&c["out"]);
+        let mut mine = vec![
+            i64::from(got),
+            o.b_ver1_default_mode as i64,
+            o.n_mode as i64,
+        ];
+        mine.extend(
+            [
+                o.b_inchi_output_options,
+                o.b_inchi_output_options2,
+                o.b_std_format,
+                o.b_hash_key,
+                o.b_hash_xtra1,
+                o.b_hash_xtra2,
+                o.b_fix_sp3_bug,
+                o.b_fix_fb2,
+                o.b_add_phosphine_stereo,
+                o.b_add_arsine_stereo,
+                o.b_no_struct_labels,
+                o.b_pointed_edge_stereo,
+                o.b_do_not_add_h,
+                o.b_forced_chiral_flag,
+                o.b_reconnect_coord,
+                o.b_keto_enol_taut,
+                o.b15_taut_non_ring,
+                o.b_pt_06_00_taut,
+                o.b_pt_13_00_taut,
+                o.b_pt_16_00_taut,
+                o.b_pt_18_00_taut,
+                o.b_pt_22_00_taut,
+                o.b_pt_39_00_taut,
+                o.b_loose_tsa_check,
+                o.b_large_molecules,
+                o.b_polymers,
+                o.b_fold_polymer_sru,
+                o.b_frame_shift_scheme,
+                o.b_stereo_at_zz,
+                o.b_np_zz,
+                o.b_no_warnings,
+                o.b_merge_hash,
+                o.b_hide_inchi,
+            ]
+            .map(i64::from),
+        );
+        mine.extend([
+            i64::from(ip.n_input_type),
+            ip.first_struct_number,
+            ip.last_struct_number,
+            i64::from(ip.b_save_all_good_structs_as_problem),
+            i64::from(ip.b_filter_ss),
+            i64::from(ip.b_fix_non_uniform_draw),
+        ]);
+        assert_eq!(mine, out, "arg {:?} dev {}", c["arg"], c["dev"]);
+    }
+}

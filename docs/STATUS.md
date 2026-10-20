@@ -243,6 +243,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 127 | InChI I1c: the `inp_ATOM` helpers of `util` (bonds to metals, explicit H, ion groups, `nNoMetal*`), tested against the C code on 500 random atom arrays | done |
 | 128 | InChI I1d: the string helpers of `util` (normalize/trim/delimiter reading, InChI and AuxInfo extraction, case-insensitive compare, removed-protons text), tested against the C code on 600 random strings; `util` is complete | done |
 | 129 | InChI I1e: `ichi_io` (string/file streams, line readers, growing print buffer, record header), tested against the C code on 600 random inputs | done |
+| 130 | InChI I2a: `ichiparm::set_common_options_by_parg` (all option names and flags), tested against the C function on 568 cases; stage I1 closed (plain structs come with their first users) | done |
 
 ## Python package files
 
@@ -542,3 +543,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-19 — Stage 127: InChI I1c: util atom helpers
 * 2026-10-19 — Stage 128: InChI I1d: util string helpers
 * 2026-10-19 — Stage 129: InChI I1e: ichi_io
+* 2026-10-19 — Stage 130: InChI I2a: common option parsing
