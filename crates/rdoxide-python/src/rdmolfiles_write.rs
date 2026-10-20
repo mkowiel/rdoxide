@@ -70,7 +70,7 @@ impl PySmilesWriteParams {
 #[pymethods]
 impl PySmilesWriteParams {
     #[new]
-    fn py_new() -> Self {
+    pub(crate) fn py_new() -> Self {
         let d = SmilesWriteParams::default();
         PySmilesWriteParams {
             doIsomericSmiles: d.do_isomeric_smiles,
