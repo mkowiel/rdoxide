@@ -235,6 +235,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 119 | `rdChemReactions.Compute2DCoordsForReaction` (`chem_reactions::depict`, identical coordinates to RDKit) | done |
 | 120 | `Chem.MolFromPNGFile/String`, `MolsFromPNGFile/String`, `MolMetadataToPNGFile/String`, `AddMetadataToPNGFile/String`, `MetadataFromPNGFile/String` and `PNGMetadataParams` (`file_parsers::png`: tEXt/zTXt chunks with a built-in inflate and stored-block zlib writer, CRC32, pickle/CXSMILES/mol block tags) | ✅ | Python tests; upstream `rough_test.py` testMolFromPNG, testMolsFromPNG, testMolToPNG, testMetadataToPNG |
 | 121 | `rdMolDescriptors.GetAtomFeatures` (`descriptors::atom_feat`: the 49/52 one-hot atom features of AtomFeat.cpp) | ✅ | Python tests against values from RDKit 2026.09.1 |
+| 122 | `rdFingerprintGenerator.FingerprintGenerator32`: the class exists as upstream's `no_init` class; no API returns a 32-bit generator (all `Get*Generator` return 64-bit ones) | ✅ | Python tests |
 | 123 | `Chem.MaeMolSupplier` (file name, binary file object e.g. `gzip.open`, `SetData`, iteration, `len`, indexing, `reset`): `file_parsers::mae_reader` reads the Maestro format (typed properties, indexed blocks parsed lazily, `maeparser` error messages with line and column) and `mae_mol_supplier` builds molecules (atom/bond/PDB/stereo labels, reserved atomic numbers). Identical to RDKit 2026.09.1 on all `FileParsers/test_data/*.mae*` files | ✅ | Python tests; upstream `rough_test.py` testMae*Supplier* (6) |
 
 ## Python package files
@@ -527,4 +528,5 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-19 — Stage 119: Reaction depiction.
 * 2026-10-19 — Stage 120: PNG metadata read and write, without a compression library
 * 2026-10-19 — Stage 121: GetAtomFeatures
+* 2026-10-19 — Stage 122: FingerprintGenerator32
 * 2026-10-19 — Stage 123: MaeMolSupplier
