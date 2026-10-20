@@ -28,6 +28,12 @@ except ImportError:
 from rdoxide.Chem.rdmolfiles import *
 from rdoxide.Chem.rdmolops import *
 
+try:
+  # This is an optional component of the build
+  from rdoxide.Chem.rdMolInterchange import *
+except ImportError:
+  pass
+
 # rdoxide: the native submodules are registered in sys.modules up front, so
 # the import system never binds them as attributes of this package; do it
 # here so that `Chem.rdmolops`, `Chem.rdMolDescriptors`, ... work as upstream.

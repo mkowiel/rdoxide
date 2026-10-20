@@ -230,7 +230,8 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 114 | O3A (`mol_align_o3a`: MolHistogram, LAP, SDM, O3A; MMFF and Crippen schemes) and Python GetO3A, GetCrippenO3A, GetO3AForProbeConfs, GetCrippenO3AForProbeConfs, O3A | done |
 | 115 | CDXML reading (`file_parsers::cdxml`: XML reader, fragments, fusing, stereo groups, queries, schemes) with Python MolsFromCDXML/MolsFromCDXMLFile/CDXMLParserParams/CDXMLFormat/MolToCDXMLBlock and ReactionsFromCDXMLFile/Block (CDX binary and writing not supported) | done |
 | 116 | Enumeration strategy Initialize reads reagent list sizes instead of copying every molecule (20 ms -> 0.8 ms for 71k reagents) | done |
-| 117 | Bonds with a complex bond type query contribute 0 to the valence, as `QueryBond::getValenceContrib` (SetHybridization/Compute2DCoords on SMARTS molecules) | done |
+| 117 | `Chem.MolToJSON`, `MolsToJSON`, `JSONToMols` and the JSON parameter classes re-exported from `rdMolInterchange` as upstream's Chem does | done |
+| 118 | Bonds with a complex bond type query contribute 0 to the valence, as `QueryBond::getValenceContrib` (SetHybridization/Compute2DCoords on SMARTS molecules) | done |
 
 ## Python package files
 
@@ -517,4 +518,5 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-19 — Stage 114: O3A port; testMolAlign 20/20.
 * 2026-10-19 — Stage 115: CDXML parser; test_cdxml 10/10.
 * 2026-10-19 — Stage 116: Initialize via bb_sizes.
-* 2026-10-19 — Stage 117: QueryBond::getValenceContrib port.
+* 2026-10-19 — Stage 117: Chem exports rdMolInterchange.
+* 2026-10-19 — Stage 118: QueryBond::getValenceContrib port.
