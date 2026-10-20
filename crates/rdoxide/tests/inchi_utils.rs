@@ -178,3 +178,62 @@ fn element_helpers_match_the_c_code() {
         assert_eq!(got, expected, "{input}");
     }
 }
+
+#[test]
+fn ring_search_matches_the_c_code() {
+    use rdoxide::external::inchi::ichiring::{
+        Queue, is_atom_in_3memb_ring, is_bond_in_nmax_memb_ring,
+    };
+    use rdoxide::external::inchi::inpdef::InpAtom;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_ring.json")).unwrap();
+    let cases = data.as_array().unwrap();
+    assert!(cases.len() >= 400);
+    let ints = |v: &serde_json::Value| -> Vec<i64> {
+        v.as_array()
+            .unwrap()
+            .iter()
+            .map(|x| x.as_i64().unwrap())
+            .collect()
+    };
+    for case in cases {
+        let adj = case["adj"].as_array().unwrap();
+        let n = adj.len();
+        let mut atoms = vec![InpAtom::default(); n];
+        for (i, a) in adj.iter().enumerate() {
+            let nb = ints(a);
+            atoms[i].valence = nb.len() as i8;
+            for (j, x) in nb.iter().enumerate() {
+                atoms[i].neighbor[j] = *x as u16;
+            }
+            atoms[i].n_ring_system = case["rs"][i].as_u64().unwrap() as u16;
+            atoms[i].n_num_at_in_ring_system = case["nar"][i].as_u64().unwrap() as u16;
+        }
+        let mut q = Queue::create(n as i32 + 1).unwrap();
+        let mut lev = vec![0u16; n];
+        let mut src = vec![0i8; n];
+        let expected = ints(&case["ring"]);
+        for (k, query) in case["q"].as_array().unwrap().iter().enumerate() {
+            let p = ints(query);
+            let r = is_bond_in_nmax_memb_ring(
+                &atoms,
+                p[0] as usize,
+                p[1] as usize,
+                &mut q,
+                &mut lev,
+                &mut src,
+                p[2] as u16,
+            );
+            assert_eq!(i64::from(r), expected[k], "query {p:?} in {adj:?}");
+        }
+        assert!(lev.iter().all(|&l| l == 0) && src.iter().all(|&s| s == 0));
+        let tri = ints(&case["tri"]);
+        for i in 0..n {
+            assert_eq!(
+                is_atom_in_3memb_ring(&atoms, i) as i64,
+                tri[i],
+                "atom {i} in {adj:?}"
+            );
+        }
+    }
+}

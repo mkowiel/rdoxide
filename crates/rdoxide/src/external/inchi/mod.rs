@@ -21,10 +21,12 @@
 
 pub mod el_data;
 pub mod ichierr;
+pub mod ichiring;
 pub mod ichisort;
 pub mod ikey_base26;
 pub mod ikey_dll;
 pub mod incomdef;
+pub mod inpdef;
 pub mod sha256;
 
 pub mod util;
