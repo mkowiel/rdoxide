@@ -17,3 +17,8 @@ pub const METAL: i32 = 1;
 pub const METAL2: i32 = 3;
 /// metal bitmap
 pub const IS_METAL: i32 = 3;
+
+pub const BOND_TYPE_SINGLE: i32 = 1;
+pub const BOND_TYPE_DOUBLE: i32 = 2;
+pub const BOND_TYPE_TRIPLE: i32 = 3;
+pub const BOND_TYPE_ALTERN: i32 = 4;

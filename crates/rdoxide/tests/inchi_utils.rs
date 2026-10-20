@@ -237,3 +237,82 @@ fn ring_search_matches_the_c_code() {
         }
     }
 }
+
+#[test]
+fn atom_helpers_match_the_c_code() {
+    use rdoxide::external::inchi::inpdef::InpAtom;
+    use rdoxide::external::inchi::util::*;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_atoms.json")).unwrap();
+    for (el, g) in data["groups"].as_array().unwrap().iter().enumerate() {
+        assert_eq!(
+            ion_el_group(el as u8) as i64,
+            g[0].as_i64().unwrap(),
+            "el {el}"
+        );
+        assert_eq!(
+            get_endpoint_valence(el as u8) as i64,
+            g[1].as_i64().unwrap(),
+            "el {el}"
+        );
+    }
+    let cases = data["cases"].as_array().unwrap();
+    assert!(cases.len() >= 500);
+    for case in cases {
+        let atoms_json = case.as_array().unwrap();
+        let mut at = vec![InpAtom::default(); atoms_json.len()];
+        for (i, a) in atoms_json.iter().enumerate() {
+            at[i].el_number = a["el"].as_u64().unwrap() as u8;
+            at[i].charge = a["ch"].as_i64().unwrap() as i8;
+            at[i].chem_bonds_valence = a["cbv"].as_i64().unwrap() as i8;
+            at[i].num_h = a["h"][0].as_i64().unwrap() as i8;
+            for k in 0..3 {
+                at[i].num_iso_h[k] = a["h"][k + 1].as_i64().unwrap() as i8;
+            }
+            let nb = a["nb"].as_array().unwrap();
+            at[i].valence = nb.len() as i8;
+            for (j, e) in nb.iter().enumerate() {
+                at[i].neighbor[j] = e[0].as_u64().unwrap() as u16;
+                at[i].bond_type[j] = e[1].as_u64().unwrap() as u8;
+            }
+        }
+        for (i, a) in atoms_json.iter().enumerate() {
+            let exp: Vec<i64> = a["out"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|x| x.as_i64().unwrap())
+                .collect();
+            let n0 = if at[i].valence > 0 {
+                i32::from(at[i].neighbor[0])
+            } else {
+                -1
+            };
+            let n1 = if at[i].valence > 1 {
+                i32::from(at[i].neighbor[1])
+            } else {
+                -1
+            };
+            let got = [
+                i64::from(n_bonds_val_to_metal(&at, i)),
+                i64::from(num_of_h(&at, i)),
+                i64::from(n_no_metal_num_bonds(&at, i)),
+                i64::from(n_no_metal_bonds_valence(&at, i)),
+                i64::from(n_no_metal_neigh_index(&at, i)),
+                i64::from(n_no_metal_other_neigh_index(&at, i, n0)),
+                i64::from(n_no_metal_other_neigh_index2(&at, i, n0, n1)),
+                if n0 >= 0 {
+                    i64::from(has_other_ion_neigh(&at, i, n0 as usize))
+                } else {
+                    -1
+                },
+                if n0 >= 0 {
+                    i64::from(has_other_ion_in_sphere_2(&mut at, i, n0 as usize))
+                } else {
+                    -1
+                },
+            ];
+            assert_eq!(got.to_vec(), exp, "atom {i}: {a}");
+        }
+    }
+}

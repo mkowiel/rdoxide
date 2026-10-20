@@ -204,3 +204,6 @@ impl InpAtom {
         i32::from(self.num_h) + self.num_iso_h_total()
     }
 }
+
+/// `BOND_TYPE_MASK` (`extr_ct.h`)
+pub const BOND_TYPE_MASK: i32 = 0x0f;
