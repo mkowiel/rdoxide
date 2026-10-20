@@ -332,7 +332,7 @@ fn set_atom_properties(atom: &mut Atom, block: &ParsedIndexedBlock, i: usize) ->
     Ok(())
 }
 
-fn required<'a, T>(res: std::result::Result<&'a T, String>) -> Result<&'a T> {
+fn required<T>(res: std::result::Result<&T, String>) -> Result<&T> {
     res.map_err(file_parse)
 }
 
