@@ -1436,3 +1436,83 @@ fn metal_disconnection_matches_the_c_code() {
         "{coord_mismatch} coordinate mismatches"
     );
 }
+
+#[test]
+fn terminal_hydrogen_removal_matches_the_c_code() {
+    use rdoxide::external::inchi::inpdef::{InpAtom, MAX_NUM_STEREO_BONDS};
+    use rdoxide::external::inchi::strutil::{add_dt_to_num_h, remove_terminal_hdt};
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_termh.json")).unwrap();
+    for c in data.as_array().unwrap() {
+        let inp = &c["in"];
+        let mut at: Vec<InpAtom> = Vec::new();
+        for a in inp["atoms"].as_array().unwrap() {
+            let nb = a["nb"].as_array().unwrap();
+            let ch = |k: &str| match a[k].as_str().unwrap() {
+                "_" => 0u8,
+                s => s.as_bytes()[0],
+            };
+            let mut x = InpAtom {
+                valence: nb.len() as i8,
+                chem_bonds_valence: a["cbv"].as_i64().unwrap() as i8,
+                charge: a["chg"].as_i64().unwrap() as i8,
+                iso_atw_diff: a["iso"].as_i64().unwrap() as i8,
+                num_h: a["nh"].as_i64().unwrap() as i8,
+                ..Default::default()
+            };
+            x.elname[0] = ch("e0");
+            x.elname[1] = ch("e1");
+            for m in 0..3 {
+                x.num_iso_h[m] = a["ih"][m].as_i64().unwrap() as i8;
+            }
+            for (j, e) in nb.iter().enumerate() {
+                x.neighbor[j] = e[0].as_u64().unwrap() as u16;
+                x.bond_type[j] = e[1].as_u64().unwrap() as u8;
+                x.bond_stereo[j] = e[2].as_i64().unwrap() as i8;
+            }
+            for (m, e) in a["sb"].as_array().unwrap().iter().take(3).enumerate() {
+                x.sb_ord[m] = e[0].as_i64().unwrap() as i8;
+                x.sn_ord[m] = e[1].as_i64().unwrap() as i8;
+                x.sb_parity[m] = e[2].as_i64().unwrap() as i8;
+            }
+            at.push(x);
+        }
+        let n = at.len();
+        let r = remove_terminal_hdt(&mut at, inp["fix"] == 1);
+        if inp["add"] == 1 {
+            let m = if r > 0 { r as usize } else { n };
+            add_dt_to_num_h(&mut at[..m]);
+        }
+        let mut got = vec![format!("R {r}")];
+        for a in &at {
+            let mut s = format!(
+                "A {} {} {} {} {} {} {} {} {} {} {}",
+                a.elname[0],
+                a.elname[1],
+                a.valence,
+                a.chem_bonds_valence,
+                a.charge,
+                a.iso_atw_diff,
+                a.num_h,
+                a.num_iso_h[0],
+                a.num_iso_h[1],
+                a.num_iso_h[2],
+                a.component
+            );
+            for k in 0..a.valence as usize {
+                s += &format!(" {}:{}:{}", a.neighbor[k], a.bond_type[k], a.bond_stereo[k]);
+            }
+            for m in 0..MAX_NUM_STEREO_BONDS {
+                s += &format!(" S{}:{}:{}", a.sb_ord[m], a.sn_ord[m], a.sb_parity[m]);
+            }
+            got.push(s);
+        }
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        assert_eq!(got, want, "{inp}");
+    }
+}
