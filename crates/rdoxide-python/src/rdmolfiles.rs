@@ -54,7 +54,7 @@ impl PySmilesParserParams {
 }
 
 impl PySmilesParserParams {
-    fn to_core(&self) -> SmilesParserParams {
+    pub(crate) fn to_core(&self) -> SmilesParserParams {
         SmilesParserParams {
             sanitize: self.sanitize,
             allow_cx_smiles: self.allow_cx_smiles,
@@ -243,6 +243,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     crate::rdmolfiles_write::init(m)?;
     crate::rdmolfiles_smarts::init(m)?;
     crate::rdmolfiles_molblock::init(m)?;
+    crate::rdmolfiles_png::init(m)?;
     crate::rdmolfiles_scsr::init(m)?;
     crate::rdmolfiles_xyz::init(m)?;
     crate::rdmolfiles_cml::init(m)?;
