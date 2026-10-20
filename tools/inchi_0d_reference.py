@@ -2,7 +2,9 @@
 0D stereo descriptors into atom/bond parities (`Extract0DParities` of
 readinch.c with `FixUnkn0DStereoBonds`, `ReconcileAllCmlBondParities`,
 `ReconcileCmlIncidentBondParities` and `get_opposite_sb_atom` of ichister.c)
-on random molecules with random, partly invalid descriptors. The function
+on random molecules with random, partly invalid descriptors; then
+`InpAtom0DToInchiAtom` (inchi_dll.c) converts the result back to `inchi_Atom`/
+`inchi_Stereo0D`. The function
 texts are cut out of the sources. Needs a C compiler and the fetched InChI
 sources."""
 
@@ -47,9 +49,11 @@ int main(void) {
         scanf("%d %d %d", &n, &n0d, &unk);
         inp_ATOM *at = calloc(n, sizeof(inp_ATOM));
         for (int i = 0; i < n; i++) {
-            int v, cbv, el, orig;
-            scanf("%d %d %d %d", &v, &cbv, &el, &orig);
+            int v, cbv, el, orig, chg, rad, iso, nh, n1, n2, n3; char en[16];
+            scanf("%d %d %d %d %d %d %d %d %d %d %d %s", &v, &cbv, &el, &orig, &chg, &rad, &iso, &nh, &n1, &n2, &n3, en);
             at[i].valence = v; at[i].chem_bonds_valence = cbv; at[i].el_number = el; at[i].orig_at_number = orig;
+            at[i].charge = chg; at[i].radical = rad; at[i].iso_atw_diff = iso; at[i].num_H = nh;
+            at[i].num_iso_H[0] = n1; at[i].num_iso_H[1] = n2; at[i].num_iso_H[2] = n3; strcpy(at[i].elname, en);
             for (int j = 0; j < v; j++) { int x, b; scanf("%d %d", &x, &b); at[i].neighbor[j] = x; at[i].bond_type[j] = b; }
         }
         inchi_Stereo0D *st = calloc(n0d ? n0d : 1, sizeof(inchi_Stereo0D));
@@ -71,6 +75,22 @@ int main(void) {
                    a->p_orig_at_num[0], a->p_orig_at_num[1], a->p_orig_at_num[2], a->p_orig_at_num[3]);
             for (int k = 0; k < a->valence; k++) printf(" %d", a->bond_stereo[k]);
             printf("\n");
+        }
+        {
+            AT_NUM na = 0, ns = 0; inchi_Atom *oa = NULL; inchi_Stereo0D *os = NULL;
+            int ret = InpAtom0DToInchiAtom(at, n, &na, &oa, &ns, &os);
+            printf("R %d %d %d\n", ret, na, ns);
+            for (int i = 0; i < na; i++) {
+                inchi_Atom *a = &oa[i];
+                printf("B %d %d %d %d %d %d %d %d %d", a->num_bonds, a->charge, a->radical, a->isotopic_mass, a->num_iso_H[0], a->num_iso_H[1], a->num_iso_H[2], a->num_iso_H[3], 0);
+                printf(" "); hex(a->elname);
+                for (int k = 0; k < a->num_bonds; k++) printf(" %d:%d", a->neighbor[k], a->bond_type[k]);
+                printf("\n");
+            }
+            for (int i = 0; i < ns; i++) {
+                inchi_Stereo0D *t = &os[i];
+                printf("T %d %d %d %d %d %d %d\n", t->type, t->central_atom, t->parity, t->neighbor[0], t->neighbor[1], t->neighbor[2], t->neighbor[3]);
+            }
         }
         free(at); free(st);
     }
@@ -105,7 +125,9 @@ def build_case(rng):
     atoms = []
     for i in range(n):
         cbv = sum(t for _, t in adj[i])
-        atoms.append({"v": len(adj[i]), "cbv": cbv, "el": 6, "orig": rng.choice([i + 1, i + 1, rng.randrange(1, 40)]), "nb": adj[i]})
+        atoms.append({"v": len(adj[i]), "cbv": cbv, "el": 6, "orig": rng.choice([i + 1, i + 1, rng.randrange(1, 40)]), "nb": adj[i],
+                      "x": [rng.choice([0, 0, 1, -1]), rng.choice([0, 0, 1, 2, 3]), rng.choice([0, 0, 0, 1, 2, 3, -2, 5]), rng.randrange(0, 3),
+                            rng.choice([0, 0, 1]), rng.choice([0, 0, 1]), rng.choice([0, 0, 1]), rng.choice(["C", "N", "O", "Cl", "Xx"])]})
     desc = []
 
     def par():
@@ -158,7 +180,8 @@ def main():
     for c in cases:
         stdin += f"{c['n']} {len(c['desc'])} {c['unk']}\n"
         for a in c["atoms"]:
-            stdin += f"{a['v']} {a['cbv']} {a['el']} {a['orig']} " + " ".join(f"{x} {t}" for x, t in a["nb"]) + "\n"
+            x = a["x"]
+            stdin += f"{a['v']} {a['cbv']} {a['el']} {a['orig']} {x[0]} {x[1]} {x[2]} {x[3]} {x[4]} {x[5]} {x[6]} {x[7]} " + " ".join(f"{x} {t}" for x, t in a["nb"]) + "\n"
         for d in c["desc"]:
             stdin += " ".join(map(str, d)) + "\n"
     ri = (SRC / "readinch.c").read_text(errors="replace")
@@ -168,12 +191,15 @@ def main():
     funcs.append(cut(ic, "int FixUnkn0DStereoBonds( inp_ATOM *at, int num_at )\n{"))
     funcs.append(cut(ic, "int ReconcileAllCmlBondParities( inp_ATOM *at,\n                                 int num_atoms,\n                                 int bDisconnected )\n{"))
     funcs.append(cut(ic, "int ReconcileCmlIncidentBondParities( inp_ATOM *at,\n                                      int cur_atom,\n                                      int prev_atom,\n                                      S_CHAR *visited,\n                                      int bDisconnected )\n{"))
+    dll = (ROOT / "upstream/external/InChI/INCHI_API/libinchi/src/inchi_dll.c").read_text(errors="replace")
+    funcs.append(cut(dll, "int InpAtom0DToInchiAtom( inp_ATOM *at,\n                          int num_inp_atoms,\n                          AT_NUM *num_atoms,\n                          inchi_Atom **atom,\n                          AT_NUM *num_stereo0D,\n                          inchi_Stereo0D **stereo0D )\n{"))
     funcs.append(cut(ic, "int get_opposite_sb_atom( inp_ATOM *at,\n                          int cur_atom,\n                          int icur2nxt,\n                          int *pnxt_atom,\n                          int *pinxt2cur,\n                          int *pinxt_sb_parity_ord )\n{"))
     protos = """int FixUnkn0DStereoBonds( inp_ATOM *at, int num_at );
 int ReconcileAllCmlBondParities( inp_ATOM *at, int num_atoms, int bDisconnected );
 int ReconcileCmlIncidentBondParities( inp_ATOM *at, int cur_atom, int prev_atom, S_CHAR *visited, int bDisconnected );
 int get_opposite_sb_atom( inp_ATOM *at, int cur_atom, int icur2nxt, int *pnxt_atom, int *pinxt2cur, int *pinxt_sb_parity_ord );
 int Extract0DParities( inp_ATOM *at, int nNumAtoms, inchi_Stereo0D *stereo0D, int num_stereo0D, char *pStrErr, int *err, int vABParityUnknown );
+int InpAtom0DToInchiAtom( inp_ATOM *at, int num_inp_atoms, AT_NUM *num_atoms, inchi_Atom **atom, AT_NUM *num_stereo0D, inchi_Stereo0D **stereo0D );
 """
     with tempfile.TemporaryDirectory() as d:
         exe = Path(d) / "h"
@@ -187,7 +213,12 @@ int Extract0DParities( inp_ATOM *at, int nNumAtoms, inchi_Stereo0D *stereo0D, in
         k += 1
         atoms = out[k:k + c["n"]]
         k += c["n"]
-        data.append({"in": c, "head": head, "atoms": atoms})
+        r = out[k]
+        k += 1
+        na, ns = int(r.split()[2]), int(r.split()[3])
+        back = out[k:k + na + ns]
+        k += na + ns
+        data.append({"in": c, "head": head, "atoms": atoms, "back": [r] + back})
     path = ROOT / "tests/data/inchi_0d.json"
     path.write_text(json.dumps(data, separators=(",", ":")))
     print(len(data), "cases ->", path)
