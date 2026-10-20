@@ -3,4 +3,5 @@
 
 pub mod inchi;
 pub mod inchi_api;
+pub mod inchi_input;
 pub mod ring_decomposer_lib;
