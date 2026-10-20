@@ -790,3 +790,259 @@ pub fn n_no_metal_other_neigh_index2(
         })
         .map_or(-1, |i| i as i32)
 }
+
+// ---- strings and text handling ----
+
+/// C `isspace` in the "C" locale
+fn is_c_space(c: u8) -> bool {
+    matches!(c, b' ' | 0x09..=0x0d)
+}
+
+/// The part of a buffer before the first NUL, like a C string.
+fn c_str(s: &[u8]) -> &[u8] {
+    &s[..s.iter().position(|&c| c == 0).unwrap_or(s.len())]
+}
+
+/// `MakeRemovedProtonsString`: the text and the number of isotopic H kinds
+/// removed (`num_removed_iso_H`, only set when there are any).
+pub fn make_removed_protons_string(
+    n_num_removed_protons: i32,
+    n_num_exchg_isotopic_h: Option<&[i32; NUM_H_ISOTOPES]>,
+    n_num_removed_protons_isotopic: Option<&[i32; NUM_H_ISOTOPES]>,
+    b_isotopic: bool,
+) -> (String, Option<i32>) {
+    let mut s = String::new();
+    let mut num_iso = None;
+    if n_num_removed_protons != 0 {
+        s = format!(
+            "Proton balance: {} {} H+",
+            if n_num_removed_protons >= 0 { '+' } else { '-' },
+            n_num_removed_protons.abs()
+        );
+    }
+    if b_isotopic && (n_num_removed_protons_isotopic.is_some() || n_num_exchg_isotopic_h.is_some())
+    {
+        let mut j = 0;
+        for i in 0..NUM_H_ISOTOPES {
+            let num = n_num_exchg_isotopic_h.map_or(0, |a| a[i])
+                + n_num_removed_protons_isotopic.map_or(0, |a| a[i]);
+            if num != 0 {
+                s += &format!(
+                    "{} {}^{}H",
+                    if j != 0 { ", " } else { "  [ removed " },
+                    num,
+                    i + 1
+                );
+                j += 1;
+            }
+        }
+        if j != 0 {
+            s += " ]";
+            num_iso = Some(j);
+        }
+    }
+    (s, num_iso)
+}
+
+/// `normalize_string`: removes leading and trailing white space and replaces
+/// runs of white space with a single space; returns the new length.
+pub fn normalize_string(name: &mut Vec<u8>) -> i32 {
+    let mut len = name.len() as i32;
+    let mut n: i32 = 0;
+    let mut i: i32 = 0;
+    while i < len {
+        if is_c_space(name[i as usize]) {
+            name[i as usize] = b' ';
+            n += 1;
+        } else {
+            if n > 0 {
+                name.copy_within((i as usize).., (i - n) as usize);
+                i -= n;
+                len -= n;
+            }
+            n = -1;
+        }
+        i += 1;
+    }
+    if n == len {
+        len = 0;
+    } else {
+        n += 1;
+        if n != 0 && n <= len {
+            len -= n;
+        }
+    }
+    name.truncate(len as usize);
+    len
+}
+
+/// `dotify_non_printable_chars`: replaces non-ASCII and control characters
+/// with '.', returns the number of replacements
+pub fn dotify_non_printable_chars(line: &mut [u8]) -> i32 {
+    let mut num = 0;
+    for c in line.iter_mut() {
+        if *c == 0 {
+            break;
+        }
+        if *c < b' ' || *c >= 0x7f {
+            *c = b'.';
+            num += 1;
+        }
+    }
+    num
+}
+
+/// `is_matching_any_delim`
+pub fn is_matching_any_delim(c: u8, delims: &[u8]) -> bool {
+    c_str(delims).contains(&c)
+}
+
+/// `read_upto_delim`: `s` is the C string and `*pstring` the reading
+/// position in it (`None` = NULL). Copies up to the next delimiter or the end
+/// to `field`; the position is moved to the delimiter (or `None` at the end).
+/// Returns the number of bytes copied, -1 on error.
+pub fn read_upto_delim(
+    s: &[u8],
+    pstring: &mut Option<usize>,
+    field: &mut Vec<u8>,
+    maxlen: i32,
+    delims: &[u8],
+) -> i32 {
+    let Some(start) = *pstring else {
+        return -1;
+    };
+    let s = c_str(s);
+    let at = |k: usize| s.get(k).copied().unwrap_or(0);
+    let mut i = 0;
+    while at(start + i) != 0 && is_c_space(at(start + i)) {
+        i += 1;
+    }
+    let p = start + i;
+    let mut n = 0;
+    while at(p + n) != 0 && !is_matching_any_delim(at(p + n), delims) {
+        n += 1;
+    }
+    if n as i32 + 1 > maxlen {
+        return -1;
+    }
+    *field = s[p..p + n].to_vec();
+    *pstring = if at(p + n) == 0 {
+        None
+    } else {
+        Some(start + i + n)
+    };
+    n as i32
+}
+
+/// `remove_trailing_spaces`
+pub fn remove_trailing_spaces(p: &mut Vec<u8>) {
+    while p.last().is_some_and(|&c| is_c_space(c)) {
+        p.pop();
+    }
+}
+
+/// `remove_one_lf`: removes a final "\n" or "\r\n"
+pub fn remove_one_lf(p: &mut Vec<u8>) {
+    let len = p.len();
+    if len > 0 && p[len - 1] == b'\n' {
+        p.truncate(len - 1);
+        if len >= 2 && p[len - 2] == b'\r' {
+            p.truncate(len - 2);
+        }
+    }
+}
+
+/// `mystrncpy`: copies up to `maxlen` bytes including the terminating zero
+/// from `source` to the start of `target` and zero-fills up to `maxlen`.
+/// Returns false (C: 0) for empty input.
+pub fn mystrncpy(target: &mut [u8], source: &[u8], maxlen: usize) -> bool {
+    if maxlen == 0 {
+        return false;
+    }
+    let window = &source[..maxlen.min(source.len())];
+    let len = window.iter().position(|&c| c == 0).unwrap_or(maxlen - 1);
+    let len = len.min(window.len());
+    target[..len].copy_from_slice(&source[..len]);
+    target[len..maxlen].fill(0);
+    true
+}
+
+/// `lrtrim`: removes leading and trailing white space; returns the length
+pub fn lrtrim(p: &mut Vec<u8>) -> i32 {
+    let is_sp = |c: u8| c.is_ascii() && is_c_space(c);
+    let lead = p.iter().take_while(|&&c| is_sp(c)).count();
+    p.drain(..lead);
+    while p.last().is_some_and(|&c| is_sp(c)) {
+        p.pop();
+    }
+    p.len() as i32
+}
+
+/// `extract_inchi_substring`: the InChI embedded in `s` (from "InChI=" up to
+/// the first character an InChI cannot contain, at most `slen` characters)
+pub fn extract_inchi_substring(s: &str, slen: usize) -> Option<String> {
+    let p = &s[s.find("InChI=")?..];
+    let b = p.as_bytes();
+    let mut i = 0;
+    while i < slen {
+        let c = b.get(i).copied().unwrap_or(0);
+        if !(c.is_ascii_alphanumeric() || b"()*+,-./;=?@".contains(&c)) {
+            break;
+        }
+        i += 1;
+    }
+    Some(p[..i.min(b.len())].to_string())
+}
+
+/// `extract_auxinfo_substring`: from "AuxInfo=" to the first white space
+pub fn extract_auxinfo_substring(s: &str, slen: usize) -> Option<String> {
+    let p = &s[s.find("AuxInfo=")?..];
+    let b = p.as_bytes();
+    let mut i = 0;
+    while i < slen {
+        if b.get(i).is_some_and(|&c| is_c_space(c)) {
+            break;
+        }
+        i += 1;
+    }
+    Some(p[..i.min(b.len())].to_string())
+}
+
+fn my_tolower(c: u8) -> i32 {
+    i32::from(c.to_ascii_lowercase())
+}
+
+/// `inchi_memicmp`
+pub fn inchi_memicmp(p1: &[u8], p2: &[u8], length: usize) -> i32 {
+    for i in 0..length {
+        if p1[i] != p2[i] && my_tolower(p1[i]) != my_tolower(p2[i]) {
+            return my_tolower(p1[i]) - my_tolower(p2[i]);
+        }
+    }
+    0
+}
+
+/// `inchi_stricmp`
+pub fn inchi_stricmp(s1: &str, s2: &str) -> i32 {
+    let (a, b) = (s1.as_bytes(), s2.as_bytes());
+    let mut i = 0;
+    while i < a.len() {
+        let c2 = b.get(i).copied().unwrap_or(0);
+        if a[i] != c2 && my_tolower(a[i]) != my_tolower(c2) {
+            return my_tolower(a[i]) - my_tolower(c2);
+        }
+        i += 1;
+    }
+    if i < b.len() { -1 } else { 0 }
+}
+
+/// `inchi__strnset`: sets up to `length` characters before the terminating
+/// zero to `val`
+pub fn inchi_strnset(s: &mut [u8], val: u8, length: usize) {
+    for c in s.iter_mut().take(length) {
+        if *c == 0 {
+            break;
+        }
+        *c = val;
+    }
+}
