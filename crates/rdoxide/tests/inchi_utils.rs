@@ -412,3 +412,134 @@ fn string_helpers_match_the_c_code() {
         );
     }
 }
+
+fn upto_nul(b: &[u8]) -> &[u8] {
+    &b[..b.iter().position(|&c| c == 0).unwrap_or(b.len())]
+}
+
+#[test]
+fn io_streams_match_the_c_code() {
+    use rdoxide::external::inchi::ichi_io::*;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_io.json")).unwrap();
+    let cases = data.as_array().unwrap();
+    assert!(cases.len() >= 600);
+    let ios_state = |s: &InchiIostream| {
+        format!(
+            " [{} {} {}]",
+            s.s.n_allocated_length, s.s.n_used_length, s.s.n_ptr
+        )
+    };
+    let ios_text = |s: &InchiIostream| match &s.s.p_str {
+        Some(p) => hex(upto_nul(p)),
+        None => hex(b""),
+    };
+    for c in cases {
+        let expected = c["out"].as_str().unwrap();
+        match c["kind"].as_str().unwrap() {
+            "Q" => {
+                let text = unhex(c["text"].as_str().unwrap());
+                let mut ios = InchiIostream::default();
+                inchi_ios_init(&mut ios, INCHI_IOS_TYPE_STRING, IosFile::None);
+                inchi_ios_print(Some(&mut ios), &String::from_utf8(text.clone()).unwrap());
+                ios.s.n_ptr = 0;
+                let mut sb = InchiIosString::default();
+                inchi_strbuf_init(&mut sb, 8, 4);
+                let mut got = String::new();
+                let line_of =
+                    |r: &IosLine| format!("{} {} {}", r.length, r.too_long as i32, hex(&r.line));
+                for op in c["ops"].as_array().unwrap() {
+                    let o = op[0].as_str().unwrap();
+                    let a = op[1].as_i64().unwrap() as i32;
+                    let b = op[2].as_i64().unwrap();
+                    match o {
+                        "g" => got += &line_of(&inchi_ios_gets(a, &mut ios)),
+                        "t" => got += &line_of(&inchi_ios_gets_tab(a, &mut ios)),
+                        "1" => got += &line_of(&inchi_ios_gets_tab1(a, &mut ios)),
+                        "s" => {
+                            got += &inchi_sgets(a, &mut ios)
+                                .map_or("N".to_string(), |l| format!("S {}", hex(&l)));
+                        }
+                        "f" => {
+                            got += &inchi_fgets_lf(a, &mut ios)
+                                .map_or("N".to_string(), |l| format!("S {}", hex(&l)));
+                        }
+                        "c" => {
+                            got += &inchi_ios_str_getc(&mut ios)
+                                .map_or(-1, i32::from)
+                                .to_string();
+                        }
+                        _ => {
+                            let r = inchi_strbuf_addline(&mut sb, &mut ios, a != 0, b != 0);
+                            got += &format!(
+                                "{r} {} {}",
+                                hex(upto_nul(sb.p_str.as_ref().unwrap())),
+                                sb.n_allocated_length
+                            );
+                        }
+                    }
+                    got += &format!(" #{};", ios.s.n_ptr);
+                }
+                assert_eq!(got, expected, "text {:?}", String::from_utf8_lossy(&text));
+            }
+            "P" => {
+                let text = unhex(c["text"].as_str().unwrap());
+                let mut o = InchiIostream::default();
+                inchi_ios_init(&mut o, INCHI_IOS_TYPE_STRING, IosFile::None);
+                let mut sb = InchiIosString::default();
+                inchi_strbuf_init(&mut sb, 16, 8);
+                for (k, chunk) in text.chunks(7).enumerate() {
+                    let ch = String::from_utf8(chunk.to_vec()).unwrap();
+                    inchi_ios_print(Some(&mut o), &ch);
+                    inchi_strbuf_printf(&mut sb, &ch);
+                    if k == 2 {
+                        inchi_strbuf_printf_from(&mut sb, 3, "ab");
+                    }
+                }
+                let mut got = format!(
+                    "{} {}{}",
+                    o.s.n_allocated_length,
+                    ios_text(&o),
+                    ios_state(&o)
+                );
+                got += &format!(
+                    " | {} {} {} {}",
+                    sb.n_allocated_length,
+                    sb.n_used_length,
+                    sb.n_ptr,
+                    hex(upto_nul(sb.p_str.as_ref().unwrap()))
+                );
+                got += &format!(" {}", inchi_strbuf_update(&mut sb, 40));
+                inchi_strbuf_reset(&mut sb);
+                got += &format!(
+                    " {} {} {}",
+                    sb.n_allocated_length, sb.n_used_length, sb.n_ptr
+                );
+                inchi_ios_flush_not_displayed(Some(&mut o));
+                got += &format!(" | {}{}", ios_text(&o), ios_state(&o));
+                assert_eq!(got, expected, "print {:?}", String::from_utf8_lossy(&text));
+            }
+            _ => {
+                let a = c["args"].as_array().unwrap();
+                let (lab, val) = (a[0].as_str().unwrap(), a[1].as_str().unwrap());
+                let mut o = InchiIostream::default();
+                inchi_ios_init(&mut o, INCHI_IOS_TYPE_STRING, IosFile::None);
+                output_record_info(
+                    &mut o,
+                    a[2].as_i64().unwrap() as i32,
+                    a[3].as_i64().unwrap() != 0,
+                    (!lab.is_empty()).then_some(lab),
+                    (!val.is_empty()).then_some(val),
+                    a[4].as_u64().unwrap(),
+                    "\n",
+                    "\t",
+                );
+                assert_eq!(
+                    format!("{}{}", ios_text(&o), ios_state(&o)),
+                    expected,
+                    "record {a:?}"
+                );
+            }
+        }
+    }
+}
