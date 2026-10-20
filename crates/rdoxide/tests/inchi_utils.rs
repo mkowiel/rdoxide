@@ -316,3 +316,99 @@ fn atom_helpers_match_the_c_code() {
         }
     }
 }
+
+fn unhex(s: &str) -> Vec<u8> {
+    let h = &s[1..];
+    (0..h.len() / 2)
+        .map(|i| u8::from_str_radix(&h[2 * i..2 * i + 2], 16).unwrap())
+        .collect()
+}
+
+fn hex(b: &[u8]) -> String {
+    let mut s = String::from("x");
+    for c in b {
+        s += &format!("{c:02x}");
+    }
+    s
+}
+
+#[test]
+fn string_helpers_match_the_c_code() {
+    use rdoxide::external::inchi::util::*;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_strings.json")).unwrap();
+    let cases = data.as_array().unwrap();
+    assert!(cases.len() >= 600);
+    for c in cases {
+        let s1 = unhex(c["s1"].as_str().unwrap());
+        let s2 = unhex(c["s2"].as_str().unwrap());
+        let slen = c["slen"].as_u64().unwrap() as usize;
+        let maxlen = c["maxlen"].as_i64().unwrap() as i32;
+        let out: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        let ctx = format!("{:?}", String::from_utf8_lossy(&s1));
+        let mut b = s1.clone();
+        let len = normalize_string(&mut b);
+        assert_eq!(format!("{} {len}", hex(&b)), out[0], "normalize {ctx}");
+        let mut b = s1.clone();
+        let n = dotify_non_printable_chars(&mut b);
+        assert_eq!(format!("{} {n}", hex(&b)), out[1], "dotify {ctx}");
+        let mut b = s1.clone();
+        let len = lrtrim(&mut b);
+        assert_eq!(format!("{} {len}", hex(&b)), out[2], "lrtrim {ctx}");
+        let mut b = s1.clone();
+        remove_trailing_spaces(&mut b);
+        assert_eq!(hex(&b), out[3], "trailing {ctx}");
+        let mut b = s1.clone();
+        remove_one_lf(&mut b);
+        assert_eq!(hex(&b), out[4], "lf {ctx}");
+        let mut pos = Some(0);
+        let mut field = Vec::new();
+        let n = read_upto_delim(&s1, &mut pos, &mut field, maxlen, b", \t");
+        let fld = if n > 0 { hex(&field) } else { "x".to_string() };
+        let p = pos.map_or(-1, |p| p as i64);
+        assert_eq!(format!("{n} {fld} {p}"), out[5], "read_upto_delim {ctx}");
+        let st = String::from_utf8_lossy(&s1).to_string();
+        let ascii = s1.is_ascii() && s2.is_ascii();
+        if ascii {
+            let o =
+                extract_inchi_substring(&st, slen).map_or("N".to_string(), |s| hex(s.as_bytes()));
+            assert_eq!(o, out[6], "extract_inchi {ctx}");
+            let o =
+                extract_auxinfo_substring(&st, slen).map_or("N".to_string(), |s| hex(s.as_bytes()));
+            assert_eq!(o, out[7], "extract_aux {ctx}");
+            let a = inchi_stricmp(&st, &String::from_utf8_lossy(&s2)).signum();
+            let m = inchi_memicmp(&s1, &s2, s1.len().min(s2.len())).signum();
+            assert_eq!(format!("{a} {m}"), out[8], "icmp {ctx}");
+        }
+        let mut t = vec![b'z'; 64];
+        t[63] = 0;
+        mystrncpy(&mut t, &s1, maxlen as usize);
+        assert_eq!(hex(&t), out[9], "mystrncpy {ctx}");
+        let bi = c["bi"].as_i64().unwrap();
+        let arr = |k: &str| -> [i32; 3] {
+            let a = c[k].as_array().unwrap();
+            [
+                a[0].as_i64().unwrap() as i32,
+                a[1].as_i64().unwrap() as i32,
+                a[2].as_i64().unwrap() as i32,
+            ]
+        };
+        let (e, r) = (arr("e"), arr("r"));
+        let (s, niso) = make_removed_protons_string(
+            c["nrp"].as_i64().unwrap() as i32,
+            if bi & 2 != 0 { None } else { Some(&e) },
+            if bi & 4 != 0 { None } else { Some(&r) },
+            bi & 1 != 0,
+        );
+        assert_eq!(
+            format!("{} {}", hex(s.as_bytes()), niso.unwrap_or(0)),
+            out[10],
+            "protons"
+        );
+    }
+}
