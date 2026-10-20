@@ -33,6 +33,7 @@ pub mod incomdef;
 pub mod inpdef;
 pub mod readinch;
 pub mod sha256;
+pub mod strutil;
 
 pub mod util;
 

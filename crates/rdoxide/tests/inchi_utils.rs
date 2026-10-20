@@ -1034,3 +1034,84 @@ fn zero_d_parities_match_the_c_code() {
         }
     }
 }
+
+#[test]
+fn drawing_corrections_match_the_c_code() {
+    use rdoxide::external::inchi::inpdef::InpAtom;
+    use rdoxide::external::inchi::strutil::*;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_strutil.json")).unwrap();
+    let cases = data.as_array().unwrap();
+    assert!(cases.len() >= 1500);
+    for c in cases {
+        let inp = &c["in"];
+        let mut at: Vec<InpAtom> = Vec::new();
+        for a in inp["atoms"].as_array().unwrap() {
+            let nb = a["nb"].as_array().unwrap();
+            let mut x = InpAtom {
+                valence: nb.len() as i8,
+                chem_bonds_valence: a["cbv"].as_i64().unwrap() as i8,
+                el_number: a["el"].as_u64().unwrap() as u8,
+                charge: a["chg"].as_i64().unwrap() as i8,
+                radical: a["rad"].as_i64().unwrap() as i8,
+                iso_atw_diff: a["iso"].as_i64().unwrap() as i8,
+                num_h: a["nh"].as_i64().unwrap() as i8,
+                component: a["comp"].as_u64().unwrap() as u16,
+                ..Default::default()
+            };
+            for (j, e) in nb.iter().enumerate() {
+                x.neighbor[j] = e[0].as_u64().unwrap() as u16;
+                x.bond_type[j] = e[1].as_u64().unwrap() as u8;
+                x.bond_stereo[j] = e[2].as_i64().unwrap() as i8;
+            }
+            at.push(x);
+        }
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        let mut got: Vec<String> = Vec::new();
+        for q in inp["q"].as_array().unwrap() {
+            let atno = q[0].as_u64().unwrap() as usize;
+            let mut ord: Vec<i32> = q[1]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|v| v.as_i64().unwrap() as i32)
+                .collect();
+            let n = ord.len();
+            let r = n_find_one_om(&at, atno, &mut ord, n);
+            let mut s = format!("Q {r}");
+            for o in &ord {
+                s += &format!(" {o}");
+            }
+            got.push(s);
+        }
+        for i in 0..at.len() {
+            got.push(match the_only_doublet_neigh(&at, i) {
+                Some((n, a, b)) => format!("D {n} {a} {b}"),
+                None => "D -1 -9 -9".to_string(),
+            });
+        }
+        for i in 0..at.len().saturating_sub(1) {
+            got.push(format!(
+                "C {}",
+                cmp_iso_atw_diff_component_no(&at[i], &at[i + 1])
+            ));
+        }
+        let (mut n1, mut n2) = (0, 0);
+        fix_non_uniform_drawn_oxoanions(&mut at, &mut n1);
+        fix_non_uniform_drawn_amidiniums(&mut at, &mut n2);
+        got.push(format!("N {n1} {n2}"));
+        for a in &at {
+            let mut s = format!("A {} {} {}", a.charge, a.chem_bonds_valence, a.valence);
+            for k in 0..a.valence as usize {
+                s += &format!(" {}:{}", a.bond_type[k], a.bond_stereo[k]);
+            }
+            got.push(s);
+        }
+        assert_eq!(got, want, "case {inp}");
+    }
+}
