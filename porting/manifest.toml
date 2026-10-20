@@ -1816,3 +1816,10 @@
 
 [module."rdoxide::graphmol::chem_reactions::depict".sources]
 "Code/GraphMol/ChemReactions/ReactionDepict.cpp" = "ff2cda6dc20da118db24c0d6dd7e90e164bc3918"
+
+[module."rdoxide::graphmol::file_parsers::mae_mol_supplier".sources]
+"Code/GraphMol/FileParsers/MaeMolSupplier.cpp" = "b6e75ede2c0ef6c4e66b267bc4702b490a7436a8"
+"Code/GraphMol/FileParsers/MaestroProperties.h" = "041f3c22684409ca0611b9d357502c3511086bbf"
+
+[module."rdoxide_python::rdmolfiles_maesupplier".sources]
+"Code/GraphMol/Wrap/MaeMolSupplier.cpp" = "168ab2ebf3726f7d1336a0766b92108ca627c2fa"
