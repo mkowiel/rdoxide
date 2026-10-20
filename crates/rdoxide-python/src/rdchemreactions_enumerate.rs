@@ -44,6 +44,24 @@ fn convert_bbs(reagents: &Bound<'_, PyAny>) -> PyResult<Bbs> {
         .collect()
 }
 
+/// The sizes of the reagent lists, checking the elements are molecules
+/// without copying them (a strategy only needs the sizes).
+fn bb_sizes(reagents: &Bound<'_, PyAny>) -> PyResult<Vec<u64>> {
+    reagents
+        .try_iter()?
+        .map(|set| {
+            let mut n = 0u64;
+            for m in set?.try_iter()? {
+                mol_ref(&m?).map_err(|_| {
+                    PyValueError::new_err("reaction called with non molecule reactant")
+                })?;
+                n += 1;
+            }
+            Ok(n)
+        })
+        .collect()
+}
+
 /// Controls some aspects of how the enumeration is performed.
 ///
 /// Options:
@@ -193,8 +211,7 @@ impl PyEnumerationStrategyBase {
         ob: &Bound<'_, PyList>,
     ) -> PyResult<()> {
         let _ = rxn.borrow();
-        let bbs = convert_bbs(ob.as_any())?;
-        let sizes: Vec<u64> = bbs.iter().map(|b| b.len() as u64).collect();
+        let sizes = bb_sizes(ob.as_any())?;
         self.inner.initialize(&sizes).py()
     }
 }
