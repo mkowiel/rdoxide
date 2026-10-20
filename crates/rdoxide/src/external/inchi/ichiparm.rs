@@ -375,3 +375,77 @@ pub fn set_common_options_by_parg(
     }
     got
 }
+
+/// `INCHI_MAX_NUM_ARG` (`inchi_dll.h`)
+pub const INCHI_MAX_NUM_ARG: usize = 32;
+
+/// `parse_options_string` (`inchi_dll.c`): splits the option string into
+/// arguments with the quoting rules of the Windows command line (a pair of
+/// backslashes is one backslash, a backslash before a quote makes it
+/// literal, `""` inside quotes is a quote). The C function edits the string
+/// in place; here the arguments are returned. `argv[0]` is the empty program
+/// name, as in C, and at most `maxargs - 2` arguments follow it.
+pub fn parse_options_string(cmd: &[u8], maxargs: usize) -> Vec<Vec<u8>> {
+    // the C string with its terminating zero; reads past the end give 0
+    let mut buf: Vec<u8> = cmd.iter().copied().take_while(|&c| c != 0).collect();
+    buf.push(0);
+    let at = |buf: &Vec<u8>, k: usize| buf.get(k).copied().unwrap_or(0);
+    let mut argv: Vec<Vec<u8>> = vec![Vec::new()];
+    let mut p = 0usize;
+    let mut inside_quotes = false;
+    while argv.len() + 1 < maxargs {
+        while matches!(at(&buf, p), b' ' | b'\t') {
+            p += 1;
+        }
+        if at(&buf, p) == 0 {
+            break;
+        }
+        let start = p;
+        let mut cur = p; // pArgCurChar
+        loop {
+            let mut copy_char = true;
+            let mut backslashes = 0usize;
+            while at(&buf, p) == b'\\' {
+                p += 1;
+                backslashes += 1;
+            }
+            if at(&buf, p) == b'"' {
+                if backslashes % 2 == 0 {
+                    if inside_quotes {
+                        if at(&buf, p + 1) == b'"' {
+                            p += 1;
+                        } else {
+                            copy_char = false;
+                        }
+                    } else {
+                        copy_char = false;
+                    }
+                    inside_quotes = !inside_quotes;
+                }
+                backslashes /= 2;
+            }
+            for _ in 0..backslashes {
+                buf[cur] = b'\\';
+                cur += 1;
+            }
+            if at(&buf, p) == 0 {
+                break;
+            }
+            if !inside_quotes && matches!(at(&buf, p), b' ' | b'\t') {
+                p += 1;
+                break;
+            }
+            if copy_char {
+                buf[cur] = buf[p];
+                cur += 1;
+            }
+            p += 1;
+        }
+        let arg = buf[start..cur].to_vec();
+        if cur < buf.len() {
+            buf[cur] = 0;
+        }
+        argv.push(arg);
+    }
+    argv
+}

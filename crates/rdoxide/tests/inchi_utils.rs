@@ -662,3 +662,30 @@ fn common_options_match_the_c_code() {
         assert_eq!(mine, out, "arg {:?} dev {}", c["arg"], c["dev"]);
     }
 }
+
+#[test]
+fn options_string_splitting_matches_the_c_code() {
+    use rdoxide::external::inchi::ichiparm::parse_options_string;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_optstr.json")).unwrap();
+    let cases = data.as_array().unwrap();
+    assert!(cases.len() >= 600);
+    for c in cases {
+        let s = unhex(c["s"].as_str().unwrap());
+        let argv = parse_options_string(&s, c["max"].as_u64().unwrap() as usize);
+        assert_eq!(
+            argv.len() as u64,
+            c["n"].as_u64().unwrap(),
+            "{:?}",
+            String::from_utf8_lossy(&s)
+        );
+        let got: Vec<String> = argv.iter().map(|a| hex(a)).collect();
+        let want: Vec<&str> = c["argv"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        assert_eq!(got, want, "{:?}", String::from_utf8_lossy(&s));
+    }
+}
