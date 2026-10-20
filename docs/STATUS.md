@@ -259,6 +259,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 143 | done |
 | 144 | done |
 | 145 | done |
+| 146 | done |
 
 ## Python package files
 
@@ -574,3 +575,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-19 — Stage 143: InChI port I3f: remove_terminal_HDT and add_DT_to_num_H ported, differential test on 12000 arrays
 * 2026-10-19 — Stage 144: InChI port I3g: MarkDisconnectedComponents and component helpers ported, differential test on 12000 arrays
 * 2026-10-19 — Stage 145: InChI port I3h: PreprocessOneStructure ported (runichi3), differential test on 4000 structures
+* 2026-10-19 — Stage 146: InChI port I4a: MarkRingSystemsInp and UnMark helpers ported, differential test on 15000 graphs
