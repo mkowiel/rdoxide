@@ -1046,7 +1046,6 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::test56LazySDMolSupplier
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test58Issue2983794
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test59Issue3007178
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test5Smiles
-Code/GraphMol/nbWrap/rough_test.py::TestCase::test60SmilesWriterClose
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test61PathToSubmol
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test62SmilesAndSmartsReplacements
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test63Issue3313539
@@ -1421,6 +1420,8 @@ rdkit/Chem/UnitTestCatalog.py::TestCase::test7ScoreMolecules
 rdkit/Chem/UnitTestCatalog.py::TestCase::test8MolRanks
 rdkit/Chem/UnitTestCatalog.py::TestCase::test9Issue116
 rdkit/Chem/UnitTestChem.py::TestCase::testGithub4144
+rdkit/Chem/UnitTestChem.py::TestCase::testJSON1
+rdkit/Chem/UnitTestChem.py::TestCase::testJSON2
 rdkit/Chem/UnitTestChem.py::TestCase::testMultiConfMolFromSDF
 rdkit/Chem/UnitTestChem.py::TestCase::testPkl
 rdkit/Chem/UnitTestChem.py::TestCase::testPkl1
