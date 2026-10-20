@@ -1,3 +1,4 @@
+import pytest
 """rdFingerprintGenerator Morgan generator (expectations from RDKit 2026.09.1)."""
 
 from rdoxide import Chem
@@ -75,3 +76,11 @@ def test_legacy_rdk_fingerprint():
     assert ab == [[28, 44, 0, 31], [28, 44, 59, 50, 0, 31], [59, 50, 0, 31]]
     assert bi == {0: [[0, 1]], 28: [[0]], 31: [[0, 1]], 44: [[0]], 50: [[1]], 59: [[1]]}
     assert len(Chem.UnfoldedRDKFingerprintCountBased(m).GetNonzeroElements()) == 3
+
+
+def test_fingerprint_generator32_class_exists_but_is_not_constructible():
+    from rdoxide.Chem import rdFingerprintGenerator
+
+    assert rdFingerprintGenerator.FingerprintGenerator32.__name__ == "FingerprintGenerator32"
+    with pytest.raises(TypeError):
+        rdFingerprintGenerator.FingerprintGenerator32()
