@@ -311,7 +311,7 @@ pub fn is_el_a_metal(n_periodic_num: i32) -> bool {
 
 /// C's `strtol(s, &end, 10)`: the value and the number of bytes consumed
 /// (0 when there is no number).
-fn strtol10(s: &[u8]) -> (i64, usize) {
+pub(crate) fn strtol10(s: &[u8]) -> (i64, usize) {
     let mut i = 0;
     while s
         .get(i)

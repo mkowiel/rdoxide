@@ -22,6 +22,7 @@
 pub mod el_data;
 pub mod ichi_io;
 pub mod ichierr;
+pub mod ichiparm;
 pub mod ichiring;
 pub mod ichisort;
 pub mod ikey_base26;
