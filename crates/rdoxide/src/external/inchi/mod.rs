@@ -14,10 +14,12 @@
 //! Module layout and port plan: `docs/INCHI_PORT.md`. Each submodule names
 //! the C sources (`INCHI_BASE/src/*.c`, `INCHI_API/libinchi/src/*.c`) it is
 //! translated from. Ported so far: the InChIKey (`ikey_dll.c`,
-//! `ikey_base26.c`) and the sorting primitives (`ichisort.c`). The structure -> InChI and InChI -> structure pipelines
+//! `ikey_base26.c`) the sorting primitives (`ichisort.c`) and the error codes
+//! and messages (`ichierr.c`). The structure -> InChI and InChI -> structure pipelines
 //! follow in later stages; the RDKit-facing API is
 //! [`crate::external::inchi_api`].
 
+pub mod ichierr;
 pub mod ichisort;
 pub mod ikey_base26;
 pub mod ikey_dll;

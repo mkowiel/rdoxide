@@ -1,6 +1,6 @@
 """Generates tests/data/inchi_sort.json: inputs and outputs of `inchi_qsort`
 and `insertions_sort` of the InChI C sources (upstream/external/InChI), for
-`crates/rdoxide/tests/inchi_sort.rs`. Needs a C compiler and the fetched
+`crates/rdoxide/tests/inchi_utils.rs`. Needs a C compiler and the fetched
 InChI sources (`tools/sync_upstream.py fetch`).
 
 Elements are (key, id) pairs compared by key only, so the order of equal keys

@@ -3,7 +3,7 @@
 //! InChI does not use the C library's `qsort`: the canonical numbering
 //! depends on the exact order in which an unstable sort leaves equal
 //! elements, so `inchi_qsort` and the insertion sorts are translated
-//! literally (and tested against the C code, see `tests/inchi_sort.rs`).
+//! literally (and tested against the C code, see `tests/inchi_utils.rs`).
 //!
 //! Pointers into the arrays become indices; the comparison functions return
 //! an `i32` like the C ones. `NEIGH_LIST` (an `AT_NUMB *` whose first element

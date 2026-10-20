@@ -58,3 +58,30 @@ fn small_sorts() {
     iisort(&mut l);
     assert_eq!(l, [1, 2, 5, 9]);
 }
+
+#[test]
+fn error_messages_match_the_c_code() {
+    use rdoxide::external::inchi::ichierr::{add_error_message, err_msg};
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_err.json")).unwrap();
+    for (code, msg) in data["codes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .zip(data["messages"].as_array().unwrap())
+    {
+        let code = code.as_i64().unwrap() as i32;
+        assert_eq!(err_msg(code), msg.as_str().unwrap(), "code {code}");
+    }
+    let cases = data["cases"].as_array().unwrap();
+    assert!(cases.len() >= 300);
+    for case in cases {
+        let mut buf = String::new();
+        let outs = case["out"].as_array().unwrap();
+        for (m, out) in case["in"].as_array().unwrap().iter().zip(outs) {
+            let r = add_error_message(&mut buf, m.as_str().unwrap());
+            assert_eq!(i64::from(r), out[0].as_i64().unwrap(), "{case}");
+            assert_eq!(buf, out[1].as_str().unwrap(), "{case}");
+        }
+    }
+}
