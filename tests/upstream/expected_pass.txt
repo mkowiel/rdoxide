@@ -846,7 +846,16 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::testIssue1735
 Code/GraphMol/Wrap/rough_test.py::TestCase::testKekulizeIfPossible
 Code/GraphMol/Wrap/rough_test.py::TestCase::testLegacyRingFinding
 Code/GraphMol/Wrap/rough_test.py::TestCase::testMDLProps
+<<<<<<< HEAD
+Code/GraphMol/Wrap/rough_test.py::TestCase::testMaeFileSupplier
+Code/GraphMol/Wrap/rough_test.py::TestCase::testMaeFileSupplierException
+Code/GraphMol/Wrap/rough_test.py::TestCase::testMaeFileSupplierExceptionMsgs
+Code/GraphMol/Wrap/rough_test.py::TestCase::testMaeFileSupplierGetItem
+Code/GraphMol/Wrap/rough_test.py::TestCase::testMaeFileSupplierSetData
+Code/GraphMol/Wrap/rough_test.py::TestCase::testMaeStreamSupplier
+=======
 Code/GraphMol/Wrap/rough_test.py::TestCase::testMetadataToPNG
+>>>>>>> origin/main
 Code/GraphMol/Wrap/rough_test.py::TestCase::testMolBlockChirality
 Code/GraphMol/Wrap/rough_test.py::TestCase::testMolBundles1
 Code/GraphMol/Wrap/rough_test.py::TestCase::testMolBundles2
@@ -1180,7 +1189,16 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::testIssue1735
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testKekulizeIfPossible
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testLegacyRingFinding
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testMDLProps
+<<<<<<< HEAD
+Code/GraphMol/nbWrap/rough_test.py::TestCase::testMaeFileSupplier
+Code/GraphMol/nbWrap/rough_test.py::TestCase::testMaeFileSupplierException
+Code/GraphMol/nbWrap/rough_test.py::TestCase::testMaeFileSupplierExceptionMsgs
+Code/GraphMol/nbWrap/rough_test.py::TestCase::testMaeFileSupplierGetItem
+Code/GraphMol/nbWrap/rough_test.py::TestCase::testMaeFileSupplierSetData
+Code/GraphMol/nbWrap/rough_test.py::TestCase::testMaeStreamSupplier
+=======
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testMetadataToPNG
+>>>>>>> origin/main
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testMolBlockChirality
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testMolBundles1
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testMolBundles2

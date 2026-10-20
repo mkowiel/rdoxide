@@ -10,7 +10,7 @@ use crate::errors::to_py;
 use crate::mol::PyMol;
 
 /// The translators registered in rdmolfiles.cpp.
-fn translate(e: RDKitError) -> PyErr {
+pub(crate) fn translate(e: RDKitError) -> PyErr {
     match e {
         RDKitError::BadFile(m) => PyIOError::new_err(format!("File error: {m}")),
         RDKitError::FileParse(m) => PyRuntimeError::new_err(format!("File parsing error: {m}")),

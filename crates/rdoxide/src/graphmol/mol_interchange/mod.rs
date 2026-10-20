@@ -96,14 +96,14 @@ const BOND_ORDERS: [(i64, BondType); 6] = [
     (17, BondType::Dative),
 ];
 
-fn bond_type_from_order(order: i64) -> Option<BondType> {
+pub(crate) fn bond_type_from_order(order: i64) -> Option<BondType> {
     BOND_ORDERS
         .iter()
         .find(|(o, _)| *o == order)
         .map(|&(_, t)| t)
 }
 
-fn bond_order(bond_type: BondType) -> Option<i64> {
+pub(crate) fn bond_order(bond_type: BondType) -> Option<i64> {
     BOND_ORDERS
         .iter()
         .find(|(_, t)| *t == bond_type)

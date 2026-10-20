@@ -78,6 +78,7 @@ mod rdmolfiles;
 mod rdmolfiles_cdxml;
 mod rdmolfiles_cml;
 mod rdmolfiles_fwdsdsupplier;
+mod rdmolfiles_maesupplier;
 mod rdmolfiles_marvin;
 mod rdmolfiles_mol2;
 mod rdmolfiles_molblock;
