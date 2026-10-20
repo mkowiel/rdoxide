@@ -1815,5 +1815,5 @@
 "Code/GraphMol/MolAlign/O3AAlignMolecules.h" = "13112f8f052f4f90fd5b37b01fd2b6894d788ada"
 
 [module."rdoxide::graphmol::file_parsers::png".sources]
-"Code/GraphMol/FileParsers/PNGParser.cpp" = "x"
-"Code/GraphMol/FileParsers/PNGParser.h" = "x"
+"Code/GraphMol/FileParsers/PNGParser.cpp" = "b700d4c87d8323fb358d9952943ac8d544068a62"
+"Code/GraphMol/FileParsers/PNGParser.h" = "93f519bba28f10902565abb1f64782a8d6e48308"
