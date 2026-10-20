@@ -156,6 +156,16 @@ fn nested_map<T: Copy + for<'py> IntoPyObject<'py>>(
     Ok(d.into_any().unbind())
 }
 
+/// `FingerprintGenerator32`: like upstream's (`python::no_init`) class it has no
+/// constructor, and no function of the module returns one: the generators are
+/// all 64-bit ones.
+#[pyclass(
+    name = "FingerprintGenerator32",
+    module = "rdoxide.Chem.rdFingerprintGenerator"
+)]
+#[derive(Debug)]
+pub struct PyFPGen32;
+
 /// `FingerprintGenerator64`
 #[pyclass(
     name = "FingerprintGenerator64",
@@ -1190,6 +1200,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyAtomInvGen>()?;
     m.add_class::<PyBondInvGen>()?;
     m.add_class::<PyAdditionalOutput>()?;
+    m.add_class::<PyFPGen32>()?;
     m.add_class::<PyFPGen>()?;
     m.add_class::<PyFingerprintOptions>()?;
     m.add_class::<PyMorganOptions>()?;
