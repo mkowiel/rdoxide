@@ -807,7 +807,6 @@ Code/GraphMol/Wrap/rough_test.py::TestCase::testGitHub1166
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGitHub1985
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGitHub2082
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGitHub2082_2
-Code/GraphMol/Wrap/rough_test.py::TestCase::testGitHub2597
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub1041
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub1051
 Code/GraphMol/Wrap/rough_test.py::TestCase::testGithub1320
@@ -1007,6 +1006,7 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::test25SDMolSupplier
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test26SmiMolSupplier
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test27SmilesWriter
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test28SmilesReverse
+Code/GraphMol/nbWrap/rough_test.py::TestCase::test29SDWriterLoop
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test2Atom
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test30Issues109and110
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test31ChiralitySmiles
@@ -1046,6 +1046,7 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::test56LazySDMolSupplier
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test58Issue2983794
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test59Issue3007178
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test5Smiles
+Code/GraphMol/nbWrap/rough_test.py::TestCase::test60SmilesWriterClose
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test61PathToSubmol
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test62SmilesAndSmartsReplacements
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test63Issue3313539
@@ -1140,7 +1141,6 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::testGitHub1166
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGitHub1985
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGitHub2082
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGitHub2082_2
-Code/GraphMol/nbWrap/rough_test.py::TestCase::testGitHub2597
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGithub1041
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGithub1051
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testGithub1320
