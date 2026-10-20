@@ -234,6 +234,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 118 | Bonds with a complex bond type query contribute 0 to the valence, as `QueryBond::getValenceContrib` (SetHybridization/Compute2DCoords on SMARTS molecules) | done |
 | 119 | `rdChemReactions.Compute2DCoordsForReaction` (`chem_reactions::depict`, identical coordinates to RDKit) | done |
 | 120 | `Chem.MolFromPNGFile/String`, `MolsFromPNGFile/String`, `MolMetadataToPNGFile/String`, `AddMetadataToPNGFile/String`, `MetadataFromPNGFile/String` and `PNGMetadataParams` (`file_parsers::png`: tEXt/zTXt chunks with a built-in inflate and stored-block zlib writer, CRC32, pickle/CXSMILES/mol block tags) | ✅ | Python tests; upstream `rough_test.py` testMolFromPNG, testMolsFromPNG, testMolToPNG, testMetadataToPNG |
+| 121 | `rdMolDescriptors.GetAtomFeatures` (`descriptors::atom_feat`: the 49/52 one-hot atom features of AtomFeat.cpp) | ✅ | Python tests against values from RDKit 2026.09.1 |
 
 ## Python package files
 
@@ -524,3 +525,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-19 — Stage 118: QueryBond::getValenceContrib port.
 * 2026-10-19 — Stage 119: Reaction depiction.
 * 2026-10-19 — Stage 120: PNG metadata read and write, without a compression library
+* 2026-10-19 — Stage 121: GetAtomFeatures

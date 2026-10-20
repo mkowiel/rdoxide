@@ -1814,6 +1814,9 @@
 "Code/GraphMol/MolAlign/O3AAlignMolecules.cpp" = "61135e8c08a92ea1b317e6ed2e63ecf68779279d"
 "Code/GraphMol/MolAlign/O3AAlignMolecules.h" = "13112f8f052f4f90fd5b37b01fd2b6894d788ada"
 
+[module."rdoxide::graphmol::descriptors::atom_feat".sources]
+"Code/GraphMol/Descriptors/AtomFeat.cpp" = "93af566c2618ac915445d5334023169b19840ba1"
+"Code/GraphMol/Descriptors/AtomFeat.h" = "9b99a67600e0c93f69f6092add1055ba9b394e39"
 [module."rdoxide::graphmol::file_parsers::png".sources]
 "Code/GraphMol/FileParsers/PNGParser.cpp" = "b700d4c87d8323fb358d9952943ac8d544068a62"
 "Code/GraphMol/FileParsers/PNGParser.h" = "93f519bba28f10902565abb1f64782a8d6e48308"
