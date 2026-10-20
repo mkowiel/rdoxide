@@ -1619,3 +1619,156 @@ fn component_marking_matches_the_c_code() {
         assert_eq!(got, want, "{inp}");
     }
 }
+
+fn dump_orig(tag: &str, od: &rdoxide::external::inchi::strutil::OrigAtomData) -> Vec<String> {
+    use rdoxide::external::inchi::inpdef::MAX_NUM_STEREO_BONDS;
+    let mut out = vec![format!(
+        "{tag} {} {} {} {}",
+        od.num_inp_atoms, od.b_disconnect_salts, od.b_disconnect_coord, od.num_components
+    )];
+    if od.at.is_empty() {
+        out.push("-".into());
+        return out;
+    }
+    let nc = od.num_components.max(0) as usize;
+    let list = |name: &str, v: &Option<Vec<u16>>| {
+        let mut s = name.to_string();
+        if let Some(v) = v {
+            for x in &v[..nc] {
+                s += &format!(" {x}");
+            }
+        }
+        s
+    };
+    out.push(list("L", &od.n_cur_at_len));
+    out.push(list("O", &od.n_old_comp_number));
+    for a in &od.at[..od.num_inp_atoms] {
+        let mut s = format!(
+            "A {} {} {} {} {} {} {} {} {} {} {} {} {} {} {}",
+            a.el_number,
+            a.valence,
+            a.chem_bonds_valence,
+            a.charge,
+            a.num_h,
+            a.num_iso_h[0],
+            a.num_iso_h[1],
+            a.num_iso_h[2],
+            a.iso_atw_diff,
+            a.radical,
+            a.component,
+            a.orig_at_number,
+            a.x.to_bits(),
+            a.y.to_bits(),
+            a.z.to_bits()
+        );
+        for k in 0..a.valence as usize {
+            s += &format!(" {}:{}:{}", a.neighbor[k], a.bond_type[k], a.bond_stereo[k]);
+        }
+        for m in 0..MAX_NUM_STEREO_BONDS {
+            s += &format!(
+                " S{}:{}:{}:{}",
+                a.sb_ord[m], a.sn_ord[m], a.sb_parity[m], a.sn_orig_at_num[m]
+            );
+        }
+        out.push(s);
+    }
+    out
+}
+
+#[test]
+fn preprocess_one_structure_matches_the_c_code() {
+    use rdoxide::external::inchi::ichiparm::InputParms;
+    use rdoxide::external::inchi::inpdef::InpAtom;
+    use rdoxide::external::inchi::runichi3::{StructData, preprocess_one_structure};
+    use rdoxide::external::inchi::strutil::OrigAtomData;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_preprocess.json")).unwrap();
+    let mut coord_mismatch = 0;
+    for c in data.as_array().unwrap() {
+        let inp = &c["in"];
+        let mut at: Vec<InpAtom> = Vec::new();
+        for (i, a) in inp["atoms"].as_array().unwrap().iter().enumerate() {
+            let nb = a["nb"].as_array().unwrap();
+            let mut x = InpAtom {
+                valence: nb.len() as i8,
+                chem_bonds_valence: a["cbv"].as_i64().unwrap() as i8,
+                el_number: a["el"].as_u64().unwrap() as u8,
+                charge: a["chg"].as_i64().unwrap() as i8,
+                radical: a["rad"].as_i64().unwrap() as i8,
+                iso_atw_diff: a["iso"].as_i64().unwrap() as i8,
+                num_h: a["nh"].as_i64().unwrap() as i8,
+                orig_at_number: i as u16 + 1,
+                x: a["xyz"][0].as_f64().unwrap(),
+                y: a["xyz"][1].as_f64().unwrap(),
+                z: a["xyz"][2].as_f64().unwrap(),
+                ..Default::default()
+            };
+            for (k, b) in a["sym"].as_str().unwrap().bytes().enumerate() {
+                x.elname[k] = b;
+            }
+            for m in 0..3 {
+                x.num_iso_h[m] = a["ih"][m].as_i64().unwrap() as i8;
+            }
+            for (j, e) in nb.iter().enumerate() {
+                x.neighbor[j] = e[0].as_u64().unwrap() as u16;
+                x.bond_type[j] = e[1].as_u64().unwrap() as u8;
+                x.bond_stereo[j] = e[2].as_i64().unwrap() as i8;
+            }
+            at.push(x);
+        }
+        let ip = InputParms {
+            b_taut_flags: inp["flags"].as_u64().unwrap(),
+            b_fix_non_uniform_draw: inp["fnu"].as_i64().unwrap() as i32,
+            b_no_warnings: inp["nowarn"].as_i64().unwrap() as i32,
+            ..Default::default()
+        };
+        let mut orig = OrigAtomData {
+            num_inp_atoms: at.len(),
+            num_inp_bonds: inp["nbonds"].as_i64().unwrap() as i32,
+            at,
+            ..Default::default()
+        };
+        let mut prep = [OrigAtomData::default(), OrigAtomData::default()];
+        let mut sd = StructData::default();
+        let r = preprocess_one_structure(&mut sd, &ip, &mut orig, &mut prep);
+        let mut got = vec![format!(
+            "R {r} {} {} [{}] {} {} {} {}",
+            sd.n_error_type,
+            sd.n_struct_read_error,
+            sd.str_err_struct,
+            sd.taut_flags[0],
+            sd.taut_flags[1],
+            sd.taut_flags_done[0],
+            sd.taut_flags_done[1]
+        )];
+        got.extend(dump_orig("O", &orig));
+        got.extend(dump_orig("P", &prep[0]));
+        got.extend(dump_orig("Q", &prep[1]));
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        // coordinates of added hydrogens depend on the platform libm: counted
+        assert_eq!(got.len(), want.len(), "{inp}");
+        for (g, w) in got.iter().zip(&want) {
+            let (gt, wt): (Vec<&str>, Vec<&str>) = (g.split(' ').collect(), w.split(' ').collect());
+            assert_eq!(gt.len(), wt.len(), "{inp}: {g} vs {w}");
+            let coord = g.starts_with("A ");
+            for (q, (x, y)) in gt.iter().zip(&wt).enumerate() {
+                if coord && (13..16).contains(&q) {
+                    let fx = f64::from_bits(x.parse().unwrap());
+                    let fy = f64::from_bits(y.parse().unwrap());
+                    coord_mismatch += usize::from((fx - fy).abs() > 1e-12 * fy.abs().max(1.0));
+                } else {
+                    assert_eq!(x, y, "{inp}: {g} vs {w}");
+                }
+            }
+        }
+    }
+    assert!(
+        coord_mismatch <= 10,
+        "{coord_mismatch} coordinate mismatches"
+    );
+}

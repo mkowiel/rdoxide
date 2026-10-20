@@ -1893,6 +1893,8 @@ pub struct OrigAtomData {
     pub n_cur_at_len: Option<Vec<u16>>,
     /// `num_components`
     pub num_components: i32,
+    /// `bDisconnectSalts`
+    pub b_disconnect_salts: i32,
 }
 
 /// Heteroatoms that may take a charge after a ligand is disconnected: the
@@ -2926,5 +2928,10 @@ pub fn set_connected_component_number(at: &mut [InpAtom], component_number: u16)
     for a in at.iter_mut() {
         a.component = component_number;
     }
+    0
+}
+
+/// `post_fix_odd_things`: currently does nothing in the C code
+pub fn post_fix_odd_things(_at: &mut [InpAtom]) -> i32 {
     0
 }
