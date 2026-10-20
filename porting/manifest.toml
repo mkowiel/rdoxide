@@ -1813,3 +1813,7 @@
 [module."rdoxide::graphmol::mol_align_o3a".sources]
 "Code/GraphMol/MolAlign/O3AAlignMolecules.cpp" = "61135e8c08a92ea1b317e6ed2e63ecf68779279d"
 "Code/GraphMol/MolAlign/O3AAlignMolecules.h" = "13112f8f052f4f90fd5b37b01fd2b6894d788ada"
+
+[module."rdoxide::graphmol::file_parsers::png".sources]
+"Code/GraphMol/FileParsers/PNGParser.cpp" = "x"
+"Code/GraphMol/FileParsers/PNGParser.h" = "x"
