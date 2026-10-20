@@ -896,6 +896,7 @@ fn atom_input_conversion_matches_the_c_code() {
 
 #[test]
 fn zero_d_parities_match_the_c_code() {
+    use rdoxide::external::inchi::inchi_dll::inp_atom_0d_to_inchi_atom;
     use rdoxide::external::inchi::inpdef::InpAtom;
     use rdoxide::external::inchi::readinch::*;
     let data: serde_json::Value =
@@ -917,6 +918,15 @@ fn zero_d_parities_match_the_c_code() {
                 x.neighbor[j] = e[0].as_u64().unwrap() as u16;
                 x.bond_type[j] = e[1].as_u64().unwrap() as u8;
             }
+            let ex = a["x"].as_array().unwrap();
+            x.charge = ex[0].as_i64().unwrap() as i8;
+            x.radical = ex[1].as_i64().unwrap() as i8;
+            x.iso_atw_diff = ex[2].as_i64().unwrap() as i8;
+            x.num_h = ex[3].as_i64().unwrap() as i8;
+            for k in 0..3 {
+                x.num_iso_h[k] = ex[4 + k].as_i64().unwrap() as i8;
+            }
+            x.set_elname(ex[7].as_str().unwrap());
             at.push(x);
         }
         let st: Vec<InchiStereo0D> = inp["desc"]
@@ -978,6 +988,49 @@ fn zero_d_parities_match_the_c_code() {
                 s += &format!(" {}", a.bond_stereo[k]);
             }
             assert_eq!(s, line.as_str().unwrap(), "atom {i} of {inp}");
+        }
+        // and back to the API structures
+        let (ret, atoms, stereo) = inp_atom_0d_to_inchi_atom(&at);
+        let back = c["back"].as_array().unwrap();
+        assert_eq!(
+            format!("R {ret} {} {}", atoms.len(), stereo.len()),
+            back[0].as_str().unwrap(),
+            "back of {inp}"
+        );
+        for (i, a) in atoms.iter().enumerate() {
+            let mut s = format!(
+                "B {} {} {} {} {} {} {} {} 0 {}",
+                a.num_bonds,
+                a.charge,
+                a.radical,
+                a.isotopic_mass,
+                a.num_iso_h[0],
+                a.num_iso_h[1],
+                a.num_iso_h[2],
+                a.num_iso_h[3],
+                hex(upto_nul(&a.elname))
+            );
+            for k in 0..a.num_bonds as usize {
+                s += &format!(" {}:{}", a.neighbor[k], a.bond_type[k]);
+            }
+            assert_eq!(s, back[1 + i].as_str().unwrap(), "back atom {i} of {inp}");
+        }
+        for (i, t) in stereo.iter().enumerate() {
+            let s = format!(
+                "T {} {} {} {} {} {} {}",
+                t.type_,
+                t.central_atom,
+                t.parity,
+                t.neighbor[0],
+                t.neighbor[1],
+                t.neighbor[2],
+                t.neighbor[3]
+            );
+            assert_eq!(
+                s,
+                back[1 + atoms.len() + i].as_str().unwrap(),
+                "back stereo {i} of {inp}"
+            );
         }
     }
 }

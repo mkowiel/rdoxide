@@ -249,6 +249,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 133 | InChI I2d: the standardness-enforcement block of `GetINCHIEx` (`enforce_std_format`), tested against the C code on 600 option states | done |
 | 134 | InChI I2e: `inchi_dll` input conversion (`SetAtomProperties`, `SetBondProperties`, `SetAtomAndBondProperties`, `SetNumImplicitH`, the `ExtractOneStructure` loop, `WriteCoord`), tested against the C code on 1200 molecules incl. invalid input | done |
 | 135 | InChI I2f: `Extract0DParities` with the bond-parity reconciliation of `ichister`, tested against the C code on 1500 molecules with valid and invalid 0D descriptors | done |
+| 136 | InChI I2g: `InpAtom0DToInchiAtom` (inp_ATOM with parities back to inchi_Atom/inchi_Stereo0D), tested against the C code on 1500 molecules | done |
 
 ## Python package files
 
@@ -554,3 +555,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-19 — Stage 133: InChI I2d: standard-format enforcement
 * 2026-10-19 — Stage 134: InChI I2e: inchi_Atom to inp_ATOM
 * 2026-10-19 — Stage 135: InChI I2f: 0D stereo parities
+* 2026-10-19 — Stage 136: InChI I2g: InpAtom0DToInchiAtom

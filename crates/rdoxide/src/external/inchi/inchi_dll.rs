@@ -621,3 +621,151 @@ pub fn extract_atoms_and_bonds(
     set_num_implicit_h(&mut at);
     (at, n_dim, n_num_bonds, sz_coord)
 }
+
+use super::inpdef::MAX_NUM_STEREO_ATOM_NEIGH;
+use super::inpdef::MAX_NUM_STEREO_BONDS;
+use super::readinch::{
+    INCHI_PARITY_EVEN, INCHI_PARITY_ODD, INCHI_STEREO_TYPE_ALLENE, INCHI_STEREO_TYPE_DOUBLE_BOND,
+    INCHI_STEREO_TYPE_TETRAHEDRAL, InchiStereo0D, NO_ATOM,
+};
+
+/// `InpAtom0DToInchiAtom`: converts `inp_ATOM`s with 0D parities back to the
+/// API structures. Returns the result code (bit 1: more stereo descriptors
+/// than were counted) and the atoms and 0D stereo descriptors.
+pub fn inp_atom_0d_to_inchi_atom(at: &[InpAtom]) -> (i32, Vec<InchiAtom>, Vec<InchiStereo0D>) {
+    let num_inp_atoms = at.len();
+    let mut ret = 0;
+    let mut num_stereo_centers = 0usize;
+    let mut num_stereo_bonds = 0usize;
+    // count stereobonds, allenes, cumulenes and stereoatoms
+    for a in at {
+        if a.p_parity != 0 {
+            num_stereo_centers += 1;
+        } else {
+            let mut m = 0;
+            while m < MAX_NUM_STEREO_BONDS && a.sb_parity[m] != 0 {
+                m += 1;
+            }
+            num_stereo_bonds += m;
+        }
+    }
+    num_stereo_bonds /= 2;
+    let num_inp_stereo_0d = num_stereo_bonds + num_stereo_centers;
+
+    let mut atom = vec![InchiAtom::default(); num_inp_atoms];
+    let mut stereo_0d: Vec<InchiStereo0D> = Vec::new();
+
+    // copy atom properties
+    for (i, a) in at.iter().enumerate() {
+        atom[i].num_bonds = i16::from(a.valence);
+        for m in 0..a.valence as usize {
+            atom[i].bond_type[m] = a.bond_type[m] as i8;
+            atom[i].neighbor[m] = a.neighbor[m] as i16;
+        }
+        atom[i].charge = a.charge;
+        atom[i].elname = a.elname;
+        if a.iso_atw_diff != 0 {
+            atom[i].isotopic_mass = (ISOTOPIC_SHIFT_FLAG
+                + if a.iso_atw_diff > 0 {
+                    i32::from(a.iso_atw_diff) - 1
+                } else {
+                    i32::from(a.iso_atw_diff)
+                }) as i16;
+        }
+        atom[i].num_iso_h[0] = a.num_h;
+        for m in 0..NUM_H_ISOTOPES {
+            atom[i].num_iso_h[m + 1] = a.num_iso_h[m];
+        }
+        atom[i].radical = a.radical;
+    }
+
+    // stereo
+    'atoms: for i in 0..num_inp_atoms {
+        if at[i].p_parity != 0 {
+            if stereo_0d.len() < num_inp_stereo_0d {
+                let mut neighbor = [0i16; 4];
+                for m in 0..MAX_NUM_STEREO_ATOM_NEIGH {
+                    neighbor[m] = (i32::from(at[i].p_orig_at_num[m]) - 1) as i16;
+                }
+                stereo_0d.push(InchiStereo0D {
+                    neighbor,
+                    central_atom: i as i16,
+                    type_: INCHI_STEREO_TYPE_TETRAHEDRAL,
+                    parity: at[i].p_parity,
+                });
+            } else {
+                ret |= 1;
+                break 'atoms;
+            }
+        } else {
+            let mut m1 = 0;
+            while m1 < MAX_NUM_STEREO_BONDS && at[i].sb_parity[m1] != 0 {
+                // find the opposite atom at the other end of a double bond,
+                // allene, or cumulene
+                let mut chain = [0usize; 12];
+                let mut len = 0usize;
+                let mut cur = i;
+                chain[len] = i;
+                len += 1;
+                let mut nxt_neigh = at[cur].sb_ord[m1] as usize;
+                loop {
+                    let nxt = at[cur].neighbor[nxt_neigh] as usize;
+                    chain[len] = nxt;
+                    len += 1;
+                    nxt_neigh = usize::from(at[nxt].neighbor[0] as usize == cur);
+                    cur = nxt;
+                    if !(at[cur].sb_parity[0] == 0 && len < 12 && at[cur].valence == 2) {
+                        break;
+                    }
+                }
+                if at[cur].sb_parity[0] != 0 && len <= 4 && i < cur {
+                    // double bond, cumulene, or allene has been found
+                    let mut m2 = 0;
+                    while m2 < MAX_NUM_STEREO_BONDS && at[cur].sb_parity[m2] != 0 {
+                        if chain[len - 2] == at[cur].neighbor[at[cur].sb_ord[m2] as usize] as usize
+                        {
+                            if stereo_0d.len() < num_inp_stereo_0d {
+                                let parity1 = i32::from(at[i].sb_parity[m1]);
+                                let parity2 = i32::from(at[cur].sb_parity[m2]);
+                                let parity = if (parity1 == INCHI_PARITY_ODD
+                                    || parity1 == INCHI_PARITY_EVEN)
+                                    && (parity2 == INCHI_PARITY_ODD || parity2 == INCHI_PARITY_EVEN)
+                                {
+                                    // well-defined parity
+                                    if parity1 == parity2 {
+                                        INCHI_PARITY_EVEN
+                                    } else {
+                                        INCHI_PARITY_ODD
+                                    }
+                                } else {
+                                    parity1.max(parity2)
+                                };
+                                stereo_0d.push(InchiStereo0D {
+                                    neighbor: [
+                                        (i32::from(at[i].sn_orig_at_num[m1]) - 1) as i16,
+                                        i as i16,
+                                        cur as i16,
+                                        (i32::from(at[cur].sn_orig_at_num[m2]) - 1) as i16,
+                                    ],
+                                    central_atom: if len == 3 { chain[1] as i16 } else { NO_ATOM },
+                                    type_: if len == 3 {
+                                        INCHI_STEREO_TYPE_ALLENE
+                                    } else {
+                                        INCHI_STEREO_TYPE_DOUBLE_BOND
+                                    },
+                                    parity: parity as i8,
+                                });
+                            } else {
+                                ret |= 1;
+                            }
+                            break;
+                        }
+                        m2 += 1;
+                    }
+                }
+                m1 += 1;
+            }
+        }
+    }
+    (ret, atom, stereo_0d)
+}
