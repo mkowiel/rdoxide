@@ -788,3 +788,35 @@ fn read_command_line_parms_matches_the_c_code() {
         );
     }
 }
+
+#[test]
+fn std_format_enforcement_matches_the_c_code() {
+    use rdoxide::external::inchi::ichiparm::*;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_stdenforce.json")).unwrap();
+    let cases = data.as_array().unwrap();
+    assert!(cases.len() >= 600);
+    for c in cases {
+        let i: Vec<u64> = c["in"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_u64().unwrap())
+            .collect();
+        let want: Vec<u64> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_u64().unwrap())
+            .collect();
+        let mut ip = InputParms {
+            n_mode: i[0],
+            b_taut_flags: i[1],
+            b_inchi_output_options: i[2] as i32,
+            ..Default::default()
+        };
+        enforce_std_format(&mut ip);
+        let got = vec![ip.n_mode, ip.b_taut_flags, ip.b_inchi_output_options as u64];
+        assert_eq!(got, want, "input {i:?}");
+    }
+}
