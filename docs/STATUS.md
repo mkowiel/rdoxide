@@ -255,6 +255,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 139 | done |
 | 140 | done |
 | 141 | done |
+| 142 | done |
 
 ## Python package files
 
@@ -566,3 +567,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-19 — Stage 139: InChI port I3b: remove_ion_pairs and fix_odd_things ported, differential test against the C code on 12000 atom arrays
 * 2026-10-19 — Stage 140: InChI port I3c: RemoveInpAtBond and DisconnectInpAtBond ported, differential test on 8000 stereo atom arrays
 * 2026-10-19 — Stage 141: InChI port I3d: ammonium/metal salt disconnection ported, differential test on 9000 arrays
+* 2026-10-19 — Stage 142: InChI port I3e: DisconnectMetals, DisconnectOneLigand, move_explicit_Hcation ported, bit-exact differential test on 4000 complexes

@@ -1326,3 +1326,91 @@ fn salt_disconnection_matches_the_c_code() {
     }
     assert!(changed > 500);
 }
+
+#[test]
+fn metal_disconnection_matches_the_c_code() {
+    use rdoxide::external::inchi::inpdef::InpAtom;
+    use rdoxide::external::inchi::strutil::{
+        OrigAtomData, disconnect_metals, may_disconnect_metals,
+    };
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_metals.json")).unwrap();
+    for c in data.as_array().unwrap() {
+        let inp = &c["in"];
+        let mut at: Vec<InpAtom> = Vec::new();
+        for (i, a) in inp["atoms"].as_array().unwrap().iter().enumerate() {
+            let nb = a["nb"].as_array().unwrap();
+            let mut x = InpAtom {
+                valence: nb.len() as i8,
+                chem_bonds_valence: a["cbv"].as_i64().unwrap() as i8,
+                el_number: a["el"].as_u64().unwrap() as u8,
+                charge: a["chg"].as_i64().unwrap() as i8,
+                radical: a["rad"].as_i64().unwrap() as i8,
+                iso_atw_diff: a["iso"].as_i64().unwrap() as i8,
+                num_h: a["nh"].as_i64().unwrap() as i8,
+                component: a["comp"].as_u64().unwrap() as u16,
+                orig_at_number: i as u16 + 1,
+                x: a["xyz"][0].as_f64().unwrap(),
+                y: a["xyz"][1].as_f64().unwrap(),
+                z: a["xyz"][2].as_f64().unwrap(),
+                ..Default::default()
+            };
+            for m in 0..3 {
+                x.num_iso_h[m] = a["ih"][m].as_i64().unwrap() as i8;
+            }
+            for (j, e) in nb.iter().enumerate() {
+                x.neighbor[j] = e[0].as_u64().unwrap() as u16;
+                x.bond_type[j] = e[1].as_u64().unwrap() as u8;
+                x.bond_stereo[j] = e[2].as_i64().unwrap() as i8;
+            }
+            at.push(x);
+        }
+        let check = inp["check"] == 1;
+        let (may, bdc) = may_disconnect_metals(&at);
+        let mut od = OrigAtomData {
+            num_inp_atoms: at.len(),
+            at,
+            b_disconnect_coord: bdc,
+            n_old_comp_number: Some(vec![1u16; 16]),
+            ..Default::default()
+        };
+        let mut flags = 0u64;
+        let r = disconnect_metals(&mut od, check, Some(&mut flags));
+        let old = od.n_old_comp_number.as_ref().unwrap();
+        let mut got = vec![format!(
+            "R {may} {bdc} {r} {} {flags} {} {} {}",
+            od.num_inp_atoms, old[0], old[1], old[2]
+        )];
+        for a in &od.at[..od.num_inp_atoms] {
+            let mut s = format!(
+                "A {} {} {} {} {} {} {} {} {} {} {} {} {} {} {}",
+                a.el_number,
+                a.valence,
+                a.chem_bonds_valence,
+                a.charge,
+                a.num_h,
+                a.num_iso_h[0],
+                a.num_iso_h[1],
+                a.num_iso_h[2],
+                a.iso_atw_diff,
+                a.radical,
+                a.component,
+                a.orig_at_number,
+                a.x.to_bits(),
+                a.y.to_bits(),
+                a.z.to_bits()
+            );
+            for k in 0..a.valence as usize {
+                s += &format!(" {}:{}:{}", a.neighbor[k], a.bond_type[k], a.bond_stereo[k]);
+            }
+            got.push(s);
+        }
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        assert_eq!(got, want, "{inp}");
+    }
+}
