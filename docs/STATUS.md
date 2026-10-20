@@ -254,6 +254,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 138 | InChI I3a: `strutil` drawing corrections (non-uniformly drawn oxoanions and amidinium cations, doublet-radical neighbor, `nFindOneOM`), tested against the C code on 1500 atom arrays | done |
 | 139 | done |
 | 140 | done |
+| 141 | done |
 
 ## Python package files
 
@@ -564,3 +565,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-19 — Stage 138: InChI I3a: strutil drawing corrections
 * 2026-10-19 — Stage 139: InChI port I3b: remove_ion_pairs and fix_odd_things ported, differential test against the C code on 12000 atom arrays
 * 2026-10-19 — Stage 140: InChI port I3c: RemoveInpAtBond and DisconnectInpAtBond ported, differential test on 8000 stereo atom arrays
+* 2026-10-19 — Stage 141: InChI port I3d: ammonium/metal salt disconnection ported, differential test on 9000 arrays

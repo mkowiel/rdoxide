@@ -1250,3 +1250,79 @@ fn bond_removal_matches_the_c_code() {
         assert_eq!(got, want, "{inp}");
     }
 }
+
+#[test]
+fn salt_disconnection_matches_the_c_code() {
+    use rdoxide::external::inchi::inpdef::InpAtom;
+    use rdoxide::external::inchi::strutil::{disconnect_salts, may_disconnect_metals};
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_salts.json")).unwrap();
+    let mut changed = 0;
+    for c in data.as_array().unwrap() {
+        let inp = &c["in"];
+        let mut at: Vec<InpAtom> = Vec::new();
+        for (i, a) in inp["atoms"].as_array().unwrap().iter().enumerate() {
+            let nb = a["nb"].as_array().unwrap();
+            let mut x = InpAtom {
+                valence: nb.len() as i8,
+                chem_bonds_valence: a["cbv"].as_i64().unwrap() as i8,
+                el_number: a["el"].as_u64().unwrap() as u8,
+                charge: a["chg"].as_i64().unwrap() as i8,
+                radical: a["rad"].as_i64().unwrap() as i8,
+                iso_atw_diff: a["iso"].as_i64().unwrap() as i8,
+                num_h: a["nh"].as_i64().unwrap() as i8,
+                orig_at_number: i as u16 + 1,
+                x: a["xyz"][0].as_f64().unwrap(),
+                y: a["xyz"][1].as_f64().unwrap(),
+                z: a["xyz"][2].as_f64().unwrap(),
+                ..Default::default()
+            };
+            for m in 0..3 {
+                x.num_iso_h[m] = a["ih"][m].as_i64().unwrap() as i8;
+            }
+            for (j, e) in nb.iter().enumerate() {
+                x.neighbor[j] = e[0].as_u64().unwrap() as u16;
+                x.bond_type[j] = e[1].as_u64().unwrap() as u8;
+                x.bond_stereo[j] = e[2].as_i64().unwrap() as i8;
+            }
+            at.push(x);
+        }
+        let mode = inp["mode"].as_i64().unwrap();
+        let mut got = Vec::new();
+        if mode <= 1 {
+            let mut nbonds = inp["nb"].as_i64().unwrap() as i32;
+            let r = disconnect_salts(&mut at, &mut nbonds, mode == 1);
+            got.push(format!("R {r} {nbonds}"));
+            changed += usize::from(r != 0);
+        } else {
+            let (r, bdc) = may_disconnect_metals(&at);
+            got.push(format!("R {r} {bdc} 0"));
+        }
+        for a in &at {
+            let mut s = format!(
+                "A {} {} {} {} {} {} {} {} {}",
+                a.valence,
+                a.chem_bonds_valence,
+                a.charge,
+                a.num_h,
+                a.num_iso_h[0],
+                a.num_iso_h[1],
+                a.num_iso_h[2],
+                a.iso_atw_diff,
+                a.radical
+            );
+            for k in 0..a.valence as usize {
+                s += &format!(" {}:{}:{}", a.neighbor[k], a.bond_type[k], a.bond_stereo[k]);
+            }
+            got.push(s);
+        }
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        assert_eq!(got, want, "{inp}");
+    }
+    assert!(changed > 500);
+}
