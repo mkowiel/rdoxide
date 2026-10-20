@@ -689,3 +689,102 @@ fn options_string_splitting_matches_the_c_code() {
         assert_eq!(got, want, "{:?}", String::from_utf8_lossy(&s));
     }
 }
+
+#[test]
+fn read_command_line_parms_matches_the_c_code() {
+    use rdoxide::external::inchi::ichi_io::*;
+    use rdoxide::external::inchi::ichiparm::*;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_readparms.json")).unwrap();
+    let cases = data.as_array().unwrap();
+    assert!(cases.len() >= 700);
+    for c in cases {
+        let args: Vec<String> = c["args"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|a| a.as_str().unwrap().to_string())
+            .collect();
+        let mut argv: Vec<&str> = vec![""];
+        argv.extend(args.iter().map(String::as_str));
+        let mut log = InchiIostream::default();
+        inchi_ios_init(&mut log, INCHI_IOS_TYPE_STRING, IosFile::None);
+        let mut ip = InputParms::default();
+        let r = read_command_line_parms(&argv, &mut ip, c["rel"].as_i64().unwrap() != 0, &mut log);
+        let ints: Vec<String> = [
+            i64::from(r),
+            i64::from(ip.n_input_type),
+            ip.num_paths as i64,
+            i64::from(ip.b_abc_numbers),
+            i64::from(ip.b_ct_predecessors),
+            ip.n_mode as i64,
+            ip.b_taut_flags as i64,
+            ip.b_taut_flags_done as i64,
+            i64::from(ip.b_inchi_output_options),
+            i64::from(ip.b_inchi_output_options2),
+            i64::from(ip.b_display_each_component_inchi),
+            i64::from(ip.b_display),
+            i64::from(ip.b_display_if_restore_warnings),
+            i64::from(ip.b_merge_all_input_structures),
+            i64::from(ip.b_save_warning_structs_as_problem),
+            i64::from(ip.b_save_all_good_structs_as_problem),
+            i64::from(ip.b_get_sdfile_id),
+            i64::from(ip.b_get_molfile_number),
+            i64::from(ip.b_compare_components),
+            i64::from(ip.b_display_composite_results),
+            i64::from(ip.b_do_not_add_h),
+            i64::from(ip.b_no_struct_labels),
+            i64::from(ip.b_fix_non_uniform_draw),
+            i64::from(ip.b_calc_inchi_hash),
+            i64::from(ip.b_chiral_flag),
+            i64::from(ip.b_allow_empty_structure),
+            i64::from(ip.b_large_molecules),
+            i64::from(ip.b_loose_tsa_check),
+            i64::from(ip.b_polymers),
+            i64::from(ip.b_fold_polymer_sru),
+            i64::from(ip.b_frame_shift_scheme),
+            i64::from(ip.b_np_zz),
+            i64::from(ip.b_stereo_at_zz),
+            i64::from(ip.b_merge_hash),
+            i64::from(ip.b_no_warnings),
+            i64::from(ip.b_hide_inchi),
+            i64::from(ip.b_read_inchi_options),
+            i64::from(ip.b_underivatize),
+            i64::from(ip.b_ring2_chain),
+            i64::from(ip.b_ignore_unchanged),
+            i64::from(ip.b_filter_ss),
+            ip.first_struct_number,
+            ip.last_struct_number,
+            ip.msec_max_time,
+            ip.msec_left_time,
+            ip.ul_displ_time,
+            ip.l_sdf_id as i64,
+            ip.l_molfile_number,
+            i64::from(ip.p_sdf_label),
+            i64::from(ip.p_sdf_value),
+        ]
+        .iter()
+        .map(|v| v.to_string())
+        .collect();
+        let mut got = ints.join(" ");
+        got += &format!(" {}", hex(ip.sz_sdf_data_header.as_bytes()));
+        for p in &ip.path {
+            got += &p
+                .as_ref()
+                .map_or(" N".to_string(), |p| format!(" {}", hex(p.as_bytes())));
+        }
+        let logtext = log
+            .s
+            .p_str
+            .as_ref()
+            .map_or(Vec::new(), |p| upto_nul(p).to_vec());
+        got += &format!(" {}", hex(&logtext));
+        assert_eq!(
+            got,
+            c["out"].as_str().unwrap(),
+            "args {:?} rel {}",
+            c["args"],
+            c["rel"]
+        );
+    }
+}

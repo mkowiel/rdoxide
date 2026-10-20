@@ -245,6 +245,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 129 | InChI I1e: `ichi_io` (string/file streams, line readers, growing print buffer, record header), tested against the C code on 600 random inputs | done |
 | 130 | InChI I2a: `ichiparm::set_common_options_by_parg` (all option names and flags), tested against the C function on 568 cases; stage I1 closed (plain structs come with their first users) | done |
 | 131 | InChI I2b: `parse_options_string` (Windows-style quoting of the InChI option string), tested against the C function on 600 strings | done |
+| 132 | InChI I2c: `ReadCommandLineParms` of the library build with `INPUT_PARMS`, tested against the C function on 700 argument lists | done |
 
 ## Python package files
 
@@ -546,3 +547,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-19 — Stage 129: InChI I1e: ichi_io
 * 2026-10-19 — Stage 130: InChI I2a: common option parsing
 * 2026-10-19 — Stage 131: InChI I2b: options string splitting
+* 2026-10-19 — Stage 132: InChI I2c: ReadCommandLineParms
