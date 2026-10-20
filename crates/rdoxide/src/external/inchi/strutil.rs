@@ -1873,3 +1873,609 @@ pub fn may_disconnect_metals(at: &[InpAtom]) -> (i32, i32) {
         if num_changes != 0 { num_impl_h + 1 } else { 0 },
     )
 }
+
+// ---- metal disconnection ----
+
+/// `TG_FLAG_MOVE_CHARGE_COORD_DONE`
+pub const TG_FLAG_MOVE_CHARGE_COORD_DONE: u64 = 0x0000_0400;
+
+/// The members of `ORIG_ATOM_DATA` that the metal disconnection uses
+#[derive(Debug, Clone, Default)]
+pub struct OrigAtomData {
+    pub at: Vec<InpAtom>,
+    pub num_inp_atoms: usize,
+    pub num_inp_bonds: i32,
+    /// `bDisconnectCoord`: number of implicit H on the metals + 1, or 0
+    pub b_disconnect_coord: i32,
+    /// `nOldCompNumber`
+    pub n_old_comp_number: Option<Vec<u16>>,
+}
+
+/// Heteroatoms that may take a charge after a ligand is disconnected: the
+/// first `NUM_HALOGENS` are halogens (`elnumber_Heteroat`)
+const ELNUMBER_HETEROATOM: [u8; 13] = [
+    EL_NUMBER_F,
+    EL_NUMBER_CL,
+    EL_NUMBER_BR,
+    EL_NUMBER_I,
+    EL_NUMBER_AT,
+    EL_NUMBER_N,
+    EL_NUMBER_P,
+    EL_NUMBER_AS,
+    EL_NUMBER_O,
+    EL_NUMBER_S,
+    EL_NUMBER_SE,
+    EL_NUMBER_TE,
+    EL_NUMBER_B,
+];
+const NUM_HALOGENS: usize = 5;
+
+use super::inpdef::{ATOM_EL_LEN, MAX_ATOMS, MAXVAL};
+use super::util::{EL_NUMBER_AT, EL_NUMBER_B};
+
+/// `DisconnectOneLigand`: cuts the bonds between the ligand
+/// `at[iMetal].neighbor[jLigand]` and metal atoms, then tries to give the
+/// ligand a charge that fits its valence
+pub fn disconnect_one_ligand(
+    at: &mut [InpAtom],
+    mut n_old_comp_number: Option<&mut [u16]>,
+    b_metal: &[u8],
+    num_atoms: usize,
+    i_metal: usize,
+    j_ligand: usize,
+    taut_flags_done: Option<&mut u64>,
+) -> i32 {
+    let i_ligand = nb(at, i_metal, j_ligand);
+    let mut metal_neigh_ord: Vec<usize> = Vec::new();
+    let mut num_neigh_arom_bonds = [0i32; MAXVAL];
+    let mut num_disconnections = 0;
+    let (mut num_del_arom_bonds, mut num_tot_arom_bonds) = (0i32, 0i32);
+
+    for i in 0..at[i_ligand].valence as usize {
+        let neigh = nb(at, i_ligand, i);
+        if neigh < num_atoms && b_metal[neigh] != 0 {
+            metal_neigh_ord.push(i);
+            if i32::from(at[i_ligand].bond_type[i]) > BOND_TYPE_TRIPLE {
+                for j in 0..at[neigh].valence as usize {
+                    num_neigh_arom_bonds[i] +=
+                        i32::from(i32::from(at[neigh].bond_type[j]) > BOND_TYPE_TRIPLE);
+                }
+                num_del_arom_bonds += 1;
+            }
+        }
+        num_tot_arom_bonds += i32::from(i32::from(at[i_ligand].bond_type[i]) > BOND_TYPE_TRIPLE);
+    }
+
+    if num_del_arom_bonds != 0 {
+        for &j in &metal_neigh_ord {
+            if num_neigh_arom_bonds[j] != 0 {
+                let neigh = nb(at, i_ligand, j);
+                let d = num_neigh_arom_bonds[j] / 2 - (num_neigh_arom_bonds[j] - 1) / 2;
+                at[neigh].chem_bonds_valence -= d as i8;
+            }
+        }
+        let d = num_tot_arom_bonds / 2 - (num_tot_arom_bonds - num_del_arom_bonds) / 2;
+        at[i_ligand].chem_bonds_valence -= d as i8;
+    }
+
+    for &ord in metal_neigh_ord.iter().rev() {
+        num_disconnections += i32::from(disconnect_inp_at_bond(
+            at,
+            n_old_comp_number.as_deref_mut(),
+            i_ligand,
+            ord,
+        ));
+    }
+
+    // attempt to change the ligand charge to make its valence natural
+    let i = num_tot_arom_bonds - num_del_arom_bonds;
+    let p = ELNUMBER_HETEROATOM
+        .iter()
+        .position(|&e| e == at[i_ligand].el_number)
+        .or(if at[i_ligand].el_number == 0 {
+            Some(ELNUMBER_HETEROATOM.len())
+        } else {
+            None
+        });
+    if (i != 0 && i != 2 && i != 3)
+        || (at[i_ligand].radical != 0 && i32::from(at[i_ligand].radical) != RAD_SINGLET)
+        || p.is_none()
+    {
+        return num_disconnections;
+    }
+    let p = p.unwrap();
+    let val = i32::from(at[i_ligand].chem_bonds_valence) + at[i_ligand].numh();
+    let mut new_charge = MAX_ATOMS as i32; // impossible value
+    if val == 0 {
+        if p < NUM_HALOGENS {
+            new_charge = -1;
+        }
+    } else {
+        for c in -1..=1 {
+            if val == get_el_valence(i32::from(at[i_ligand].el_number), c, 0) {
+                new_charge = c;
+                break;
+            }
+        }
+    }
+    if new_charge != MAX_ATOMS as i32
+        && (new_charge != i32::from(at[i_ligand].charge)
+            || (at[i_ligand].radical != 0 && i32::from(at[i_ligand].radical) != RAD_SINGLET))
+        && metal_neigh_ord.len() == 1
+    {
+        let l = &at[i_ligand];
+        if new_charge == 1
+            && val == 4
+            && l.valence == 2
+            && l.chem_bonds_valence == 4
+            && l.bond_type[0] == l.bond_type[1]
+        {
+            // do not add +1 charge to disconnected =N=
+        } else {
+            if let Some(f) = taut_flags_done
+                && new_charge != i32::from(l.charge)
+            {
+                *f |= TG_FLAG_MOVE_CHARGE_COORD_DONE;
+            }
+            let old = i32::from(at[i_ligand].charge);
+            at[i_metal].charge -= (new_charge - old) as i8;
+            at[i_ligand].charge = new_charge as i8;
+        }
+    }
+    num_disconnections
+}
+
+/// `dist3D`
+pub fn dist3d(a: &InpAtom, b: &InpAtom) -> f64 {
+    let (dx, dy, dz) = (a.x - b.x, a.y - b.y, a.z - b.z);
+    (dx * dx + dy * dy + dz * dz).sqrt()
+}
+
+const MIN_BOND_LENGTH: f64 = 1.0e-6;
+const MIN_COS: f64 = 1.0e-6;
+const MIN_BOND_LENGTH2: f64 = MIN_BOND_LENGTH * MIN_BOND_LENGTH;
+const MAX_BOND_LENGTH: f64 = 1.0e30;
+
+/// `GetMinDistDistribution`: distances from `at[iat]` to the nearest bonds in
+/// `num_segm` angular sectors; returns the average bond length
+pub fn get_min_dist_distribution(
+    at: &[InpAtom],
+    num_at: usize,
+    iat: usize,
+    iat_h: usize,
+    b_in_all_components: bool,
+    min_dist: &mut [f64],
+    num_segm: usize,
+) -> f64 {
+    let one_pi = std::f64::consts::PI;
+    let two_pi = 2.0 * one_pi;
+    let f_step = two_pi / num_segm as f64;
+    let h_step = f_step / 2.0;
+    let ns = num_segm as i32;
+    for d in min_dist.iter_mut().take(num_segm) {
+        *d = MAX_BOND_LENGTH;
+    }
+    let mut num_bonds = 0;
+    let mut ave_bond_len = 0.0;
+    let seg = |f: f64| ((f + h_step) / f_step).floor() as i32;
+
+    for i in 0..num_at {
+        if i == iat || i == iat_h || !(b_in_all_components || at[i].component == at[iat].component)
+        {
+            continue;
+        }
+        for j in 0..at[i].valence as usize {
+            let n = nb(at, i, j);
+            if (n > i && n != iat) || n == iat_h {
+                continue;
+            }
+            let mut xi = at[i].x - at[iat].x;
+            let mut yi = at[i].y - at[iat].y;
+            let mut xn = at[n].x - at[iat].x;
+            let mut yn = at[n].y - at[iat].y;
+            let cross_prod_in = xi * yn - xn * yi;
+            if cross_prod_in < -0.01 * MIN_BOND_LENGTH2 {
+                std::mem::swap(&mut xi, &mut xn);
+                std::mem::swap(&mut yi, &mut yn);
+            }
+            let xni = xn - xi;
+            let yni = yn - yi;
+            let rni = xni * xni + yni * yni;
+            let tni;
+            let rmin;
+            if rni > 0.01 * MIN_BOND_LENGTH2 {
+                tni = -(xni * xi + yni * yi) / rni;
+                rmin = if tni < 0.0 {
+                    (xi * xi + yi * yi).sqrt()
+                } else if tni > 1.0 {
+                    (xn * xn + yn * yn).sqrt()
+                } else {
+                    (tni * tni * rni).sqrt()
+                };
+                ave_bond_len += rni.sqrt();
+                num_bonds += 1;
+            } else {
+                tni = 0.5;
+                rmin = (xi * xi + yi * yi).sqrt();
+            }
+            if rmin >= 0.1 * MIN_BOND_LENGTH {
+                let mut b_calc_rt = true;
+                let (mut ft, mut rt) = (0.0, 0.0);
+                let mut fi = yi.atan2(xi);
+                let mut fn_ = if n == iat { fi } else { yn.atan2(xn) };
+                if fi > fn_ {
+                    fn_ += two_pi;
+                }
+                if fi < 0.0 {
+                    fi += two_pi;
+                    fn_ += two_pi;
+                }
+                let ki = seg(fi);
+                let kn = seg(fn_);
+                for k in ki..=kn {
+                    let kk = (k % ns) as usize;
+                    if min_dist[kk] < rmin {
+                        continue;
+                    }
+                    if b_calc_rt {
+                        if n == iat {
+                            ft = fi;
+                            rt = rmin;
+                        } else {
+                            let xt = xi + xni * tni;
+                            let yt = yi + yni * tni;
+                            ft = yt.atan2(xt);
+                            rt = (xt * xt + yt * yt).sqrt();
+                        }
+                        b_calc_rt = false;
+                    }
+                    let fk = f_step * kk as f64;
+                    let mut c = (fk - ft).cos().abs();
+                    if c < MIN_COS {
+                        c = MIN_COS;
+                    }
+                    let rk = rt / c;
+                    if min_dist[kk] > rk {
+                        min_dist[kk] = rk;
+                    }
+                }
+            } else {
+                let ri = xi * xi + yi * yi;
+                let rn = xn * xn + yn * yn;
+                if ri > MIN_BOND_LENGTH2 && rn > MIN_BOND_LENGTH2 {
+                    let dot_prod_in = xn * xi + yn * yi;
+                    if dot_prod_in > 0.01 * MIN_BOND_LENGTH2 {
+                        let mut f = yi.atan2(xi);
+                        if f < 0.0 {
+                            f += two_pi;
+                        }
+                        let kk = (seg(f) % ns) as usize;
+                        if min_dist[kk] > rmin {
+                            min_dist[kk] = rmin;
+                        }
+                    } else if dot_prod_in < -0.01 * MIN_BOND_LENGTH2 {
+                        let mut f = yi.atan2(xi);
+                        if f < 0.0 {
+                            f += two_pi;
+                        }
+                        let kk = (seg(f) % ns) as usize;
+                        if min_dist[kk] > rmin {
+                            min_dist[kk] = rmin;
+                        }
+                        f += one_pi;
+                        let kk = (seg(f) % ns) as usize;
+                        if min_dist[kk] > rmin {
+                            min_dist[kk] = rmin;
+                        }
+                    }
+                } else if ri <= MIN_BOND_LENGTH2 && rn <= MIN_BOND_LENGTH2 {
+                    // coincides with at[iat]; ignore
+                } else {
+                    let mut f = if ri > rn { yi.atan2(xi) } else { yn.atan2(xn) };
+                    if f < 0.0 {
+                        f += two_pi;
+                    }
+                    let kk = (seg(f) % ns) as usize;
+                    if min_dist[kk] > rmin {
+                        min_dist[kk] = rmin;
+                    }
+                }
+            }
+        }
+    }
+    if num_bonds != 0 {
+        ave_bond_len / f64::from(num_bonds)
+    } else {
+        0.0
+    }
+}
+
+/// `move_explicit_Hcation`: attaches the hydrogen `iat_h` to `iat`, placing it
+/// at a free position around `iat` in the 2D drawing
+pub fn move_explicit_h_cation(
+    at: &mut [InpAtom],
+    num_at: usize,
+    iat: usize,
+    iat_h: usize,
+    b_in_all_components: bool,
+) -> i32 {
+    const NUM_SEGM: usize = 20;
+    let one_pi = std::f64::consts::PI;
+    let two_pi = 2.0 * one_pi;
+    let f_step = two_pi / NUM_SEGM as f64;
+    let h_step = f_step / 2.0;
+    let mut min_dist = [0f64; NUM_SEGM];
+    let (mut xd, mut yd, mut zd) = (0.0f64, 0.0f64, 0.0f64);
+    let mut r;
+    let mut r0;
+
+    if at[iat].valence != 0 {
+        let mut nbn = 0.0;
+        r = 0.0;
+        for i in 0..at[iat].valence as usize {
+            let next = nb(at, iat, i);
+            xd += at[next].x;
+            yd += at[next].y;
+            zd += at[next].z;
+            r += dist3d(&at[iat], &at[next]);
+            nbn += 1.0;
+        }
+        xd /= nbn;
+        yd /= nbn;
+        zd /= nbn;
+        r /= nbn;
+        r0 = ((xd - at[iat].x) * (xd - at[iat].x) + (yd - at[iat].y) * (yd - at[iat].y)).sqrt();
+    } else {
+        r = if at[iat_h].valence != 0 {
+            dist3d(&at[iat_h], &at[nb(at, iat_h, 0)])
+        } else {
+            0.0
+        };
+        r0 = 0.0;
+    }
+
+    let ave_bond_len = get_min_dist_distribution(
+        at,
+        num_at,
+        iat,
+        iat_h,
+        b_in_all_components,
+        &mut min_dist,
+        NUM_SEGM,
+    );
+    if r < MIN_BOND_LENGTH && ave_bond_len > MIN_BOND_LENGTH {
+        r = ave_bond_len;
+    }
+
+    let (mut xr, mut yr, mut zr);
+    if r > MIN_BOND_LENGTH {
+        if 10.0 * r0 < r {
+            xr = -r;
+            yr = 0.0;
+            zr = 0.0;
+        } else {
+            xr = r * (at[iat].x - xd) / r0;
+            yr = r * (at[iat].y - yd) / r0;
+            zr = r * (at[iat].z - zd) / r0;
+            if xr * xr + yr * yr < 0.04 * r * r {
+                xr = -r;
+                yr = 0.0;
+            }
+        }
+        r = (xr * xr + yr * yr).sqrt();
+        let mut f = yr.atan2(xr);
+        if f < 0.0 {
+            f += two_pi;
+        }
+        let kk = (((f + h_step) / f_step).floor() as i32 % NUM_SEGM as i32) as usize;
+        if min_dist[kk] < 1.5 * r {
+            let mut dist = 1.5 * r;
+            let mut start_max: i32 = -1;
+            loop {
+                let (mut start, mut len, mut len_max) = (0i32, 0i32, 0i32);
+                for k in 0..2 * NUM_SEGM as i32 {
+                    let kk = (k % NUM_SEGM as i32) as usize;
+                    if min_dist[kk] >= dist {
+                        if len == 0 {
+                            start = k;
+                        }
+                        len += 1;
+                    } else {
+                        if len > len_max {
+                            len_max = len;
+                            start_max = start;
+                        }
+                        len = 0;
+                    }
+                }
+                if len_max == 0 {
+                    if dist > 0.1 * r {
+                        dist *= 0.75;
+                        continue;
+                    }
+                    break; // do it anyway
+                }
+                f = f_step * (f64::from(start_max) + (f64::from(len_max) - 1.0) / 2.0);
+                r0 = dist / 1.5;
+                xr = r0 * f.cos();
+                yr = r0 * f.sin();
+                zr = zr / r * r0;
+                break;
+            }
+        }
+    } else {
+        xr = 0.0;
+        yr = 0.0;
+        zr = 0.0;
+    }
+
+    let (ok, next) = if at[iat_h].valence != 0 {
+        let next = nb(at, iat_h, 0);
+        let pos = at[next].neighbor[..at[next].valence as usize]
+            .iter()
+            .position(|&x| x as usize == iat_h);
+        if let Some(i) = pos {
+            remove_inp_at_bond(at, next, i);
+        }
+        (pos.is_some(), next)
+    } else {
+        at[iat_h].valence = 1;
+        at[iat_h].chem_bonds_valence = 1;
+        at[iat_h].bond_type[0] = SINGLE;
+        (true, iat_h)
+    };
+    if !ok {
+        return 0;
+    }
+    if at[next].charge > 0 && at[iat].charge < 0 {
+        at[next].charge -= 1;
+        at[iat].charge += 1;
+    }
+    let val = at[iat].valence as usize;
+    if val < MAXVAL {
+        let bt = at[iat_h].bond_type[0];
+        at[iat].neighbor[val] = iat_h as u16;
+        at[iat].bond_type[val] = bt;
+        at[iat].bond_stereo[val] = 0;
+        at[iat].chem_bonds_valence += bt as i8;
+        at[iat].valence = (val + 1) as i8;
+    }
+    at[iat_h].component = at[iat].component;
+    at[iat_h].neighbor[0] = iat as u16;
+    at[iat_h].bond_stereo[0] = 0;
+    at[iat_h].x = at[iat].x + xr;
+    at[iat_h].y = at[iat].y + yr;
+    at[iat_h].z = at[iat].z + zr;
+    1
+}
+
+/// `DisconnectMetals`: returns the number of disconnected bonds, or the
+/// negated error code; on success `orig` gets the new atom array in which
+/// the implicit H of the metals are explicit
+pub fn disconnect_metals(
+    orig: &mut OrigAtomData,
+    b_check_metal_valence: bool,
+    mut taut_flags_done: Option<&mut u64>,
+) -> i32 {
+    let _ = b_check_metal_valence;
+    let num_atoms = orig.num_inp_atoms;
+    let n_num_expl_h = if orig.b_disconnect_coord > 0 {
+        (orig.b_disconnect_coord - 1) as usize
+    } else {
+        0
+    };
+    let mut at: Vec<InpAtom> = orig.at[..num_atoms].to_vec();
+    at.resize(num_atoms + n_num_expl_h, InpAtom::default());
+    let mut b_metal = vec![0u8; num_atoms + n_num_expl_h];
+    let mut num_at = num_atoms;
+    let mut num_disconnected = 0;
+    let mut num_impl_h = 0usize;
+    let mut err = 0;
+    let mut num_explicit_h = [0i8; NUM_H_ISOTOPES + 1];
+
+    'body: {
+        for i in 0..num_atoms {
+            let val = at[i].valence;
+            if val == 0 && at[i].numh() == 0 {
+                continue;
+            }
+            let rad_or_mult = val == 0
+                || val != at[i].chem_bonds_valence
+                || (at[i].radical != 0 && i32::from(at[i].radical) != RAD_SINGLET);
+            if !rad_or_mult && is_ammonium_salt(&at, i, &mut num_explicit_h).is_some() {
+            } else if !rad_or_mult && is_metal_salt(&at, i) {
+            } else if is_metal_to_disconnect(&at, i) == 1 {
+                let k = at[i].numh();
+                num_impl_h += k as usize;
+                b_metal[i] = (1 + k) as u8;
+            }
+            // (`bIsMetalToDisconnect` never returns 2, so
+            // TG_FLAG_CHECK_VALENCE_COORD_DONE is never set)
+        }
+        if num_impl_h != n_num_expl_h {
+            err = 2;
+            break 'body;
+        }
+
+        // replace implicit H atoms with explicit H atoms
+        let mut i = 0;
+        while i < num_atoms && num_impl_h > 0 {
+            if b_metal[i] <= 1 {
+                i += 1;
+                continue;
+            }
+            for k in 0..=NUM_H_ISOTOPES {
+                let n = if k != 0 {
+                    i32::from(at[i].num_iso_h[k - 1])
+                } else {
+                    i32::from(at[i].num_h)
+                };
+                for _ in 0..n {
+                    if num_at >= num_atoms + n_num_expl_h {
+                        err = 3;
+                        break 'body;
+                    }
+                    at[num_at].elname = [0; ATOM_EL_LEN];
+                    at[num_at].elname[0] = b'H';
+                    at[num_at].el_number = EL_NUMBER_H;
+                    at[num_at].iso_atw_diff = k as i8;
+                    at[num_at].component = at[i].component;
+                    move_explicit_h_cation(&mut at, num_at + 1, i, num_at, true);
+                    at[num_at].orig_at_number = (num_at + 1) as u16;
+                    num_at += 1;
+                    num_impl_h -= 1;
+                    b_metal[i] -= 1;
+                    if k != 0 {
+                        at[i].num_iso_h[k - 1] -= 1;
+                    } else {
+                        at[i].num_h -= 1;
+                    }
+                }
+            }
+            if b_metal[i] != 1 {
+                err = 4;
+                break 'body;
+            }
+            i += 1;
+        }
+        if num_at != num_atoms + n_num_expl_h {
+            err = 5;
+            break 'body;
+        }
+
+        // metal - ligand bonds, then metal - metal bonds
+        for metal_pass in [false, true] {
+            for i in 0..num_atoms {
+                if b_metal[i] == 0 {
+                    continue;
+                }
+                let mut j = i32::from(at[i].valence) - 1;
+                while j >= 0 {
+                    if j < i32::from(at[i].valence)
+                        && (b_metal[nb(&at, i, j as usize)] != 0) == metal_pass
+                    {
+                        num_disconnected += disconnect_one_ligand(
+                            &mut at,
+                            orig.n_old_comp_number.as_deref_mut(),
+                            &b_metal,
+                            num_atoms,
+                            i,
+                            j as usize,
+                            taut_flags_done.as_deref_mut(),
+                        );
+                    }
+                    j -= 1;
+                }
+            }
+        }
+    }
+
+    if num_disconnected == 0 {
+        err = 6;
+    }
+    if err == 0 {
+        orig.at = at;
+        orig.num_inp_atoms = num_at;
+    }
+    if err != 0 { -err } else { num_disconnected }
+}
