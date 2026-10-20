@@ -251,6 +251,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 135 | InChI I2f: `Extract0DParities` with the bond-parity reconciliation of `ichister`, tested against the C code on 1500 molecules with valid and invalid 0D descriptors | done |
 | 136 | InChI I2g: `InpAtom0DToInchiAtom` (inp_ATOM with parities back to inchi_Atom/inchi_Stereo0D), tested against the C code on 1500 molecules | done |
 | 137 | InChI I2h: RDKit's input side of `MolToInchi` (`rCleanUp`, `fixOptionSymbol`, `inchi_Atom`/`inchi_Stereo0D` from a molecule), checked against the AuxInfo of the reference corpus and hand-written stereo/isotope cases | done |
+| 138 | InChI I3a: `strutil` drawing corrections (non-uniformly drawn oxoanions and amidinium cations, doublet-radical neighbor, `nFindOneOM`), tested against the C code on 1500 atom arrays | done |
 
 ## Python package files
 
@@ -558,3 +559,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-19 — Stage 135: InChI I2f: 0D stereo parities
 * 2026-10-19 — Stage 136: InChI I2g: InpAtom0DToInchiAtom
 * 2026-10-19 — Stage 137: InChI I2h: molecule to inchi_Input
+* 2026-10-19 — Stage 138: InChI I3a: strutil drawing corrections
