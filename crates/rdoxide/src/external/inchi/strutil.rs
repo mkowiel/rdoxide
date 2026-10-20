@@ -1403,3 +1403,156 @@ pub fn fix_odd_things(at: &mut [InpAtom], b_fix_bug: bool, b_fix_non_uniform_dra
     num_changes += remove_ion_pairs(at);
     num_changes
 }
+
+// ---- bond removal for salt and metal disconnection ----
+
+use super::ichister::{AB_PARITY_UNDF, atom_parity_well_def, get_opposite_sb_atom};
+use super::inpdef::{MAX_NUM_STEREO_ATOM_NEIGH, MAX_NUM_STEREO_BONDS};
+
+/// Removes the parity slot `m` of `at` (the following slots move up)
+fn remove_sb_slot(a: &mut InpAtom, m: usize) {
+    for q in m..MAX_NUM_STEREO_BONDS - 1 {
+        a.sb_parity[q] = a.sb_parity[q + 1];
+        a.sb_ord[q] = a.sb_ord[q + 1];
+        a.sn_ord[q] = a.sn_ord[q + 1];
+        a.sn_orig_at_num[q] = a.sn_orig_at_num[q + 1];
+    }
+    let l = MAX_NUM_STEREO_BONDS - 1;
+    a.sb_parity[l] = 0;
+    a.sb_ord[l] = 0;
+    a.sn_ord[l] = 0;
+    a.sn_orig_at_num[l] = 0;
+}
+
+/// `RemoveInpAtBond`: removes the bond `k` of atom `iat` (one direction only)
+/// and updates the CML stereo of that atom
+pub fn remove_inp_at_bond(atom: &mut [InpAtom], iat: usize, k: usize) -> i32 {
+    let val = i32::from(atom[iat].valence) - 1;
+    if val < 0 {
+        return 0;
+    }
+    let mut bond = atom[iat].bond_type[k];
+    if i32::from(bond) > BOND_TYPE_TRIPLE {
+        bond = SINGLE;
+    }
+    let ki = k as i32;
+
+    if atom[iat].p_parity != 0 {
+        let own = atom[iat].orig_at_number;
+        if atom[iat].p_orig_at_num[..MAX_NUM_STEREO_ATOM_NEIGH].contains(&own) {
+            atom[iat].p_parity = 0; // only 3 bonds are present
+        }
+        if atom[iat].p_parity != 0 {
+            let nk_orig = atom[atom[iat].neighbor[k] as usize].orig_at_number;
+            let valence = (atom[iat].valence as usize).min(MAX_NUM_STEREO_ATOM_NEIGH);
+            let m = (0..valence).find(|&m| nk_orig == atom[iat].p_orig_at_num[m]);
+            match m {
+                Some(m) => atom[iat].p_orig_at_num[m] = own,
+                None => atom[iat].p_parity = 0,
+            }
+        }
+    }
+
+    if atom[iat].sb_parity[0] != 0 {
+        let mut m = 0;
+        while m < MAX_NUM_STEREO_BONDS && atom[iat].sb_parity[m] != 0 {
+            let a = &atom[iat];
+            let (sb_ord, sn_ord) = (i32::from(a.sb_ord[m]), i32::from(a.sn_ord[m]));
+            if ki == sb_ord
+                || (ki == sn_ord && val < 2 && atom_parity_well_def(i32::from(a.sb_parity[m])))
+            {
+                // stereogenic bond is removed or its only neighbor is removed
+                let (len, pnxt, _, pord) = get_opposite_sb_atom(atom, iat, sb_ord as usize);
+                let i = if len != 0 { pord } else { MAX_NUM_STEREO_BONDS };
+                if i < MAX_NUM_STEREO_BONDS && atom[pnxt].sb_parity[i] != 0 {
+                    remove_sb_slot(&mut atom[iat], m);
+                    remove_sb_slot(&mut atom[pnxt], i);
+                } else {
+                    m += 1; // inconsistent stereobond parity
+                }
+            } else if ki == sn_ord {
+                let alt = (0..atom[iat].valence as i32).find(|&j| j != ki && j != sb_ord);
+                match alt {
+                    None => {
+                        if atom_parity_well_def(i32::from(atom[iat].sb_parity[m])) {
+                            let (len, pnxt, _, pord) =
+                                get_opposite_sb_atom(atom, iat, sb_ord as usize);
+                            if len > 0 {
+                                atom[iat].sb_parity[m] = AB_PARITY_UNDF as i8;
+                                atom[pnxt].sb_parity[pord] = AB_PARITY_UNDF as i8;
+                            }
+                        }
+                        let a = &mut atom[iat];
+                        a.sn_ord[m] = -99;
+                        a.sb_ord[m] -= i8::from(sb_ord > ki);
+                        a.sn_orig_at_num[m] = 0;
+                    }
+                    Some(i) => {
+                        let ni = atom[iat].neighbor[i as usize] as usize;
+                        let orig = atom[ni].orig_at_number;
+                        let a = &mut atom[iat];
+                        if atom_parity_well_def(i32::from(a.sb_parity[m])) {
+                            a.sb_parity[m] = 3 - a.sb_parity[m];
+                        }
+                        a.sn_ord[m] = (i - i32::from(i > ki)) as i8;
+                        a.sb_ord[m] -= i8::from(sb_ord > ki);
+                        a.sn_orig_at_num[m] = orig;
+                    }
+                }
+                m += 1;
+            } else {
+                let a = &mut atom[iat];
+                if sb_ord > ki {
+                    a.sb_ord[m] -= 1;
+                }
+                if sn_ord > ki {
+                    a.sn_ord[m] -= 1;
+                }
+                m += 1;
+            }
+        }
+    }
+
+    let a = &mut atom[iat];
+    let v = val as usize;
+    for q in k..v {
+        a.neighbor[q] = a.neighbor[q + 1];
+        a.bond_stereo[q] = a.bond_stereo[q + 1];
+        a.bond_type[q] = a.bond_type[q + 1];
+    }
+    a.neighbor[v] = 0;
+    a.bond_stereo[v] = 0;
+    a.bond_type[v] = 0;
+    a.valence = val as i8;
+    a.chem_bonds_valence -= bond as i8;
+    1
+}
+
+/// `DisconnectInpAtBond`: removes the bond `neigh_ord` of `iat` in both
+/// directions; resets the old component numbers of both ends
+pub fn disconnect_inp_at_bond(
+    at: &mut [InpAtom],
+    n_old_comp_number: Option<&mut [u16]>,
+    iat: usize,
+    neigh_ord: usize,
+) -> bool {
+    let neigh = at[iat].neighbor[neigh_ord] as usize;
+    let Some(i) = at[neigh].neighbor[..at[neigh].valence as usize]
+        .iter()
+        .position(|&x| x as usize == iat)
+    else {
+        return false;
+    };
+    let ret = remove_inp_at_bond(at, iat, neigh_ord) + remove_inp_at_bond(at, neigh, i);
+    if let Some(old) = n_old_comp_number
+        && ret != 0
+    {
+        for x in [iat, neigh] {
+            let component = at[x].component;
+            if component != 0 {
+                old[component as usize - 1] = 0;
+            }
+        }
+    }
+    ret == 2
+}

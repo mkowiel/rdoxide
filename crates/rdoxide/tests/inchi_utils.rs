@@ -1174,3 +1174,79 @@ fn ion_pairs_and_odd_things_match_the_c_code() {
     }
     assert!(changed > 1000);
 }
+
+#[test]
+fn bond_removal_matches_the_c_code() {
+    use rdoxide::external::inchi::inpdef::{InpAtom, MAX_NUM_STEREO_BONDS};
+    use rdoxide::external::inchi::strutil::{disconnect_inp_at_bond, remove_inp_at_bond};
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_bondremove.json")).unwrap();
+    for c in data.as_array().unwrap() {
+        let inp = &c["in"];
+        let mut at: Vec<InpAtom> = Vec::new();
+        for (i, a) in inp["atoms"].as_array().unwrap().iter().enumerate() {
+            let nb = a["nb"].as_array().unwrap();
+            let mut x = InpAtom {
+                valence: nb.len() as i8,
+                chem_bonds_valence: a["cbv"].as_i64().unwrap() as i8,
+                p_parity: a["pp"].as_i64().unwrap() as i8,
+                component: a["cmp"].as_u64().unwrap() as u16,
+                orig_at_number: i as u16 + 1,
+                ..Default::default()
+            };
+            for (m, v) in a["po"].as_array().unwrap().iter().enumerate() {
+                x.p_orig_at_num[m] = v.as_u64().unwrap() as u16;
+            }
+            for (j, e) in nb.iter().enumerate() {
+                x.neighbor[j] = e[0].as_u64().unwrap() as u16;
+                x.bond_type[j] = e[1].as_u64().unwrap() as u8;
+                x.bond_stereo[j] = e[2].as_i64().unwrap() as i8;
+            }
+            for (m, e) in a["sb"].as_array().unwrap().iter().enumerate() {
+                x.sb_ord[m] = e[0].as_i64().unwrap() as i8;
+                x.sn_ord[m] = e[1].as_i64().unwrap() as i8;
+                x.sb_parity[m] = e[2].as_i64().unwrap() as i8;
+                x.sn_orig_at_num[m] = e[3].as_u64().unwrap() as u16;
+            }
+            at.push(x);
+        }
+        let mut comp = [1u16; 16];
+        let mut got: Vec<String> = Vec::new();
+        for r in inp["rem"].as_array().unwrap() {
+            let (mode, iat, k) = (
+                r[0].as_i64().unwrap(),
+                r[1].as_u64().unwrap() as usize,
+                r[2].as_u64().unwrap() as usize,
+            );
+            let ret = if mode == 1 {
+                i32::from(disconnect_inp_at_bond(&mut at, Some(&mut comp), iat, k))
+            } else {
+                remove_inp_at_bond(&mut at, iat, k)
+            };
+            got.push(format!("R {ret} {} {} {}", comp[0], comp[1], comp[2]));
+        }
+        for a in &at {
+            let mut s = format!("A {} {} {}", a.valence, a.chem_bonds_valence, a.p_parity);
+            for m in 0..4 {
+                s += &format!(" {}", a.p_orig_at_num[m]);
+            }
+            for k in 0..a.valence as usize {
+                s += &format!(" {}:{}:{}", a.neighbor[k], a.bond_type[k], a.bond_stereo[k]);
+            }
+            for m in 0..MAX_NUM_STEREO_BONDS {
+                s += &format!(
+                    " S{}:{}:{}:{}",
+                    a.sb_ord[m], a.sn_ord[m], a.sb_parity[m], a.sn_orig_at_num[m]
+                );
+            }
+            got.push(s);
+        }
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        assert_eq!(got, want, "{inp}");
+    }
+}
