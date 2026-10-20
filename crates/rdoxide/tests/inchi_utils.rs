@@ -1772,3 +1772,65 @@ fn preprocess_one_structure_matches_the_c_code() {
         "{coord_mismatch} coordinate mismatches"
     );
 }
+
+#[test]
+fn ring_systems_match_the_c_code() {
+    use rdoxide::external::inchi::ichinorm::*;
+    use rdoxide::external::inchi::inpdef::InpAtom;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_ringsys.json")).unwrap();
+    for c in data.as_array().unwrap() {
+        let inp = &c["in"];
+        let mut at: Vec<InpAtom> = Vec::new();
+        for a in inp["atoms"].as_array().unwrap() {
+            let nb = a["nb"].as_array().unwrap();
+            let mut x = InpAtom {
+                valence: nb.len() as i8,
+                num_h: a["nh"].as_i64().unwrap() as i8,
+                at_type: 5,
+                c_flags: 3,
+                component: 4,
+                orig_compt_at_numb: 6,
+                ..Default::default()
+            };
+            for m in 0..3 {
+                x.num_iso_h[m] = a["ih"][m].as_i64().unwrap() as i8;
+            }
+            for (j, e) in nb.iter().enumerate() {
+                x.neighbor[j] = e.as_u64().unwrap() as u16;
+            }
+            at.push(x);
+        }
+        let r = mark_ring_systems_inp(&mut at, inp["start"].as_u64().unwrap() as usize);
+        let mut got = vec![format!("R {r}")];
+        for a in &at {
+            got.push(format!(
+                "A {} {} {} {}",
+                a.n_block_system, a.b_cut_vertex, a.n_ring_system, a.n_num_at_in_ring_system
+            ));
+        }
+        unmark_ring_systems_inp(&mut at);
+        unmark_other_indicators(&mut at);
+        unmark_one_component(&mut at);
+        subtract_dt_from_num_h(&mut at);
+        for a in &at {
+            got.push(format!(
+                "B {} {} {} {} {} {} {}",
+                a.n_block_system,
+                a.b_cut_vertex,
+                a.n_ring_system,
+                a.at_type,
+                a.c_flags,
+                a.component,
+                a.num_h
+            ));
+        }
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        assert_eq!(got, want, "{inp}");
+    }
+}
