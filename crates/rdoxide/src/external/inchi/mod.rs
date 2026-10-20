@@ -27,6 +27,7 @@ pub mod ichiring;
 pub mod ichisort;
 pub mod ikey_base26;
 pub mod ikey_dll;
+pub mod inchi_dll;
 pub mod incomdef;
 pub mod inpdef;
 pub mod sha256;
