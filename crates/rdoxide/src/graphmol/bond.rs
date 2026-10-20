@@ -286,6 +286,13 @@ impl Bond {
         if atom_idx != self.begin && atom_idx != self.end {
             return 0.0;
         }
+        // `QueryBond::getValenceContrib`: bonds with a complex bond type query
+        // ("single or aromatic", ...) do not count towards the valence
+        if let Some(q) = &self.query
+            && crate::graphmol::queries::has_complex_bond_type_query(q)
+        {
+            return 0.0;
+        }
         match self.bond_type {
             BondType::Dative | BondType::DativeOne if atom_idx != self.end => 0.0,
             BondType::Hydrogen => 0.0,

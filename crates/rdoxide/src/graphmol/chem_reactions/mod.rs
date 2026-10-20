@@ -11,6 +11,7 @@
 
 pub mod cdxml;
 pub mod daylight;
+pub mod depict;
 pub mod enumerate;
 pub mod fingerprints;
 pub mod mdl;

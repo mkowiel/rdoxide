@@ -231,7 +231,10 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 115 | CDXML reading (`file_parsers::cdxml`: XML reader, fragments, fusing, stereo groups, queries, schemes) with Python MolsFromCDXML/MolsFromCDXMLFile/CDXMLParserParams/CDXMLFormat/MolToCDXMLBlock and ReactionsFromCDXMLFile/Block (CDX binary and writing not supported) | done |
 | 116 | Enumeration strategy Initialize reads reagent list sizes instead of copying every molecule (20 ms -> 0.8 ms for 71k reagents) | done |
 | 117 | `Chem.MolToJSON`, `MolsToJSON`, `JSONToMols` and the JSON parameter classes re-exported from `rdMolInterchange` as upstream's Chem does | done |
-| 118 | `rdMolDescriptors.GetAtomFeatures` (`descriptors::atom_feat`: the 49/52 one-hot atom features of AtomFeat.cpp) | ✅ | Python tests against values from RDKit 2026.09.1 |
+| 118 | Bonds with a complex bond type query contribute 0 to the valence, as `QueryBond::getValenceContrib` (SetHybridization/Compute2DCoords on SMARTS molecules) | done |
+| 119 | `rdChemReactions.Compute2DCoordsForReaction` (`chem_reactions::depict`, identical coordinates to RDKit) | done |
+| 120 | `Chem.MolFromPNGFile/String`, `MolsFromPNGFile/String`, `MolMetadataToPNGFile/String`, `AddMetadataToPNGFile/String`, `MetadataFromPNGFile/String` and `PNGMetadataParams` (`file_parsers::png`: tEXt/zTXt chunks with a built-in inflate and stored-block zlib writer, CRC32, pickle/CXSMILES/mol block tags) | ✅ | Python tests; upstream `rough_test.py` testMolFromPNG, testMolsFromPNG, testMolToPNG, testMetadataToPNG |
+| 121 | `rdMolDescriptors.GetAtomFeatures` (`descriptors::atom_feat`: the 49/52 one-hot atom features of AtomFeat.cpp) | ✅ | Python tests against values from RDKit 2026.09.1 |
 
 ## Python package files
 
@@ -519,4 +522,7 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-19 — Stage 115: CDXML parser; test_cdxml 10/10.
 * 2026-10-19 — Stage 116: Initialize via bb_sizes.
 * 2026-10-19 — Stage 117: Chem exports rdMolInterchange.
-* 2026-10-19 — Stage 118: GetAtomFeatures
+* 2026-10-19 — Stage 118: QueryBond::getValenceContrib port.
+* 2026-10-19 — Stage 119: Reaction depiction.
+* 2026-10-19 — Stage 120: PNG metadata read and write, without a compression library
+* 2026-10-19 — Stage 121: GetAtomFeatures
