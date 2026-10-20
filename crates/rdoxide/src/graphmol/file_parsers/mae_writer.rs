@@ -112,7 +112,7 @@ fn is_mmct_property_name(name: &str) -> bool {
         return false;
     }
     let rest = &name[2..];
-    let Some(end) = rest.find(|c| c == '_' || c == ' ') else {
+    let Some(end) = rest.find(['_', ' ']) else {
         return false;
     };
     if end == 0 || !rest[end..].starts_with('_') {
