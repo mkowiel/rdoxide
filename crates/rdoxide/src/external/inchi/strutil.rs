@@ -314,3 +314,1092 @@ pub fn n_find_one_om(at: &[InpAtom], at_no: usize, ord_om: &mut [i32], num_om: u
     // return any
     ord_om[0]
 }
+
+// ---- remove_ion_pairs and fix_odd_things ----
+
+use super::incomdef::{BOND_TYPE_TRIPLE, RADICAL_SINGLET as RAD_SINGLET};
+use super::util::{
+    EL_NUMBER_AS, EL_NUMBER_C, EL_NUMBER_H, EL_NUMBER_N, EL_NUMBER_O, EL_NUMBER_P, EL_NUMBER_S,
+    EL_NUMBER_SB, EL_NUMBER_SE, EL_NUMBER_TE, get_el_valence, has_other_ion_in_sphere_2,
+    has_other_ion_neigh, ion_el_group, n_no_metal_bonds_valence, n_no_metal_neigh_index,
+    n_no_metal_num_bonds, n_no_metal_other_neigh_index, n_no_metal_other_neigh_index2, num_of_h,
+};
+
+const SINGLE: u8 = BOND_TYPE_SINGLE as u8;
+const DOUBLE: u8 = BOND_TYPE_DOUBLE as u8;
+const TRIPLE: u8 = BOND_TYPE_TRIPLE as u8;
+
+/// Position of `of` in the neighbor list of `at[n]` (`is_in_the_list(...) -
+/// neighbor` in C; the bond is always present in valid input)
+fn pos_of(at: &[InpAtom], n: usize, of: usize) -> usize {
+    at[n].neighbor[..at[n].valence as usize]
+        .iter()
+        .position(|&a| a as usize == of)
+        .expect("symmetric adjacency lists")
+}
+
+fn nb(at: &[InpAtom], i: usize, k: usize) -> usize {
+    at[i].neighbor[k] as usize
+}
+
+fn nnm_bonds(at: &[InpAtom], i: usize) -> i32 {
+    n_no_metal_num_bonds(at, i)
+}
+
+fn nnm_val(at: &[InpAtom], i: usize) -> i32 {
+    n_no_metal_bonds_valence(at, i)
+}
+
+fn grp(at: &[InpAtom], i: usize) -> u8 {
+    ion_el_group(at[i].el_number)
+}
+
+/// The common action of the two-atom conversions: removes the charges and
+/// raises the bond order between `i` (bond position `i1`) and `n` (`i2`).
+fn neutralize_pair(at: &mut [InpAtom], i: usize, i1: usize, n: usize, i2: usize) {
+    at[i].charge -= 1;
+    at[n].charge += 1;
+    at[i].chem_bonds_valence += 1;
+    at[n].chem_bonds_valence += 1;
+    at[i].bond_type[i1] += 1;
+    at[n].bond_type[i2] += 1;
+}
+
+/// `remove_ion_pairs`: neutralizes ion pairs of the types 1..18 described in
+/// the comments of the C code (`O=N(+)-O(-)`, `N(+)-C(-)`, `C(+)-O-N(-)`, ...).
+/// Returns the number of changes.
+pub fn remove_ion_pairs(at: &mut [InpAtom]) -> i32 {
+    let num_atoms = at.len();
+    let mut num_changes = 0;
+    let (mut num_c_ii, mut num_c_plus, mut num_c_minus) = (0, 0, 0);
+    let (mut num_n_plus, mut num_n_minus, mut num_o_plus, mut num_o_minus) = (0, 0, 0, 0);
+
+    // count candidates
+    for a in at.iter() {
+        let chrg = a.charge;
+        if chrg == 1 || chrg == -1 {
+            match ion_el_group(a.el_number) {
+                EL_NUMBER_C => {
+                    if chrg > 0 {
+                        num_c_plus += 1;
+                    } else {
+                        num_c_minus += 1;
+                    }
+                }
+                EL_NUMBER_O => {
+                    if chrg > 0 {
+                        num_o_plus += 1;
+                    } else {
+                        num_o_minus += 1;
+                    }
+                }
+                EL_NUMBER_N => {
+                    if chrg > 0 {
+                        num_n_plus += 1;
+                    } else {
+                        num_n_minus += 1;
+                    }
+                }
+                _ => {}
+            }
+        } else if chrg == 0
+            && i32::from(a.chem_bonds_valence) + a.numh() == 2
+            && get_el_valence(i32::from(a.el_number), 0, 0) == 4
+            && ion_el_group(a.el_number) == EL_NUMBER_C
+        {
+            num_c_ii += 1;
+        }
+    }
+    let mut num_all =
+        num_c_ii + num_c_plus + num_c_minus + num_n_plus + num_n_minus + num_o_plus + num_o_minus;
+    if num_all == 0 {
+        return 0;
+    }
+
+    for type_ in 1..=18 {
+        // ---- terminal ion pair type 1: O=N(+)-O(-) => O=N=O ----
+        if type_ == 1 {
+            let mut i = 0;
+            while i < num_atoms && num_n_plus > 0 && num_o_minus > 0 {
+                if at[i].charge == 1
+                    && nnm_bonds(at, i) == 3
+                    && nnm_val(at, i) == 4
+                    && grp(at, i) == EL_NUMBER_N
+                {
+                    let mut ord_om = [0i32; 3];
+                    let mut num_om = 0usize;
+                    let mut num_o = 0;
+                    let mut num_o_other = 0;
+                    for i1 in 0..at[i].valence as usize {
+                        let n = nb(at, i, i1);
+                        if nnm_bonds(at, n) == 1
+                            && num_of_h(at, n) == 0
+                            && grp(at, n) == EL_NUMBER_O
+                        {
+                            if at[i].bond_type[i1] == SINGLE && at[n].charge == -1 {
+                                if num_om < 3 {
+                                    ord_om[num_om] = i1 as i32;
+                                }
+                                num_om += 1;
+                            } else if at[n].bond_type[0] == DOUBLE && at[n].charge == 0 {
+                                num_o += 1;
+                            } else {
+                                num_o_other += 1;
+                            }
+                        }
+                    }
+                    if num_om > 0 && num_o > 0 && num_o_other == 0 {
+                        let i1 = n_find_one_om(at, i, &mut ord_om, num_om);
+                        if i1 >= 0 {
+                            // remove charges and increase bond order
+                            let i1 = i1 as usize;
+                            let n = nb(at, i, i1);
+                            let i2 = pos_of(at, n, i);
+                            neutralize_pair(at, i, i1, n, i2);
+                            at[i].radical = 0;
+                            at[n].radical = 0;
+                            num_changes += 1;
+                            num_n_plus -= 1;
+                            num_o_minus -= 1;
+                            num_all -= 2;
+                        }
+                    }
+                }
+                i += 1;
+            }
+        }
+
+        // ---- terminal pair types 2..9 ----
+        if (2..=9).contains(&type_) {
+            let mut i = 0;
+            while i < num_atoms && num_all > 0 {
+                let i1c = n_no_metal_neigh_index(at, i);
+                if at[i].charge == 0
+                    && nnm_bonds(at, i) == 1
+                    && nnm_val(at, i) == 2
+                    && num_of_h(at, i) == 0
+                    && grp(at, i) == EL_NUMBER_O
+                    && i1c >= 0
+                    && at[i].bond_type[i1c as usize] <= TRIPLE
+                {
+                    // terminal O=
+                    let i1 = i1c as usize;
+                    let n = nb(at, i, i1);
+                    if type_ == 2 && num_c_ii > 0 {
+                        // avoid alternating bonds
+                        if at[n].charge == 0
+                            && nnm_bonds(at, n) == 2
+                            && nnm_val(at, n) == 3
+                            && num_of_h(at, n) == 0
+                            && grp(at, n) == EL_NUMBER_N
+                        {
+                            let i2c = n_no_metal_other_neigh_index(at, n, i as i32);
+                            if i2c >= 0 && at[n].bond_type[i2c as usize] <= TRIPLE {
+                                let i2 = i2c as usize;
+                                let n2 = nb(at, n, i2);
+                                if at[n2].charge == 0
+                                    && at[n2].valence == 2
+                                    && at[n2].chem_bonds_valence == 2
+                                    && num_of_h(at, n2) == 0
+                                    && grp(at, n2) == EL_NUMBER_C
+                                {
+                                    // O=N-C(II)- => O=N#C-
+                                    let i3 = usize::from(at[n2].neighbor[0] as usize != n);
+                                    at[n].chem_bonds_valence = 5;
+                                    at[n2].chem_bonds_valence = 4;
+                                    at[n].bond_type[i2] = TRIPLE;
+                                    at[n2].bond_type[i3] = TRIPLE;
+                                    at[n2].radical = 0;
+                                    num_changes += 1;
+                                    num_c_ii -= 1;
+                                    num_all -= 1;
+                                    i += 1;
+                                    continue;
+                                }
+                            }
+                        }
+                    }
+                    if type_ == 3 && num_o_plus > 0 && num_c_minus > 0 {
+                        if at[n].charge == 1
+                            && nnm_bonds(at, n) == 2
+                            && nnm_val(at, n) == 3
+                            && num_of_h(at, n) == 0
+                            && grp(at, n) == EL_NUMBER_O
+                        {
+                            let i2c = n_no_metal_other_neigh_index(at, n, i as i32);
+                            if i2c >= 0 && at[n].bond_type[i2c as usize] <= TRIPLE {
+                                let i2 = i2c as usize;
+                                let n2 = nb(at, n, i2);
+                                if at[n2].charge == -1
+                                    && nnm_bonds(at, n2) <= 3
+                                    && nnm_val(at, n2) + at[n2].numh() == 3
+                                    && grp(at, n2) == EL_NUMBER_C
+                                {
+                                    // O=O(+)-C(-)(III) => O=O=C(IV)
+                                    let i3 = usize::from(at[n2].neighbor[0] as usize != n);
+                                    at[n].charge -= 1;
+                                    at[n2].charge += 1;
+                                    at[n].chem_bonds_valence += 1;
+                                    at[n2].chem_bonds_valence += 1;
+                                    at[n].bond_type[i2] = DOUBLE;
+                                    at[n2].bond_type[i3] = DOUBLE;
+                                    num_changes += 1;
+                                    num_o_plus -= 1;
+                                    num_c_minus -= 1;
+                                    num_all -= 2;
+                                    i += 1;
+                                    continue;
+                                }
+                            }
+                        }
+                    }
+                } else if at[i].charge == -1
+                    && num_o_minus + num_n_minus > 0
+                    && num_n_plus + num_o_plus + num_c_plus > 0
+                    && nnm_bonds(at, i) == 1
+                    && nnm_val(at, i) == 1
+                    && num_of_h(at, i) == 0
+                    && grp(at, i) == EL_NUMBER_O
+                    && i1c >= 0
+                    && at[i].bond_type[i1c as usize] <= TRIPLE
+                {
+                    // terminal O(-)-
+                    let i1 = i1c as usize;
+                    let n = nb(at, i, i1);
+                    if type_ == 4
+                        && num_o_minus > 0
+                        && num_n_plus > 0
+                        && at[n].charge == 1
+                        && nnm_bonds(at, n) <= 3
+                        && nnm_val(at, n) == 4
+                        && num_of_h(at, n) == 0
+                        && grp(at, n) == EL_NUMBER_N
+                    {
+                        // O(-)-N(+)(IV) => O=N(V)
+                        let i2 = pos_of(at, n, i);
+                        at[i].charge += 1;
+                        at[n].charge -= 1;
+                        at[i].chem_bonds_valence += 1;
+                        at[n].chem_bonds_valence += 1;
+                        at[i].bond_type[i1] += 1;
+                        at[n].bond_type[i2] += 1;
+                        num_changes += 1;
+                        num_o_minus -= 1;
+                        num_n_plus -= 1;
+                        num_all -= 2;
+                        i += 1;
+                        continue;
+                    }
+                    if type_ == 5
+                        && num_o_minus > 0
+                        && num_o_plus > 0
+                        && at[n].charge == 1
+                        && nnm_bonds(at, n) <= 3
+                        && nnm_val(at, n) == 3
+                        && num_of_h(at, n) == 0
+                        && grp(at, n) == EL_NUMBER_O
+                    {
+                        // O(-)-O(+)(III) => O=O(IV)
+                        let i2 = pos_of(at, n, i);
+                        at[i].charge += 1;
+                        at[n].charge -= 1;
+                        at[i].chem_bonds_valence += 1;
+                        at[n].chem_bonds_valence += 1;
+                        at[i].bond_type[i1] += 1;
+                        at[n].bond_type[i2] += 1;
+                        num_changes += 1;
+                        num_o_minus -= 1;
+                        num_o_plus -= 1;
+                        num_all -= 2;
+                        i += 1;
+                        continue;
+                    }
+                    if type_ == 6
+                        && num_o_minus > 0
+                        && num_c_plus > 0
+                        && at[n].charge == 0
+                        && nnm_bonds(at, n) == 2
+                        && nnm_val(at, n) == 2
+                        && num_of_h(at, n) == 0
+                        && grp(at, n) == EL_NUMBER_O
+                    {
+                        let i2c = n_no_metal_other_neigh_index(at, n, i as i32);
+                        if i2c >= 0 && at[n].bond_type[i2c as usize] <= TRIPLE {
+                            let i2 = i2c as usize;
+                            let n2 = nb(at, n, i2);
+                            if at[n2].charge == 1
+                                && nnm_bonds(at, n2) <= 3
+                                && nnm_val(at, n2) + at[n2].numh() == 3
+                                && grp(at, n2) == EL_NUMBER_C
+                            {
+                                // O(-)-O-C(+)(III) => O=O=C(IV)
+                                let i3 = pos_of(at, n2, n);
+                                let i4 = pos_of(at, n, i);
+                                at[i].charge += 1;
+                                at[n2].charge -= 1;
+                                at[i].chem_bonds_valence += 1;
+                                at[n].chem_bonds_valence += 2;
+                                at[n2].chem_bonds_valence += 1;
+                                at[i].bond_type[i1] = DOUBLE;
+                                at[n].bond_type[i4] = DOUBLE;
+                                at[n].bond_type[i2] = DOUBLE;
+                                at[n2].bond_type[i3] = DOUBLE;
+                                num_changes += 1;
+                                num_o_minus -= 1;
+                                num_c_plus -= 1;
+                                num_all -= 2;
+                                i += 1;
+                                continue;
+                            }
+                        }
+                    }
+                } else if at[i].charge == -1
+                    && num_n_minus > 0
+                    && num_n_plus + num_o_plus + num_c_plus > 0
+                    && nnm_bonds(at, i) == 1
+                    && nnm_val(at, i) + at[i].numh() == 2
+                    && grp(at, i) == EL_NUMBER_N
+                    && i1c >= 0
+                    && at[i].bond_type[i1c as usize] <= TRIPLE
+                {
+                    // terminal N(-)=
+                    let i1 = 0usize;
+                    let n = nb(at, i, i1);
+                    let apply = |at: &mut [InpAtom], n: usize| {
+                        let i2 = pos_of(at, n, i);
+                        at[i].charge += 1;
+                        at[n].charge -= 1;
+                        at[i].chem_bonds_valence += 1;
+                        at[n].chem_bonds_valence += 1;
+                        at[i].bond_type[i1] += 1;
+                        at[n].bond_type[i2] += 1;
+                    };
+                    if type_ == 7
+                        && num_n_plus > 0
+                        && at[n].charge == 1
+                        && nnm_bonds(at, n) <= 3
+                        && nnm_val(at, n) == 4
+                        && num_of_h(at, n) == 0
+                        && grp(at, n) == EL_NUMBER_N
+                    {
+                        // N(-)=N(+)(IV) => N#N(V)
+                        apply(at, n);
+                        num_changes += 1;
+                        num_n_minus -= 1;
+                        num_n_plus -= 1;
+                        num_all -= 2;
+                        i += 1;
+                        continue;
+                    }
+                    if type_ == 8
+                        && num_o_plus > 0
+                        && at[n].charge == 1
+                        && nnm_bonds(at, n) == 2
+                        && nnm_val(at, n) == 3
+                        && num_of_h(at, n) == 0
+                        && grp(at, n) == EL_NUMBER_O
+                    {
+                        // N(-)=O(+)(III) => N#O(IV)-
+                        apply(at, n);
+                        num_changes += 1;
+                        num_n_minus -= 1;
+                        num_o_plus -= 1;
+                        num_all -= 2;
+                        i += 1;
+                        continue;
+                    }
+                    if type_ == 9
+                        && num_c_plus > 0
+                        && at[n].charge == 1
+                        && at[n].valence == 2
+                        && at[n].chem_bonds_valence == 3
+                        && num_of_h(at, n) == 0
+                        && grp(at, n) == EL_NUMBER_C
+                    {
+                        // N(-)=C(+)(III) => N#C(IV)-
+                        apply(at, n);
+                        num_changes += 1;
+                        num_n_minus -= 1;
+                        num_c_plus -= 1;
+                        num_all -= 2;
+                        i += 1;
+                        continue;
+                    }
+                }
+                i += 1;
+            }
+        }
+
+        // ---- non-terminal ion pairs: types 10..15 ----
+        if (10..=15).contains(&type_) {
+            let mut i = 0;
+            while i < num_atoms && num_all > 0 {
+                if at[i].charge == 1
+                    && num_n_plus + num_o_plus > 0
+                    && num_c_minus + num_n_minus > 0
+                    && nnm_bonds(at, i) <= 4
+                    && nnm_val(at, i) == 4
+                    && num_of_h(at, i) == 0
+                    && grp(at, i) == EL_NUMBER_N
+                {
+                    // non-terminal N(+)(IV)
+                    if type_ == 10 && num_n_plus > 0 && num_c_minus > 0 {
+                        let mut num_neigh = 0;
+                        let mut pos_neigh = 0usize;
+                        for i1 in 0..at[i].valence as usize {
+                            let n = nb(at, i, i1);
+                            if at[n].charge == -1
+                                && at[n].valence <= 3
+                                && i32::from(at[n].chem_bonds_valence) + at[n].numh() == 3
+                                && at[i].bond_type[i1] == SINGLE
+                                && grp(at, n) == EL_NUMBER_C
+                            {
+                                num_neigh += 1;
+                                pos_neigh = i1;
+                            }
+                        }
+                        if num_neigh == 1 {
+                            let i1 = pos_neigh;
+                            let n = nb(at, i, i1);
+                            if at[i].bond_type[i1] <= TRIPLE
+                                && !has_other_ion_neigh(at, i, n)
+                                && !has_other_ion_neigh(at, n, i)
+                            {
+                                let i2 = pos_of(at, n, i);
+                                neutralize_pair(at, i, i1, n, i2);
+                                num_changes += 1;
+                                num_c_minus -= 1;
+                                num_n_plus -= 1;
+                                num_all -= 2;
+                                i += 1;
+                                continue;
+                            }
+                        }
+                    }
+                    if type_ == 11 && num_n_plus > 0 && num_c_minus > 0 {
+                        let mut num_neigh = 0;
+                        let mut pos_neigh = 0usize;
+                        for i1 in 0..at[i].valence as usize {
+                            let n = nb(at, i, i1);
+                            if at[n].charge == -1
+                                && at[n].valence <= 3
+                                && i32::from(at[n].chem_bonds_valence) + at[n].numh() == 3
+                                && at[i].bond_type[i1] == DOUBLE
+                                && grp(at, n) == EL_NUMBER_C
+                            {
+                                num_neigh += 1;
+                                pos_neigh = i1;
+                            }
+                        }
+                        if num_neigh == 1 {
+                            let i1 = pos_neigh;
+                            let n = nb(at, i, i1);
+                            if !has_other_ion_neigh(at, i, n) && !has_other_ion_neigh(at, n, i) {
+                                let i2 = pos_of(at, n, i);
+                                neutralize_pair(at, i, i1, n, i2);
+                                num_changes += 1;
+                                num_c_minus -= 1;
+                                num_n_plus -= 1;
+                                num_all -= 2;
+                                i += 1;
+                                continue;
+                            }
+                        }
+                    }
+                    if type_ == 12 && num_n_plus > 0 && num_n_minus > 0 {
+                        let mut num_neigh = 0;
+                        let mut pos_neigh = 0usize;
+                        for i1 in 0..at[i].valence as usize {
+                            let n = nb(at, i, i1);
+                            if at[n].charge == -1
+                                && nnm_bonds(at, n) <= 2
+                                && nnm_val(at, n) + at[n].numh() == 2
+                                && at[i].bond_type[i1] == SINGLE
+                                && grp(at, n) == EL_NUMBER_N
+                            {
+                                num_neigh += 1;
+                                pos_neigh = i1;
+                            }
+                        }
+                        if num_neigh == 1 {
+                            let i1 = pos_neigh;
+                            let n = nb(at, i, i1);
+                            if !has_other_ion_neigh(at, i, n) && !has_other_ion_neigh(at, n, i) {
+                                let i2 = pos_of(at, n, i);
+                                neutralize_pair(at, i, i1, n, i2);
+                                num_changes += 1;
+                                num_n_minus -= 1;
+                                num_n_plus -= 1;
+                                num_all -= 2;
+                                i += 1;
+                                continue;
+                            }
+                        }
+                    }
+                } else if at[i].charge == 1
+                    && num_o_plus > 0
+                    && num_c_minus + num_n_minus > 0
+                    && nnm_bonds(at, i) <= 3
+                    && nnm_val(at, i) == 3
+                    && num_of_h(at, i) == 0
+                    && grp(at, i) == EL_NUMBER_O
+                {
+                    // non-terminal O(+)(III)
+                    for (tt, bt, want_c) in
+                        [(13, SINGLE, true), (14, DOUBLE, true), (15, SINGLE, false)]
+                    {
+                        if type_ != tt
+                            || (want_c && num_c_minus == 0)
+                            || (!want_c && num_n_minus == 0)
+                        {
+                            continue;
+                        }
+                        let mut num_neigh = 0;
+                        let mut pos_neigh = 0usize;
+                        for i1 in 0..at[i].valence as usize {
+                            let n = nb(at, i, i1);
+                            let ok = if want_c {
+                                at[n].charge == -1
+                                    && at[n].valence <= 3
+                                    && i32::from(at[n].chem_bonds_valence) + at[n].numh() == 3
+                                    && at[i].bond_type[i1] == bt
+                                    && grp(at, n) == EL_NUMBER_C
+                            } else {
+                                at[n].charge == -1
+                                    && nnm_bonds(at, n) <= 2
+                                    && nnm_val(at, n) + at[n].numh() == 2
+                                    && at[i].bond_type[i1] == bt
+                                    && grp(at, n) == EL_NUMBER_N
+                            };
+                            if ok {
+                                num_neigh += 1;
+                                pos_neigh = i1;
+                            }
+                        }
+                        if num_neigh == 1 {
+                            let i1 = pos_neigh;
+                            let n = nb(at, i, i1);
+                            if !has_other_ion_neigh(at, i, n) && !has_other_ion_neigh(at, n, i) {
+                                let i2 = pos_of(at, n, i);
+                                neutralize_pair(at, i, i1, n, i2);
+                                num_changes += 1;
+                                if want_c {
+                                    num_c_minus -= 1;
+                                } else {
+                                    num_n_minus -= 1;
+                                }
+                                num_o_plus -= 1;
+                                num_all -= 2;
+                                break;
+                            }
+                        }
+                    }
+                    // (the C code `continue`s after a change; the loop below
+                    // advances in both cases, so the next atom is examined)
+                }
+                i += 1;
+            }
+        }
+
+        // ---- non-terminal ion triples: types 16, 17, 18 ----
+        if type_ == 16 && num_c_plus > 0 && num_n_minus > 0 {
+            for i in 0..num_atoms {
+                if !(at[i].charge == 0
+                    && nnm_bonds(at, i) == 2
+                    && nnm_val(at, i) == 2
+                    && num_of_h(at, i) == 0)
+                {
+                    continue;
+                }
+                let j0 = n_no_metal_neigh_index(at, i);
+                if j0 < 0 {
+                    continue;
+                }
+                let m0 = nb(at, i, j0 as usize);
+                if at[m0].charge == 0 {
+                    continue;
+                }
+                let j1 = n_no_metal_other_neigh_index(at, i, m0 as i32);
+                if j1 < 0 {
+                    continue;
+                }
+                let m1 = nb(at, i, j1 as usize);
+                if at[m0].charge + at[m1].charge != 0
+                    || nnm_val(at, m0) + nnm_val(at, m1) > 5
+                    || grp(at, i) != EL_NUMBER_O
+                {
+                    continue;
+                }
+                let m = [m0, m1];
+                let j = [j0 as usize, j1 as usize];
+                // found non-terminal A(+)-O-B(-); chem_bond_val of A+B <= 5
+                let (mut n_n, mut n_c, mut i_c) = (-1i32, -1i32, 0usize);
+                for k in 0..2 {
+                    let n = m[k];
+                    if at[n].charge == -1
+                        && nnm_bonds(at, n) + at[n].numh() == 2
+                        && grp(at, n) == EL_NUMBER_N
+                    {
+                        n_n = n as i32;
+                    } else if at[n].charge == 1
+                        && i32::from(at[n].chem_bonds_valence) + at[n].numh() == 3
+                        && grp(at, n) == EL_NUMBER_C
+                    {
+                        n_c = n as i32;
+                        i_c = k;
+                    }
+                }
+                if n_c < 0
+                    || n_n < 0
+                    || has_other_ion_in_sphere_2(at, n_c as usize, n_n as usize) != 0
+                    || has_other_ion_in_sphere_2(at, n_n as usize, n_c as usize) != 0
+                {
+                    continue;
+                }
+                // C(+)(III)-O-N(-)(II) => C(IV)=O=N(III)
+                for k in 0..2 {
+                    let n = if k == 1 { n_c as usize } else { n_n as usize };
+                    let i1 = if k == 1 { j[i_c] } else { j[1 - i_c] };
+                    let i2 = pos_of(at, n, i);
+                    at[i].bond_type[i1] += 1;
+                    at[n].bond_type[i2] += 1;
+                    at[i].chem_bonds_valence += 1;
+                    at[n].chem_bonds_valence += 1;
+                    at[n].charge += if k == 1 { -1 } else { 1 };
+                }
+                num_changes += 1;
+                num_n_minus -= 1;
+                num_c_plus -= 1;
+                num_all -= 2;
+            }
+        }
+
+        if type_ == 17 && num_c_plus > 0 && num_c_minus > 0 {
+            for i in 0..num_atoms {
+                if !(at[i].charge == 0
+                    && nnm_bonds(at, i) == 3
+                    && nnm_val(at, i) == 3
+                    && num_of_h(at, i) == 0)
+                {
+                    continue;
+                }
+                let j0 = n_no_metal_neigh_index(at, i);
+                if j0 < 0 {
+                    continue;
+                }
+                let m0 = nb(at, i, j0 as usize);
+                let j1 = n_no_metal_other_neigh_index(at, i, m0 as i32);
+                if j1 < 0 {
+                    continue;
+                }
+                let m1 = nb(at, i, j1 as usize);
+                let j2 = n_no_metal_other_neigh_index2(at, i, m0 as i32, m1 as i32);
+                if j2 < 0 {
+                    continue;
+                }
+                let m2 = nb(at, i, j2 as usize);
+                let m = [m0, m1, m2];
+                let j = [j0 as usize, j1 as usize, j2 as usize];
+                let c = [at[m0].charge, at[m1].charge, at[m2].charge];
+                let nzero = c.iter().filter(|&&x| x == 0).count();
+                let three = |k: usize| -> i32 {
+                    i32::from(
+                        (if c[k] != 0 {
+                            i32::from(at[m[k]].chem_bonds_valence) + at[m[k]].numh()
+                        } else {
+                            0
+                        }) == 3,
+                    )
+                };
+                if !(nzero == 1
+                    && i32::from(c[0]) + i32::from(c[1]) + i32::from(c[2]) == 0
+                    && three(0) + three(1) + three(2) == 2
+                    && grp(at, i) == EL_NUMBER_N)
+                {
+                    continue;
+                }
+                let (mut n_cp, mut n_cm, mut i_cp, mut i_cm) = (-1i32, -1i32, 0usize, 0usize);
+                for k in 0..3 {
+                    if c[k] != 0 {
+                        let n = m[k];
+                        if at[n].charge == -1 && grp(at, n) == EL_NUMBER_C {
+                            n_cm = n as i32;
+                            i_cm = k;
+                        } else if at[n].charge == 1 && grp(at, n) == EL_NUMBER_C {
+                            n_cp = n as i32;
+                            i_cp = k;
+                        }
+                    }
+                }
+                if n_cp < 0
+                    || n_cm < 0
+                    || has_other_ion_in_sphere_2(at, n_cp as usize, n_cm as usize) != 0
+                    || has_other_ion_in_sphere_2(at, n_cm as usize, n_cp as usize) != 0
+                {
+                    continue;
+                }
+                // C(+)(III)-N-C(-)(III) => C(IV)=N=C(IV)
+                for k in 0..2 {
+                    let n = if k == 1 { n_cp as usize } else { n_cm as usize };
+                    let i1 = if k == 1 { j[i_cp] } else { j[i_cm] };
+                    let i2 = pos_of(at, n, i);
+                    at[i].bond_type[i1] += 1;
+                    at[n].bond_type[i2] += 1;
+                    at[i].chem_bonds_valence += 1;
+                    at[n].chem_bonds_valence += 1;
+                    at[n].charge += if k == 1 { -1 } else { 1 };
+                }
+                num_changes += 1;
+                num_c_minus -= 1;
+                num_c_plus -= 1;
+                num_all -= 2;
+            }
+        }
+
+        if type_ == 18 && ((num_c_plus > 0 && num_c_minus > 0) || num_c_ii > 0) {
+            for i in 0..num_atoms {
+                if !(at[i].charge == 0
+                    && nnm_bonds(at, i) == 2
+                    && nnm_val(at, i) == 3
+                    && num_of_h(at, i) == 0)
+                {
+                    continue;
+                }
+                let j0 = n_no_metal_neigh_index(at, i);
+                if j0 < 0 {
+                    continue;
+                }
+                let m0 = nb(at, i, j0 as usize);
+                let j1 = n_no_metal_other_neigh_index(at, i, m0 as i32);
+                if j1 < 0 {
+                    continue;
+                }
+                let m1 = nb(at, i, j1 as usize);
+                let v = [
+                    i32::from(at[m0].chem_bonds_valence) + at[m0].numh(),
+                    i32::from(at[m1].chem_bonds_valence) + at[m1].numh(),
+                ];
+                if !(at[m0].charge + at[m1].charge == 0
+                    && v[0] + v[1] == 6
+                    && (v[0] - v[1]).abs() <= 2
+                    && grp(at, i) == EL_NUMBER_N
+                    && grp(at, m0) == EL_NUMBER_C
+                    && grp(at, m1) == EL_NUMBER_C)
+                {
+                    continue;
+                }
+                let m = [m0, m1];
+                let j = [j0 as usize, j1 as usize];
+                // C(-)(III)-N=C(+)(III) or C(IV)=N-C(II) => C(IV)=N#C(IV)
+                let (mut n_cp, mut n_cm, mut i_cp, mut i_cm) = (-1i32, -1i32, 0usize, 0usize);
+                for k in 0..2 {
+                    let n = m[k];
+                    if v[k] == 4 || (v[k] == 3 && at[i].bond_type[j[k]] == SINGLE) {
+                        n_cm = n as i32;
+                        i_cm = k;
+                    } else if v[k] == 2 || (v[k] == 3 && at[i].bond_type[j[k]] == DOUBLE) {
+                        n_cp = n as i32;
+                        i_cp = k;
+                    }
+                }
+                if n_cp < 0 || n_cm < 0 {
+                    continue;
+                }
+                let (n_cp, n_cm) = (n_cp as usize, n_cm as usize);
+                if i32::from(at[n_cp].valence) + at[n_cp].numh() != 2 {
+                    continue; // guarantees at[n_cp].valence <= 2
+                }
+                if v[i_cp] == 2 || at[n_cp].charge == 0 {
+                    if at[n_cp].valence == 2 {
+                        // neighbor of at[n_cp] opposite to at[i]
+                        let k = nb(at, n_cp, usize::from(at[n_cp].neighbor[0] as usize == i));
+                        if grp(at, k) == EL_NUMBER_N {
+                            continue;
+                        }
+                    }
+                } else if at[n_cp].charge != 0 {
+                    if has_other_ion_in_sphere_2(at, n_cp, n_cm) != 0
+                        || has_other_ion_in_sphere_2(at, n_cm, n_cp) != 0
+                    {
+                        continue;
+                    }
+                } else {
+                    continue; // unknown case
+                }
+                if at[n_cp].charge != 0 {
+                    num_c_minus -= 1;
+                    num_c_plus -= 1;
+                    num_all -= 2;
+                } else {
+                    num_c_ii -= 1;
+                    num_all -= 1;
+                }
+                for k in 0..2 {
+                    let n = if k == 1 { n_cp } else { n_cm };
+                    let i3 = if k == 1 { i_cp } else { i_cm };
+                    let i1 = j[i3];
+                    if v[i3] < 4 {
+                        let delta = (4 - v[i3]) as u8;
+                        let i2 = pos_of(at, n, i);
+                        at[i].bond_type[i1] += delta;
+                        at[n].bond_type[i2] += delta;
+                        at[i].chem_bonds_valence += delta as i8;
+                        at[n].chem_bonds_valence += delta as i8;
+                        at[n].charge = 0;
+                        at[n].radical = 0;
+                    }
+                }
+                at[i].charge = 0;
+                at[i].radical = 0;
+                num_changes += 1;
+            }
+        }
+    }
+    num_changes
+}
+
+/// `fix_odd_things`: corrects structure-drawing oddities — H(-)-X, charge
+/// separated `XHm(-)--Y==XHn(+)`, `Y++` with two `X-`, doublet pairs — and
+/// then removes ion pairs (`REMOVE_ION_PAIRS_EARLY`). `b_fix_bug` is the
+/// `bFixBug` flag, `b_fix_non_uniform_draw` the `bFixNonUniformDraw` flag.
+pub fn fix_odd_things(at: &mut [InpAtom], b_fix_bug: bool, b_fix_non_uniform_draw: bool) -> i32 {
+    const EN: [u8; 8] = [
+        EL_NUMBER_N,
+        EL_NUMBER_P,
+        EL_NUMBER_AS,
+        EL_NUMBER_SB,
+        EL_NUMBER_O,
+        EL_NUMBER_S,
+        EL_NUMBER_SE,
+        EL_NUMBER_TE,
+    ];
+    const FIRST_NEIGHB2: usize = 4;
+    const FIRST_CENTER2: usize = 5;
+    let rad_ok = |r: i8| r == 0 || i32::from(r) == RAD_SINGLET;
+    let num_atoms = at.len();
+    let mut num_changes = 0;
+    let mut c: usize = 0;
+
+    if b_fix_non_uniform_draw {
+        fix_non_uniform_drawn_oxoanions(at, &mut num_changes);
+        fix_non_uniform_drawn_amidiniums(at, &mut num_changes);
+    }
+
+    // H(-)-X -> H-X(-); H(+)-X -> H-X(+)
+    for i1 in 0..num_atoms {
+        if at[i1].valence == 1
+            && at[i1].charge.abs() == 1
+            && rad_ok(at[i1].radical)
+            && at[i1].bond_type[0] == SINGLE
+            && at[i1].el_number == EL_NUMBER_H
+        {
+            let i2 = nb(at, i1, 0);
+            if at[i2].el_number != EL_NUMBER_H && at[i1].numh() == 0 && at[i2].numh() == 0 {
+                at[i2].charge += at[i1].charge;
+                at[i1].charge = 0;
+            }
+        }
+    }
+
+    // replace XHm(-)--Y==XHn(+) with XHm==Y--XHn
+    for i1 in 0..num_atoms {
+        if at[i1].charge != 1
+            || (at[i1].radical != 0 && i32::from(at[i1].radical) != RAD_SINGLET)
+            || at[i1].chem_bonds_valence == at[i1].valence
+            || !EN.contains(&at[i1].el_number)
+            || get_el_valence(i32::from(at[i1].el_number), i32::from(at[i1].charge), 0)
+                != i32::from(at[i1].chem_bonds_valence) + at[i1].numh()
+        {
+            continue;
+        }
+        // a candidate for X in XHn(+)
+        if at[i1].valence == 1 && at[i1].bond_type[0] == DOUBLE {
+            c = nb(at, i1, 0);
+            for k2 in 0..at[c].valence as usize {
+                let i2 = nb(at, c, k2);
+                if at[i2].valence == 1
+                    && at[i2].charge == -1
+                    && at[i2].el_number == at[i1].el_number
+                    && rad_ok(at[i2].radical)
+                    && at[i2].bond_type[0] == SINGLE
+                    && get_el_valence(i32::from(at[i2].el_number), i32::from(at[i2].charge), 0)
+                        == i32::from(at[i2].chem_bonds_valence) + at[i2].numh()
+                {
+                    // found both X(-) and X(+); change bonds and remove charges
+                    let k1 = pos_of(at, c, i1);
+                    at[i1].charge = 0;
+                    at[i2].charge = 0;
+                    at[i1].bond_type[0] = SINGLE;
+                    at[c].bond_type[k1] = SINGLE;
+                    at[i1].chem_bonds_valence -= 1;
+                    at[i2].bond_type[0] = DOUBLE;
+                    at[c].bond_type[k2] = DOUBLE;
+                    at[i2].chem_bonds_valence += 1;
+                    num_changes += 1;
+                    break;
+                }
+            }
+        } else {
+            // explicit H case: detect H-neighbors and Y
+            let mut num_h_i1 = 0;
+            let mut i1_c: i32 = -1;
+            for ineigh in 0..at[i1].valence as usize {
+                let neigh = nb(at, i1, ineigh);
+                if at[neigh].el_number == EL_NUMBER_H {
+                    if at[neigh].chem_bonds_valence == 1 && rad_ok(at[neigh].radical) {
+                        num_h_i1 += 1;
+                    } else {
+                        break; // wrong neighbor
+                    }
+                } else if at[i1].bond_type[ineigh] == DOUBLE {
+                    // a candidate for Y; the bond must be double
+                    i1_c = ineigh as i32;
+                    c = neigh;
+                }
+            }
+            if i1_c < 0 || num_h_i1 + 1 != i32::from(at[i1].valence) {
+                continue;
+            }
+            for k2 in 0..at[c].valence as usize {
+                let i2 = nb(at, c, k2);
+                if at[i2].charge == -1
+                    && at[i2].el_number == at[i1].el_number
+                    && rad_ok(at[i2].radical)
+                    && get_el_valence(i32::from(at[i2].el_number), i32::from(at[i2].charge), 0)
+                        == i32::from(at[i2].chem_bonds_valence) + at[i2].numh()
+                {
+                    let mut num_h_i2 = 0;
+                    let mut i2_c: i32 = -1;
+                    for ineigh in 0..at[i2].valence as usize {
+                        let neigh = nb(at, i2, ineigh);
+                        if at[neigh].el_number == EL_NUMBER_H {
+                            if at[neigh].chem_bonds_valence == 1 && rad_ok(at[neigh].radical) {
+                                num_h_i2 += 1;
+                            } else {
+                                break;
+                            }
+                        } else if c == neigh && at[i2].bond_type[ineigh] == SINGLE {
+                            i2_c = ineigh as i32; // position of the Y neighbor
+                        } else {
+                            break;
+                        }
+                    }
+                    if num_h_i2 + i32::from(i2_c >= 0) != i32::from(at[i2].valence) {
+                        continue;
+                    }
+                    // found both X(-) and X(+); change bonds and remove charges
+                    let k1 = pos_of(at, c, i1);
+                    at[i1].charge = 0;
+                    at[i2].charge = 0;
+                    at[i1].bond_type[i1_c as usize] = SINGLE;
+                    at[c].bond_type[k1] = SINGLE;
+                    at[i1].chem_bonds_valence -= 1;
+                    at[i2].bond_type[i2_c as usize] = DOUBLE;
+                    at[c].bond_type[k2] = DOUBLE;
+                    at[i2].chem_bonds_valence += 1;
+                    num_changes += 1;
+                    break;
+                }
+            }
+        }
+    }
+
+    // X- ... >Y++ ... X-  =>  X= ... >Y ... X
+    for i1 in 0..num_atoms {
+        if !(at[i1].valence == 1
+            && at[i1].charge == -1
+            && rad_ok(at[i1].radical)
+            && at[i1].numh() == 0
+            && at[i1].bond_type[0] == SINGLE
+            && EN[FIRST_NEIGHB2..].contains(&at[i1].el_number))
+        {
+            continue;
+        }
+        // a candidate for X
+        c = nb(at, i1, 0); // candidate for Y
+        let mut charge = 2;
+        let accept = if (charge == i32::from(at[c].charge)
+            && EN[FIRST_CENTER2..].contains(&at[c].el_number))
+            || {
+                charge = 1;
+                charge == i32::from(at[c].charge) && at[c].el_number == EL_NUMBER_P
+            } {
+            at[c].valence == 4
+                && rad_ok(at[c].radical)
+                && at[c].valence == at[c].chem_bonds_valence
+                && at[c].numh() == 0
+        } else {
+            false
+        };
+        if !accept {
+            continue;
+        }
+        for k2 in 0..at[c].valence as usize {
+            let i2 = nb(at, c, k2);
+            if i2 == i1 {
+                continue;
+            }
+            if at[i2].valence == 1
+                && at[i2].charge == -1
+                && EN[FIRST_NEIGHB2..].contains(&at[i2].el_number)
+                && rad_ok(at[i2].radical)
+                && at[i2].numh() == 0
+                && at[i2].bond_type[0] == SINGLE
+            {
+                // found both X(-) and X(-); change bonds and remove charges
+                let k1 = pos_of(at, c, i1);
+                for i in 0..charge {
+                    match i {
+                        0 => {
+                            at[i1].charge += 1;
+                            at[i1].bond_type[0] = DOUBLE;
+                            at[c].bond_type[k1] = DOUBLE;
+                            at[i1].bond_stereo[0] = 0;
+                            at[c].bond_stereo[k1] = 0;
+                            at[i1].chem_bonds_valence += 1;
+                            at[c].chem_bonds_valence += 1;
+                            if b_fix_bug {
+                                at[c].charge -= 1;
+                            }
+                            num_changes += 1;
+                        }
+                        1 => {
+                            at[i2].charge += 1;
+                            at[i2].bond_type[0] = DOUBLE;
+                            at[c].bond_type[k2] = DOUBLE;
+                            at[i2].bond_stereo[0] = 0;
+                            at[c].bond_stereo[k2] = 0;
+                            at[i2].chem_bonds_valence += 1;
+                            at[c].chem_bonds_valence += 1;
+                            if b_fix_bug {
+                                at[c].charge -= 1;
+                            }
+                            num_changes += 1;
+                        }
+                        _ => {}
+                    }
+                }
+                break;
+            }
+        }
+    }
+
+    // A(doublet)-B(doublet) -> A=B;  A(doublet)=B(doublet) -> A#B
+    for i1 in 0..num_atoms {
+        if i32::from(at[i1].radical) == RADICAL_DOUBLET
+            && let Some((i2, k1, k2)) = the_only_doublet_neigh(at, i1)
+            && i32::from(at[i1].bond_type[k1]) <= BOND_TYPE_DOUBLE
+        {
+            at[i1].bond_type[k1] += 1;
+            at[i1].chem_bonds_valence += 1;
+            at[i2].bond_type[k2] += 1;
+            at[i2].chem_bonds_valence += 1;
+            at[i1].radical = 0;
+            at[i2].radical = 0;
+        }
+    }
+
+    // REMOVE_ION_PAIRS_EARLY == 1
+    num_changes += remove_ion_pairs(at);
+    num_changes
+}

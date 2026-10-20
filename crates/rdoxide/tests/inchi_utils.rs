@@ -1115,3 +1115,62 @@ fn drawing_corrections_match_the_c_code() {
         assert_eq!(got, want, "case {inp}");
     }
 }
+
+#[test]
+fn ion_pairs_and_odd_things_match_the_c_code() {
+    use rdoxide::external::inchi::inpdef::InpAtom;
+    use rdoxide::external::inchi::strutil::{fix_odd_things, remove_ion_pairs};
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_ionpairs.json")).unwrap();
+    let cases = data.as_array().unwrap();
+    assert!(cases.len() >= 12000);
+    let mut changed = 0;
+    for c in cases {
+        let inp = &c["in"];
+        let mut at: Vec<InpAtom> = Vec::new();
+        for a in inp["atoms"].as_array().unwrap() {
+            let nb = a["nb"].as_array().unwrap();
+            let mut x = InpAtom {
+                valence: nb.len() as i8,
+                chem_bonds_valence: a["cbv"].as_i64().unwrap() as i8,
+                el_number: a["el"].as_u64().unwrap() as u8,
+                charge: a["chg"].as_i64().unwrap() as i8,
+                radical: a["rad"].as_i64().unwrap() as i8,
+                iso_atw_diff: a["iso"].as_i64().unwrap() as i8,
+                num_h: a["nh"].as_i64().unwrap() as i8,
+                ..Default::default()
+            };
+            for (j, e) in nb.iter().enumerate() {
+                x.neighbor[j] = e[0].as_u64().unwrap() as u16;
+                x.bond_type[j] = e[1].as_u64().unwrap() as u8;
+                x.bond_stereo[j] = e[2].as_i64().unwrap() as i8;
+            }
+            at.push(x);
+        }
+        let r = if inp["mode"] == 1 {
+            fix_odd_things(&mut at, inp["fb"] == 1, inp["fn"] == 1)
+        } else {
+            remove_ion_pairs(&mut at)
+        };
+        let mut got = vec![format!("R {r}")];
+        for a in &at {
+            let mut s = format!(
+                "A {} {} {} {}",
+                a.charge, a.chem_bonds_valence, a.radical, a.valence
+            );
+            for k in 0..a.valence as usize {
+                s += &format!(" {}:{}:{}", a.neighbor[k], a.bond_type[k], a.bond_stereo[k]);
+            }
+            got.push(s);
+        }
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        assert_eq!(got, want, "{inp}");
+        changed += usize::from(r != 0);
+    }
+    assert!(changed > 1000);
+}
