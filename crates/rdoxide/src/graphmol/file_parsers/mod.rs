@@ -6,6 +6,7 @@ pub mod helm_parser;
 pub mod helm_writer;
 pub mod mae_mol_supplier;
 pub mod mae_reader;
+pub mod mae_writer;
 pub mod marvin;
 pub mod mol2;
 pub mod mol_file_parser;
