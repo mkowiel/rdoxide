@@ -236,6 +236,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 120 | `Chem.MolFromPNGFile/String`, `MolsFromPNGFile/String`, `MolMetadataToPNGFile/String`, `AddMetadataToPNGFile/String`, `MetadataFromPNGFile/String` and `PNGMetadataParams` (`file_parsers::png`: tEXt/zTXt chunks with a built-in inflate and stored-block zlib writer, CRC32, pickle/CXSMILES/mol block tags) | ✅ | Python tests; upstream `rough_test.py` testMolFromPNG, testMolsFromPNG, testMolToPNG, testMetadataToPNG |
 | 121 | `rdMolDescriptors.GetAtomFeatures` (`descriptors::atom_feat`: the 49/52 one-hot atom features of AtomFeat.cpp) | ✅ | Python tests against values from RDKit 2026.09.1 |
 | 122 | `rdFingerprintGenerator.FingerprintGenerator32`: the class exists as upstream's `no_init` class; no API returns a 32-bit generator (all `Get*Generator` return 64-bit ones) | ✅ | Python tests |
+| 123 | InChI port stage I1a: `external::inchi::ichisort` (`inchi_qsort`, `insertions_sort*`, neighbor-list comparisons, `iisort`), translated literally from InChI 1.07.3 `ichisort.c`; the InChI sources are fetched with `tools/sync_upstream.py fetch` (pinned). Checked against the C code on 372 cases including the order of tied elements (`tools/inchi_sort_reference.py`, `tests/inchi_sort.rs`). The comparators that need the canonicalization globals follow with their data model | 🟡 | `crates/rdoxide/tests/inchi_sort.rs` |
 
 ## Python package files
 
@@ -528,3 +529,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-19 — Stage 120: PNG metadata read and write, without a compression library
 * 2026-10-19 — Stage 121: GetAtomFeatures
 * 2026-10-19 — Stage 122: FingerprintGenerator32
+* 2026-10-19 — Stage 123: InChI I1a: ichisort
