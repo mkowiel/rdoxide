@@ -1516,3 +1516,106 @@ fn terminal_hydrogen_removal_matches_the_c_code() {
         assert_eq!(got, want, "{inp}");
     }
 }
+
+#[test]
+fn component_marking_matches_the_c_code() {
+    use rdoxide::external::inchi::inpdef::InpAtom;
+    use rdoxide::external::inchi::strutil::*;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_components.json")).unwrap();
+    for c in data.as_array().unwrap() {
+        let inp = &c["in"];
+        let mut at: Vec<InpAtom> = Vec::new();
+        for a in inp["atoms"].as_array().unwrap() {
+            let nb = a["nb"].as_array().unwrap();
+            let mut x = InpAtom {
+                valence: nb.len() as i8,
+                chem_bonds_valence: a["cbv"].as_i64().unwrap() as i8,
+                el_number: a["el"].as_u64().unwrap() as u8,
+                charge: a["chg"].as_i64().unwrap() as i8,
+                radical: a["rad"].as_i64().unwrap() as i8,
+                iso_atw_diff: a["iso"].as_i64().unwrap() as i8,
+                num_h: a["nh"].as_i64().unwrap() as i8,
+                component: a["comp"].as_u64().unwrap() as u16,
+                ..Default::default()
+            };
+            for m in 0..3 {
+                x.num_iso_h[m] = a["ih"][m].as_i64().unwrap() as i8;
+            }
+            for (j, e) in nb.iter().enumerate() {
+                x.neighbor[j] = e[0].as_u64().unwrap() as u16;
+                x.bond_type[j] = e[1].as_u64().unwrap() as u8;
+            }
+            at.push(x);
+        }
+        let n = at.len();
+        let mut got: Vec<String> = Vec::new();
+        got.push(format!("B {}", num_hetero_atom_has_isotopic_h(&at)));
+        let mut h = String::from("H");
+        for i in 0..n {
+            h += &format!(
+                " {}:{}",
+                get_iat_number(at[i].el_number),
+                hetero_atom_may_have_xchg_iso_h(&at, i)
+            );
+        }
+        got.push(h);
+        let old: Vec<u16> = inp["old"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_u64().unwrap() as u16)
+            .collect();
+        let mut od = OrigAtomData {
+            at,
+            num_inp_atoms: n,
+            num_components: inp["prevnc"].as_i64().unwrap() as i32,
+            n_old_comp_number: (inp["hasold"] == 1).then_some(old),
+            ..Default::default()
+        };
+        let r = mark_disconnected_components(&mut od, inp["bproc"] == 1);
+        got.push(format!("R {r} {}", od.num_components));
+        let mut s = String::from("C");
+        for a in &od.at {
+            s += &format!(" {}", a.component);
+        }
+        got.push(s);
+        let mut s = String::from("L");
+        let mut o = String::from("O");
+        if r > 0 {
+            for v in &od.n_cur_at_len.as_ref().unwrap()[..r as usize] {
+                s += &format!(" {v}");
+            }
+            for v in od.n_old_comp_number.as_ref().unwrap() {
+                o += &format!(" {v}");
+            }
+        }
+        got.push(s);
+        got.push(o);
+        for k in 1..=r {
+            let mut ca = Vec::new();
+            let m = extract_connected_component(&od.at, k as u16, &mut ca);
+            let mut s = format!("X {m}");
+            for a in &ca {
+                s += &format!(" |{}", a.orig_compt_at_numb);
+                for j in 0..a.valence as usize {
+                    s += &format!(" {}", a.neighbor[j]);
+                }
+            }
+            got.push(s);
+        }
+        set_connected_component_number(&mut od.at, 7);
+        got.push(format!(
+            "S {} {}",
+            od.at[0].component,
+            od.at[n - 1].component
+        ));
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        assert_eq!(got, want, "{inp}");
+    }
+}
