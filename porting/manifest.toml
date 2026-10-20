@@ -1829,3 +1829,9 @@
 
 [module."rdoxide_python::rdmolfiles_maesupplier".sources]
 "Code/GraphMol/Wrap/MaeMolSupplier.cpp" = "168ab2ebf3726f7d1336a0766b92108ca627c2fa"
+
+[module."rdoxide::graphmol::file_parsers::mae_writer".sources]
+"Code/GraphMol/FileParsers/MaeWriter.cpp" = "ba15730eedf2af2360234ef7418837909f5c06eb"
+
+[module."rdoxide_python::rdmolfiles_maewriter".sources]
+"Code/GraphMol/Wrap/MaeWriter.cpp" = "6ebae7db765168a0646cdb318669e2673b2dba75"
