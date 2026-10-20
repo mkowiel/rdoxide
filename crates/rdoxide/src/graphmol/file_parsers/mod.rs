@@ -15,6 +15,7 @@ pub mod mol_file_writer;
 pub mod multithreaded_supplier;
 pub mod pdb_parser;
 pub mod pdb_writer;
+pub mod png;
 pub mod property_lists;
 pub mod proximity_bonds;
 pub mod scsr;
