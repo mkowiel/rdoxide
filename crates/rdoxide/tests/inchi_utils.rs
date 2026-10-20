@@ -1411,6 +1411,25 @@ fn metal_disconnection_matches_the_c_code() {
             .iter()
             .map(|v| v.as_str().unwrap())
             .collect();
-        assert_eq!(got, want, "{inp}");
+        // the coordinates come from sin/cos/atan2 of the platform libm: compare
+        // them to 1e-12, everything else exactly
+        assert_eq!(got.len(), want.len(), "{inp}");
+        for (g, w) in got.iter().zip(&want) {
+            let (gt, wt): (Vec<&str>, Vec<&str>) = (g.split(' ').collect(), w.split(' ').collect());
+            assert_eq!(gt.len(), wt.len(), "{inp}");
+            let coord = g.starts_with("A ");
+            for (q, (x, y)) in gt.iter().zip(&wt).enumerate() {
+                if coord && (13..16).contains(&q) {
+                    let fx = f64::from_bits(x.parse().unwrap());
+                    let fy = f64::from_bits(y.parse().unwrap());
+                    assert!(
+                        (fx - fy).abs() <= 1e-12 * fy.abs().max(1.0),
+                        "{inp}: {g} vs {w}"
+                    );
+                } else {
+                    assert_eq!(x, y, "{inp}");
+                }
+            }
+        }
     }
 }
