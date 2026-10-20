@@ -1889,6 +1889,10 @@ pub struct OrigAtomData {
     pub b_disconnect_coord: i32,
     /// `nOldCompNumber`
     pub n_old_comp_number: Option<Vec<u16>>,
+    /// `nCurAtLen`: number of atoms per component
+    pub n_cur_at_len: Option<Vec<u16>>,
+    /// `num_components`
+    pub num_components: i32,
 }
 
 /// Heteroatoms that may take a charge after a ligand is disconnected: the
@@ -2673,4 +2677,254 @@ pub fn remove_terminal_hdt(at: &mut [InpAtom], b_fix_term_h_chrg: bool) -> i32 {
     }
     at.clone_from_slice(&new_at);
     num_others as i32
+}
+
+// ---- connected components ----
+
+/// `get_iat_number`: the position of an element in the `ION_ATOM_TYPE` list
+/// (H, C, N, P, O, S, Se, Te, F, Cl, Br, I), -1 for others
+pub fn get_iat_number(el_number: u8) -> i32 {
+    use super::util::{EL_NUMBER_SE, EL_NUMBER_TE};
+    match el_number {
+        EL_NUMBER_H => 0,
+        EL_NUMBER_C => 1,
+        EL_NUMBER_N => 2,
+        super::util::EL_NUMBER_P => 3,
+        EL_NUMBER_O => 4,
+        super::util::EL_NUMBER_S => 5,
+        EL_NUMBER_SE => 6,
+        EL_NUMBER_TE => 7,
+        EL_NUMBER_F => 8,
+        EL_NUMBER_CL => 9,
+        EL_NUMBER_BR => 10,
+        EL_NUMBER_I => 11,
+        _ => -1,
+    }
+}
+
+/// The target valence of an atom whose hydrogens may be exchanged
+/// (`None`: the atom is excluded); `is_h` is set for an isolated proton
+fn xchg_valence(a: &InpAtom, is_h: &mut bool) -> Option<i32> {
+    let iat = get_iat_number(a.el_number);
+    if iat < 0 {
+        return None;
+    }
+    if a.charge.abs() > 1 || (a.radical != 0 && i32::from(a.radical) != RAD_SINGLET) {
+        return None;
+    }
+    let chg = i32::from(a.charge);
+    let mut val = -1;
+    match iat {
+        2 | 3 => val = 3 + chg,
+        4..=7 => val = 2 + chg,
+        8..=11 => {
+            if chg == 0 {
+                val = 1;
+            }
+        }
+        0 if a.valence == 0 && chg == 1 => {
+            *is_h = true;
+            val = 0;
+        }
+        _ => {}
+    }
+    (val >= 0).then_some(val)
+}
+
+/// `bHeteroAtomMayHaveXchgIsoH`: 0 = no, 1 = heteroatom, 2 = isolated proton
+pub fn hetero_atom_may_have_xchg_iso_h(atom: &[InpAtom], iat: usize) -> i32 {
+    let at = &atom[iat];
+    let mut is_h = false;
+    let Some(val) = xchg_valence(at, &mut is_h) else {
+        return 0;
+    };
+    if val != i32::from(at.chem_bonds_valence) + at.numh() {
+        return 0;
+    }
+    if is_h {
+        return 2;
+    }
+    for j in 0..at.valence as usize {
+        let at2 = &atom[at.neighbor[j] as usize];
+        if (at2.charge != 0 && at.charge != 0)
+            || (at2.radical != 0 && i32::from(at2.radical) != RAD_SINGLET)
+        {
+            return 0;
+        }
+    }
+    1
+}
+
+/// `bNumHeterAtomHasIsotopicH`: bit 0 = a neutralizable heteroatom has an
+/// isotopic H, bit 1 = the structure has isotopic atoms
+pub fn num_hetero_atom_has_isotopic_h(atom: &[InpAtom]) -> i32 {
+    let mut is_h = false;
+    let mut num_iso_h = 0;
+    let mut num_iso_atoms = 0i32;
+    for at in atom {
+        num_iso_atoms += i32::from(at.iso_atw_diff != 0 || at.num_iso_h_total() != 0);
+        let Some(val) = xchg_valence(at, &mut is_h) else {
+            continue;
+        };
+        if val != i32::from(at.chem_bonds_valence) + at.numh() {
+            continue;
+        }
+        let mut b_accept = true;
+        let mut cur_num_iso_h;
+        if is_h {
+            cur_num_iso_h = i32::from(at.iso_atw_diff != 0);
+        } else {
+            cur_num_iso_h = 0;
+            for j in 0..at.valence as usize {
+                let at2 = &atom[at.neighbor[j] as usize];
+                if (at2.charge != 0 && at.charge != 0)
+                    || (at2.radical != 0 && i32::from(at2.radical) != RAD_SINGLET)
+                {
+                    b_accept = false;
+                    break;
+                } else if at2.el_number == EL_NUMBER_H && at2.valence == 1 && at2.iso_atw_diff != 0
+                {
+                    cur_num_iso_h += 1;
+                }
+            }
+            if b_accept {
+                num_iso_atoms -= cur_num_iso_h;
+                cur_num_iso_h += at.num_iso_h_total();
+            }
+        }
+        num_iso_h += i32::from(b_accept && cur_num_iso_h != 0);
+    }
+    i32::from(num_iso_h != 0) | if num_iso_atoms != 0 { 2 } else { 0 }
+}
+
+/// `MarkDisconnectedComponents`: sets `at[*].component` (1-based, components
+/// sorted by decreasing number of atoms, stable); returns the number of
+/// components
+pub fn mark_disconnected_components(
+    orig: &mut OrigAtomData,
+    mut b_process_old_comp_numbers: bool,
+) -> i32 {
+    if b_process_old_comp_numbers && orig.n_old_comp_number.is_none() {
+        b_process_old_comp_numbers = false;
+    }
+    let num_at = orig.num_inp_atoms;
+    if num_at == 0 {
+        return 0;
+    }
+    let at = &mut orig.at;
+    let mut n_new_comp = vec![0u16; num_at];
+    let mut n_prev = vec![0u16; num_at];
+    let mut i_neigh = vec![0i8; num_at];
+    let mut num_components = 0usize;
+    for j in 0..num_at {
+        if n_new_comp[j] != 0 {
+            continue;
+        }
+        num_components += 1;
+        let fst = j;
+        let mut cur = j;
+        n_new_comp[fst] = num_components as u16;
+        loop {
+            if i_neigh[cur] < at[cur].valence {
+                let nxt = at[cur].neighbor[i_neigh[cur] as usize] as usize;
+                i_neigh[cur] += 1;
+                if n_new_comp[nxt] == 0 {
+                    n_new_comp[nxt] = num_components as u16;
+                    n_prev[nxt] = cur as u16;
+                    cur = nxt;
+                }
+            } else if cur == fst {
+                break;
+            } else {
+                cur = n_prev[cur] as usize;
+            }
+        }
+    }
+
+    let size = num_components.max(orig.num_components.max(0) as usize);
+    let mut n_old = vec![0u16; size + 1];
+    // [0] atoms, [1] original number, [2] new number
+    let mut comp: Vec<[u16; 3]> = (0..num_components).map(|i| [0, i as u16, 0]).collect();
+    for &c in &n_new_comp {
+        comp[c as usize - 1][0] += 1;
+    }
+    comp.sort_by(|a, b| b[0].cmp(&a[0]).then(a[1].cmp(&b[1])));
+    let mut n_cur_len = vec![0u16; num_components + 1];
+    for i in 0..num_components {
+        n_cur_len[i] = comp[i][0];
+        let o = comp[i][1] as usize;
+        comp[o][2] = (i + 1) as u16;
+    }
+    let no_component = (num_at + 1) as u16;
+    for j in 0..num_at {
+        let new_comp_no = comp[n_new_comp[j] as usize - 1][2] as usize - 1;
+        if b_process_old_comp_numbers {
+            let old_comp_no = at[j].component;
+            if old_comp_no == 0 {
+                n_old[new_comp_no] = no_component;
+            } else if n_old[new_comp_no] != old_comp_no {
+                if n_old[new_comp_no] == 0 {
+                    n_old[new_comp_no] = old_comp_no;
+                } else {
+                    let another = n_old[new_comp_no];
+                    for v in n_old.iter_mut().take(num_components) {
+                        if *v == old_comp_no || *v == another {
+                            *v = no_component;
+                        }
+                    }
+                }
+            }
+        }
+        at[j].component = (new_comp_no + 1) as u16;
+    }
+    if b_process_old_comp_numbers {
+        let prev = orig.n_old_comp_number.as_ref().unwrap();
+        for v in n_old.iter_mut().take(num_components) {
+            if *v == no_component {
+                *v = 0;
+            } else if *v != 0 && prev[*v as usize - 1] == 0 {
+                *v = 0;
+            }
+        }
+    } else {
+        for (j, v) in n_old.iter_mut().take(num_components).enumerate() {
+            *v = (j + 1) as u16;
+        }
+    }
+    orig.n_cur_at_len = Some(n_cur_len);
+    orig.n_old_comp_number = Some(n_old);
+    orig.num_components = num_components as i32;
+    num_components as i32
+}
+
+/// `ExtractConnectedComponent`: copies the atoms of a component to
+/// `component_at` with renumbered neighbors; returns their number
+pub fn extract_connected_component(
+    at: &[InpAtom],
+    component_number: u16,
+    component_at: &mut Vec<InpAtom>,
+) -> i32 {
+    let mut number = vec![0u16; at.len()];
+    component_at.clear();
+    for (i, a) in at.iter().enumerate() {
+        if a.component == component_number {
+            number[i] = component_at.len() as u16;
+            component_at.push(a.clone());
+        }
+    }
+    for (i, a) in component_at.iter_mut().enumerate() {
+        a.orig_compt_at_numb = (i + 1) as u16;
+        for j in 0..a.valence as usize {
+            a.neighbor[j] = number[a.neighbor[j] as usize];
+        }
+    }
+    component_at.len() as i32
+}
+
+/// `SetConnectedComponentNumber`
+pub fn set_connected_component_number(at: &mut [InpAtom], component_number: u16) -> i32 {
+    for a in at.iter_mut() {
+        a.component = component_number;
+    }
+    0
 }
