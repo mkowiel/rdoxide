@@ -1556,3 +1556,320 @@ pub fn disconnect_inp_at_bond(
     }
     ret == 2
 }
+
+// ---- ammonium and metal salt disconnection ----
+
+use super::incomdef::IS_METAL;
+use super::incomdef::NUM_H_ISOTOPES;
+use super::util::{EL_NUMBER_BR, EL_NUMBER_CL, EL_NUMBER_F, EL_NUMBER_I, get_el_type};
+
+/// `at[i].num_iso_H[idx]`; as in the C code the index `NUM_H_ISOTOPES`
+/// addresses the next structure member, `iso_atw_diff`
+fn iso_h_slot(a: &mut InpAtom, idx: usize) -> &mut i8 {
+    if idx < NUM_H_ISOTOPES {
+        &mut a.num_iso_h[idx]
+    } else {
+        &mut a.iso_atw_diff
+    }
+}
+
+fn is_halogen(el: u8) -> bool {
+    el == EL_NUMBER_F || el == EL_NUMBER_CL || el == EL_NUMBER_BR || el == EL_NUMBER_I
+}
+
+/// `bIsAmmoniumSalt`: `NH4(+)-O(-)-C` or `NH4-X`; returns the position of
+/// the O (or halogen) atom `iO`, its index `k` in the neighbor list of `i`
+/// and fills `num_explicit_h` with the explicit hydrogens by isotope
+pub fn is_ammonium_salt(
+    at: &[InpAtom],
+    i: usize,
+    num_explicit_h: &mut [i8; NUM_H_ISOTOPES + 1],
+) -> Option<(usize, usize)> {
+    if at[i].el_number != EL_NUMBER_N {
+        return None;
+    }
+    let val = at[i].valence as usize;
+    let mut num_h = i32::from(at[i].num_h) + at[i].num_iso_h_total();
+    if val as i32 + num_h != 5 {
+        return None;
+    }
+    let mut num_o = 0;
+    let (mut io, mut k) = (0usize, 0usize);
+    *num_explicit_h = [0; NUM_H_ISOTOPES + 1];
+    for j in 0..val {
+        let neigh = nb(at, i, j);
+        let n = &at[neigh];
+        if n.num_h != 0
+            || (n.charge != 0
+                && (n.el_number != EL_NUMBER_O
+                    || i32::from(n.charge) + i32::from(at[i].charge) != 0))
+            || (n.radical != 0 && i32::from(n.radical) != RAD_SINGLET)
+        {
+            return None;
+        }
+        if n.el_number == EL_NUMBER_H && n.valence == 1 && n.charge == 0 && n.radical == 0 {
+            num_h += 1;
+            num_explicit_h[n.iso_atw_diff as usize] += 1;
+        } else if n.el_number == EL_NUMBER_O && n.valence == 2 && num_o == 0 {
+            num_o += 1;
+            io = neigh;
+            k = j;
+            let ic = nb(at, io, usize::from(nb(at, io, 0) == i));
+            if at[ic].el_number != EL_NUMBER_C
+                || at[ic].charge != 0
+                || (at[ic].radical != 0 && i32::from(at[ic].radical) != RAD_SINGLET)
+            {
+                return None;
+            }
+        } else if is_halogen(n.el_number)
+            && n.valence == 1
+            && n.chem_bonds_valence == 1
+            && n.charge == 0
+            && n.numh() == 0
+            && num_o == 0
+        {
+            num_o += 1;
+            io = neigh;
+            k = j;
+        } else {
+            return None;
+        }
+    }
+    (num_o == 1 && num_h == 4).then_some((io, k))
+}
+
+/// `DisconnectAmmoniumSalt`: removes the bond N-O and moves one hydrogen
+/// from N to O
+pub fn disconnect_ammonium_salt(
+    at: &mut [InpAtom],
+    i_n: usize,
+    i_o: usize,
+    k: usize,
+    num_explicit_h: &[i8; NUM_H_ISOTOPES + 1],
+) -> i32 {
+    let mut n_move_h_iso_diff: i32 = -1;
+    let mut val = at[i_n].valence as i32;
+    if at[i_n].charge != 0 && at[i_n].charge + at[i_o].charge == 0 {
+        at[i_n].charge = 0;
+        at[i_o].charge = 0;
+    }
+    let neigh_pos = if at[i_o].valence == 2 {
+        usize::from(nb(at, i_o, 1) == i_n)
+    } else {
+        0
+    };
+    remove_inp_at_bond(at, i_o, neigh_pos);
+    remove_inp_at_bond(at, i_n, k);
+    val -= 1;
+
+    for iso_diff in 0..=NUM_H_ISOTOPES {
+        if iso_diff == 0 {
+            if at[i_n].num_h != 0 {
+                at[i_n].num_h -= 1;
+                at[i_o].num_h += 1;
+                break;
+            } else if num_explicit_h[0] != 0 {
+                n_move_h_iso_diff = 0;
+                break;
+            }
+        } else if *iso_h_slot(&mut at[i_n], iso_diff) != 0 {
+            *iso_h_slot(&mut at[i_n], iso_diff) -= 1;
+            *iso_h_slot(&mut at[i_o], iso_diff) += 1;
+            break;
+        } else if num_explicit_h[iso_diff] != 0 {
+            n_move_h_iso_diff = iso_diff as i32;
+            break;
+        }
+    }
+
+    if n_move_h_iso_diff >= 0 {
+        let mut min_dist2: f64 = -1.0;
+        let (mut jh, mut ih) = (0usize, 0usize);
+        for j in 0..val as usize {
+            let neigh = nb(at, i_n, j);
+            if at[neigh].el_number == EL_NUMBER_H
+                && i32::from(at[neigh].iso_atw_diff) == n_move_h_iso_diff
+            {
+                let d2 = (at[neigh].x - at[i_o].x) * (at[neigh].x - at[i_o].x)
+                    + (at[neigh].y - at[i_o].y) * (at[neigh].y - at[i_o].y)
+                    + (at[neigh].z - at[i_o].z) * (at[neigh].z - at[i_o].z);
+                if min_dist2 < 0.0 || min_dist2 > d2 {
+                    min_dist2 = d2;
+                    ih = neigh;
+                    jh = j;
+                }
+            }
+        }
+        let pos = at[i_o].valence as usize;
+        let bt = at[ih].bond_type[0];
+        at[i_o].neighbor[pos] = ih as u16;
+        at[i_o].bond_stereo[pos] = 0;
+        at[i_o].bond_type[pos] = bt;
+        at[i_o].chem_bonds_valence += bt as i8;
+        at[i_o].valence += 1;
+        at[ih].neighbor[0] = i_o as u16;
+        at[ih].bond_stereo[0] = 0;
+        remove_inp_at_bond(at, i_n, jh);
+    }
+    1
+}
+
+/// `bIsMetalSalt`: a metal with the normal valence whose neighbors are all
+/// `-O-C(=)` (without H on C) or halogens
+pub fn is_metal_salt(at: &[InpAtom], i: usize) -> bool {
+    let val = i32::from(at[i].valence);
+    if val == 0 {
+        return false;
+    }
+    let ty = get_el_type(i32::from(at[i].el_number));
+    if ty == 0 || ty & IS_METAL == 0 || at[i].num_h != 0 {
+        return false;
+    }
+    let el = i32::from(at[i].el_number);
+    let chg = i32::from(at[i].charge);
+    let ok = (chg == 0
+        && ((ty & 1 != 0 && val == get_el_valence(el, 0, 0))
+            || (ty & 2 != 0 && val == get_el_valence(el, 0, 1))))
+        || (chg > 0 && ty & 1 != 0 && val == get_el_valence(el, chg, 0));
+    if !ok {
+        return false;
+    }
+    for k in 0..at[i].valence as usize {
+        let io = nb(at, i, k);
+        let o = &at[io];
+        if is_halogen(o.el_number)
+            && o.valence == 1
+            && o.chem_bonds_valence == 1
+            && o.charge == 0
+            && !(o.radical != 0 && i32::from(o.radical) != RAD_SINGLET)
+            && o.numh() == 0
+        {
+            continue;
+        }
+        if o.el_number != EL_NUMBER_O
+            || o.numh() != 0
+            || o.valence != 2
+            || o.charge != 0
+            || (o.radical != 0 && i32::from(o.radical) != RAD_SINGLET)
+            || o.valence != o.chem_bonds_valence
+        {
+            return false;
+        }
+        let ic = nb(at, io, usize::from(nb(at, io, 0) == i));
+        let c = &at[ic];
+        if c.el_number != EL_NUMBER_C
+            || c.num_h != 0
+            || c.chem_bonds_valence != 4
+            || c.charge != 0
+            || (c.radical != 0 && i32::from(c.radical) != RAD_SINGLET)
+            || c.valence == c.chem_bonds_valence
+        {
+            return false;
+        }
+        if (0..c.valence as usize).any(|j| at[c.neighbor[j] as usize].el_number == EL_NUMBER_H) {
+            return false;
+        }
+    }
+    true
+}
+
+/// `DisconnectMetalSalt`: cuts all bonds of the metal `i`, the neighbors
+/// become anions; returns the number of removed bonds
+pub fn disconnect_metal_salt(at: &mut [InpAtom], i: usize) -> i32 {
+    let n = at[i].valence as usize;
+    for k in 0..n {
+        let io = nb(at, i, k);
+        if at[io].valence == 2 {
+            if at[io].neighbor[0] as usize == i {
+                at[io].neighbor[0] = at[io].neighbor[1];
+                at[io].bond_stereo[0] = at[io].bond_stereo[1];
+                at[io].bond_type[0] = at[io].bond_type[1];
+            }
+            at[io].neighbor[1] = 0;
+            at[io].bond_stereo[1] = 0;
+            at[io].bond_type[1] = 0;
+        } else {
+            at[io].neighbor[0] = 0;
+            at[io].bond_stereo[0] = 0;
+            at[io].bond_type[0] = 0;
+        }
+        at[io].charge = -1;
+        at[io].valence -= 1;
+        at[io].chem_bonds_valence -= 1;
+        at[i].neighbor[k] = 0;
+        at[i].bond_stereo[k] = 0;
+        at[i].bond_type[k] = 0;
+        at[i].charge += 1;
+    }
+    at[i].valence = 0;
+    at[i].chem_bonds_valence = 0;
+    n as i32
+}
+
+/// `DisconnectSalts`: `num_inp_bonds` is `orig_inp_data->num_inp_bonds`
+pub fn disconnect_salts(at: &mut [InpAtom], num_inp_bonds: &mut i32, b_disconnect: bool) -> i32 {
+    let mut num_changes = 0;
+    let mut num_explicit_h = [0i8; NUM_H_ISOTOPES + 1];
+    for i in 0..at.len() {
+        let val = at[i].valence;
+        if val == 0
+            || val != at[i].chem_bonds_valence
+            || (at[i].radical != 0 && i32::from(at[i].radical) != RAD_SINGLET)
+        {
+            continue;
+        }
+        if let Some((io, k)) = is_ammonium_salt(at, i, &mut num_explicit_h) {
+            if b_disconnect {
+                disconnect_ammonium_salt(at, i, io, k, &num_explicit_h);
+                *num_inp_bonds -= 1;
+            }
+            num_changes += 1;
+        } else if is_metal_salt(at, i) {
+            if b_disconnect {
+                *num_inp_bonds -= disconnect_metal_salt(at, i);
+            }
+            num_changes += 1;
+        }
+    }
+    num_changes
+}
+
+/// `bIsMetalToDisconnect`: 0 = nothing to disconnect, 1 = disconnect
+/// (the C code's check for a normal valence, result 2, never runs: its loop
+/// condition `i & type` is false for i = 0)
+pub fn is_metal_to_disconnect(at: &[InpAtom], i: usize) -> i32 {
+    let ty = get_el_type(i32::from(at[i].el_number));
+    if ty == 0 || ty & IS_METAL == 0 {
+        return 0;
+    }
+    let at_valence = at[i].numh() + i32::from(at[i].chem_bonds_valence);
+    i32::from(at_valence != 0)
+}
+
+/// `bMayDisconnectMetals`: counts the metals that `DisconnectMetals` would
+/// disconnect; returns that count and the `bDisconnectCoord` value
+/// (implicit H count + 1, or 0)
+pub fn may_disconnect_metals(at: &[InpAtom]) -> (i32, i32) {
+    let mut num_changes = 0;
+    let mut num_impl_h = 0;
+    let mut num_explicit_h = [0i8; NUM_H_ISOTOPES + 1];
+    for i in 0..at.len() {
+        let val = at[i].valence;
+        if val == 0 && at[i].numh() == 0 {
+            continue;
+        }
+        let rad_or_mult = val == 0
+            || val != at[i].chem_bonds_valence
+            || (at[i].radical != 0 && i32::from(at[i].radical) != RAD_SINGLET);
+        if !rad_or_mult && is_ammonium_salt(at, i, &mut num_explicit_h).is_some() {
+        } else if !rad_or_mult && is_metal_salt(at, i) {
+        } else if is_metal_to_disconnect(at, i) == 1 {
+            num_impl_h += at[i].numh();
+            num_changes += 1;
+        }
+    }
+    (
+        num_changes,
+        if num_changes != 0 { num_impl_h + 1 } else { 0 },
+    )
+}
