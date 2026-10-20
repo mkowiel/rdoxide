@@ -2479,3 +2479,198 @@ pub fn disconnect_metals(
     }
     if err != 0 { -err } else { num_disconnected }
 }
+
+// ---- terminal hydrogens ----
+
+use super::ichisort::insertions_sort_at_rank;
+
+/// `ATW_H`
+const ATW_H: i32 = 1;
+
+/// `add_DT_to_num_H`: adds the isotopic H counts to `num_H`
+pub fn add_dt_to_num_h(at: &mut [InpAtom]) -> i32 {
+    for a in at.iter_mut() {
+        for j in 0..NUM_H_ISOTOPES {
+            a.num_h += a.num_iso_h[j];
+        }
+    }
+    0
+}
+
+/// `remove_terminal_HDT`: moves the terminal explicit H, D, T to the end of
+/// the array and makes them implicit hydrogens of their neighbors. Returns
+/// the new number of atoms (the first `ret` atoms of `at` are the heavy ones)
+pub fn remove_terminal_hdt(at: &mut [InpAtom], b_fix_term_h_chrg: bool) -> i32 {
+    const HDT: [u8; 4] = [b'H', b'D', b'T', 0];
+    const K_MAX: i32 = 4;
+    let num_atoms = at.len();
+    let na = num_atoms as i32;
+    let mut new_ord = vec![0u16; num_atoms];
+    let mut new_at = vec![InpAtom::default(); num_atoms];
+    let mut num_hydrogens: i32 = 0;
+    let mut num_h = 0;
+
+    for i in 0..num_atoms {
+        at[i].component = i as u16;
+        let mut k = if at[i].elname[1] != 0 {
+            K_MAX
+        } else {
+            HDT.iter()
+                .position(|&c| c == at[i].elname[0])
+                .map_or(K_MAX, |p| p as i32)
+        };
+        if k == ATW_H || k == ATW_H + 1 {
+            at[i].elname[0] = b'H';
+            k += 1;
+            at[i].iso_atw_diff = k as i8;
+        }
+        num_h += i32::from(
+            k != K_MAX && at[i].valence == 1 && at[i].chem_bonds_valence == 1 && at[i].numh() == 0,
+        );
+    }
+
+    if num_h == 2 && num_atoms == 2 && at[0].numh() == 0 && at[1].numh() == 0 {
+        if at[0].iso_atw_diff >= at[1].iso_atw_diff {
+            new_ord[0] = 0;
+            new_ord[1] = 1;
+        } else {
+            new_ord[0] = 1;
+            new_ord[1] = 0;
+        }
+        let (o0, o1) = (new_ord[0] as usize, new_ord[1] as usize);
+        if at[o1].charge != 0 {
+            at[o0].charge += at[o1].charge;
+            at[o1].charge = 0;
+        }
+        new_at[o0] = at[0].clone();
+        new_at[o1] = at[1].clone();
+        num_hydrogens = 1;
+    } else {
+        for i in 0..num_atoms {
+            let k = if at[i].elname[1] != 0 || at[i].numh() != 0 {
+                K_MAX
+            } else if at[i].elname[0] == b'H' {
+                i32::from(at[i].iso_atw_diff)
+            } else {
+                K_MAX
+            };
+            let n = at[i].neighbor[0] as usize;
+            if k < K_MAX
+                && at[i].valence == 1
+                && at[i].chem_bonds_valence == 1
+                && (n > i || i32::from(new_ord[n]) < na - num_hydrogens)
+            {
+                num_hydrogens += 1;
+                if at[i].charge != 0 {
+                    at[n].charge += at[i].charge;
+                    at[i].charge = 0;
+                    if b_fix_term_h_chrg && i > n {
+                        let t = new_ord[n] as usize;
+                        new_at[t].charge = at[n].charge;
+                    }
+                }
+                new_ord[i] = (na - num_hydrogens) as u16;
+            } else {
+                new_ord[i] = (i as i32 - num_hydrogens) as u16;
+            }
+            new_at[new_ord[i] as usize] = at[i].clone();
+        }
+    }
+
+    if num_hydrogens == 0 {
+        return na;
+    }
+    let num_others = (na - num_hydrogens) as usize;
+    if num_hydrogens > 1 {
+        new_at[num_others..].sort_by(|a, b| cmp_iso_atw_diff_component_no(a, b).cmp(&0));
+    }
+    for i in num_others..num_atoms {
+        new_ord[new_at[i].component as usize] = i as u16;
+    }
+
+    for i in 0..num_others {
+        let mut new_hydrogen_at_order = [0u16; NUM_H_ISOTOPES + 1];
+        let mut new_other_neigh_order = [0u16; MAXVAL];
+        let mut num_other_neigh = 0usize;
+        let mut num_hydrogen_at = 0usize;
+        let mut num_h_flag = 0;
+        let mut val = 0usize;
+
+        for k in 0..new_at[i].valence as usize {
+            let n = new_ord[new_at[i].neighbor[k] as usize] as usize;
+            if num_others <= n {
+                let iso = i32::from(new_at[n].iso_atw_diff);
+                if 0 < iso && iso < ATW_H + NUM_H_ISOTOPES as i32 {
+                    new_at[i].num_iso_h[iso as usize - 1] += 1;
+                    num_hydrogen_at += usize::from(new_hydrogen_at_order[iso as usize] == 0);
+                    new_hydrogen_at_order[iso as usize] = (k + 1) as u16;
+                } else {
+                    new_at[i].num_h += 1;
+                    num_hydrogen_at += usize::from(num_h_flag == 0);
+                    num_h_flag += 1;
+                    new_hydrogen_at_order[0] = (k + 1) as u16;
+                }
+                new_at[i].chem_bonds_valence = (new_at[i].chem_bonds_valence - 1).max(0);
+                new_at[n].neighbor[0] = i as u16;
+                if new_at[i].sb_parity[0] != 0 {
+                    let mut m = 0;
+                    while m < MAX_NUM_STEREO_BONDS && new_at[i].sb_parity[m] != 0 {
+                        if k as i32 == i32::from(new_at[i].sn_ord[m]) {
+                            new_at[i].sn_ord[m] = -(new_at[n].iso_atw_diff + 1);
+                        }
+                        m += 1;
+                    }
+                }
+            } else {
+                if new_at[i].sb_parity[0] != 0 {
+                    if num_other_neigh < MAX_NUM_STEREO_BONDS {
+                        new_other_neigh_order[num_other_neigh] = (k + 1) as u16;
+                    }
+                    num_other_neigh += 1;
+                    if val != k {
+                        let mut m = 0;
+                        while m < MAX_NUM_STEREO_BONDS && new_at[i].sb_parity[m] != 0 {
+                            if k as i32 == i32::from(new_at[i].sb_ord[m]) {
+                                new_at[i].sb_ord[m] = val as i8;
+                            } else if k as i32 == i32::from(new_at[i].sn_ord[m]) {
+                                new_at[i].sn_ord[m] = val as i8;
+                            }
+                            m += 1;
+                        }
+                    }
+                }
+                new_at[i].neighbor[val] = new_ord[new_at[i].neighbor[k] as usize];
+                new_at[i].bond_type[val] = new_at[i].bond_type[k];
+                new_at[i].bond_stereo[val] = new_at[i].bond_stereo[k];
+                val += 1;
+            }
+        }
+        if new_at[i].valence as usize > val
+            && new_at[i].sb_parity[0] != 0
+            && num_hydrogen_at == new_at[i].valence as usize - val
+            && num_hydrogen_at + num_other_neigh <= MAXVAL
+        {
+            new_other_neigh_order.copy_within(0..num_other_neigh, num_hydrogen_at);
+            let mut j = 1usize;
+            for k in 0..=NUM_H_ISOTOPES {
+                if new_hydrogen_at_order[k] != 0 {
+                    new_other_neigh_order[num_hydrogen_at - j] = new_hydrogen_at_order[k];
+                    let mut m = 0;
+                    while m < MAX_NUM_STEREO_BONDS && new_at[i].sb_parity[m] != 0 {
+                        if i32::from(new_at[i].sn_ord[m]) == -(k as i32 + 1) {
+                            new_at[i].sn_ord[m] = -(j as i8);
+                        }
+                        m += 1;
+                    }
+                    j += 1;
+                }
+            }
+            insertions_sort_at_rank(
+                &mut new_other_neigh_order[..num_hydrogen_at + num_other_neigh],
+            );
+        }
+        new_at[i].valence = val as i8;
+    }
+    at.clone_from_slice(&new_at);
+    num_others as i32
+}
