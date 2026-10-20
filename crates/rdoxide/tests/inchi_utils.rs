@@ -820,3 +820,76 @@ fn std_format_enforcement_matches_the_c_code() {
         assert_eq!(got, want, "input {i:?}");
     }
 }
+
+#[test]
+fn atom_input_conversion_matches_the_c_code() {
+    use rdoxide::external::inchi::inchi_dll::*;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_setatoms.json")).unwrap();
+    let cases = data.as_array().unwrap();
+    assert!(cases.len() >= 1200);
+    for c in cases {
+        let inp = &c["in"];
+        let atoms = inp["atoms"].as_array().unwrap();
+        let mut ati = Vec::new();
+        for a in atoms {
+            let mut x = InchiAtom::default();
+            for (d, s) in x
+                .elname
+                .iter_mut()
+                .zip(a["el"].as_str().unwrap().bytes().take(5))
+            {
+                *d = s;
+            }
+            let xyz = a["xyz"].as_array().unwrap();
+            x.x = xyz[0].as_f64().unwrap();
+            x.y = xyz[1].as_f64().unwrap();
+            x.z = xyz[2].as_f64().unwrap();
+            x.isotopic_mass = a["iso"].as_u64().unwrap() as i16;
+            x.radical = a["rad"].as_i64().unwrap() as i8;
+            x.charge = a["chg"].as_i64().unwrap() as i8;
+            for (k, v) in a["nh"].as_array().unwrap().iter().enumerate() {
+                x.num_iso_h[k] = v.as_i64().unwrap() as i8;
+            }
+            let nb = a["nb"].as_array().unwrap();
+            x.num_bonds = nb.len() as i16;
+            for (j, e) in nb.iter().enumerate() {
+                x.neighbor[j] = e[0].as_i64().unwrap() as i16;
+                x.bond_type[j] = e[1].as_i64().unwrap() as i8;
+                x.bond_stereo[j] = e[2].as_i64().unwrap() as i8;
+            }
+            ati.push(x);
+        }
+        let mut msg = String::new();
+        let mut err = 0;
+        let (at, n_dim, n_bonds, coords) =
+            extract_atoms_and_bonds(&ati, inp["dna"].as_i64().unwrap() != 0, &mut msg, &mut err);
+        let head = format!("{err} {n_dim} {n_bonds} {}", hex(msg.as_bytes()));
+        assert_eq!(head, c["head"].as_str().unwrap(), "case {inp}");
+        for (i, line) in c["atoms"].as_array().unwrap().iter().enumerate() {
+            let a = &at[i];
+            let mut s = format!("A {}", hex(upto_nul(&a.elname)));
+            s += &format!(
+                " {} {} {} {} {} {} {} {} {} {} {} {} 0 0",
+                a.el_number,
+                a.charge,
+                a.radical,
+                a.valence,
+                a.chem_bonds_valence,
+                a.num_h,
+                a.num_iso_h[0],
+                a.num_iso_h[1],
+                a.num_iso_h[2],
+                a.iso_atw_diff,
+                a.at_type,
+                a.orig_at_number
+            );
+            s += &format!(" {:.6} {:.6} {:.6}", a.x, a.y, a.z);
+            for k in 0..a.valence as usize {
+                s += &format!(" {}:{}:{}", a.neighbor[k], a.bond_type[k], a.bond_stereo[k]);
+            }
+            s += &format!(" |{}", hex(upto_nul(&coords[i])));
+            assert_eq!(s, line.as_str().unwrap(), "atom {i} of {inp}");
+        }
+    }
+}
