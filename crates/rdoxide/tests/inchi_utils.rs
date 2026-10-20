@@ -85,3 +85,96 @@ fn error_messages_match_the_c_code() {
         }
     }
 }
+
+#[test]
+fn element_helpers_match_the_c_code() {
+    use rdoxide::external::inchi::incomdef::NUM_H_ISOTOPES;
+    use rdoxide::external::inchi::util::*;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_util.json")).unwrap();
+    let cases = data["cases"].as_array().unwrap();
+    assert!(cases.len() > 7000);
+    let ints = |s: &str| -> Vec<i32> { s.split(' ').map(|v| v.parse().unwrap()).collect() };
+    for case in cases {
+        let (input, expected) = (case["in"].as_str().unwrap(), case["out"].as_str().unwrap());
+        let (op, rest) = input.split_once(' ').unwrap();
+        let got = match op {
+            "S" => {
+                let n: i32 = rest.parse().unwrap();
+                let (r, s) = get_element_chemical_symbol(n);
+                let (r2, t) = get_element_or_pseudoelement_symbol(n);
+                format!("{r} {s} {r2} {t}")
+            }
+            "P" => format!(
+                "{} {} {} 0",
+                el_number_in_internal_ref_table(rest),
+                get_periodic_table_number(rest),
+                get_atomic_mass(rest)
+            ),
+            "E" => {
+                let n: i32 = rest.parse().unwrap();
+                format!(
+                    "{} {} {} {}",
+                    get_atomic_mass_from_elnum(n),
+                    i32::from(if_skip_add_h(n)),
+                    get_el_type(n),
+                    i32::from(is_el_a_metal(n))
+                )
+            }
+            "V" => {
+                let a = ints(rest);
+                get_el_valence(a[0], a[1], a[2] as usize).to_string()
+            }
+            "U" => {
+                let a = ints(rest);
+                format!(
+                    "{} {} {}",
+                    get_unusual_el_valence(a[0], a[1], a[2], a[3], a[5], a[6]),
+                    needed_unusual_el_valence(a[0], a[1], a[2], a[3], a[4], a[5], a[6]),
+                    detect_unusual_el_valence(a[0], a[1], a[2], a[3], a[5], a[6])
+                )
+            }
+            "C" => {
+                let mut s = rest.as_bytes().to_vec();
+                let (rad, ch) = extract_charges_and_radicals(&mut s);
+                format!(
+                    "{} {rad} {ch} [{}]",
+                    i32::from(rad != 0 || ch != 0),
+                    String::from_utf8(s).unwrap()
+                )
+            }
+            "H" => {
+                let mut s = rest.as_bytes().to_vec();
+                let mut iso = [0i8; NUM_H_ISOTOPES];
+                let h = extract_h_atoms(&mut s, &mut iso);
+                format!(
+                    "{h} {} {} {} [{}]",
+                    iso[0],
+                    iso[1],
+                    iso[2],
+                    String::from_utf8(s).unwrap()
+                )
+            }
+            "N" => {
+                let (el, nums) = rest.split_once(' ').unwrap();
+                let a = ints(nums);
+                let iso = [a[1] as i8, a[2] as i8, a[3] as i8];
+                get_num_h(
+                    el,
+                    a[0],
+                    Some(&iso),
+                    a[4],
+                    a[5],
+                    a[6],
+                    a[7],
+                    a[8] != 0,
+                    a[9] != 0,
+                    a[10] != 0,
+                )
+                .to_string()
+            }
+            _ => panic!("{input}"),
+        };
+        assert_eq!(got, expected, "{input}");
+    }
+}

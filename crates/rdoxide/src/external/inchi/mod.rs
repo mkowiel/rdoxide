@@ -15,15 +15,19 @@
 //! the C sources (`INCHI_BASE/src/*.c`, `INCHI_API/libinchi/src/*.c`) it is
 //! translated from. Ported so far: the InChIKey (`ikey_dll.c`,
 //! `ikey_base26.c`) the sorting primitives (`ichisort.c`) and the error codes
-//! and messages (`ichierr.c`). The structure -> InChI and InChI -> structure pipelines
+//! and messages (`ichierr.c`) and the element helpers (`util.c`). The structure -> InChI and InChI -> structure pipelines
 //! follow in later stages; the RDKit-facing API is
 //! [`crate::external::inchi_api`].
 
+pub mod el_data;
 pub mod ichierr;
 pub mod ichisort;
 pub mod ikey_base26;
 pub mod ikey_dll;
+pub mod incomdef;
 pub mod sha256;
+
+pub mod util;
 
 pub use ikey_dll::{
     InchiKey, InchiKeyCheck, InchiKeyError, check_inchikey, get_inchikey_from_inchi,
