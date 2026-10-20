@@ -1082,3 +1082,34 @@ pub fn read_command_line_parms(
     ip.b_inchi_output_options2 = o.b_inchi_output_options2;
     0
 }
+
+/// The "Ensure standardness" block of `GetINCHIEx` (`inchi_dll.c`): when the
+/// caller asks for a standard InChI, every option that would make the result
+/// non-standard is switched off.
+pub fn enforce_std_format(ip: &mut InputParms) {
+    ip.b_inchi_output_options &= !INCHI_OUT_SAVEOPT;
+    ip.b_taut_flags &= !TG_FLAG_RECONNECT_COORD;
+    ip.n_mode &= !REQ_MODE_BASIC;
+    if ip.n_mode & REQ_MODE_RELATIVE_STEREO != 0 {
+        ip.n_mode &=
+            !(REQ_MODE_RACEMIC_STEREO | REQ_MODE_RELATIVE_STEREO | REQ_MODE_CHIR_FLG_STEREO);
+    }
+    if ip.n_mode & REQ_MODE_RACEMIC_STEREO != 0 {
+        ip.n_mode &=
+            !(REQ_MODE_RACEMIC_STEREO | REQ_MODE_RELATIVE_STEREO | REQ_MODE_CHIR_FLG_STEREO);
+    }
+    if ip.n_mode & REQ_MODE_CHIR_FLG_STEREO != 0 {
+        ip.n_mode &=
+            !(REQ_MODE_RACEMIC_STEREO | REQ_MODE_RELATIVE_STEREO | REQ_MODE_CHIR_FLG_STEREO);
+    }
+    ip.n_mode &= !REQ_MODE_DIFF_UU_STEREO;
+    if ip.n_mode & (REQ_MODE_SB_IGN_ALL_UU | REQ_MODE_SC_IGN_ALL_UU) == 0 {
+        ip.n_mode |= REQ_MODE_SB_IGN_ALL_UU;
+        ip.n_mode |= REQ_MODE_SC_IGN_ALL_UU;
+    }
+    ip.b_taut_flags &= !TG_FLAG_KETO_ENOL_TAUT;
+    ip.b_taut_flags &= !TG_FLAG_1_5_TAUT;
+    // And anyway...
+    ip.b_inchi_output_options |= INCHI_OUT_STDINCHI;
+    ip.b_inchi_output_options &= !INCHI_OUT_SAVEOPT;
+}
