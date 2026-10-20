@@ -1,6 +1,6 @@
-import pytest
 """rdFingerprintGenerator Morgan generator (expectations from RDKit 2026.09.1)."""
 
+import pytest
 from rdoxide import Chem
 from rdoxide.Chem import rdFingerprintGenerator as G
 
