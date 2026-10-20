@@ -5,6 +5,7 @@
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
+use rdoxide::graphmol::descriptors::atom_feat::{ATOM_FEAT_VERSION, atom_feat_vect};
 use rdoxide::graphmol::descriptors::crippen::{
     CRIPPEN_VERSION, calc_crippen_descriptors, get_crippen_atom_contribs,
 };
@@ -734,6 +735,17 @@ fn calc_num_spiro_atoms_py(
     Ok(found.len() as u32)
 }
 
+/// Returns the Atom Features vector
+#[pyfunction]
+#[pyo3(name = "GetAtomFeatures", signature = (mol, atomid, addchiral = false))]
+fn get_atom_features(
+    mol: &Bound<'_, PyMol>,
+    atomid: u32,
+    #[pyo3(from_py_with = crate::pyconv::truthy)] addchiral: bool,
+) -> PyResult<Vec<f64>> {
+    atom_feat_vect(&mut mol.borrow_mut().mol, atomid, addchiral).py()
+}
+
 /// `CalcNumBridgeheadAtoms(mol, atoms=None)`: appends the bridgehead atoms to `atoms` when given.
 #[pyfunction]
 #[pyo3(name = "CalcNumBridgeheadAtoms", signature = (mol, atoms = None))]
@@ -922,6 +934,8 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(calc_num_saturated_carbocycles, m)?)?;
     m.add_function(wrap_pyfunction!(calc_num_spiro_atoms_py, m)?)?;
     m.add_function(wrap_pyfunction!(calc_num_bridgehead_atoms_py, m)?)?;
+    m.add("_GetAtomFeatures_version", ATOM_FEAT_VERSION)?;
+    m.add_function(wrap_pyfunction!(get_atom_features, m)?)?;
     m.add_function(wrap_pyfunction!(calc_num_atom_stereo_centers, m)?)?;
     m.add_function(wrap_pyfunction!(
         calc_num_unspecified_atom_stereo_centers,
