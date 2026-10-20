@@ -32,6 +32,7 @@ pub mod inchi_dll;
 pub mod incomdef;
 pub mod inpdef;
 pub mod readinch;
+pub mod runichi3;
 pub mod sha256;
 pub mod strutil;
 
