@@ -11,8 +11,10 @@
 
 use super::el_data::EL_DATA;
 use super::incomdef::{
-    IS_METAL, NUM_H_ISOTOPES, RADICAL_DOUBLET, RADICAL_SINGLET, RADICAL_TRIPLET,
+    BOND_TYPE_ALTERN, BOND_TYPE_TRIPLE, IS_METAL, NUM_H_ISOTOPES, RADICAL_DOUBLET, RADICAL_SINGLET,
+    RADICAL_TRIPLET,
 };
+use super::inpdef::{BOND_TYPE_MASK, InpAtom};
 
 pub const EL_NUMBER_H: u8 = 1;
 pub const EL_NUMBER_B: u8 = 5;
@@ -566,4 +568,225 @@ pub fn get_atomic_mass(elname: &str) -> i32 {
     } else {
         0
     }
+}
+
+// ---- functions on `inp_ATOM` ----
+
+/// `S_VI_O_PLUS_METAL_FIX_BOND == 1`
+const S_VI_O_PLUS_METAL_FIX_BOND: bool = true;
+
+/// `get_endpoint_valence`
+pub fn get_endpoint_valence(el_number: u8) -> i32 {
+    match el_number {
+        EL_NUMBER_O | EL_NUMBER_S | EL_NUMBER_SE | EL_NUMBER_TE => 2,
+        EL_NUMBER_N => 3,
+        _ => 0,
+    }
+}
+
+/// `is_in_the_ilist`: the position of `next_atom` in the list
+pub fn is_in_the_ilist(path_atom: &[i32], next_atom: i32) -> Option<usize> {
+    path_atom.iter().position(|&a| a == next_atom)
+}
+
+/// `is_ilist_inside`: whether every element of `ilist` is in `ilist2`
+pub fn is_ilist_inside(ilist: &[i32], ilist2: &[i32]) -> bool {
+    ilist.iter().all(|&a| is_in_the_ilist(ilist2, a).is_some())
+}
+
+/// `nBondsValToMetal`: the sum of the orders of the bonds to metals, or -1
+/// if such a bond has no well-defined order.
+pub fn n_bonds_val_to_metal(at: &[InpAtom], iat: usize) -> i32 {
+    let a = &at[iat];
+    let mut val_to_metal = 0;
+    for i in 0..a.valence as usize {
+        if is_el_a_metal(i32::from(at[a.neighbor[i] as usize].el_number)) {
+            let bond_type = i32::from(a.bond_type[i]);
+            if bond_type <= BOND_TYPE_TRIPLE {
+                val_to_metal += bond_type;
+            } else {
+                return -1;
+            }
+        }
+    }
+    val_to_metal
+}
+
+/// `num_of_H`: explicit terminal H plus implicit H
+pub fn num_of_h(at: &[InpAtom], iat: usize) -> i32 {
+    let a = &at[iat];
+    let explicit = (0..a.valence as usize)
+        .filter(|&i| {
+            let n = &at[a.neighbor[i] as usize];
+            n.valence == 1 && n.el_number == EL_NUMBER_H
+        })
+        .count() as i32;
+    explicit + a.numh()
+}
+
+/// `ion_el_group` (`FIX_REM_ION_PAIRS_Si_BUG == 0`)
+pub fn ion_el_group(el: u8) -> u8 {
+    match el {
+        EL_NUMBER_C => EL_NUMBER_C,
+        EL_NUMBER_N | EL_NUMBER_P | EL_NUMBER_AS | EL_NUMBER_SB => EL_NUMBER_N,
+        EL_NUMBER_O | EL_NUMBER_S | EL_NUMBER_SE | EL_NUMBER_TE => EL_NUMBER_O,
+        _ => 0,
+    }
+}
+
+/// `has_other_ion_neigh`
+pub fn has_other_ion_neigh(at: &[InpAtom], iat: usize, iat_ion_neigh: usize) -> bool {
+    let charge = at[iat_ion_neigh].charge;
+    (0..at[iat].valence as usize).any(|i| {
+        let neigh = at[iat].neighbor[i] as usize;
+        neigh != iat_ion_neigh
+            && at[neigh].charge == charge
+            && ion_el_group(at[neigh].el_number) != 0
+    })
+}
+
+/// `has_other_ion_in_sphere_2`: BFS to radius 2; `c_flags` is used as the
+/// visited mark and restored.
+pub fn has_other_ion_in_sphere_2(at: &mut [InpAtom], iat: usize, iat_ion_neigh: usize) -> i32 {
+    let mut q: Vec<usize> = vec![iat];
+    at[iat].c_flags = 1;
+    let mut iq = 0;
+    let mut dist = 1;
+    let mut ret = 0;
+    while dist <= 2 {
+        let lenq2 = q.len();
+        while iq < lenq2 {
+            let i = q[iq];
+            for j in 0..at[i].valence as usize {
+                let neigh = at[i].neighbor[j] as usize;
+                if at[neigh].c_flags == 0
+                    && at[neigh].valence <= 3
+                    && ion_el_group(at[neigh].el_number) != 0
+                {
+                    q.push(neigh);
+                    at[neigh].c_flags = 1;
+                    if neigh != iat_ion_neigh && at[iat_ion_neigh].charge == at[neigh].charge {
+                        ret += 1;
+                    }
+                }
+            }
+            iq += 1;
+        }
+        dist += 1;
+    }
+    for &i in &q {
+        at[i].c_flags = 0;
+    }
+    ret
+}
+
+/// The bonds to metals of an atom whose valence exceeds the standard one (or
+/// the `O(+)` case): `(count, sum of orders)`, `None` for the C code's
+/// "fall back" return.
+fn metal_bonds(at: &[InpAtom], a: &InpAtom) -> Option<(i32, i32)> {
+    let mut count = 0;
+    let mut sum = 0;
+    for i in 0..a.valence as usize {
+        if is_el_a_metal(i32::from(at[a.neighbor[i] as usize].el_number)) {
+            if i32::from(a.bond_type[i]) & BOND_TYPE_MASK >= BOND_TYPE_ALTERN {
+                return None;
+            }
+            count += 1;
+            sum += i32::from(a.bond_type[i]) & BOND_TYPE_MASK;
+        }
+    }
+    Some((count, sum))
+}
+
+/// `nNoMetalNumBonds`: the number of bonds not counting those to metals when
+/// that gives the standard valence
+pub fn n_no_metal_num_bonds(at: &[InpAtom], at_no: usize) -> i32 {
+    let a = &at[at_no];
+    let num_h = a.numh();
+    let std = get_el_valence(i32::from(a.el_number), i32::from(a.charge), 0);
+    let cbv = i32::from(a.chem_bonds_valence);
+    let valence = i32::from(a.valence);
+    if cbv + num_h > std {
+        let Some((n, v)) = metal_bonds(at, a) else {
+            return valence;
+        };
+        if cbv + num_h - v == std {
+            return valence - n;
+        }
+    } else if S_VI_O_PLUS_METAL_FIX_BOND
+        && a.charge == 1
+        && get_endpoint_valence(a.el_number) == 2
+        && cbv + num_h == std
+    {
+        let Some((n, v)) = metal_bonds(at, a) else {
+            return valence;
+        };
+        if v == 1 {
+            return valence - n;
+        }
+    }
+    valence
+}
+
+/// `nNoMetalBondsValence`
+pub fn n_no_metal_bonds_valence(at: &[InpAtom], at_no: usize) -> i32 {
+    let a = &at[at_no];
+    let num_h = a.numh();
+    let std = get_el_valence(i32::from(a.el_number), i32::from(a.charge), 0);
+    let cbv = i32::from(a.chem_bonds_valence);
+    if cbv + num_h > std {
+        let Some((_, v)) = metal_bonds(at, a) else {
+            return i32::from(a.valence);
+        };
+        if cbv + num_h - v == std {
+            return cbv - v;
+        }
+    } else if S_VI_O_PLUS_METAL_FIX_BOND
+        && a.charge == 1
+        && get_endpoint_valence(a.el_number) == 2
+        && cbv + num_h == std
+    {
+        let Some((_, v)) = metal_bonds(at, a) else {
+            return i32::from(a.valence);
+        };
+        if v == 1 {
+            return cbv - v;
+        }
+    }
+    cbv
+}
+
+/// `nNoMetalNeighIndex`: the index of the first non-metal neighbor, or -1
+pub fn n_no_metal_neigh_index(at: &[InpAtom], at_no: usize) -> i32 {
+    let a = &at[at_no];
+    (0..a.valence as usize)
+        .find(|&i| !is_el_a_metal(i32::from(at[a.neighbor[i] as usize].el_number)))
+        .map_or(-1, |i| i as i32)
+}
+
+/// `nNoMetalOtherNeighIndex`
+pub fn n_no_metal_other_neigh_index(at: &[InpAtom], at_no: usize, cur_neigh: i32) -> i32 {
+    let a = &at[at_no];
+    (0..a.valence as usize)
+        .find(|&i| {
+            let n = i32::from(a.neighbor[i]);
+            n != cur_neigh && !is_el_a_metal(i32::from(at[n as usize].el_number))
+        })
+        .map_or(-1, |i| i as i32)
+}
+
+/// `nNoMetalOtherNeighIndex2`
+pub fn n_no_metal_other_neigh_index2(
+    at: &[InpAtom],
+    at_no: usize,
+    cur_neigh: i32,
+    cur_neigh2: i32,
+) -> i32 {
+    let a = &at[at_no];
+    (0..a.valence as usize)
+        .find(|&i| {
+            let n = i32::from(a.neighbor[i]);
+            n != cur_neigh && n != cur_neigh2 && !is_el_a_metal(i32::from(at[n as usize].el_number))
+        })
+        .map_or(-1, |i| i as i32)
 }
