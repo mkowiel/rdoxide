@@ -1063,6 +1063,64 @@ fn reactions_tuple<'py>(
     )
 }
 
+/// Compute 2D coordinates for a reaction. The templates are laid out side by side.
+///
+///   ARGUMENTS:
+///     - reaction - the reaction of interest
+///     - spacing - the amount of space left between components of the reaction
+///     - canonOrient - orient the reactants and products in a canonical way
+///     - updateProps - if set, properties such as conjugation and
+///       hybridization will be calculated for the reactant and product
+///       templates before generating coordinates. This should result in
+///       better depictions, but can lead to errors in some cases.
+///     - nFlipsPerSample - number of rotatable bonds that are flipped at
+///       random at a time
+///     - nSample - number of samples
+///     - sampleSeed - seed for the random sampling process
+///     - permuteDeg4Nodes - try permuting the drawing order of bonds around
+///       atoms with four neighbors in order to improve the depiction
+///     - bondLength - change the default bond length for depiction
+#[pyfunction]
+#[pyo3(name = "Compute2DCoordsForReaction", signature = (reaction, spacing = 1.0, updateProps = true, canonOrient = true, nFlipsPerSample = 0, nSample = 0, sampleSeed = 0, permuteDeg4Nodes = false, bondLength = -1.0))]
+#[allow(clippy::too_many_arguments, non_snake_case)]
+fn py_compute_2d_coords_for_reaction(
+    py: Python<'_>,
+    reaction: &Bound<'_, PyChemicalReaction>,
+    spacing: f64,
+    updateProps: bool,
+    canonOrient: bool,
+    nFlipsPerSample: u32,
+    nSample: u32,
+    sampleSeed: i32,
+    permuteDeg4Nodes: bool,
+    bondLength: f64,
+) -> PyResult<()> {
+    use rdoxide::graphmol::chem_reactions::depict::{
+        ReactionDepictParams, compute_2d_coords_for_reaction,
+    };
+    use rdoxide::graphmol::depictor::depict_utils::{bond_len, set_bond_len};
+    let mut guard = synced(reaction);
+    let params = ReactionDepictParams {
+        spacing,
+        update_props: updateProps,
+        canon_orient: canonOrient,
+        n_flips_per_sample: nFlipsPerSample,
+        n_samples: nSample,
+        sample_seed: sampleSeed,
+        permute_deg4_nodes: permuteDeg4Nodes,
+    };
+    let old = bond_len();
+    if bondLength > 0.0 {
+        set_bond_len(bondLength);
+    }
+    let res = compute_2d_coords_for_reaction(&mut guard.rxn, &params);
+    if bondLength > 0.0 {
+        set_bond_len(old);
+    }
+    guard.push(py);
+    res.py()
+}
+
 /// construct a string in MDL rxn format for a ChemicalReaction
 #[pyfunction]
 #[pyo3(name = "ReactionToRxnBlock", signature = (reaction, separateAgents = false, forceV3000 = false))]
@@ -1457,6 +1515,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
         "Module containing classes and functions for working with chemical reactions.",
     )?;
     m.add_class::<PyChemicalReaction>()?;
+    m.add_function(wrap_pyfunction!(py_compute_2d_coords_for_reaction, m)?)?;
     m.add_function(wrap_pyfunction!(py_reactions_from_cdxml_file, m)?)?;
     m.add_function(wrap_pyfunction!(py_reactions_from_cdxml_block, m)?)?;
     crate::rdchemreactions_enumerate::init(m)?;
