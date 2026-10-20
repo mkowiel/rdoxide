@@ -893,3 +893,91 @@ fn atom_input_conversion_matches_the_c_code() {
         }
     }
 }
+
+#[test]
+fn zero_d_parities_match_the_c_code() {
+    use rdoxide::external::inchi::inpdef::InpAtom;
+    use rdoxide::external::inchi::readinch::*;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_0d.json")).unwrap();
+    let cases = data.as_array().unwrap();
+    assert!(cases.len() >= 1500);
+    for c in cases {
+        let inp = &c["in"];
+        let mut at: Vec<InpAtom> = Vec::new();
+        for a in inp["atoms"].as_array().unwrap() {
+            let mut x = InpAtom {
+                valence: a["v"].as_i64().unwrap() as i8,
+                chem_bonds_valence: a["cbv"].as_i64().unwrap() as i8,
+                el_number: a["el"].as_u64().unwrap() as u8,
+                orig_at_number: a["orig"].as_u64().unwrap() as u16,
+                ..Default::default()
+            };
+            for (j, e) in a["nb"].as_array().unwrap().iter().enumerate() {
+                x.neighbor[j] = e[0].as_u64().unwrap() as u16;
+                x.bond_type[j] = e[1].as_u64().unwrap() as u8;
+            }
+            at.push(x);
+        }
+        let st: Vec<InchiStereo0D> = inp["desc"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|d| {
+                let v: Vec<i64> = d
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|x| x.as_i64().unwrap())
+                    .collect();
+                InchiStereo0D {
+                    neighbor: [v[0] as i16, v[1] as i16, v[2] as i16, v[3] as i16],
+                    central_atom: v[4] as i16,
+                    type_: v[5] as i8,
+                    parity: v[6] as i8,
+                }
+            })
+            .collect();
+        let mut msg = String::new();
+        let mut err = 0;
+        extract_0d_parities(
+            &mut at,
+            &st,
+            &mut msg,
+            &mut err,
+            inp["unk"].as_i64().unwrap() as i32,
+        );
+        assert_eq!(
+            format!("{err} {}", hex(msg.as_bytes())),
+            c["head"].as_str().unwrap(),
+            "case {inp}"
+        );
+        for (i, line) in c["atoms"].as_array().unwrap().iter().enumerate() {
+            let a = &at[i];
+            let mut s = format!(
+                "A {} {} {} | {} {} {} | {} {} {} | {} {} {} | {} | {} {} {} {} |",
+                a.sb_parity[0],
+                a.sb_parity[1],
+                a.sb_parity[2],
+                a.sb_ord[0],
+                a.sb_ord[1],
+                a.sb_ord[2],
+                a.sn_ord[0],
+                a.sn_ord[1],
+                a.sn_ord[2],
+                a.sn_orig_at_num[0],
+                a.sn_orig_at_num[1],
+                a.sn_orig_at_num[2],
+                a.p_parity,
+                a.p_orig_at_num[0],
+                a.p_orig_at_num[1],
+                a.p_orig_at_num[2],
+                a.p_orig_at_num[3]
+            );
+            for k in 0..a.valence as usize {
+                s += &format!(" {}", a.bond_stereo[k]);
+            }
+            assert_eq!(s, line.as_str().unwrap(), "atom {i} of {inp}");
+        }
+    }
+}

@@ -25,11 +25,13 @@ pub mod ichierr;
 pub mod ichiparm;
 pub mod ichiring;
 pub mod ichisort;
+pub mod ichister;
 pub mod ikey_base26;
 pub mod ikey_dll;
 pub mod inchi_dll;
 pub mod incomdef;
 pub mod inpdef;
+pub mod readinch;
 pub mod sha256;
 
 pub mod util;
