@@ -1,5 +1,6 @@
 //! Molecular descriptors (upstream `GraphMol/Descriptors`).
 
+pub mod atom_feat;
 pub mod autocorr2d;
 pub mod autocorr3d;
 pub mod bcut;
