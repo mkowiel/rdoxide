@@ -945,9 +945,18 @@ fn map_stereo_in_cs(
         v_ab_parity_unknown,
     );
     let k = m.rm.linear_ct_stereo_carb.len();
-    carb_buf[..k].copy_from_slice(&m.rm.linear_ct_stereo_carb);
+    let kk = k.min(carb_buf.len());
+    carb_buf[..kk].copy_from_slice(&m.rm.linear_ct_stereo_carb[..kk]);
+    if k != nc {
+        // stereocenters removed as non-stereo: `nLenLinearCTStereoCarb--`
+        cs.n_len_linear_ct_stereo_carb = k as i32;
+    }
     let k = m.rm.linear_ct_stereo_dble.len();
-    dble_buf[..k].copy_from_slice(&m.rm.linear_ct_stereo_dble);
+    let kk = k.min(dble_buf.len());
+    dble_buf[..kk].copy_from_slice(&m.rm.linear_ct_stereo_dble[..kk]);
+    if k != nd {
+        cs.n_len_linear_ct_stereo_dble = k as i32;
+    }
     *cs.carb_buf(sc) = carb_buf;
     *cs.dble_buf(sd) = dble_buf;
     cs.n_symm_rank = m.rm.n_symm_rank;
