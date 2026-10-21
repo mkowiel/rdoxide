@@ -266,6 +266,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 150 | done |
 | 151 | done |
 | 152 | done |
+| 153 | done |
 
 ## Python package files
 
@@ -588,3 +589,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-19 — Stage 150: I4e: BalancedNetworkSearch (blossom search), radical endpoints
 * 2026-10-19 — Stage 151: I4f: bAddNewVertex, AddNewEdge, group vertex lookups, st-cap
 * 2026-10-19 — Stage 152: I4g: bSetBnsToCheckAltPath, restore, flow checks
+* 2026-10-19 — Stage 153: I4h: SetBondsFromBnStructFlow, SetAtomBondType, RestoreBnStructFlow
