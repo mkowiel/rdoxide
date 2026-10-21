@@ -307,6 +307,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 191 | InChI port I6h: ichimap1 stereo mapping helpers (All_SC_Same, Next_SB_At_CanonRanks2, CompareLinCtStereo*, nGetMcr, CUR_TREE) with differential test against the C code |
 | 192 | InChI port I6i: ichimap2 mapping functions (NumberOfTies, map_an_atom2, parity_of_mapped_atom2/half_bond) with differential test against the C code |
 | 193 | InChI port I6j: ichimap2 BreakNeighborsTie, CheckNextSymmNeighborsAndBonds, CreateCheckSymmPaths with differential test against the C code |
+| 194 | InChI port I6k: ichimap2 CalculatedPathsParitiesAreIdentical with differential test against the C code |
 
 ## Python package files
 
@@ -670,3 +671,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-21 — Stage 191: ported ichimap1.c and tested it against the real InChI C on 3000 random cases.
 * 2026-10-21 — Stage 192: ported the mapping part of ichimap2.c and tested it against the real InChI C on 3000 random cases.
 * 2026-10-21 — Stage 193: ported BreakNeighborsTie and the symmetric path checks of ichimap2.c and tested them against the real InChI C on 3000 random cases.
+* 2026-10-21 — Stage 194: ported CalculatedPathsParitiesAreIdentical and tested it against the real InChI C on 6000 random cases.

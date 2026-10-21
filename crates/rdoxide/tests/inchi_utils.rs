@@ -8926,3 +8926,129 @@ fn neighbor_tie_breaking_and_symmetric_paths_match_the_c_code() {
         assert_eq!(got, want, "case {case}");
     }
 }
+
+#[test]
+fn calculated_paths_parity_comparison_matches_the_c_code() {
+    use rdoxide::external::inchi::ichimap::*;
+    use rdoxide::external::inchi::ichister::{AtStereoCarb, AtStereoDble, SpAtom};
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_mapcalc.json")).unwrap();
+    fn ints(v: &serde_json::Value) -> Vec<i64> {
+        v.as_array()
+            .unwrap()
+            .iter()
+            .map(|x| x.as_i64().unwrap())
+            .collect()
+    }
+    fn pa(a: &[u16], n: usize) -> String {
+        let mut s = String::new();
+        for x in &a[..n] {
+            s += &format!(" {x}");
+        }
+        s + " |"
+    }
+    for (case, c) in data.as_array().unwrap().iter().enumerate() {
+        let inp = &c["in"];
+        let atoms = inp["atoms"].as_array().unwrap();
+        let n = atoms.len();
+        let nmax = n + 2;
+        let mut at = vec![SpAtom::default(); n + 1];
+        let (mut crank, mut r1, mut acanon) = (
+            vec![0u16; nmax + 8],
+            vec![0u16; nmax + 8],
+            vec![0u16; nmax + 8],
+        );
+        for (i, a) in atoms.iter().enumerate() {
+            let g = |k: &str| a[k].as_i64().unwrap();
+            let nb = a["nb"].as_array().unwrap();
+            at[i].valence = nb.len() as i8;
+            at[i].parity = g("par") as i8;
+            at[i].stereo_atom_parity = g("sap") as i8;
+            at[i].num_h = g("nh") as i8;
+            at[i].n_ring_system = inp["rs"][i].as_u64().unwrap() as u16;
+            r1[i] = g("rank") as u16;
+            crank[i] = g("crank") as u16;
+            acanon[i] = g("ac") as u16;
+            for (j, q) in nb.iter().enumerate() {
+                at[i].neighbor[j] = q.as_u64().unwrap() as u16;
+            }
+            for (j, s) in a["sb"].as_array().unwrap().iter().enumerate() {
+                let s = ints(s);
+                at[i].stereo_bond_neighbor[j] = s[0] as u16;
+                at[i].stereo_bond_ord[j] = s[1] as i8;
+                at[i].stereo_bond_z_prod[j] = s[2] as i8;
+                at[i].stereo_bond_parity[j] = s[3] as i8;
+            }
+        }
+        let carb: Vec<AtStereoCarb> = inp["carb"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|x| {
+                let x = ints(x);
+                AtStereoCarb {
+                    at_num: x[0] as u16,
+                    parity: x[1] as u8,
+                }
+            })
+            .collect();
+        let dble: Vec<AtStereoDble> = inp["dble"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|x| {
+                let x = ints(x);
+                AtStereoDble {
+                    at_num1: x[0] as u16,
+                    at_num2: x[1] as u16,
+                    parity: x[2] as u8,
+                }
+            })
+            .collect();
+        let mut got: Vec<String> = Vec::new();
+        for call in inp["calls"].as_array().unwrap() {
+            let k = call.as_array().unwrap();
+            let i = |j: usize| k[j].as_i64().unwrap();
+            let mut v1: Vec<u16> = ints(&k[7]).iter().map(|x| *x as u16).collect();
+            let mut v2: Vec<u16> = ints(&k[8]).iter().map(|x| *x as u16).collect();
+            v1.resize(nmax, 0);
+            v2.resize(nmax, 0);
+            let (mut c1, mut c2) = (vec![0u16; nmax], vec![0u16; nmax]);
+            let ret = calculated_paths_parities_are_identical(
+                &at,
+                n,
+                &r1,
+                &crank,
+                &acanon,
+                &mut c1,
+                &mut c2,
+                &mut v1,
+                &mut v2,
+                i(0) as u16,
+                i(1) as u16,
+                i(2) as u16,
+                i(3) as u16,
+                i(4) as i32,
+                i(5) as i32,
+                i(6) as i32,
+                &carb,
+                &dble,
+                3,
+            );
+            got.push(format!(
+                "Q {ret} |{}{}{}{}",
+                pa(&v1, n),
+                pa(&v2, n),
+                pa(&c1, n),
+                pa(&c2, n)
+            ));
+        }
+        let want: Vec<String> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| s.as_str().unwrap().to_string())
+            .collect();
+        assert_eq!(got, want, "case {case}");
+    }
+}
