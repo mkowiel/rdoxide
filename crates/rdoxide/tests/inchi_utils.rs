@@ -12035,3 +12035,365 @@ fn hill_formula_and_stereo_copy_match_the_c_code() {
         assert_eq!(got, want, "case {ci}: {inp}");
     }
 }
+
+#[test]
+#[allow(clippy::too_many_lines)]
+fn create_inchi_matches_the_c_code() {
+    use rdoxide::external::inchi::ichi::{
+        InChI, InChIAux, InChIIsotopicAtom, InChIIsotopicTGroup, InChIStereo, OrigInfo,
+    };
+    use rdoxide::external::inchi::ichimake::{InpAtomData, create_inchi};
+    use rdoxide::external::inchi::ichiparm::{InputParms, REQ_MODE_ISO};
+    use rdoxide::external::inchi::ichitaut::TGroupInfo;
+    use rdoxide::external::inchi::inpdef::InpAtom;
+    fn alloc_stereo(n: usize, nb: usize) -> InChIStereo {
+        InChIStereo {
+            n_number: vec![0; n],
+            t_parity: vec![0; n],
+            n_number_inv: vec![0; n],
+            t_parity_inv: vec![0; n],
+            n_bond_atom1: vec![0; nb],
+            n_bond_atom2: vec![0; nb],
+            b_parity: vec![0; nb],
+            ..Default::default()
+        }
+    }
+    fn pr_stereo(tag: &str, s: &Option<InChIStereo>) -> String {
+        let Some(s) = s else {
+            return format!("{tag} -");
+        };
+        let mut l = format!(
+            "{tag} {} {} {} {} |",
+            s.n_number_of_stereo_centers,
+            s.n_number_of_stereo_bonds,
+            s.n_comp_inv2_abs,
+            s.b_trivial_inv
+        );
+        for i in 0..s.n_number_of_stereo_centers as usize {
+            l += &format!(
+                " {},{},{},{}",
+                s.n_number[i], s.t_parity[i], s.n_number_inv[i], s.t_parity_inv[i]
+            );
+        }
+        l += " |";
+        for i in 0..s.n_number_of_stereo_bonds as usize {
+            l += &format!(
+                " {},{},{}",
+                s.n_bond_atom1[i], s.n_bond_atom2[i], s.b_parity[i]
+            );
+        }
+        l
+    }
+    fn pr_arr(tag: &str, a: &[u16], n: usize) -> String {
+        if a.is_empty() {
+            return format!("{tag} -");
+        }
+        format!(
+            "{tag}{}",
+            a.iter()
+                .take(n)
+                .map(|x| format!(" {x}"))
+                .collect::<String>()
+        )
+    }
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_create.json")).unwrap();
+    for (ci, c) in data.as_array().unwrap().iter().enumerate() {
+        let inp = c["in"].as_str().unwrap();
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        let mut t = InchiTok(inp.split_whitespace());
+        let n = t.i() as usize;
+        let which = t.i();
+        let mode = t.i() as u64;
+        let flags = t.i() as u64;
+        let done = t.i() as u64;
+        let loose = t.i();
+        let mut at = vec![InpAtom::default(); n];
+        for a in at.iter_mut() {
+            let v = t.i() as usize;
+            a.valence = v as i8;
+            a.chem_bonds_valence = t.i() as i8;
+            let el = t.i();
+            a.el_number = el as u8;
+            let name = match el {
+                6 => "C",
+                7 => "N",
+                8 => "O",
+                15 => "P",
+                16 => "S",
+                17 => "Cl",
+                _ => "Xx",
+            };
+            a.elname[..name.len()].copy_from_slice(name.as_bytes());
+            a.radical = t.i() as i8;
+            a.charge = t.i() as i8;
+            a.num_h = t.i() as i8;
+            a.num_iso_h = [t.i() as i8, t.i() as i8, t.i() as i8];
+            a.iso_atw_diff = t.i() as i8;
+            a.x = t.0.next().unwrap().parse().unwrap();
+            a.y = t.0.next().unwrap().parse().unwrap();
+            a.z = t.0.next().unwrap().parse().unwrap();
+            for j in 0..v {
+                a.neighbor[j] = t.i() as u16;
+                a.bond_type[j] = t.i() as u8;
+            }
+        }
+        for (i, a) in at.iter_mut().enumerate() {
+            a.orig_at_number = i as u16 + 1;
+        }
+        let mut nd = [InpAtomData::default(), InpAtomData::default()];
+        if which & 1 != 0 {
+            nd[0].at = vec![InpAtom::default(); n + 8];
+            nd[0].num_at = n as i32;
+        }
+        if which & 2 != 0 {
+            nd[1].at = vec![InpAtom::default(); n + 8];
+            nd[1].num_at = n as i32;
+            if which & 4 != 0 {
+                nd[1].at_fixed_bonds = Some(vec![InpAtom::default(); n + 8]);
+            }
+        }
+        let nb: usize = at.iter().map(|a| a.valence as usize).sum::<usize>() / 2;
+        let niso = at
+            .iter()
+            .filter(|a| a.iso_atw_diff != 0 || a.num_iso_h.iter().any(|&x| x != 0))
+            .count();
+        let b_iso = mode & REQ_MODE_ISO != 0;
+        let mut pi: [Option<InChI>; 2] = [None, None];
+        let mut pa: [Option<InChIAux>; 2] = [None, None];
+        for k in 0..2 {
+            if which & (1 << k) == 0 {
+                continue;
+            }
+            let mut p = InChI {
+                n_atom: vec![0; n],
+                n_conn_table: vec![0; n + nb],
+                n_tautomer: vec![0; 5 * n / 2 + 1],
+                n_num_h: vec![0; n],
+                n_num_h_fixed: Some(vec![0; n]),
+                stereo: Some(alloc_stereo(n, nb)),
+                ..Default::default()
+            };
+            let al = n + n / 2;
+            let mut a = InChIAux {
+                n_orig_at_nos_in_canon_ord: vec![0; al],
+                n_orig_at_nos_in_canon_ord_inv: vec![0; al],
+                n_constit_equ_numbers: vec![0; al],
+                orig_info: vec![OrigInfo::default(); n],
+                ..Default::default()
+            };
+            if n > 1 {
+                a.n_constit_equ_t_group_numbers = vec![0; n / 2 + 1];
+            }
+            if b_iso {
+                if niso > 0 {
+                    p.isotopic_atom = vec![InChIIsotopicAtom::default(); niso];
+                    p.isotopic_t_group = vec![InChIIsotopicTGroup::default(); niso];
+                }
+                p.n_possible_locations_of_isotopic_h = vec![0; n + 1];
+                p.stereo_isotopic = Some(alloc_stereo(n, nb));
+                a.n_isotopic_orig_at_nos_in_canon_ord = vec![0; al];
+                a.n_isotopic_orig_at_nos_in_canon_ord_inv = vec![0; al];
+                a.n_constit_equ_isotopic_numbers = vec![0; al];
+                a.n_constit_equ_isotopic_t_group_numbers = vec![0; n / 2 + 1];
+            }
+            pi[k] = Some(p);
+            pa[k] = Some(a);
+        }
+        let ip = InputParms {
+            b_loose_tsa_check: loose as i32,
+            ..Default::default()
+        };
+        let mut ti = TGroupInfo::default();
+        let mut se = String::new();
+        let (mut fl, mut dn) = (flags, done);
+        let ret = create_inchi(
+            &mut pi,
+            &mut pa,
+            &at,
+            &mut nd,
+            n,
+            mode,
+            &mut fl,
+            &mut dn,
+            Some(&mut ti),
+            &mut se,
+            &ip,
+        );
+        let mut got = vec![
+            format!(
+                "R {ret} {fl} {dn} {} {}",
+                ti.num_t_groups, ti.n_num_endpoints
+            ),
+            format!("E {se}"),
+        ];
+        for k in 0..2 {
+            let d = &nd[k];
+            got.push(format!(
+                "D{k} {} {} {} {} {} {} {} {} {} {} {} {} {} {}",
+                d.num_at,
+                d.num_removed_h,
+                d.b_deleted,
+                d.b_tautomeric,
+                d.b_taut_preprocessed,
+                d.n_num_removed_protons,
+                d.n_num_removed_protons_isotopic[0],
+                d.n_num_removed_protons_isotopic[1],
+                d.n_num_removed_protons_isotopic[2],
+                d.num_iso_h[0],
+                i32::from(d.num_iso_h[1]) * 100 + i32::from(d.num_iso_h[2]),
+                d.b_taut_flags,
+                d.b_taut_flags_done,
+                d.b_normalization_flags
+            ));
+            if !d.at.is_empty() {
+                let mut l = format!("DA{k}");
+                for a in &d.at[..n] {
+                    l += &format!(
+                        " {},{},{},{},{},{},{},{},{},{},{},{}:",
+                        a.charge,
+                        a.num_h,
+                        a.radical,
+                        a.chem_bonds_valence,
+                        a.endpoint,
+                        a.c_point,
+                        a.at_type,
+                        a.num_iso_h[0],
+                        a.num_iso_h[1],
+                        a.num_iso_h[2],
+                        a.valence,
+                        a.orig_at_number
+                    );
+                    for j in 0..a.valence as usize {
+                        l += &format!("{}.{}.", a.neighbor[j], a.bond_type[j]);
+                    }
+                }
+                got.push(l);
+            }
+            let (Some(p), Some(a)) = (&pi[k], &pa[k]) else {
+                continue;
+            };
+            let na = p.n_number_of_atoms as usize;
+            got.push(format!(
+                "I{k} {} {} {} {} {}",
+                p.n_error_code,
+                p.n_flags,
+                p.n_total_charge,
+                p.n_number_of_atoms,
+                p.sz_hill_formula.as_deref().unwrap_or("NULL")
+            ));
+            got.push(format!(
+                "IA{k}{}",
+                p.n_atom[..na]
+                    .iter()
+                    .map(|x| format!(" {x}"))
+                    .collect::<String>()
+            ));
+            got.push(format!(
+                "IC{k} {}{}",
+                p.len_conn_table,
+                p.n_conn_table[..p.len_conn_table as usize]
+                    .iter()
+                    .map(|x| format!(" {x}"))
+                    .collect::<String>()
+            ));
+            got.push(format!(
+                "IT{k} {}{}",
+                p.len_tautomer,
+                p.n_tautomer[..p.len_tautomer as usize]
+                    .iter()
+                    .map(|x| format!(" {x}"))
+                    .collect::<String>()
+            ));
+            let fixed = p.n_num_h_fixed.as_ref();
+            got.push(format!(
+                "IH{k}{}",
+                (0..na)
+                    .map(|i| format!(
+                        " {}/{}",
+                        p.n_num_h[i],
+                        fixed.map_or(-1, |f| i32::from(f[i]))
+                    ))
+                    .collect::<String>()
+            ));
+            let mut l = format!(
+                "II{k} {} {}",
+                p.n_number_of_isotopic_atoms, p.n_number_of_isotopic_t_groups
+            );
+            for e in p
+                .isotopic_atom
+                .iter()
+                .take(p.n_number_of_isotopic_atoms.max(0) as usize)
+            {
+                l += &format!(
+                    " {},{},{},{},{}",
+                    e.n_atom_number, e.n_iso_difference, e.n_num_h, e.n_num_d, e.n_num_t
+                );
+            }
+            l += " |";
+            for e in p
+                .isotopic_t_group
+                .iter()
+                .take(p.n_number_of_isotopic_t_groups.max(0) as usize)
+            {
+                l += &format!(
+                    " {},{},{},{}",
+                    e.n_t_group_number, e.n_num_h, e.n_num_d, e.n_num_t
+                );
+            }
+            got.push(l);
+            let loc_n = p
+                .n_possible_locations_of_isotopic_h
+                .first()
+                .map_or(0, |&x| x as usize);
+            got.push(pr_arr("IL", &p.n_possible_locations_of_isotopic_h, loc_n));
+            got.push(pr_stereo("IS", &p.stereo));
+            got.push(pr_stereo("IZ", &p.stereo_isotopic));
+            got.push(format!(
+                "X{k} {} {} {} {} {}",
+                a.n_error_code,
+                a.n_number_of_atoms,
+                a.n_number_of_t_groups,
+                a.b_is_tautomeric,
+                a.n_canon_flags
+            ));
+            got.push(pr_arr("XA", &a.n_orig_at_nos_in_canon_ord, n));
+            got.push(pr_arr("XB", &a.n_orig_at_nos_in_canon_ord_inv, n));
+            got.push(pr_arr("XC", &a.n_isotopic_orig_at_nos_in_canon_ord, n));
+            got.push(pr_arr("XD", &a.n_isotopic_orig_at_nos_in_canon_ord_inv, n));
+            got.push(pr_arr("XE", &a.n_constit_equ_numbers, n));
+            got.push(pr_arr("XF", &a.n_constit_equ_isotopic_numbers, n));
+            got.push(pr_arr(
+                "XG",
+                &a.n_constit_equ_t_group_numbers,
+                a.n_number_of_t_groups.max(0) as usize,
+            ));
+            got.push(pr_arr(
+                "XH",
+                &a.n_constit_equ_isotopic_t_group_numbers,
+                a.n_number_of_t_groups.max(0) as usize,
+            ));
+            got.push(format!(
+                "XO{}",
+                a.orig_info
+                    .iter()
+                    .take(n)
+                    .map(|o| format!(" {},{},{}", o.c_charge, o.c_radical, o.c_unusual_valence))
+                    .collect::<String>()
+            ));
+            got.push(format!(
+                "XP {} {} {} {}",
+                a.n_num_removed_protons,
+                a.n_num_removed_isotopic_h[0],
+                a.n_num_removed_isotopic_h[1],
+                a.n_num_removed_isotopic_h[2]
+            ));
+        }
+        assert_eq!(got, want, "case {ci}");
+    }
+}

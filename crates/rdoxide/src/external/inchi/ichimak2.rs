@@ -446,8 +446,12 @@ pub fn mark_ambiguous_stereo(
     };
     for c in carb {
         let p = i32::from(c.parity);
+        if !(parity_known(p) && p != 3) {
+            continue;
+        }
+        // the C code indexes before the parity test (a stale zero entry reads out of range)
         let j1 = canon_ord[c.at_num as usize - 1] as usize;
-        if parity_known(p) && p != 3 && at[j1].b_ambiguous_stereo != 0 {
+        if at[j1].b_ambiguous_stereo != 0 {
             at[j1].b_ambiguous_stereo |= mark_atom;
             norm_at[j1].b_ambiguous_stereo |= mark_atom;
             num += 1;

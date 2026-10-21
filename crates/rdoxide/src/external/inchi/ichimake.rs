@@ -409,3 +409,642 @@ pub fn check_canon_numbering_correctness(
     }
     if n_error_code != 0 { CT_CANON_ERR } else { 0 }
 }
+
+/// `INP_ATOM_DATA`: the normalized structure of one kind (tautomeric or not)
+#[derive(Debug, Clone, Default)]
+pub struct InpAtomData {
+    pub at: Vec<InpAtom>,
+    /// `at_fixed_bonds`: tautomeric case, added or removed H
+    pub at_fixed_bonds: Option<Vec<InpAtom>>,
+    pub num_at: i32,
+    pub num_removed_h: i32,
+    pub num_bonds: i32,
+    pub num_isotopic: i32,
+    pub b_exists: i32,
+    pub b_deleted: i32,
+    pub b_has_isotopic_layer: i32,
+    pub b_tautomeric: i32,
+    pub b_taut_preprocessed: i32,
+    pub n_num_removed_protons: i32,
+    pub n_num_removed_protons_isotopic: [i16; 3],
+    pub num_iso_h: [i16; 3],
+    pub b_taut_flags: u64,
+    pub b_taut_flags_done: u64,
+    pub b_normalization_flags: u64,
+}
+
+/// `Create_INChI`: normalizes the structure, finds the tautomeric groups and
+/// stereo, canonicalizes and fills `p_inchi[..]` / `p_aux[..]` (both slots
+/// `TAUT_NON` and `TAUT_YES` of the result arrays must be allocated by the
+/// caller when requested). Returns the number of atoms or a negative error code;
+/// the t-group info is returned in `ti_out` when given. The time-out checks,
+/// the polymer end-bond list and the debug extraction flags of the C code
+/// are not ported.
+#[allow(clippy::too_many_arguments, unused_assignments)]
+pub fn create_inchi(
+    p_inchi: &mut [Option<super::ichi::InChI>; 2],
+    p_aux: &mut [Option<super::ichi::InChIAux>; 2],
+    inp_at: &[InpAtom],
+    out_norm_data: &mut [InpAtomData; 2],
+    num_inp_at: usize,
+    mut n_user_mode: u64,
+    pb_taut_flags: &mut u64,
+    pb_taut_flags_done: &mut u64,
+    ti_out: Option<&mut super::ichitaut::TGroupInfo>,
+    str_err: &mut String,
+    ip: &super::ichiparm::InputParms,
+) -> i32 {
+    use super::ichican2::{
+        AtomSizes, Bcn, TAUT_NON, TAUT_YES, get_base_canon_ranking, set_atom_iso_sort_keys,
+    };
+    use super::ichicano::{
+        CMODE_CT, CMODE_ISO, CMODE_ISO_STEREO, CMODE_NOEQ_STEREO, CMODE_STEREO, CMODE_TAUT,
+        CanonStat, allocate_cs, canon_inchi, get_canon_lengths,
+    };
+    use super::ichierr::{CT_ERR_MAX, CT_ERR_MIN, CT_TAUCOUNT_ERR};
+    use super::ichimak2::fill_out_inchi;
+    use super::ichiparm::*;
+    use super::ichister::{
+        AB_PARITY_UNDF, AB_PARITY_UNKN, PES_BIT_ARSINE_STEREO, PES_BIT_FIX_SP3_BUG,
+        PES_BIT_PHOSPHINE_STEREO, PES_BIT_POINT_EDGE_STEREO, set_stereo_parity,
+    };
+    use super::ichitaut::{
+        FLAG_NORM_CONSIDER_TAUT, TGroupInfo, count_tautomer_groups, mark_alt_bonds_and_taut_groups,
+        set_tautomer_iso_sort_keys,
+    };
+    use super::inpdef::ATT_PROTON;
+    use super::runichi3::{TG_FLAG_FOUND_ISOTOPIC_ATOM_DONE, TG_FLAG_FOUND_ISOTOPIC_H_DONE};
+    use super::strutil::{add_dt_to_num_h, remove_terminal_hdt};
+    const CMODE_REDNDNT: i64 = 0x80;
+    const CMODE_NO_ALT: i64 = 0x100;
+    const CMODE_REL: i64 = 0x200;
+    const CMODE_RAC: i64 = 0x400;
+    const CMODE_SC_UU: i64 = 0x800;
+    const CMODE_SB_UU: i64 = 0x1000;
+    const CANON_MODE_ISO: i64 = CMODE_CT | CMODE_ISO | 0x04;
+    const CANON_MODE_STEREO: i64 = CMODE_CT | CMODE_STEREO;
+    const CANON_MODE_ISO_STEREO: i64 = CMODE_CT | CMODE_ISO | 0x04 | CMODE_ISO_STEREO;
+    const TG_FLAG_ALL_TAUTOMERIC: u64 = TG_FLAG_TEST_TAUT__ATOMS
+        | TG_FLAG_TEST_TAUT__SALTS
+        | TG_FLAG_TEST_TAUT2_SALTS
+        | TG_FLAG_MERGE_TAUT_SALTS;
+    let returned_error = |r: i32| (CT_ERR_MIN..=CT_ERR_MAX).contains(&r);
+    let alt_taut = |x: usize| if x > TAUT_YES { TAUT_YES } else { 1 - x };
+    let _ = str_err;
+
+    let mut s = [AtomSizes::default(), AtomSizes::default()];
+    let mut at: [Option<Vec<super::ichister::SpAtom>>; 2] = [None, None];
+    let mut tgi = TGroupInfo::default();
+    let mut bcn = Bcn::default();
+    let mut ret = 0i32;
+    let mut num_at_tg = 0usize;
+    let mut num_atoms = 0usize;
+    let mut num_taut_at = 0usize;
+    let mut num_removed_h_taut = 0usize;
+    let mut b_has_isotopic_atoms;
+    let b_pointed_edge_stereo = (if *pb_taut_flags & TG_FLAG_POINTED_EDGE_STEREO != 0 {
+        PES_BIT_POINT_EDGE_STEREO
+    } else {
+        0
+    }) | (if *pb_taut_flags & TG_FLAG_PHOSPHINE_STEREO != 0 {
+        PES_BIT_PHOSPHINE_STEREO
+    } else {
+        0
+    }) | (if *pb_taut_flags & TG_FLAG_ARSINE_STEREO != 0 {
+        PES_BIT_ARSINE_STEREO
+    } else {
+        0
+    }) | (if *pb_taut_flags & TG_FLAG_FIX_SP3_BUG != 0 {
+        PES_BIT_FIX_SP3_BUG
+    } else {
+        0
+    });
+    let b_taut_flags = *pb_taut_flags & !TG_FLAG_ALL_TAUTOMERIC;
+    let mut b_taut_flags_done = *pb_taut_flags_done;
+    let b_fix_iso_fixed_h = *pb_taut_flags & TG_FLAG_FIX_ISO_FIXEDH_BUG != 0;
+    let b_fix_term_h_chrg = *pb_taut_flags & TG_FLAG_FIX_TERM_H_CHRG_BUG != 0;
+    let large_molecules = ip.b_large_molecules != 0;
+    let v_ab_parity_unknown = if n_user_mode & REQ_MODE_DIFF_UU_STEREO != 0 {
+        AB_PARITY_UNKN
+    } else {
+        AB_PARITY_UNDF
+    };
+
+    'body: {
+        for i in 0..2 {
+            if !out_norm_data[i].at.is_empty() {
+                at[i] = Some(vec![super::ichister::SpAtom::default(); num_inp_at]);
+            }
+        }
+        if (out_norm_data[TAUT_NON].at.is_empty() && out_norm_data[TAUT_YES].at.is_empty())
+            || inp_at.is_empty()
+        {
+            ret = -1;
+            break 'body;
+        }
+        let out_idx = if !out_norm_data[TAUT_YES].at.is_empty() {
+            TAUT_YES
+        } else {
+            TAUT_NON
+        };
+        out_norm_data[out_idx].at[..num_inp_at].clone_from_slice(&inp_at[..num_inp_at]);
+        tgi.b_ignore_isotopic = 0;
+        tgi.b_taut_flags = *pb_taut_flags;
+        tgi.b_taut_flags_done = *pb_taut_flags_done;
+        tgi.t_group = None;
+
+        let num_removed_h;
+        if TG_FLAG_H_ALREADY_REMOVED & b_taut_flags != 0 {
+            let nd = if !out_norm_data[TAUT_YES].at.is_empty() {
+                &out_norm_data[TAUT_YES]
+            } else {
+                &out_norm_data[TAUT_NON]
+            };
+            num_atoms = (nd.num_at - nd.num_removed_h) as usize;
+            num_at_tg = num_atoms;
+            num_removed_h = nd.num_removed_h as usize;
+            tgi.tni.n_num_removed_explicit_h = num_removed_h as i32;
+        } else {
+            let out_at = &mut out_norm_data[out_idx].at;
+            num_atoms = remove_terminal_hdt(&mut out_at[..num_inp_at], b_fix_term_h_chrg) as usize;
+            num_at_tg = num_atoms;
+            num_removed_h = num_inp_at - num_atoms;
+            tgi.tni.n_num_removed_explicit_h = num_removed_h as i32;
+            add_dt_to_num_h(&mut out_at[..num_atoms]);
+        }
+        super::ichinorm::mark_ring_systems_inp(&mut out_norm_data[out_idx].at[..num_atoms], 0);
+        let out_copy = out_norm_data[out_idx].at[..num_inp_at].to_vec();
+        if out_idx != TAUT_YES && !out_norm_data[TAUT_YES].at.is_empty() {
+            out_norm_data[TAUT_YES].at[..num_inp_at].clone_from_slice(&out_copy);
+        }
+        if !out_norm_data[TAUT_YES].at.is_empty() {
+            if let Some(f) = out_norm_data[TAUT_YES].at_fixed_bonds.as_mut() {
+                f[..num_inp_at].clone_from_slice(&out_copy);
+            }
+        }
+        if out_idx != TAUT_NON && !out_norm_data[TAUT_NON].at.is_empty() {
+            out_norm_data[TAUT_NON].at[..num_inp_at].clone_from_slice(&out_copy);
+        }
+
+        // tautomeric structure
+        if !out_norm_data[TAUT_YES].at.is_empty() && at[TAUT_YES].is_some() {
+            {
+                let nd = &mut out_norm_data[TAUT_YES];
+                let mut dummy_done = 0u64;
+                let r = mark_alt_bonds_and_taut_groups(
+                    &mut nd.at,
+                    nd.at_fixed_bonds.as_deref_mut(),
+                    num_atoms,
+                    Some(&mut tgi),
+                    0,
+                    &mut dummy_done,
+                    &[],
+                );
+                ret = r;
+            }
+            if ret < 0 {
+                break 'body;
+            }
+            num_taut_at = ret as usize;
+            num_removed_h_taut = tgi.tni.n_num_removed_explicit_h as usize;
+            {
+                let nd = &mut out_norm_data[TAUT_YES];
+                nd.num_at = (num_atoms + num_removed_h_taut) as i32;
+                nd.num_removed_h = num_removed_h_taut as i32;
+                nd.n_num_removed_protons += tgi.tni.n_num_removed_protons;
+                for i in 0..3 {
+                    nd.n_num_removed_protons_isotopic[i] +=
+                        tgi.tni.n_num_removed_protons_isotopic[i] as i16;
+                    nd.num_iso_h[i] += tgi.num_iso_h[i];
+                }
+                if num_taut_at == 1
+                    && nd.at[0].at_type == ATT_PROTON
+                    && tgi.tni.n_num_removed_protons == 1
+                {
+                    nd.b_deleted = 1;
+                    nd.at_fixed_bonds = None;
+                } else if tgi.tni.b_normalization_flags & FLAG_NORM_CONSIDER_TAUT != 0
+                    && nd.at_fixed_bonds.is_some()
+                {
+                    nd.b_taut_preprocessed = 1;
+                }
+                *pb_taut_flags = tgi.b_taut_flags;
+                nd.b_taut_flags = tgi.b_taut_flags;
+                *pb_taut_flags_done = tgi.b_taut_flags_done;
+                nd.b_taut_flags_done = tgi.b_taut_flags_done;
+                nd.b_normalization_flags = tgi.tni.b_normalization_flags;
+            }
+            let sp = at[TAUT_YES].as_mut().unwrap();
+            inp2sp_atom(&out_norm_data[TAUT_YES].at[..num_inp_at], sp);
+            ret = set_stereo_parity(
+                &mut out_norm_data[TAUT_YES].at,
+                sp,
+                num_taut_at,
+                num_removed_h_taut,
+                Some(&mut s[TAUT_YES].n_max_num_stereo_atoms),
+                Some(&mut s[TAUT_YES].n_max_num_stereo_bonds),
+                n_user_mode,
+                b_pointed_edge_stereo,
+                v_ab_parity_unknown,
+                ip.b_loose_tsa_check != 0,
+                ip.b_stereo_at_zz,
+            );
+            if returned_error(ret) {
+                break 'body;
+            }
+            s[TAUT_YES].b_may_have_stereo = i32::from(
+                s[TAUT_YES].n_max_num_stereo_atoms != 0 || s[TAUT_YES].n_max_num_stereo_bonds != 0,
+            );
+            s[TAUT_YES].num_isotopic_atoms = set_atom_iso_sort_keys(
+                &mut sp[..num_taut_at],
+                Some(&tgi),
+                Some(&mut s[TAUT_YES].b_has_isotopic_taut_groups),
+            );
+            let mut eps: Vec<u16> = sp[..num_taut_at].iter().map(|a| a.endpoint).collect();
+            let lt = count_tautomer_groups(&mut eps, num_taut_at, &mut tgi);
+            for (a, e) in sp.iter_mut().zip(eps) {
+                a.endpoint = e;
+            }
+            s[TAUT_YES].n_len_linear_ct_tautomer = lt;
+            if returned_error(lt) {
+                ret = lt;
+                break 'body;
+            } else if lt > 0 {
+                num_at_tg = num_taut_at + tgi.num_t_groups;
+                let l = set_tautomer_iso_sort_keys(&mut tgi);
+                s[TAUT_YES].n_len_linear_ct_isotopic_tautomer = l.max(0);
+                out_norm_data[TAUT_YES].b_tautomeric = lt;
+            }
+            get_canon_lengths(num_taut_at, sp, &mut s[TAUT_YES], Some(&tgi));
+        }
+
+        if !out_norm_data[TAUT_NON].at.is_empty()
+            && !out_norm_data[TAUT_YES].at.is_empty()
+            && at[TAUT_NON].is_some()
+            && s[TAUT_YES].n_len_linear_ct_tautomer == 0
+        {
+            at[TAUT_NON] = None;
+        } else if out_norm_data[TAUT_NON].at.is_empty()
+            && !out_norm_data[TAUT_YES].at.is_empty()
+            && at[TAUT_NON].is_none()
+            && at[TAUT_YES].is_some()
+            && s[TAUT_YES].n_len_linear_ct_tautomer == 0
+        {
+            out_norm_data[TAUT_YES].b_tautomeric = 0;
+        } else if !out_norm_data[TAUT_NON].at.is_empty() && at[TAUT_NON].is_some() {
+            {
+                let nd = &mut out_norm_data[TAUT_NON];
+                ret = mark_alt_bonds_and_taut_groups(
+                    &mut nd.at,
+                    None,
+                    num_atoms,
+                    None,
+                    b_taut_flags,
+                    &mut b_taut_flags_done,
+                    &[],
+                );
+            }
+            if ret < 0 {
+                break 'body;
+            }
+            {
+                let nd = &mut out_norm_data[TAUT_NON];
+                nd.num_at = (num_atoms + num_removed_h) as i32;
+                nd.num_removed_h = num_removed_h as i32;
+                nd.b_taut_flags = *pb_taut_flags;
+                nd.b_taut_flags_done = *pb_taut_flags_done;
+                nd.b_normalization_flags = 0;
+            }
+            let sp = at[TAUT_NON].as_mut().unwrap();
+            inp2sp_atom(&out_norm_data[TAUT_NON].at[..num_inp_at], sp);
+            ret = set_stereo_parity(
+                &mut out_norm_data[TAUT_NON].at,
+                sp,
+                num_atoms,
+                num_removed_h,
+                Some(&mut s[TAUT_NON].n_max_num_stereo_atoms),
+                Some(&mut s[TAUT_NON].n_max_num_stereo_bonds),
+                n_user_mode,
+                b_pointed_edge_stereo,
+                v_ab_parity_unknown,
+                ip.b_loose_tsa_check != 0,
+                ip.b_stereo_at_zz,
+            );
+            if returned_error(ret) {
+                break 'body;
+            }
+            s[TAUT_NON].b_may_have_stereo = i32::from(
+                s[TAUT_NON].n_max_num_stereo_atoms != 0 || s[TAUT_NON].n_max_num_stereo_bonds != 0,
+            );
+            s[TAUT_NON].num_isotopic_atoms =
+                set_atom_iso_sort_keys(&mut sp[..num_atoms], None, None);
+            get_canon_lengths(num_atoms, sp, &mut s[TAUT_NON], None);
+            out_norm_data[TAUT_NON].b_tautomeric = 0;
+        }
+
+        // common
+        let b_may_have_stereo =
+            s[TAUT_YES].b_may_have_stereo != 0 || s[TAUT_NON].b_may_have_stereo != 0;
+        b_has_isotopic_atoms = s[TAUT_NON].num_isotopic_atoms > 0
+            || s[TAUT_NON].b_has_isotopic_taut_groups > 0
+            || s[TAUT_YES].num_isotopic_atoms > 0
+            || s[TAUT_YES].b_has_isotopic_taut_groups > 0;
+        if b_fix_iso_fixed_h {
+            b_has_isotopic_atoms = b_has_isotopic_atoms
+                || (s[TAUT_YES].n_len_linear_ct_tautomer > 0
+                    && tgi
+                        .tni
+                        .n_num_removed_protons_isotopic
+                        .iter()
+                        .any(|&x| x != 0));
+        }
+        b_has_isotopic_atoms = b_has_isotopic_atoms
+            || (s[TAUT_YES].n_len_isotopic_endpoints > 1
+                && tgi.b_taut_flags_done
+                    & (TG_FLAG_FOUND_ISOTOPIC_H_DONE | TG_FLAG_FOUND_ISOTOPIC_ATOM_DONE)
+                    != 0);
+        if n_user_mode & REQ_MODE_DEFAULT == 0 {
+            n_user_mode |= REQ_MODE_DEFAULT;
+        }
+        if n_user_mode & REQ_MODE_ISO != 0 && !b_has_isotopic_atoms {
+            n_user_mode ^= REQ_MODE_ISO;
+            n_user_mode |= REQ_MODE_NON_ISO;
+        }
+        if n_user_mode & REQ_MODE_STEREO != 0 && n_user_mode & REQ_MODE_ISO != 0 {
+            n_user_mode |= REQ_MODE_ISO_STEREO;
+        }
+        if n_user_mode & REQ_MODE_STEREO != 0 && n_user_mode & REQ_MODE_NON_ISO == 0 {
+            n_user_mode ^= REQ_MODE_STEREO;
+        }
+        if !b_may_have_stereo {
+            if n_user_mode & REQ_MODE_STEREO != 0 {
+                n_user_mode ^= REQ_MODE_STEREO;
+            }
+            if n_user_mode & REQ_MODE_ISO_STEREO != 0 {
+                n_user_mode ^= REQ_MODE_ISO_STEREO;
+            }
+        }
+        if n_user_mode & REQ_MODE_BASIC != 0
+            && (out_norm_data[TAUT_NON].at.is_empty()
+                || p_inchi[TAUT_NON].is_none()
+                || p_aux[TAUT_NON].is_none()
+                || at[TAUT_NON].is_none())
+        {
+            n_user_mode ^= REQ_MODE_BASIC;
+        }
+        if n_user_mode & REQ_MODE_TAUT != 0
+            && (out_norm_data[TAUT_YES].at.is_empty()
+                || p_inchi[TAUT_YES].is_none()
+                || p_aux[TAUT_YES].is_none()
+                || at[TAUT_YES].is_none())
+        {
+            n_user_mode ^= REQ_MODE_TAUT;
+        }
+        let (mut n1, mut n2) = match n_user_mode & (REQ_MODE_BASIC | REQ_MODE_TAUT) {
+            REQ_MODE_BASIC => (TAUT_NON, TAUT_NON),
+            REQ_MODE_TAUT => (TAUT_YES, TAUT_YES),
+            x if x == REQ_MODE_BASIC | REQ_MODE_TAUT => (TAUT_NON, TAUT_YES),
+            _ => {
+                ret = -3;
+                break 'body;
+            }
+        };
+
+        if n_user_mode & REQ_MODE_NON_ISO != 0 && n_user_mode & REQ_MODE_ISO == 0 {
+            {
+                tgi.b_ignore_isotopic = 1;
+                if !tgi.n_isotopic_endpoint_atom_number.is_empty() {
+                    tgi.n_isotopic_endpoint_atom_number[0] =
+                        tgi.n_isotopic_endpoint_atom_number[0].min(1);
+                }
+                tgi.num_iso_h = [0; 3];
+                tgi.tni.n_num_removed_protons_isotopic = [0; 3];
+                tgi.b_taut_flags_done &=
+                    !(TG_FLAG_FOUND_ISOTOPIC_H_DONE | TG_FLAG_FOUND_ISOTOPIC_ATOM_DONE);
+            }
+            for x in s.iter_mut() {
+                x.b_has_isotopic_taut_groups = 0;
+                x.b_ignore_isotopic = 1;
+                x.n_len_isotopic = 0;
+                x.n_len_isotopic_endpoints = 0;
+                x.n_len_linear_ct_isotopic_tautomer = 0;
+                x.num_isotopic_atoms = 0;
+            }
+            b_has_isotopic_atoms = false;
+        }
+
+        let at_refs: [Option<&[super::ichister::SpAtom]>; 2] =
+            [at[TAUT_NON].as_deref(), at[TAUT_YES].as_deref()];
+        ret = get_base_canon_ranking(
+            &mut || false,
+            num_atoms,
+            num_at_tg,
+            at_refs,
+            Some(&mut tgi),
+            &s,
+            &mut bcn,
+            b_fix_iso_fixed_h,
+            large_molecules,
+        );
+        if ret < 0 {
+            break 'body;
+        }
+        if bcn.ftcn[n1].partition_ct.rank.is_empty() {
+            n1 = alt_taut(n1);
+        }
+        if bcn.ftcn[n2].partition_ct.rank.is_empty() {
+            n2 = alt_taut(n2);
+        }
+        if n1 > n2 {
+            ret = CT_TAUCOUNT_ERR;
+            break 'body;
+        }
+
+        let mut i = n2 as i32;
+        while i >= n1 as i32 && !returned_error(ret) {
+            let iu = i as usize;
+            let mut cs = CanonStat::default();
+            let mut n_mode: i64 = if s[iu].n_len_linear_ct_tautomer == 0 {
+                CMODE_CT
+            } else {
+                CMODE_CT | CMODE_TAUT
+            };
+            if b_has_isotopic_atoms && n_user_mode & REQ_MODE_ISO != 0 {
+                n_mode |= CANON_MODE_ISO;
+            }
+            if s[iu].b_may_have_stereo != 0 && n_user_mode & REQ_MODE_STEREO != 0 {
+                n_mode |= CANON_MODE_STEREO;
+            }
+            if b_has_isotopic_atoms
+                && s[iu].b_may_have_stereo != 0
+                && n_user_mode & REQ_MODE_ISO_STEREO != 0
+            {
+                n_mode |= CANON_MODE_ISO_STEREO;
+            }
+            if n_user_mode & REQ_MODE_NOEQ_STEREO != 0 {
+                n_mode |= CMODE_NOEQ_STEREO;
+            }
+            if n_user_mode & REQ_MODE_REDNDNT_STEREO != 0 {
+                n_mode |= CMODE_REDNDNT;
+            }
+            if n_user_mode & REQ_MODE_NO_ALT_SBONDS != 0 {
+                n_mode |= CMODE_NO_ALT;
+            }
+            if n_mode & CANON_MODE_STEREO == CANON_MODE_STEREO
+                || n_mode & CANON_MODE_ISO_STEREO == CANON_MODE_ISO_STEREO
+            {
+                if n_user_mode & REQ_MODE_RELATIVE_STEREO != 0 {
+                    n_mode |= CMODE_REL;
+                }
+                if n_user_mode & REQ_MODE_RACEMIC_STEREO != 0 {
+                    n_mode |= CMODE_RAC;
+                }
+                if n_user_mode & REQ_MODE_SC_IGN_ALL_UU != 0 {
+                    n_mode |= CMODE_SC_UU;
+                }
+                if n_user_mode & REQ_MODE_SB_IGN_ALL_UU != 0 {
+                    n_mode |= CMODE_SB_UU;
+                }
+            }
+            let (na, nat) = if iu == TAUT_NON {
+                (num_atoms, num_atoms)
+            } else {
+                (num_atoms, num_at_tg)
+            };
+            ret = if iu == TAUT_NON {
+                allocate_cs(
+                    &mut cs,
+                    na,
+                    nat,
+                    s[iu].n_len_ct,
+                    s[iu].n_len_ct_at_only,
+                    s[iu].n_len_linear_ct_stereo_dble,
+                    s[iu].n_max_num_stereo_bonds,
+                    s[iu].n_len_linear_ct_stereo_carb,
+                    s[iu].n_max_num_stereo_atoms,
+                    0,
+                    0,
+                    s[iu].n_len_isotopic,
+                    n_mode,
+                    true,
+                )
+            } else {
+                allocate_cs(
+                    &mut cs,
+                    na,
+                    nat,
+                    s[iu].n_len_ct,
+                    s[iu].n_len_ct_at_only,
+                    s[iu].n_len_linear_ct_stereo_dble,
+                    s[iu].n_max_num_stereo_bonds,
+                    s[iu].n_len_linear_ct_stereo_carb,
+                    s[iu].n_max_num_stereo_atoms,
+                    s[iu].n_len_linear_ct_tautomer,
+                    s[iu].n_len_linear_ct_isotopic_tautomer,
+                    s[iu].n_len_isotopic,
+                    n_mode,
+                    true,
+                )
+            };
+            if ret != 0 {
+                break 'body;
+            }
+            if n_user_mode & REQ_MODE_DIFF_UU_STEREO != 0 {
+                n_mode |= REQ_MODE_DIFF_UU_STEREO as i64;
+            }
+            cs.l_num_decreased_ct = -1;
+            cs.b_double_bond_square = 0;
+            cs.b_ignore_isotopic = i32::from(
+                !((s[TAUT_NON].num_isotopic_atoms != 0
+                    || s[TAUT_YES].num_isotopic_atoms != 0
+                    || s[TAUT_YES].b_has_isotopic_taut_groups != 0)
+                    || n_user_mode & REQ_MODE_NON_ISO != 0
+                    || n_user_mode & REQ_MODE_ISO == 0),
+            );
+            if n_user_mode & REQ_MODE_NON_ISO != 0 && n_user_mode & REQ_MODE_ISO == 0 {
+                cs.b_ignore_isotopic = 1;
+            }
+            let have_tgi_cs = iu == TAUT_YES;
+            if have_tgi_cs {
+                tgi.b_ignore_isotopic = i32::from(
+                    !(s[TAUT_YES].b_has_isotopic_taut_groups != 0
+                        || n_user_mode & REQ_MODE_NON_ISO != 0
+                        || n_user_mode & REQ_MODE_ISO == 0),
+                );
+                if n_user_mode & REQ_MODE_NON_ISO != 0 && n_user_mode & REQ_MODE_ISO == 0 {
+                    tgi.b_ignore_isotopic = 1;
+                }
+                cs.t_group_info = Some(std::mem::take(&mut tgi));
+            }
+            cs.neigh_list = None;
+            cs.p_bcn = Some(Box::new(std::mem::take(&mut bcn)));
+            let sp = at[iu].as_mut().unwrap();
+            ret = canon_inchi(&mut || false, num_atoms, nat, sp, &mut cs, n_mode, iu);
+            bcn = *cs.p_bcn.take().unwrap();
+            if have_tgi_cs {
+                tgi = cs.t_group_info.take().unwrap();
+            }
+            let p = p_inchi[iu].as_mut().unwrap();
+            let a = p_aux[iu].as_mut().unwrap();
+            if ret <= 0 {
+                p.n_error_code = ret;
+                a.n_error_code = ret;
+            } else {
+                p.n_error_code = 0;
+                a.n_error_code = 0;
+                p.b_deleted = out_norm_data[iu].b_deleted;
+                a.b_deleted = out_norm_data[iu].b_deleted;
+                a.n_canon_flags = cs.n_canon_flags;
+                a.b_taut_flags = out_norm_data[iu].b_taut_flags;
+                a.b_taut_flags_done = out_norm_data[iu].b_taut_flags_done;
+                a.b_normalization_flags = out_norm_data[iu].b_normalization_flags;
+                let removed = if iu != 0 {
+                    num_removed_h_taut
+                } else {
+                    num_removed_h
+                };
+                ret = fill_out_inchi(
+                    p,
+                    a,
+                    num_atoms,
+                    nat,
+                    removed,
+                    sp,
+                    &mut out_norm_data[iu].at,
+                    &mut cs,
+                    have_tgi_cs.then_some(&mut tgi),
+                    iu != 0,
+                    n_user_mode,
+                    str_err,
+                    ip.b_no_warnings != 0,
+                );
+                if returned_error(ret) {
+                    p.n_error_code = ret;
+                    a.n_error_code = ret;
+                } else {
+                    if s[TAUT_YES].n_len_linear_ct_tautomer != 0 {
+                        a.b_is_tautomeric = s[TAUT_YES].n_len_linear_ct_tautomer;
+                    }
+                    cs.t_group_info = have_tgi_cs.then(|| std::mem::take(&mut tgi));
+                    let ret2 = check_canon_numbering_correctness(num_atoms, nat, sp, &mut cs);
+                    if let Some(t) = cs.t_group_info.take() {
+                        tgi = t;
+                    }
+                    if ret2 != 0 {
+                        p.n_error_code = ret2;
+                        a.n_error_code = ret2;
+                        ret = ret2;
+                    }
+                }
+            }
+            i -= 1;
+        }
+        if ret == 0 {
+            ret = num_atoms as i32;
+        }
+    }
+    if let Some(t) = ti_out {
+        *t = tgi;
+    }
+    ret
+}
