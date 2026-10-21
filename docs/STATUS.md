@@ -332,6 +332,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 216 | InChI port I7l: `CreateOneStructureINChI`, `GetOneComponent`, error classification; differential-tested on 4000 structures vs the C library |
 | 217 | InChI port I8a: `ichiprt2` (Make*String, Eql_INChI_Aux_*), differential-tested on 9000 inputs vs the C library |
 | 218 | InChI port I8b: `EquString` + first `ichiprt3` str_* layers, differential-tested on 6000 structures vs the C library |
+| 219 | InChI port I8c: `ichiprt3` stereo and isotopic str_* layers, differential-tested on 7000 structures vs the C library |
 
 ## Python package files
 
@@ -720,3 +721,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-21 — Stage 216: InChI port I7l: CreateOneStructureINChI; 4000 differential cases match
 * 2026-10-21 — Stage 217: InChI port I8a: ichiprt2; 9000 differential cases match
 * 2026-10-21 — Stage 218: InChI port I8b: ichiprt3 first layers; 6000 differential cases match
+* 2026-10-21 — Stage 219: InChI port I8c: ichiprt3 stereo/isotopic layers; 7000 differential cases match
