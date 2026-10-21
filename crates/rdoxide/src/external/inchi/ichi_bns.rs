@@ -3629,6 +3629,8 @@ const MIN_NUM_STEREO_BOND_NEIGH: i32 = 2;
 pub struct BnAatg {
     pub n_num_found: i32,
     pub n_marked_atom: Vec<i8>,
+    pub n_at_type_totals: Option<Vec<i32>>,
+    pub t_group_info: Option<TGroupInfo>,
 }
 
 /// `MarkAtomsAtTautGroups`
@@ -4000,4 +4002,318 @@ pub fn subtract_or_change_at_h_charge_bns(
         }
     }
     if err != 0 { err } else { ret }
+}
+
+// ---- does an alternating path exist between two atoms? ----
+
+use super::ichitaut::{
+    EndpointInfo, n_get_endpoint_info, n_get_endpoint_info_ket, n_get_endpoint_info_pt_06_00,
+    n_get_endpoint_info_pt_13_00, n_get_endpoint_info_pt_16_00, n_get_endpoint_info_pt_18_00,
+    n_get_endpoint_info_pt_22_00, n_get_endpoint_info_pt_39_00,
+};
+
+pub const ALT_PATH_MODE_TAUTOM_KET: i32 = 10;
+pub const ALT_PATH_MODE_TAUTOM_PT_22_00: i32 = 11;
+pub const ALT_PATH_MODE_TAUTOM_PT_16_00: i32 = 12;
+pub const ALT_PATH_MODE_TAUTOM_PT_06_00: i32 = 13;
+pub const ALT_PATH_MODE_TAUTOM_PT_39_00: i32 = 14;
+pub const ALT_PATH_MODE_TAUTOM_PT_13_00: i32 = 15;
+pub const ALT_PATH_MODE_TAUTOM_PT_18_00: i32 = 16;
+const BNS_MAX_NUM_FLOW_CHANGES: usize = 1 + 2 * MAX_BOND_EDGE_CAP as usize;
+
+type EndpointInfoFn = fn(&[InpAtom], usize, &mut EndpointInfo) -> i32;
+
+/// `bExistsAltPath`: is there an alternating path allowing to move H (or a
+/// charge) from `v_single` to `v_double`? Returns 0, or a positive code
+/// (`bSuccess + 4 * nDelta`), or a negative error
+#[allow(clippy::too_many_arguments)]
+pub fn exists_alt_path(
+    p: &mut BnStruct,
+    bd: &mut BnData,
+    mut aatg: Option<&mut BnAatg>,
+    at: &mut [InpAtom],
+    num_atoms: i32,
+    v_double: i32,
+    v_single: i32,
+    path_type: i32,
+) -> i32 {
+    let mut apc = AltPathChanges::default();
+    let mut fcd = vec![BnsFlowChanges::default(); 4 * BNS_MAX_NUM_FLOW_CHANGES + 1];
+    let mut eif = EndpointInfo::default();
+    let mut eif2 = EndpointInfo::default();
+    let mut b_change_flow = 0;
+    let (vs, vd) = (v_single as usize, v_double as usize);
+    let type_: u16;
+    let tautomer_check = |at: &[InpAtom],
+                          f: EndpointInfoFn,
+                          eif: &mut EndpointInfo,
+                          eif2: &mut EndpointInfo|
+     -> bool {
+        if at[vs].endpoint == 0 && (f(at, vs, eif) == 0 || eif.c_donor == 0) {
+            return false;
+        }
+        if at[vd].endpoint == 0 && (f(at, vd, eif2) == 0 || eif2.c_acceptor == 0) {
+            return false;
+        }
+        true
+    };
+    match path_type {
+        ALT_PATH_MODE_TAUTOM
+        | ALT_PATH_MODE_TAUTOM_PT_22_00
+        | ALT_PATH_MODE_TAUTOM_PT_16_00
+        | ALT_PATH_MODE_TAUTOM_PT_06_00
+        | ALT_PATH_MODE_TAUTOM_PT_39_00
+        | ALT_PATH_MODE_TAUTOM_PT_13_00
+        | ALT_PATH_MODE_TAUTOM_PT_18_00
+        | ALT_PATH_MODE_TAUTOM_KET => {
+            type_ = BNS_VERT_TYPE_ENDPOINT;
+            b_change_flow = BNS_EF_CHNG_RSTR;
+            let f: EndpointInfoFn = match path_type {
+                ALT_PATH_MODE_TAUTOM_PT_22_00 => n_get_endpoint_info_pt_22_00,
+                ALT_PATH_MODE_TAUTOM_PT_16_00 => n_get_endpoint_info_pt_16_00,
+                ALT_PATH_MODE_TAUTOM_PT_06_00 => n_get_endpoint_info_pt_06_00,
+                ALT_PATH_MODE_TAUTOM_PT_39_00 => n_get_endpoint_info_pt_39_00,
+                ALT_PATH_MODE_TAUTOM_PT_13_00 => n_get_endpoint_info_pt_13_00,
+                ALT_PATH_MODE_TAUTOM_PT_18_00 => n_get_endpoint_info_pt_18_00,
+                ALT_PATH_MODE_TAUTOM_KET => n_get_endpoint_info_ket,
+                _ => n_get_endpoint_info,
+            };
+            if !tautomer_check(at, f, &mut eif, &mut eif2) {
+                return 0;
+            }
+        }
+        ALT_PATH_MODE_CHARGE => {
+            type_ = BNS_VERT_TYPE_C_POINT;
+            b_change_flow = BNS_EF_CHNG_RSTR | BNS_EF_ALTR_BONDS;
+        }
+        ALT_PATH_MODE_4_SALT | ALT_PATH_MODE_4_SALT2 => {
+            type_ = BNS_VERT_TYPE_ENDPOINT;
+            b_change_flow = BNS_EF_CHNG_RSTR | BNS_EF_ALTR_BONDS;
+            if !is_bns_endpoint(p, v_single)
+                && (n_get_endpoint_info(at, vs, &mut eif) == 0 || eif.c_donor == 0)
+            {
+                return 0;
+            }
+            if !is_bns_endpoint(p, v_double)
+                && (n_get_endpoint_info(at, vd, &mut eif) == 0 || eif.c_acceptor == 0)
+            {
+                return 0;
+            }
+        }
+        ALT_PATH_MODE_REM2H_CHG | ALT_PATH_MODE_REM2H_TST => {
+            if path_type == ALT_PATH_MODE_REM2H_CHG {
+                b_change_flow |= BNS_EF_ALTR_BONDS;
+            }
+            b_change_flow |= BNS_EF_CHNG_RSTR;
+            type_ = BNS_VERT_TYPE_ENDPOINT;
+            if !is_bns_endpoint(p, v_single)
+                && (n_get_endpoint_info(at, vs, &mut eif) == 0 || eif.c_donor == 0)
+            {
+                return 0;
+            }
+            if !is_bns_endpoint(p, v_double)
+                && (n_get_endpoint_info(at, vd, &mut eif) == 0 || eif.c_donor == 0)
+            {
+                return 0;
+            }
+        }
+        ALT_PATH_MODE_ADD2H_CHG | ALT_PATH_MODE_ADD2H_TST => {
+            if path_type == ALT_PATH_MODE_ADD2H_CHG {
+                b_change_flow |= BNS_EF_ALTR_BONDS;
+            }
+            b_change_flow |= BNS_EF_CHNG_RSTR;
+            type_ = BNS_VERT_TYPE_ENDPOINT;
+            if !is_bns_endpoint(p, v_single)
+                && (n_get_endpoint_info(at, vs, &mut eif) == 0 || eif.c_acceptor == 0)
+            {
+                return 0;
+            }
+            if !is_bns_endpoint(p, v_double)
+                && (n_get_endpoint_info(at, vd, &mut eif) == 0 || eif.c_acceptor == 0)
+            {
+                return 0;
+            }
+        }
+        ALT_PATH_MODE_REM_PROTON => {
+            type_ = 0;
+            b_change_flow = (BNS_EF_SAVE_ALL | BNS_EF_UPD_H_CHARGE) | BNS_EF_ALTR_NS;
+        }
+        _ => {
+            type_ = 0;
+            b_change_flow = BNS_EF_CHNG_RSTR;
+        }
+    }
+
+    let mut b_error = 0;
+    let mut b_success = 0;
+    let mut n_delta = 0;
+    let mut ret = set_rad_endpoints2(p, bd, RAD_SRCH_NORM);
+    if is_bns_error(ret) {
+        return ret;
+    }
+    let mut n_dots = 0;
+    ret = set_bns_to_check_alt_path(
+        p,
+        v_double,
+        v_single,
+        type_,
+        path_type,
+        &mut apc,
+        &mut fcd,
+        &mut n_dots,
+    );
+    let mut b_adjust_radicals = false;
+    let mut ret_val;
+    let mut skip_search = false;
+    match ret {
+        BNS_CHK_ALTP_NO_ALTPATH => {
+            return remove_rad_endpoints(p, bd, None);
+        }
+        BNS_CHK_ALTP_SAME_TGROUP => {
+            b_success = 1;
+            skip_search = true;
+        }
+        BNS_CHK_ALTP_SAME_VERTEX => {
+            let r = remove_rad_endpoints(p, bd, None);
+            return if r != 0 { r } else { 1 };
+        }
+        BNS_CHK_ALTP_SET_SUCCESS => {}
+        super::ichierr::BNS_CANT_SET_BOND => skip_search = true,
+        _ => {
+            let _ = remove_rad_endpoints(p, bd, None);
+            if is_bns_error(ret) {
+                return ret;
+            }
+            return BNS_PROGRAM_ERR;
+        }
+    }
+    if !skip_search {
+        b_adjust_radicals =
+            b_change_flow & BNS_EF_UPD_RAD_ORI != 0 && b_change_flow & BNS_EF_RSTR_FLOW == 0;
+        ret = run_balanced_network_search(p, bd, b_change_flow);
+        if is_bns_error(ret) {
+            b_error = ret;
+        } else if ret > 0 {
+            if 2 * ret >= n_dots {
+                n_delta = 2 * ret - n_dots;
+                let mut b_do_mark_changed_bonds = 1;
+                if let Some(ag) = aatg.as_deref_mut().filter(|a| !a.n_marked_atom.is_empty()) {
+                    if ag.n_at_type_totals.is_some() && b_change_flow & BNS_EF_UPD_H_CHARGE != 0 {
+                        for m in ag.n_marked_atom.iter_mut().take(num_atoms as usize) {
+                            *m = 0;
+                        }
+                        subtract_or_change_at_h_charge_bns(
+                            p,
+                            at,
+                            num_atoms,
+                            ag.n_at_type_totals.as_deref_mut(),
+                            Some(&mut ag.n_marked_atom),
+                            None,
+                            true,
+                        );
+                        subtract_or_change_at_h_charge_bns(
+                            p,
+                            at,
+                            num_atoms,
+                            None,
+                            None,
+                            ag.t_group_info.as_mut(),
+                            false,
+                        );
+                    } else if ag.n_at_type_totals.is_none() {
+                        b_do_mark_changed_bonds =
+                            mark_atoms_at_taut_groups(p, num_atoms, ag, v_single, v_double);
+                        if b_do_mark_changed_bonds < 0 {
+                            b_error = b_do_mark_changed_bonds;
+                            b_do_mark_changed_bonds = 0;
+                        }
+                    }
+                }
+                if b_do_mark_changed_bonds != 0 {
+                    ret_val =
+                        set_bonds_after_check_one_bond(p, &fcd, -1, at, num_atoms, b_change_flow);
+                    if is_bns_error(ret_val) {
+                        b_error = ret_val;
+                    }
+                    ret = set_bonds_from_bn_struct_flow(p, at, num_atoms, b_change_flow);
+                    if is_bns_error(ret) {
+                        b_error = ret;
+                    } else if ret & 1 == 0 && ret_val & 1 == 0 {
+                        b_success = 1;
+                    } else if ((ret & 1 != 0 || ret_val & 1 != 0)
+                        && b_change_flow & BNS_EF_ALTR_BONDS != 0)
+                        || b_change_flow & BNS_EF_UPD_H_CHARGE != 0
+                    {
+                        b_success = 3;
+                    } else {
+                        b_error = BNS_BOND_ERR;
+                    }
+                    if b_error == 0 {
+                        if let Some(ag) = aatg.filter(|a| !a.n_marked_atom.is_empty()) {
+                            if b_change_flow & BNS_EF_UPD_H_CHARGE != 0 {
+                                if b_adjust_radicals {
+                                    ret_val = restore_radicals_only(p, bd, Some(at));
+                                    if is_bns_error(ret_val) {
+                                        b_error = ret_val;
+                                    }
+                                }
+                                add_changed_at_h_charge_bns(
+                                    at,
+                                    num_atoms,
+                                    ag.n_at_type_totals.as_deref_mut(),
+                                    &mut ag.n_marked_atom,
+                                );
+                                if b_change_flow & BNS_EF_CHNG_FLOW != 0 {
+                                    eliminate_plus_minus_charge_ambiguity(p, num_atoms);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            ret = restore_bn_struct_flow(p, b_change_flow & BNS_EF_CHNG_RSTR);
+            if is_bns_error(ret) {
+                b_error = ret;
+            }
+        }
+    }
+    // reinit_BNS
+    restore_bns_after_check_alt_path(p, &apc, b_change_flow & BNS_EF_UPD_H_CHARGE);
+    restore_flow_after_check_one_bond(p, &fcd);
+    ret_val = remove_rad_endpoints(p, bd, if b_adjust_radicals { Some(at) } else { None });
+    re_init_bn_struct_alt_paths(p);
+    if b_error != 0 {
+        b_error
+    } else if ret_val != 0 {
+        ret_val
+    } else {
+        b_success + 4 * n_delta
+    }
+}
+
+/// `bExistsAnyAltPath`: tries both directions
+pub fn exists_any_alt_path(
+    p: &mut BnStruct,
+    bd: &mut BnData,
+    at: &mut [InpAtom],
+    num_atoms: i32,
+    v2: i32,
+    v1: i32,
+    path_type: i32,
+) -> i32 {
+    let r1 = exists_alt_path(p, bd, None, at, num_atoms, v2, v1, path_type);
+    if r1 > 0 {
+        return r1;
+    }
+    let r2 = exists_alt_path(p, bd, None, at, num_atoms, v1, v2, path_type);
+    if r2 > 0 {
+        return r2;
+    }
+    if is_bns_error(r1) {
+        return r1;
+    }
+    if is_bns_error(r2) {
+        return r2;
+    }
+    0
 }
