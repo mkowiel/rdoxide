@@ -1046,3 +1046,13 @@ pub fn inchi_strnset(s: &mut [u8], val: u8, length: usize) {
         *c = val;
     }
 }
+
+/// `get_endpoint_valence_KET` (`KETO_ENOL_TAUT == 1`): only O and C can be an
+/// endpoint of keto-enol tautomerism
+pub fn get_endpoint_valence_ket(el_number: u8) -> i32 {
+    match el_number {
+        EL_NUMBER_C => 4,
+        EL_NUMBER_O => 2,
+        _ => 0,
+    }
+}
