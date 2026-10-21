@@ -315,6 +315,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 199 | InChI port I6p: ichican2 SetInitialRanks2, FillOutAtomInvariant2 and Clean* helpers with differential test against the C code |
 | 200 | InChI port I6q: ichican2 CanonGraph (canonical numbering search) with differential test against the C code |
 | 201 | InChI port I6r: FixCanonEquivalenceInfo, make_iso_sort_key, ATOM_SIZES and canon flags with differential test against the C code |
+| 202 | InChI port I6s: ichican2 GetBaseCanonRanking (base, fixed-H and isotopic canonical numbering) with differential test against the C code |
 
 ## Python package files
 
@@ -686,3 +687,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-21 — Stage 199: ported SetInitialRanks2, FillOutAtomInvariant2, CleanNumH, CleanCt and CleanIsoSortKeys of ichican2.c and tested them against the upstream C on 5000 random cases.
 * 2026-10-21 — Stage 200: ported CanonGraph of ichican2.c as a state machine over its goto labels and tested it against the upstream C on 3000 random and symmetric graphs, with and without layers and a fixed connection table.
 * 2026-10-21 — Stage 201: ported FixCanonEquivalenceInfo (ichicano.c) and make_iso_sort_key (ichiisot.c) plus the ATOM_SIZES type and CANON_FLAG constants, and tested them against the upstream C on 6000 random cases.
+* 2026-10-21 — Stage 202: ported GetBaseCanonRanking of ichican2.c with the BCN/FTCN result structures, completing ichican2, and tested it against the upstream C on 3000 tautomeric and non-tautomeric structures.

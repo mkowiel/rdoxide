@@ -1708,6 +1708,10 @@ pub struct SpAtom {
     pub elname: [u8; super::inpdef::ATOM_EL_LEN],
     /// `iso_sort_key`
     pub iso_sort_key: i64,
+    /// `cFlags`
+    pub c_flags: i8,
+    /// `iso_atw_diff`
+    pub iso_atw_diff: i8,
     pub neighbor: [u16; super::inpdef::MAXVAL],
     pub bond_type: [u8; super::inpdef::MAXVAL],
     pub init_rank: u16,

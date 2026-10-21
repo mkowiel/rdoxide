@@ -9768,6 +9768,7 @@ fn connection_table_parts_match_the_c_code() {
         let vals: Vec<Vec<i64>> = inp["vals"].as_array().unwrap().iter().map(ints).collect();
         let perm = ints(&inp["perm"]);
         let cd = CanonData {
+            n_canon_flags: 0,
             linear_ct: Vec::new(),
             n_max_len_linear_ct: 8 * n as i32 + 8,
             n_len_linear_ct: fl[3] as i32,
@@ -10311,6 +10312,203 @@ fn base_canonical_numbering_helpers_match_the_c_code() {
             ),
             format!("K {}", make_iso_sort_key(d[0], d[1], d[2], d[3])),
         ];
+        let want: Vec<String> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| s.as_str().unwrap().to_string())
+            .collect();
+        assert_eq!(got, want, "case {case}");
+    }
+}
+
+#[test]
+fn base_canonical_ranking_matches_the_c_code() {
+    use rdoxide::external::inchi::ichican2::*;
+    use rdoxide::external::inchi::ichister::SpAtom;
+    use rdoxide::external::inchi::ichitaut::{TGroup, TGroupInfo};
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_can2f.json")).unwrap();
+    fn ints(v: &serde_json::Value) -> Vec<i64> {
+        v.as_array()
+            .unwrap()
+            .iter()
+            .map(|x| x.as_i64().unwrap())
+            .collect()
+    }
+    fn line<T: std::fmt::Display>(t: &str, v: &[T], n: usize) -> String {
+        let mut s = t.to_string();
+        if v.is_empty() {
+            return s + " -";
+        }
+        for x in v.iter().take(n) {
+            s += &format!(" {x}");
+        }
+        s
+    }
+    for (case, c) in data.as_array().unwrap().iter().enumerate() {
+        let inp = &c["in"];
+        let n = inp["n"].as_u64().unwrap() as usize;
+        let ntg = inp["ntg"].as_u64().unwrap() as usize;
+        let have_yes = inp["haveYes"].as_i64().unwrap() != 0;
+        let have_non = inp["haveNon"].as_i64().unwrap() != 0;
+        let have_tgi = inp["haveTgi"].as_i64().unwrap() != 0;
+        let edges: Vec<(usize, usize)> = inp["edges"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|e| {
+                (
+                    e[0].as_u64().unwrap() as usize,
+                    e[1].as_u64().unwrap() as usize,
+                )
+            })
+            .collect();
+        let build = |key: &str| {
+            let mut at = vec![SpAtom::default(); n + 1];
+            for (i, a) in inp[key].as_array().unwrap().iter().enumerate() {
+                let a = ints(a);
+                let names = ["C", "N", "O", "S", "Cl", "H"];
+                let nm = names[a[0] as usize].as_bytes();
+                at[i].elname[..nm.len()].copy_from_slice(nm);
+                at[i].num_h = a[1] as i8;
+                at[i].iso_atw_diff = a[2] as i8;
+                at[i].num_iso_h = [a[3] as i8, a[4] as i8, a[5] as i8];
+                at[i].c_flags = a[6] as i8;
+                at[i].endpoint = a[7] as u16;
+            }
+            for &(a, b) in &edges {
+                let va = at[a].valence as usize;
+                at[a].neighbor[va] = b as u16;
+                at[a].valence += 1;
+                let vb = at[b].valence as usize;
+                at[b].neighbor[vb] = a as u16;
+                at[b].valence += 1;
+            }
+            at
+        };
+        let at_y = build("atY");
+        let at_n = build("atN");
+        let sz = ints(&inp["sizes"]);
+        let mut s = [AtomSizes::default(); 2];
+        for k in 0..2 {
+            let v = &sz[7 * k..7 * k + 7];
+            s[k] = AtomSizes {
+                n_len_ct: v[0] as i32,
+                n_len_ct_at_only: v[1] as i32,
+                num_isotopic_atoms: v[2] as i32,
+                b_ignore_isotopic: v[3] as i32,
+                n_len_linear_ct_tautomer: v[4] as i32,
+                b_has_isotopic_taut_groups: v[5] as i32,
+                n_len_isotopic_endpoints: v[6] as i32,
+                ..Default::default()
+            };
+        }
+        let iso = ints(&inp["iso"]);
+        let iso_list = ints(&inp["isolist"]);
+        let mut tg = vec![TGroup::default(); ntg + 2];
+        for (k, t) in inp["tgs"].as_array().unwrap().iter().enumerate() {
+            let t = ints(t);
+            tg[k].n_num_endpoints = t[0] as u16;
+            tg[k].n_first_endpoint_at_no_pos = t[1] as u16;
+            tg[k].n_group_number = k as u16 + 1;
+            for j in 0..5 {
+                tg[k].num[j] = t[2 + j] as u16;
+            }
+            tg[k].i_weight = (t[2] * 7 + t[4] * 3 + t[5]) % 5;
+        }
+        let mut tgi = TGroupInfo {
+            t_group: Some(tg),
+            n_endpoint_atom_number: ints(&inp["epl"]).iter().map(|&x| x as u16).collect(),
+            num_t_groups: ntg,
+            max_num_t_groups: ntg,
+            n_num_endpoints: inp["nE"].as_i64().unwrap() as i32,
+            n_num_isotopic_endpoints: iso[1] as i32,
+            b_taut_flags_done: iso[2] as u64,
+            b_ignore_isotopic: iso[4] as i32,
+            ..Default::default()
+        };
+        tgi.tni.b_normalization_flags = iso[3] as u64;
+        tgi.n_isotopic_endpoint_atom_number = std::iter::once(iso[0] as u16)
+            .chain(iso_list.iter().map(|&x| x as u16))
+            .collect();
+        let mut bcn = Bcn::default();
+        let at_refs: [Option<&[SpAtom]>; 2] =
+            [have_non.then_some(&at_n[..]), have_yes.then_some(&at_y[..])];
+        let ret = get_base_canon_ranking(
+            &mut || false,
+            n,
+            n + ntg,
+            at_refs,
+            have_tgi.then_some(&mut tgi),
+            &s,
+            &mut bcn,
+            inp["bfix"].as_i64().unwrap() != 0,
+            false,
+        );
+        let mut got: Vec<String> = Vec::new();
+        got.push(format!(
+            "R {ret} {} {} {} {}",
+            bcn.num_max, bcn.num_at_tg, bcn.num_atoms, bcn.n_max_len_rank_stack
+        ));
+        got.push(format!("TI {}", tgi.b_ignore_isotopic));
+        for j in 0..(bcn.n_max_len_rank_stack / 2) as usize {
+            let p = bcn.p_rank_stack.get(j).cloned().unwrap_or_default();
+            got.push(line(&format!("RS{j}"), &p.rank, bcn.num_max));
+            got.push(line(&format!("RT{j}"), &p.at_number, bcn.num_max));
+        }
+        if ret == 0 {
+            for k in 0..2 {
+                let f = &bcn.ftcn[k];
+                got.push(format!(
+                    "F{k} {} {} {} {} {} {} {} {} {}",
+                    f.num_at_tg,
+                    f.num_atoms,
+                    f.n_canon_flags,
+                    f.n_len_linear_ct_at_only,
+                    f.n_len_linear_ct,
+                    f.n_max_len_linear_ct,
+                    f.n_len_num_h,
+                    f.n_len_num_h_fix_h,
+                    f.len_iso_sort_keys
+                ));
+                let mut s = String::from("NL");
+                match &f.neigh_list {
+                    Some(nl) => {
+                        for l in nl.iter().take(f.num_at_tg) {
+                            s += " |";
+                            for j in 1..=l[0] as usize {
+                                s += &format!(" {}", l[j]);
+                            }
+                        }
+                    }
+                    None => s += " -",
+                }
+                got.push(s);
+                let lc_n = if f.linear_ct.is_empty() {
+                    0
+                } else {
+                    f.n_len_linear_ct as usize + 1
+                };
+                got.push(line("LC", &f.linear_ct, lc_n));
+                got.push(line("PR", &f.partition_ct.rank, bcn.num_max));
+                got.push(line("PA", &f.partition_ct.at_number, bcn.num_max));
+                got.push(line("SY", &f.n_symm_rank_ct, bcn.num_max));
+                let l = f.n_len_num_h as usize;
+                got.push(line("NHO", &f.n_num_h_orig, l));
+                got.push(line("NH", &f.n_num_h, l));
+                got.push(line("NFO", &f.n_num_h_orig_fix_h, l));
+                got.push(line("NF", &f.n_num_h_fix_h, l));
+                got.push(line("IR", &f.partition_ct_iso.rank, bcn.num_max));
+                got.push(line("IA", &f.partition_ct_iso.at_number, bcn.num_max));
+                got.push(line("IS", &f.n_symm_rank_ct_iso, bcn.num_max));
+                let l = f.len_iso_sort_keys as usize;
+                got.push(line("K", &f.iso_sort_keys, l));
+                got.push(line("KO", &f.iso_sort_keys_orig, l));
+                got.push(line("X", &f.iso_exchg_atnos, l));
+                got.push(line("XO", &f.iso_exchg_atnos_orig, l));
+            }
+        }
         let want: Vec<String> = c["out"]
             .as_array()
             .unwrap()
