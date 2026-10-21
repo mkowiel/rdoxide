@@ -199,6 +199,9 @@ int main(void) {
 # functional groups: (element, charge, H count) atoms, the first one binds to
 # the skeleton; bonds as (i, j, order)
 GROUPS = [
+    ([(6, 0, 0), (8, 0, 0), (6, 0, 1), (6, 0, 1), (7, 0, 2)], [(0, 1, 2), (0, 2, 1), (2, 3, 2), (3, 4, 1)]),   # vinylogous amide
+    ([(6, 0, 0), (8, 0, 1), (6, 0, 1), (6, 0, 1), (7, 0, 1)], [(0, 1, 1), (0, 2, 2), (2, 3, 1), (3, 4, 2)]),
+    ([(6, 0, 0), (8, 0, 0), (6, 0, 1), (6, 0, 0), (8, 0, 1)], [(0, 1, 2), (0, 2, 1), (2, 3, 2), (3, 4, 1)]),
     ([(6, 0, 0), (8, 0, 0), (6, 0, 3)], [(0, 1, 2), (0, 2, 1)]),           # acetyl
     ([(6, 0, 0), (8, 0, 0), (6, 0, 2), (6, 0, 0)], [(0, 1, 2), (0, 2, 1), (2, 3, 1)]),
     ([(6, 0, 0), (8, 0, 1), (6, 0, 2)], [(0, 1, 1), (0, 2, 2)]),             # enol
@@ -323,7 +326,7 @@ def main():
         fch = rng.randrange(0, 64)
         mcand = rng.choice([2, 3, n, n + 2, 2 * n])
         cases.append({"atoms": atoms, "hs": hs, "ma": ma, "me": me, "mp": rng.randrange(4, 9), "tf": rng.choice([0x10, 0x10, 0x1010]) | (fch << 16) | (min(mcand, 255) << 24),
-                      "ops": [], "calls": calls, "tg": 1 | (0x80000 if rng.random() < 0.6 else 0) | sum(0x800000 << b for b in range(6) if rng.random() < 0.6)})
+                      "ops": [], "calls": calls, "tg": 1 | (0x80000 if rng.random() < 0.6 else 0) | (0x100000 if rng.random() < 0.7 else 0) | sum(0x800000 << b for b in range(6) if rng.random() < 0.6)})
     def fmt(c):
         t = f"{len(c['atoms'])} {len(c['hs'])} {c['ma']} {c['me']} {c['mp']} {len(c['ops'])} {len(c['calls'])} {c['tf']} {c['tg']}\n"
         for a in c["atoms"]:
@@ -387,10 +390,17 @@ def main():
         "void NodeSetFromRadEndpoints( CANON_GLOBALS *pCG,\n", "void RemoveFromNodeSet( CANON_GLOBALS *pCG,\n", "int DoNodeSetsIntersect( NodeSet *cur_nodes, int k1, int k2 )\n{",
         "int IsNodeSetEmpty( NodeSet *cur_nodes, int k )\n{", "void AddNodeSet2ToNodeSet1( NodeSet *cur_nodes, int k1, int k2 )\n{", "int AddNodesToRadEndpoints( CANON_GLOBALS *pCG,\n"]]
     tt = (SRC / "ichitaut.c").read_text(errors="replace")
+    qq = (SRC / "ichiqueu.c").read_text(errors="replace")
+    def cutq(start):
+        a = qq.rindex(start)
+        return qq[a:qq.index("\n}\n", a) + 3]
+    qpre = qq[qq.index("typedef int CHECK_DFS_PATH("):qq.index("#endif /* TAUT_15_NON_RING */")]
+    qfuncs = [qpre + "\n#define REPLACE_THE_BOND(X) ( (X) == BOND_SINGLE || (X) == BOND_DOUBLE || (X) == BOND_ALTERN || (X) == BOND_ALT12NS )\n"] + [cutq(x) for x in ["int bIsCenterPointStrict( inp_ATOM *atom, int iat )\n{", "int AddBondsPos( inp_ATOM *atom,\n", "int AddEndPoints( T_ENDPOINT *EndPointTmp,\n", "int Check15TautPathCenterpoint( inp_ATOM *atom,", "int Check15TautPath( struct tagCANON_GLOBALS *pCG,\n", "int DFS_FindTautAltPath( struct tagCANON_GLOBALS *pCG,\n", "int nGet15TautInAltPath( struct tagCANON_GLOBALS *pCG,\n"]]
+
     def cut_mark():
         a = tt.index("int MarkTautomerGroups( CANON_GLOBALS *pCG,\n")
-        b = tt.index("#if ( TAUT_OTHER == 1 )", a)
-        return tt[a:b] + "\nexit_function:\n    return nErr < 0 ? nErr : tot_changes;\n}\n"
+        b = tt.index("#if ( TAUT_4PYRIDINOL_RINGS == 1 )", a)
+        return tt[a:b] + "\n    free_memory:\n        if (nDfsPathPos) inchi_free( nDfsPathPos );\n    }\n#endif\nexit_function:\n    return nErr < 0 ? nErr : tot_changes;\n}\n"
 
     def cut_first(start):
         a = tt.index(start)
@@ -400,7 +410,7 @@ def main():
         a = tt.rindex(start)
         return tt[a:tt.index("\n}\n", a) + 3]
     ctype = tt[tt.index("typedef struct tagChargeType"):tt.index("#define NUM_C_TYPES")] + "#define NUM_C_TYPES  (int)(sizeof( CType )/sizeof(CType[0]))\n"
-    endfuncs = [ctype, cut3("int CmpCCandidates( const void *a1, const void *a2 )\n{"), cut3("int RegisterCPoints( C_GROUP *c_group,\n"), cut_mark(), cut3("int GetNeutralRepsIfNeeded( AT_NUMB      *pri,\n"), cut3("int FindAccessibleEndPoints( CANON_GLOBALS *pCG,\n"), cut3("int SetTautomericBonds( inp_ATOM *at,\n"), cut3("int GetSaltChargeType( inp_ATOM *at,\n"), cut3("int GetOtherSaltChargeType( inp_ATOM *at,\n"), cut3("int GetOtherSaltType( inp_ATOM *at, int at_no, int *s_subtype )\n{"), cut3("int bDoNotMergeNonTautAtom( inp_ATOM *at, int at_no )\n{"), cut3("int comp_candidates( const void *a1, const void *a2 )\n{"), cut3("int RegisterEndPoints( CANON_GLOBALS *pCG,\n"), cut3("int AddEndPoint( T_ENDPOINT *pEndPoint, inp_ATOM *at, int iat )\n{"), cut3("int AddAtom2num( AT_RANK num[], inp_ATOM *atom, int at_no, int bSubtract )\n{"), cut3("void AddAtom2DA( AT_RANK num_DA[], inp_ATOM *atom, int at_no, int bSubtract )\n{"), cut3("int is_centerpoint_elem_KET( U_CHAR el_number )\n{"), cut3("int is_centerpoint_elem_strict( U_CHAR el_number )\n{"),
+    endfuncs = [ctype, cut3("int CmpCCandidates( const void *a1, const void *a2 )\n{"), cut3("int RegisterCPoints( C_GROUP *c_group,\n"), cut_mark(), cut3("int GetNeutralRepsIfNeeded( AT_NUMB      *pri,\n"), cut3("int FindAccessibleEndPoints( CANON_GLOBALS *pCG,\n"), cut3("int SetTautomericBonds( inp_ATOM *at,\n"), *qfuncs, cut3("int GetSaltChargeType( inp_ATOM *at,\n"), cut3("int GetOtherSaltChargeType( inp_ATOM *at,\n"), cut3("int GetOtherSaltType( inp_ATOM *at, int at_no, int *s_subtype )\n{"), cut3("int bDoNotMergeNonTautAtom( inp_ATOM *at, int at_no )\n{"), cut3("int comp_candidates( const void *a1, const void *a2 )\n{"), cut3("int RegisterEndPoints( CANON_GLOBALS *pCG,\n"), cut3("int AddEndPoint( T_ENDPOINT *pEndPoint, inp_ATOM *at, int iat )\n{"), cut3("int AddAtom2num( AT_RANK num[], inp_ATOM *atom, int at_no, int bSubtract )\n{"), cut3("void AddAtom2DA( AT_RANK num_DA[], inp_ATOM *atom, int at_no, int bSubtract )\n{"), cut3("int is_centerpoint_elem_KET( U_CHAR el_number )\n{"), cut3("int is_centerpoint_elem_strict( U_CHAR el_number )\n{"),
         cut3("int bCanBeACPoint( inp_ATOM *at,\n"), cut3("int GetChargeType( inp_ATOM *atom, int iat, S_CHAR *cChargeSubtype )\n{")]
     for v in ["", "_PT_22_00", "_PT_16_00", "_PT_06_00", "_PT_39_00", "_PT_13_00", "_PT_18_00"]:
         sig = "int nGetEndpointInfo%s(inp_ATOM *atom, int iat, ENDPOINT_INFO *eif)" % v if v else "int nGetEndpointInfo( inp_ATOM *atom, int iat, ENDPOINT_INFO *eif )"
@@ -440,6 +450,9 @@ def main():
 int GetNeutralRepsIfNeeded( AT_NUMB *pri, AT_NUMB *prj, inp_ATOM *at, int num_atoms, T_ENDPOINT *EndPoint, int nNumEndPoints, C_GROUP_INFO *cgi );
 int FindAccessibleEndPoints( CANON_GLOBALS *pCG, T_ENDPOINT *EndPoint, int *nNumEndPoints, T_BONDPOS *BondPos, int *nNumBondPos, struct BalancedNetworkStructure *pBNS, struct BalancedNetworkData *pBD, inp_ATOM *at, int num_atoms, C_GROUP_INFO *cgi, int taut_mode );
 int SetTautomericBonds( inp_ATOM *at, int nNumBondPos, T_BONDPOS *BondPos );
+int bIsCenterPointStrict( inp_ATOM *atom, int iat );
+int AddBondsPos( inp_ATOM *atom, T_BONDPOS *BondPosTmp, int nNumBondPosTmp, T_BONDPOS *BondPos, int nMaxNumBondPos, int nNumBondPos );
+int AddEndPoints( T_ENDPOINT *EndPointTmp, int nNumNewEndPoint, T_ENDPOINT *EndPoint, int nMaxNumEndPoint, int nNumEndPoint );
 int bHasOtherExchangableH( inp_ATOM *at, int i );
 int GetSaltChargeType( inp_ATOM *at, int at_no, T_GROUP_INFO *t_group_info, int *s_subtype );
 int GetOtherSaltChargeType( inp_ATOM *at, int at_no, T_GROUP_INFO *t_group_info, int *s_subtype, int bAccept_O );
