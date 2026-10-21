@@ -7978,3 +7978,244 @@ fn known_stereo_center_parities_match_the_c_code() {
         assert_eq!(got, want, "case {n}");
     }
 }
+
+#[test]
+fn rank_refinement_matches_the_c_code() {
+    use rdoxide::external::inchi::ichimap::*;
+    use rdoxide::external::inchi::ichister::SpAtom;
+    use rdoxide::external::inchi::ichitaut::{TGroup, TGroupInfo};
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_ranks.json")).unwrap();
+    fn pnl(nl: &NeighList, n: usize) -> String {
+        let mut s = String::new();
+        for l in nl.iter().take(n) {
+            s += " [";
+            s += &l
+                .iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<_>>()
+                .join(",");
+            s += "]";
+        }
+        s
+    }
+    fn pa(t: &str, a: &[u16], n: usize) -> String {
+        let mut s = t.to_string();
+        for x in a.iter().take(n) {
+            s += &format!(" {x}");
+        }
+        s
+    }
+    for (case, c) in data.as_array().unwrap().iter().enumerate() {
+        let inp = &c["in"];
+        let n = inp["n"].as_u64().unwrap() as usize;
+        let ntg = inp["ntg"].as_u64().unwrap() as usize;
+        let u16s = |v: &serde_json::Value| -> Vec<u16> {
+            v.as_array()
+                .unwrap()
+                .iter()
+                .map(|x| x.as_u64().unwrap() as u16)
+                .collect()
+        };
+        let mut rank = u16s(&inp["rank"]);
+        let mut anum = u16s(&inp["anum"]);
+        let mut symm = u16s(&inp["symm"]);
+        rank.resize(n + 8, 0);
+        anum.resize(n + 8, 0);
+        symm.resize(n + 8, 0);
+        let endpoint = u16s(&inp["endpoint"]);
+        let mut at = vec![SpAtom::default(); n + 1];
+        for i in 0..n {
+            let adj = u16s(&inp["adj"][i]);
+            let bonds = u16s(&inp["bonds"][i]);
+            at[i].valence = adj.len() as i8;
+            at[i].endpoint = endpoint[i];
+            for (j, q) in adj.iter().enumerate() {
+                at[i].neighbor[j] = *q;
+                at[i].bond_type[j] = bonds[j] as u8;
+            }
+        }
+        let mut tgi = TGroupInfo::default();
+        let mut groups = Vec::new();
+        let mut ends: Vec<u16> = Vec::new();
+        for g in inp["groups"].as_array().unwrap() {
+            let e = u16s(g);
+            let t = TGroup {
+                n_num_endpoints: e.len() as u16,
+                n_first_endpoint_at_no_pos: ends.len() as u16,
+                ..Default::default()
+            };
+            ends.extend_from_slice(&e);
+            groups.push(t);
+        }
+        tgi.t_group = Some(groups);
+        tgi.num_t_groups = ntg;
+        tgi.n_endpoint_atom_number = ends;
+        let lct = u16s(&inp["lct"]);
+        let invs: Vec<AtomInvariant2> = inp["inv"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| {
+                let mut a = AtomInvariant2::default();
+                for (j, x) in u16s(&v["val"]).iter().enumerate() {
+                    a.val[j] = *x;
+                }
+                a.iso_sort_key = v["k"].as_i64().unwrap();
+                a.iso_aux_key = v["ak"].as_i64().unwrap() as i8;
+                a
+            })
+            .collect();
+        let mut got: Vec<String> = Vec::new();
+        for sq in 0..2 {
+            let nl = create_neigh_list(n, n, &at, sq == 1, Some(&tgi));
+            got.push(format!("C{sq}{}", pnl(&nl, n)));
+            if ntg != 0 {
+                let nt = create_neigh_list(n, n + ntg, &at, sq == 1, Some(&tgi));
+                got.push(format!("T{sq}{}", pnl(&nt, n + ntg)));
+            }
+        }
+        match create_neigh_list_from_linear_ct(&lct, lct.len(), n) {
+            Some(nl) => got.push(format!("L{}", pnl(&nl, n))),
+            None => got.push("L null".to_string()),
+        }
+        let base = create_neigh_list(n, n, &at, false, Some(&tgi));
+        {
+            let mut r2 = vec![0u16; n + 8];
+            let (nd, ch) = sorted_equ_info_to_ranks(&symm, &mut r2, &anum, n);
+            got.push(format!("E {nd} {}", i32::from(ch)));
+            got.push(pa("e", &r2, n));
+            let mut s2 = vec![0u16; n + 8];
+            got.push(format!(
+                "Q {}",
+                sorted_ranks_to_equ_info(&mut s2, &rank, &anum, n)
+            ));
+            got.push(pa("q", &s2, n));
+            let mut inpl = symm.clone();
+            let (nd, _) = sorted_equ_info_to_ranks_in_place(&mut inpl, &anum, n);
+            got.push(format!("I {nd}{}", pa("i", &inpl, n)));
+        }
+        {
+            let mut nl = base.clone();
+            sort_neigh_lists2(n, &rank, &mut nl, &anum);
+            got.push(format!("S2{}", pnl(&nl, n)));
+            let mut nl = base.clone();
+            sort_neigh_lists3(n, &rank, &mut nl, &anum);
+            got.push(format!("S3{}", pnl(&nl, n)));
+            sort_neigh_lists_by_symm_and_canon_rank(n, &mut nl, &symm, &rank);
+            got.push(format!("SB{}", pnl(&nl, n)));
+        }
+        for v in 0..4 {
+            let nl = base.clone();
+            let mut an = anum.clone();
+            let mut nr = vec![0u16; n + 8];
+            let r = match v {
+                0 => set_new_ranks_from_neigh_lists3(n, &nl, &rank, &mut nr, &mut an),
+                1 => set_new_ranks_from_neigh_lists4(
+                    n,
+                    &nl,
+                    &rank,
+                    &mut nr,
+                    &mut an,
+                    (n / 2 + 1) as u16,
+                ),
+                _ => set_new_ranks_from_neigh_lists(
+                    n,
+                    &nl,
+                    &rank,
+                    &mut nr,
+                    &mut an,
+                    v - 2,
+                    RankSortCmp::NeighListRanksOrd,
+                ),
+            };
+            got.push(format!("R{v} {r}{}", pa("", &nr, n)));
+            got.push(pa("a", &an, n));
+        }
+        for alt in 0..2 {
+            let nl = base.clone();
+            let mut an = anum.clone();
+            let mut nr = vec![0u16; n + 8];
+            let r = set_new_ranks_from_neigh_lists(
+                n,
+                &nl,
+                &rank,
+                &mut nr,
+                &mut an,
+                alt,
+                RankSortCmp::NeighListRanks,
+            );
+            got.push(format!("RB{alt} {r}{}", pa("", &nr, n)));
+        }
+        for v in 0..6 {
+            let mut nl = base.clone();
+            let mut an = anum.clone();
+            let mut cur = rank.clone();
+            let mut prev = vec![0u16; n + 8];
+            let mut it = 0i64;
+            let r = match v {
+                0 => differentiate_ranks2(n, &mut nl, 1, &mut cur, &mut prev, &mut an, &mut it, 0),
+                1 => differentiate_ranks2(n, &mut nl, 1, &mut cur, &mut prev, &mut an, &mut it, 1),
+                2 => differentiate_ranks3(n, &mut nl, 1, &mut cur, &mut prev, &mut an, &mut it),
+                3 => differentiate_ranks4(
+                    n,
+                    &mut nl,
+                    1,
+                    &mut cur,
+                    &mut prev,
+                    &mut an,
+                    (n / 2 + 1) as u16,
+                    &mut it,
+                ),
+                _ => differentiate_ranks_basic(
+                    n,
+                    &mut nl,
+                    1,
+                    &mut cur,
+                    &mut prev,
+                    &mut an,
+                    &mut it,
+                    v - 4,
+                ),
+            };
+            got.push(format!("D{v} {r} {it}{}", pa("", &cur, n)));
+            got.push(pa("p", &prev, n));
+            got.push(pa("a", &an, n));
+            got.push(format!("n{}", pnl(&nl, n)));
+        }
+        {
+            let mut nl = base.clone();
+            let mut stack = vec![rank[..n].to_vec(), anum[..n].to_vec()];
+            let mut tmp = vec![0u16; n + 8];
+            let mut cs = CanonCounters::default();
+            let r = break_all_ties(n, n + 4, &mut stack, &mut nl, &mut tmp, &mut cs);
+            got.push(format!(
+                "B {r} {} {}{}",
+                cs.l_num_neigh_list_iter,
+                cs.l_num_break_ties,
+                pa("", &stack[2], n)
+            ));
+            got.push(pa("b", &stack[3], n));
+        }
+        {
+            let mut s = String::from("V");
+            for i in 0..invs.len() {
+                for j in 0..invs.len() {
+                    s += &format!(
+                        " {},{}",
+                        comp_atom_invariants2_only(&invs[i], &invs[j]),
+                        comp_atom_invariants2(&invs, i as u16, j as u16)
+                    );
+                }
+            }
+            got.push(s);
+        }
+        let want: Vec<String> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| s.as_str().unwrap().to_string())
+            .collect();
+        assert_eq!(got, want, "case {case}");
+    }
+}

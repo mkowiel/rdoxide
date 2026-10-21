@@ -1705,6 +1705,7 @@ pub const MIN_SB_RING_SIZE: u16 = 8;
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct SpAtom {
     pub neighbor: [u16; super::inpdef::MAXVAL],
+    pub bond_type: [u8; super::inpdef::MAXVAL],
     pub init_rank: u16,
     pub orig_at_number: u16,
     pub valence: i8,
