@@ -14265,3 +14265,133 @@ fn ichiprt1_orig_struct_and_reversibility_match_the_c_code() {
         assert_eq!(got, want, "case {ci}: {}", c["in"]);
     }
 }
+
+#[test]
+fn ichiprt1_polymer_output_helpers_match_the_c_code() {
+    use rdoxide::external::inchi::ichi::{InChIAux, InChISort, OrigInfo};
+    use rdoxide::external::inchi::ichi_io::{
+        INCHI_IOS_TYPE_STRING, InchiIosString, InchiIostream, IosFile, inchi_ios_init,
+        inchi_ios_print_nodisplay, inchi_strbuf_init,
+    };
+    use rdoxide::external::inchi::ichiprt1::*;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_prt1h.json")).unwrap();
+    fn opt_u16(t: &mut InchiTok) -> Vec<u16> {
+        if t.i() == 0 {
+            return Vec::new();
+        }
+        let l = t.i();
+        (0..l).map(|_| t.i() as u16).collect()
+    }
+    fn aux(t: &mut InchiTok) -> Option<InChIAux> {
+        if t.i() == 0 {
+            return None;
+        }
+        let mut a = InChIAux {
+            n_number_of_atoms: t.i() as i32,
+            n_number_of_t_groups: t.i() as i32,
+            b_deleted: t.i() as i32,
+            b_is_isotopic: t.i() as i32,
+            ..Default::default()
+        };
+        a.n_constit_equ_numbers = opt_u16(t);
+        a.n_constit_equ_t_group_numbers = opt_u16(t);
+        a.n_constit_equ_isotopic_numbers = opt_u16(t);
+        a.n_constit_equ_isotopic_t_group_numbers = opt_u16(t);
+        a.n_orig_at_nos_in_canon_ord = opt_u16(t);
+        a.n_isotopic_orig_at_nos_in_canon_ord = opt_u16(t);
+        a.n_orig_at_nos_in_canon_ord_inv = opt_u16(t);
+        a.n_isotopic_orig_at_nos_in_canon_ord_inv = opt_u16(t);
+        if t.i() != 0 {
+            let l = t.i();
+            a.orig_info = (0..l)
+                .map(|_| OrigInfo {
+                    c_charge: t.i() as i8,
+                    c_radical: t.i() as i8,
+                    c_unusual_valence: t.i() as i8,
+                })
+                .collect();
+        }
+        Some(a)
+    }
+    for (ci, c) in data.as_array().unwrap().iter().enumerate() {
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        let mut t = InchiTok(c["in"].as_str().unwrap().split_whitespace());
+        let cmd = t.s();
+        let got = match cmd.as_str() {
+            "err" => {
+                let kind = t.i() as i32;
+                let text = t.s().replace("~n", "\n");
+                let mut out = InchiIostream::default();
+                inchi_ios_init(&mut out, INCHI_IOS_TYPE_STRING, IosFile::None);
+                let ret = output_inchi_plain_error(&mut out, &text, kind);
+                format!("{ret} [{}]", strbuf_str(&out.s))
+            }
+            "bondlt" => {
+                let b1 = [t.i() as i32, t.i() as i32];
+                let b2 = [t.i() as i32, t.i() as i32];
+                format!("{}", is_bond_atom_nums_lesser(&b1, &b2))
+            }
+            "count" => {
+                let f = t.s();
+                format!("{}", count_pseudo_element_in_formula("Zz", f.as_bytes()))
+            }
+            "hide" => {
+                let pzz = t.i() as i32;
+                let zy = t.i() as i32;
+                let text = t.s().replace("~n", "\n");
+                let mut out = InchiIostream::default();
+                inchi_ios_init(&mut out, INCHI_IOS_TYPE_STRING, IosFile::None);
+                inchi_ios_print_nodisplay(Some(&mut out), &text);
+                edit_inchi_hide_polymer_zz(&mut out, pzz, zy);
+                format!("{} [{}]", out.s.n_used_length, strbuf_str(&out.s))
+            }
+            _ => {
+                let n = t.i() as usize;
+                let ot = t.i() as i32;
+                let sorts: Vec<InChISort> = (0..n)
+                    .map(|i| InChISort {
+                        p_inchi: [t.inchi(), t.inchi()],
+                        p_inchi_aux: [aux(&mut t), aux(&mut t)],
+                        ord_number: i as i16,
+                    })
+                    .collect();
+                let mut io = InchiOutCtl {
+                    taut_mode: t.i() as i32,
+                    b_omit_repetitions: t.i() as i32,
+                    b_out_type: ot,
+                    num_components: n,
+                    ..Default::default()
+                };
+                let nat = t.i() as usize;
+                io.p_inchi_sort = sorts.clone();
+                io.p_inchi_sort2 = sorts;
+                let mut sb = InchiIosString::default();
+                inchi_strbuf_init(&mut sb, 64, 16);
+                let mut cano = vec![0i32; nat + 2];
+                let mut comp = vec![0i32; nat + 2];
+                let ret = internally_get_cano_nums_and_component_nums(
+                    &mut sb,
+                    &mut io,
+                    nat,
+                    &mut cano[..nat + 1],
+                    &mut comp[..nat + 1],
+                );
+                let j = |v: &[i32]| {
+                    v[..=nat]
+                        .iter()
+                        .map(|x| format!(" {x}"))
+                        .collect::<String>()
+                };
+                format!("{ret}{} |{}", j(&cano), j(&comp))
+            }
+        };
+        let got: Vec<&str> = got.split('\n').filter(|l| !l.is_empty()).collect();
+        assert_eq!(got, want, "case {ci}: {}", c["in"]);
+    }
+}
