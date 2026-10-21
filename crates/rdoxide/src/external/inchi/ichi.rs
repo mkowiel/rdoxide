@@ -75,10 +75,11 @@ pub struct InChI {
     pub b_deleted: i32,
 }
 
-/// `INCHI_SORT` (the `INChI_Aux` pointers are not needed here)
+/// `INCHI_SORT`
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct InChISort {
     pub p_inchi: [Option<InChI>; 2],
+    pub p_inchi_aux: [Option<InChIAux>; 2],
     pub ord_number: i16,
 }
 
