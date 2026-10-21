@@ -2306,3 +2306,102 @@ fn balanced_network_structure_matches_the_c_code() {
         }
     }
 }
+
+#[test]
+fn balanced_network_search_matches_the_c_code() {
+    use rdoxide::external::inchi::ichi_bns::*;
+    use rdoxide::external::inchi::inpdef::InpAtom;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_bnsearch.json")).unwrap();
+    for c in data.as_array().unwrap() {
+        let inp = &c["in"];
+        let mut at: Vec<InpAtom> = Vec::new();
+        for a in inp["atoms"].as_array().unwrap() {
+            let mut x = InpAtom {
+                valence: a["v"].as_i64().unwrap() as i8,
+                chem_bonds_valence: a["cbv"].as_i64().unwrap() as i8,
+                el_number: a["el"].as_u64().unwrap() as u8,
+                radical: a["rad"].as_i64().unwrap() as i8,
+                c_point: a["vt"].as_u64().unwrap() as u16,
+                ..Default::default()
+            };
+            for (j, e) in a["nb"].as_array().unwrap().iter().enumerate() {
+                x.neighbor[j] = e[0].as_u64().unwrap() as u16;
+                x.bond_type[j] = e[1].as_u64().unwrap() as u8;
+            }
+            at.push(x);
+        }
+        let n = at.len();
+        let (mut p, _) = allocate_and_init_bn_struct(
+            &mut at,
+            n,
+            inp["ma"].as_i64().unwrap() as i32,
+            inp["me"].as_i64().unwrap() as i32,
+            inp["mp"].as_i64().unwrap() as i32,
+        );
+        p.type_tacn = inp["tacn"].as_u64().unwrap() as u16;
+        p.type_t = inp["t"].as_u64().unwrap() as u16;
+        p.type_cn = inp["cn"].as_u64().unwrap() as u16;
+        for i in 0..n {
+            let vt = u32::from(at[i].c_point);
+            p.vert[i].type_ |= (((vt & 0x1c) << 1) | ((vt & 3) << 9)) as u16;
+        }
+        let mut got: Vec<String> = Vec::new();
+        let mut s = String::new();
+        for i in 0..n as i32 {
+            s += &format!("e{}", i32::from(is_bns_endpoint(&p, i)));
+        }
+        got.push(s);
+        let mut bd = allocate_and_init_bn_data(p.max_vertices);
+        bd.rad_endpoints = vec![0; 2 * p.max_vertices as usize + 8];
+        bd.b_rad_srch_mode = inp["rm"].as_i64().unwrap() as i32;
+        let ret = run_balanced_network_search(&mut p, &mut bd, inp["bcf"].as_i64().unwrap() as i32);
+        got.push(format!("X {ret} {}", bd.n_num_rad_endpoints));
+        let mut s = String::new();
+        for i in 0..bd.n_num_rad_endpoints as usize {
+            s += &format!(" {}", bd.rad_endpoints[i]);
+        }
+        got.push(s);
+        for v in p.vert.iter().take(p.num_vertices as usize) {
+            let e = &v.st_edge;
+            got.push(format!(
+                "V {} {} {} {} {} {}",
+                v.type_, e.cap, e.cap0, e.flow, e.flow0, e.pass
+            ));
+        }
+        for e in p.edge.iter().take(p.num_edges as usize) {
+            got.push(format!(
+                "E {} {} {} {} {}",
+                e.cap, e.cap0, e.flow, e.flow0, e.pass
+            ));
+        }
+        got.push(format!(
+            "P {} {} {}",
+            p.num_altp, p.b_change_flow, p.b_not_a_simple_path
+        ));
+        for a in 0..p.num_altp.min(p.max_altp) as usize {
+            let ap = &p.altp[a];
+            let len = ap[I_ALTP_PATH_LEN].number();
+            let mut s = format!(
+                "A {} {} {} {} {}",
+                ap[I_ALTP_START_ATOM].number(),
+                ap[I_ALTP_END_ATOM].number(),
+                len,
+                ap[I_ALTP_FLOW].flow[0],
+                ap[I_ALTP_FLOW].flow[1]
+            );
+            for j in 0..len as usize {
+                let e = &ap[I_ALTP_NEIGHBOR + j];
+                s += &format!(" {},{}", e.ineigh(0), e.ineigh(1));
+            }
+            got.push(s);
+        }
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        assert_eq!(got, want, "{inp}");
+    }
+}
