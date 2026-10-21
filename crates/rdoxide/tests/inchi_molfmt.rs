@@ -466,3 +466,69 @@ fn molfile_v3000_matches_c() {
         assert_eq!(out, want, "case {ci}: {inp}");
     }
 }
+
+#[test]
+fn read_molfile_with_sdf_data_matches_c() {
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_molfmt4.json")).unwrap();
+    for (ci, c) in data.as_array().unwrap().iter().enumerate() {
+        let inp = c["in"].as_str().unwrap();
+        let t: Vec<&str> = inp.split(' ').collect();
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        let bcoord = t[0] == "1";
+        let polymers: i32 = t[1].parse().unwrap();
+        let npzz: i32 = t[2].parse().unwrap();
+        let nowarn = t[3] == "1";
+        let (use_name, use_id, use_val) = (t[4] == "1", t[5] == "1", t[6] == "1");
+        let labels: [Option<&[u8]>; 12] = [
+            None,
+            Some(b""),
+            Some(b"CAS"),
+            Some(b"CAS_NO"),
+            Some(b"MyLabel"),
+            Some(b"NAME"),
+            Some(b"COMMENT"),
+            Some(b"MolfileName"),
+            Some(b"MolfileLine2"),
+            Some(b"MolfileComment"),
+            Some(b"MolfileIntRegNo"),
+            Some(b"x"),
+        ];
+        let label = labels[t[7].parse::<usize>().unwrap()];
+        let mut ios = stream(&unhex(t[8]));
+        let mut perr = String::new();
+        let mut name = Vec::new();
+        let mut id: u64 = 777;
+        let mut value = Vec::new();
+        let (m, err) = read_molfile(
+            &mut ios,
+            None,
+            bcoord,
+            polymers,
+            npzz,
+            ReadMolfileExtras {
+                name: use_name.then_some((&mut name, 64)),
+                id: use_id.then_some(&mut id),
+                sdf_label: label,
+                sdf_value: use_val.then_some(&mut value),
+            },
+            &mut perr,
+            nowarn,
+        );
+        let mut out = Vec::new();
+        if let Some(m) = m {
+            dump_hdr(&m.hdr, &mut out);
+            dump_ctab(&m.ctab, &mut out);
+            dump_v3(&m.ctab, &mut out);
+            dump_all(&m.ctab, &mut out);
+        }
+        out.push(format!("N {} {id} {}", hex(&name), hex(&value)));
+        out.push(format!("R {err} {}", hex(perr.as_bytes())));
+        assert_eq!(out, want, "case {ci}: {inp}");
+    }
+}

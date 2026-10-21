@@ -336,6 +336,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 220 | InChI port I9a: Molfile field reader and V2000 header/counts/atoms/bonds readers, differential-tested on 3900 cases vs the C library |
 | 221 | InChI port I9b: Molfile property block, S-groups, pseudo-elements and V2000 driver, differential-tested on 2200 molfiles vs the C library |
 | 222 | InChI port I9c: V3000 Molfile reader wired into the Molfile driver, differential-tested on 3449 fuzzed V3000 molfiles vs the C library |
+| 223 | InChI port I9d: ReadMolfile and the SD-file data readers of mol_fmt4, differential-tested on 2286 molfiles vs the C library |
 
 ## Python package files
 
@@ -740,3 +741,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-21 — Stage 220: I9a molfmt: Molfile V2000 readers differential-tested against C (3900 cases)
 * 2026-10-21 — Stage 221: I9b molfmt: Molfile property block and V2000 driver differential-tested against C (2200 cases)
 * 2026-10-21 — Stage 222: I9c molfmt3: V3000 Molfile reader differential-tested against C (3449 cases)
+* 2026-10-21 — Stage 223: I9d molfmt4: ReadMolfile + SDFile data readers differential-tested against C (2286 cases)
