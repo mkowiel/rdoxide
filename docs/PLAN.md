@@ -95,3 +95,25 @@ Priorities inside each stage are driven by real-world usage: the API used by
   wheel for hot paths (SMILES parse/write, sanitize, substruct, fingerprints).
 
 Progress is tracked in [STATUS.md](STATUS.md).
+
+## Follow-ups after the InChI port (I12)
+
+Requested by the project owner; start only once the InChI port is finished.
+Upstream ratchet run of 2026-10-21 (1884/1987 passing) shows these failures:
+
+* **Tuple vs list return types** (most of them): upstream `nbWrap/rough_test.py`
+  expects Python `list`s where rdoxide returns `tuple`s or the other way round
+  (`testBitVectQuery`, `testCrambin`, `testDetectChemistryProblems`,
+  `testGithub4138`, `testReplaceAtomWithQueryAtom`, `testSubstructMatchAcetate`,
+  `testSubstructParameters*`, `testSubstanceGroupProperties`); audit every
+  wrapper's return type against upstream (nanobind returns `list` for
+  `std::vector`, `tuple` for `std::tuple`/`std::pair`/explicit `make_tuple`).
+* Other `rough_test.py` failures: `test12Smarts`, `test57AddRecursiveQuery`,
+  `test16Props`, `testGithub4570` (`HasProp(None)`), `testGithub8877`,
+  `testSetEnhancedStereoGroupOwnershipCheck`, `testSetEnhancedStereoTypeChecking`,
+  `test_conformer_lifetime` (`PyBorrowError` panic).
+* Missing modules/methods: `rdMolDraw2DQt`, `Chem.PandasTools`,
+  `BitEnsemble.InitScoreTable`, `testMaxMin.py` (`499500.0` passed where a
+  sequence of ints is expected), `testGetPropDefault.py`, `testThreads.py`
+  (collected without tests).
+
