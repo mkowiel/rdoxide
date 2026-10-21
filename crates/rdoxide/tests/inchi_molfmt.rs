@@ -250,3 +250,139 @@ fn molfile_reader_matches_c() {
         assert_eq!(got, want, "case {ci}: {inp}");
     }
 }
+
+fn dump_hdr(h: &MolFmtHeaderBlock, out: &mut Vec<String>) {
+    out.push(format!(
+        "H {} {} {} {} {} {} {} {} {} {} {} {} {} {} {}",
+        hex(&h.molname),
+        hex(&h.line2),
+        hex(&h.user_initls),
+        hex(&h.prog_name),
+        h.month,
+        h.day,
+        h.year,
+        h.hour,
+        h.minute,
+        hex(&h.dim_code),
+        h.scaling_factor1,
+        pd(h.scaling_factor2),
+        pd(h.energy),
+        h.internal_regno,
+        hex(&h.comment)
+    ));
+}
+
+fn dump_ctab(c: &MolFmtCtab, out: &mut Vec<String>) {
+    out.push(format!(
+        "C {} {} {} {} {} {} {}",
+        c.n_atoms,
+        c.n_bonds,
+        c.chiral_flag,
+        c.n_stext_entries,
+        c.n_property_lines,
+        hex(&c.version_string),
+        i32::from(c.v3000.is_some())
+    ));
+}
+
+fn dump_all(c: &MolFmtCtab, out: &mut Vec<String>) {
+    for i in 0..(c.n_atoms.max(0) as usize).min(300) {
+        let a = &c.atoms.as_ref().unwrap()[i];
+        out.push(format!(
+            "A {i} {} {} {} {} {} {} {} {} {} {}",
+            pd(a.fx),
+            pd(a.fy),
+            pd(a.fz),
+            hex(&a.symbol),
+            a.mass_difference,
+            a.charge,
+            a.radical,
+            a.stereo_parity,
+            a.valence,
+            a.atom_aliased_flag
+        ));
+        if let Some(co) = &c.coords {
+            let n = co[i].iter().position(|&x| x == 0).unwrap_or(32);
+            out.push(format!("O {i} {}", hex(&co[i][..n])));
+        }
+    }
+    if let Some(b) = &c.bonds {
+        for i in 0..(c.n_bonds.max(0) as usize).min(300) {
+            out.push(format!(
+                "B {i} {} {} {} {}",
+                b[i].atnum1, b[i].atnum2, b[i].bond_type, b[i].bond_stereo
+            ));
+        }
+    }
+    for s in &c.sgroups {
+        let mut l = format!(
+            "G {} {} {} {} {} ",
+            s.id, s.type_, s.subtype, s.conn, s.label
+        );
+        for x in s.xbr1.iter().chain(s.xbr2.iter()) {
+            l += &format!("{} ", pd(*x));
+        }
+        l += &hex(&s.smt);
+        l += &format!(" {}", s.alist.len());
+        for x in &s.alist {
+            l += &format!(" {x}");
+        }
+        l += &format!(" {}", s.blist.len());
+        for x in &s.blist {
+            l += &format!(" {x}");
+        }
+        out.push(l);
+    }
+}
+
+#[test]
+fn molfile_data_lines_match_c() {
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_molfmt2.json")).unwrap();
+    for (ci, c) in data.as_array().unwrap().iter().enumerate() {
+        let inp = c["in"].as_str().unwrap();
+        let t: Vec<&str> = inp.split(' ').collect();
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        let mode: i32 = t[0].parse().unwrap();
+        let (bcoord, polymers, nowarn, pseudo) =
+            (t[1] == "1", t[2] == "1", t[3] == "1", t[4] == "1");
+        let mut ios = stream(&unhex(t[5]));
+        let mut perr = String::new();
+        let mut out = Vec::new();
+        let err;
+        if mode == 0 {
+            let (m, e) =
+                molfile_read_data_lines(&mut ios, None, bcoord, polymers, &mut perr, nowarn);
+            err = e;
+            if let Some(mut m) = m {
+                dump_hdr(&m.hdr, &mut out);
+                dump_ctab(&m.ctab, &mut out);
+                let mut e2 = 0;
+                let mut s2 = String::new();
+                let nzz = molfile_treat_pseudo_element_atoms(&mut m.ctab, pseudo, &mut e2, &mut s2);
+                dump_all(&m.ctab, &mut out);
+                out.push(format!("Z {nzz} {e2} {}", hex(s2.as_bytes())));
+            }
+        } else {
+            let mut only = MolFmtData::default();
+            err = molfile_read_data_lines(
+                &mut ios,
+                Some(&mut only),
+                bcoord,
+                polymers,
+                &mut perr,
+                nowarn,
+            )
+            .1;
+            dump_hdr(&only.hdr, &mut out);
+            dump_ctab(&only.ctab, &mut out);
+        }
+        out.push(format!("R {err} {}", hex(perr.as_bytes())));
+        assert_eq!(out, want, "case {ci}: {inp}");
+    }
+}

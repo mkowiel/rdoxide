@@ -11,8 +11,11 @@
 
 use super::ichi_io::{InchiIostream, inchi_fgets_lf};
 use super::ichierr::add_error_message;
-use super::ichiprt1::{MOL_COORD_LEN, MolCoord};
-use super::util::{dotify_non_printable_chars, inchi_memicmp, mystrncpy, remove_one_lf};
+use super::ichiprt1::MolCoord;
+use super::util::{
+    dotify_non_printable_chars, extract_charges_and_radicals, get_atomic_mass, inchi_memicmp,
+    lrtrim, mystrncpy, normalize_string, remove_one_lf,
+};
 
 pub const SD_FMT_END_OF_DATA: &[u8] = b"$$$$";
 pub const MOL_FMT_INPLINELEN: i32 = 204;
@@ -127,6 +130,8 @@ pub struct MolFmtCtab {
     pub bonds: Option<Vec<MolFmtBond>>,
     pub coords: Option<Vec<MolCoord>>,
     pub sgroups: Vec<MolFmtSgroup>,
+    /// `MolFmtSgroups_Free` zeroes the container: nothing can be appended later
+    pub sgroups_freed: bool,
     pub v3000: Option<Box<MolFmtV3000>>,
 }
 
@@ -754,6 +759,7 @@ pub fn molfile_read_counts_line(
         None
     };
     ctab.sgroups = Vec::new();
+    ctab.sgroups_freed = false;
     err
 }
 
@@ -951,5 +957,825 @@ pub fn molfile_read_stext_block(
     err
 }
 
-#[allow(dead_code)]
-const _: usize = MOL_COORD_LEN;
+pub const MOL_FMT_M_STY_NON: i32 = 0;
+pub const MOL_FMT_M_STY_SRU: i32 = 1;
+pub const MOL_FMT_M_STY_MON: i32 = 2;
+pub const MOL_FMT_M_STY_COP: i32 = 3;
+pub const MOL_FMT_M_STY_MOD: i32 = 4;
+pub const MOL_FMT_M_STY_CRO: i32 = 5;
+pub const MOL_FMT_M_STY_MER: i32 = 6;
+pub const MOL_FMT_M_SST_NON: i32 = 0;
+pub const MOL_FMT_M_SST_ALT: i32 = 1;
+pub const MOL_FMT_M_SST_RAN: i32 = 2;
+pub const MOL_FMT_M_SST_BLK: i32 = 3;
+pub const MOL_FMT_M_CONN_NON: i32 = 0;
+pub const MOL_FMT_M_CONN_HT: i32 = 1;
+pub const MOL_FMT_M_CONN_HH: i32 = 2;
+pub const MOL_FMT_M_CONN_EU: i32 = 3;
+/// `ZERO_ATW_DIFF`: marks the mass of the most abundant isotope
+pub const ZERO_ATW_DIFF: i32 = 127;
+pub const MAXVAL: i32 = 20;
+
+/// `MolFmtSgroups_GetIndexBySgroupId`
+pub fn molfmt_sgroups_get_index_by_sgroup_id(id: i32, sgroups: &[MolFmtSgroup]) -> Option<usize> {
+    sgroups.iter().position(|g| g.id == id)
+}
+
+/// `MolFmtSgroups_Append`: false (C: -1) once the container was freed
+fn sgroups_append(ctab: &mut MolFmtCtab, id: i32, type_: i32) -> bool {
+    if ctab.sgroups_freed {
+        return false;
+    }
+    ctab.sgroups.push(MolFmtSgroup {
+        id,
+        type_,
+        ..Default::default()
+    });
+    true
+}
+
+/// `MolFmtSgroups_Free`
+fn sgroups_free(ctab: &mut MolFmtCtab) {
+    ctab.sgroups = Vec::new();
+    ctab.sgroups_freed = true;
+}
+
+fn read_short(len: i32, line: &[u8], pos: &mut usize) -> (i16, i32) {
+    let (v, r) = molfile_read_field_int(IntKind::Short, len, line, pos);
+    (v as i16, r)
+}
+
+/// `MolfileReadSgroupOfPolymer`
+pub fn molfile_read_sgroup_of_polymer(
+    ctab: &mut MolFmtCtab,
+    line: &[u8],
+    sz_type: &[u8],
+    pos: &mut usize,
+    mut err: i32,
+) -> i32 {
+    let num_atoms = ctab.n_atoms as i16;
+    let num_bonds = ctab.n_bonds as i16;
+    let mut fail = false;
+    let ty = sz_type;
+    let multi = |pos: &mut usize| {
+        let (n, r) = read_short(3, line, pos);
+        (n, r > 0 && (1..=8).contains(&n))
+    };
+    'exit: {
+        if ty == b"STY" && {
+            let (n, ok) = multi(pos);
+            if ok {
+                for _ in 0..n {
+                    let (num, r1) = read_short(0, line, pos);
+                    fail = r1 < 0;
+                    let mut stmp = Vec::new();
+                    if !fail {
+                        molfile_read_field_str(&mut stmp, 4, line, pos);
+                        lrtrim(&mut stmp);
+                        let id = i32::from(num);
+                        let typ = match stmp.as_slice() {
+                            b"SRU" => Some(MOL_FMT_M_STY_SRU),
+                            b"MON" => Some(MOL_FMT_M_STY_MON),
+                            b"COP" => Some(MOL_FMT_M_STY_COP),
+                            b"MOD" => Some(MOL_FMT_M_STY_MOD),
+                            b"CRO" => Some(MOL_FMT_M_STY_CRO),
+                            b"MER" => Some(MOL_FMT_M_STY_MER),
+                            _ => None,
+                        };
+                        match typ {
+                            None => fail = true,
+                            Some(typ) => {
+                                let index = match molfmt_sgroups_get_index_by_sgroup_id(
+                                    id,
+                                    &ctab.sgroups,
+                                ) {
+                                    None => {
+                                        if sgroups_append(ctab, id, typ) {
+                                            Some(ctab.sgroups.len() - 1)
+                                        } else {
+                                            fail = true;
+                                            None
+                                        }
+                                    }
+                                    Some(i) => {
+                                        ctab.sgroups[i].type_ = typ;
+                                        Some(i)
+                                    }
+                                };
+                                if let (false, Some(i)) = (fail, index) {
+                                    ctab.sgroups[i].xbr1 = [-777777.777; 4];
+                                    ctab.sgroups[i].xbr2 = [-777777.777; 4];
+                                    ctab.sgroups[i].smt.clear();
+                                }
+                            }
+                        }
+                    }
+                    if fail {
+                        err = 5;
+                        sgroups_free(ctab);
+                        return err;
+                    }
+                }
+            }
+            ok
+        } {
+        } else if ty == b"SST" && {
+            let (n, ok) = multi(pos);
+            if ok {
+                for _ in 0..n {
+                    let (num, r1) = read_short(0, line, pos);
+                    fail = r1 < 0;
+                    let mut stmp = Vec::new();
+                    if !fail {
+                        molfile_read_field_str(&mut stmp, 4, line, pos);
+                        let index =
+                            molfmt_sgroups_get_index_by_sgroup_id(i32::from(num), &ctab.sgroups);
+                        if index.is_none() {
+                            fail = true;
+                        }
+                        if let (false, Some(i)) = (fail, index) {
+                            ctab.sgroups[i].subtype = MOL_FMT_M_SST_NON;
+                            lrtrim(&mut stmp);
+                            match stmp.as_slice() {
+                                b"ALT" => ctab.sgroups[i].subtype = MOL_FMT_M_SST_ALT,
+                                b"RAN" => ctab.sgroups[i].subtype = MOL_FMT_M_SST_RAN,
+                                b"BLO" | b"BLK" => ctab.sgroups[i].subtype = MOL_FMT_M_SST_BLK,
+                                _ => {
+                                    fail = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                if fail {
+                    err = 6;
+                    sgroups_free(ctab);
+                    return err;
+                }
+            }
+            ok
+        } {
+        } else if ty == b"SLB" && {
+            let (n, ok) = multi(pos);
+            if ok {
+                for _ in 0..n {
+                    let (num, r1) = read_short(0, line, pos);
+                    let mut tmp = 0;
+                    fail = r1 < 0 || {
+                        let (t, r2) = read_short(0, line, pos);
+                        tmp = t;
+                        r2 < 0
+                    };
+                    if !fail {
+                        match molfmt_sgroups_get_index_by_sgroup_id(i32::from(num), &ctab.sgroups) {
+                            None => fail = true,
+                            Some(i) => ctab.sgroups[i].label = i32::from(tmp),
+                        }
+                    }
+                }
+                if fail {
+                    err = 7;
+                    sgroups_free(ctab);
+                    return err;
+                }
+            }
+            ok
+        } {
+        } else if ty == b"SCN" && {
+            let (n, ok) = multi(pos);
+            if ok {
+                for _ in 0..n {
+                    let (num, r1) = read_short(0, line, pos);
+                    fail = r1 < 0;
+                    let mut stmp = Vec::new();
+                    if !fail {
+                        molfile_read_field_str(&mut stmp, 4, line, pos);
+                        match molfmt_sgroups_get_index_by_sgroup_id(i32::from(num), &ctab.sgroups) {
+                            None => fail = true,
+                            Some(i) => {
+                                ctab.sgroups[i].conn = MOL_FMT_M_CONN_NON;
+                                lrtrim(&mut stmp);
+                                match stmp.as_slice() {
+                                    b"HT" => ctab.sgroups[i].conn = MOL_FMT_M_CONN_HT,
+                                    b"HH" => ctab.sgroups[i].conn = MOL_FMT_M_CONN_HH,
+                                    b"EU" => ctab.sgroups[i].conn = MOL_FMT_M_CONN_EU,
+                                    _ => fail = true,
+                                }
+                            }
+                        }
+                    }
+                    if fail {
+                        err = 8;
+                        sgroups_free(ctab);
+                        return err;
+                    }
+                }
+            }
+            ok
+        } {
+        } else if ty == b"SAL" || ty == b"SBL" {
+            let is_atoms = ty == b"SAL";
+            let (sg_num, r1) = read_short(4, line, pos);
+            let num_entries;
+            if r1 > 0 && {
+                let (n, r2) = read_short(3, line, pos);
+                num_entries = n;
+                r2 > 0
+            } {
+                let index = molfmt_sgroups_get_index_by_sgroup_id(i32::from(sg_num), &ctab.sgroups);
+                if index.is_none() {
+                    fail = true;
+                }
+                let mut items = Vec::new();
+                if !fail {
+                    let limit = if is_atoms { num_atoms } else { num_bonds };
+                    for _ in 0..num_entries {
+                        let (v, r) = read_short(0, line, pos);
+                        if r < 0 || v <= 0 || v > limit {
+                            fail = true;
+                            break;
+                        }
+                        items.push(i32::from(v));
+                    }
+                }
+                if !fail {
+                    let g = &mut ctab.sgroups[index.unwrap()];
+                    if is_atoms {
+                        g.alist.extend(items);
+                    } else {
+                        g.blist.extend(items);
+                    }
+                }
+            } else {
+                fail = true;
+            }
+            if fail {
+                err = if is_atoms { 9 } else { 10 };
+                sgroups_free(ctab);
+                return err;
+            }
+        } else if ty == b"SDI" {
+            let (sg_num, r1) = read_short(4, line, pos);
+            if r1 > 0 && {
+                let (n, r2) = read_short(3, line, pos);
+                if r2 > 0 {
+                    let index =
+                        molfmt_sgroups_get_index_by_sgroup_id(i32::from(sg_num), &ctab.sgroups);
+                    if index.is_none() || n != 4 {
+                        fail = true;
+                    }
+                    let mut x = [0f64; 4];
+                    if !fail {
+                        for xj in x.iter_mut().take(n as usize) {
+                            let (v, r) = molfile_read_field_double(0, line, pos);
+                            *xj = v;
+                            if r < 0 {
+                                fail = true;
+                                break;
+                            }
+                        }
+                    }
+                    if !fail {
+                        let g = &mut ctab.sgroups[index.unwrap()];
+                        if (-g.xbr1[0].abs() + 777777.777).abs() < 1.0e-7 {
+                            g.xbr1 = x;
+                        } else {
+                            g.xbr2 = x;
+                        }
+                    }
+                }
+                r2 > 0
+            } {
+            } else {
+                fail = true;
+            }
+            if fail {
+                err = 11;
+                sgroups_free(ctab);
+                return err;
+            }
+        } else if ty == b"SMT" {
+            let mut index = None;
+            let (sg_num, r1) = read_short(4, line, pos);
+            let mut stmplong = Vec::new();
+            if r1 > 0 && molfile_read_field_str(&mut stmplong, 80, line, pos) > 0 {
+                index = molfmt_sgroups_get_index_by_sgroup_id(i32::from(sg_num), &ctab.sgroups);
+            }
+            match index {
+                None => fail = true,
+                Some(i) => {
+                    lrtrim(&mut stmplong);
+                    ctab.sgroups[i].smt = stmplong;
+                }
+            }
+            if fail {
+                err = 11;
+                sgroups_free(ctab);
+                return err;
+            }
+        }
+        break 'exit;
+    }
+    let _ = err;
+    0
+}
+
+/// `MolfileTreatPseudoElementAtoms`: returns the number of pseudo-atoms
+pub fn molfile_treat_pseudo_element_atoms(
+    ctab: &mut MolFmtCtab,
+    pseudos_allowed: bool,
+    err: &mut i32,
+    p_str_err: &mut String,
+) -> i32 {
+    let mut nzz = 0;
+    let Some(atoms) = ctab.atoms.as_mut() else {
+        return 0;
+    };
+    for a in atoms.iter_mut().take(ctab.n_atoms.max(0) as usize) {
+        if a.symbol == b"Zy" {
+            treat_err(err, 76, p_str_err, "Invalid element(s):");
+            treat_err(err, 76, p_str_err, "Zy");
+        }
+        let is_star = a.symbol == b"*";
+        let is_zz = !is_star && a.symbol == b"Zz";
+        if is_star || is_zz {
+            nzz += 1;
+            if !pseudos_allowed {
+                treat_err(err, 76, p_str_err, "Invalid element(s):");
+                treat_err(err, 76, p_str_err, &String::from_utf8_lossy(&a.symbol));
+            } else if is_star {
+                a.symbol = b"Zz".to_vec();
+            }
+        }
+    }
+    nzz
+}
+
+/// `MolfileReadPropBlock`
+pub fn molfile_read_prop_block(
+    ctab: &mut MolFmtCtab,
+    hdr: &mut MolFmtHeaderBlock,
+    inp: &mut InchiIostream,
+    treat_polymers: bool,
+    mut err: i32,
+    p_str_err: &mut String,
+    no_warnings: bool,
+) -> i32 {
+    const ALIAS: bool = true;
+    let mut multi_line_mode = !ALIAS;
+    let mut atom_number: i32 = 0;
+    let mut skip_lines: i16 = 0;
+    let num_atoms = ctab.n_atoms as i16;
+    let mut charge_encountered = 0;
+    let mut radical_encountered = 0;
+    let mut isotope_encountered = 0;
+    let mut polymer_occurred = false;
+    let mut i: i16 = 0;
+    'fin: {
+        while !ctab.version_string.is_empty() || i < ctab.n_property_lines {
+            i = i.wrapping_add(1);
+            let Some(mut line) = get_line(inp) else {
+                if err == 0 {
+                    treat_err(&mut err, 2, p_str_err, "Cannot read properties block line");
+                }
+                break 'fin;
+            };
+            remove_one_lf(&mut line);
+            if at(&line, MOL_FMT_MAXLINELEN) != 0 {
+                treat_err(&mut err, 3, p_str_err, "Too long properties block line");
+                continue;
+            }
+            if skip_lines > 0 {
+                skip_lines -= 1;
+                continue;
+            }
+            if multi_line_mode == ALIAS && atom_number != 0 {
+                multi_line_mode = !ALIAS;
+                let len = normalize_string(&mut line);
+                if len <= 0 {
+                    atom_number = 0;
+                    continue;
+                }
+                if len < 6 {
+                    let (n_rad, n_charge) = {
+                        let (r, c) = extract_charges_and_radicals(&mut line);
+                        (r, c)
+                    };
+                    let atom = &mut ctab.atoms.as_mut().unwrap()[(atom_number - 1) as usize];
+                    atom.charge = n_charge as i8;
+                    atom.radical = n_rad as i8;
+                    if len == 1 && at(&line, 0) == b'D' {
+                        line[0] = b'H';
+                        atom.mass_difference = 1;
+                    } else if len == 1 && at(&line, 0) == b'T' {
+                        line[0] = b'H';
+                        atom.mass_difference = 2;
+                    } else {
+                        atom.mass_difference = 0;
+                    }
+                    atom.symbol = if line.len() < 6 {
+                        line.clone()
+                    } else {
+                        b"???".to_vec()
+                    };
+                    atom.atom_aliased_flag = atom.atom_aliased_flag.wrapping_add(1);
+                }
+                skip_lines = 0;
+                atom_number = 0;
+                continue;
+            }
+            let mut pos = 0;
+            let mut char_m = Vec::new();
+            let mut blank = Vec::new();
+            let mut sz_type = Vec::new();
+            if molfile_read_field_str(&mut char_m, 1, &line, &mut pos) != 1
+                || molfile_read_field_str(&mut blank, 2, &line, &mut pos) != 0
+                || molfile_read_field_str(&mut sz_type, 3, &line, &mut pos) <= 0
+            {
+                if line == SD_FMT_END_OF_DATA {
+                    err = if err != 0 { -err.abs() } else { -4 };
+                    break;
+                }
+                continue;
+            }
+            match char_m[0] {
+                b'V' => {
+                    skip_lines = 0;
+                    continue;
+                }
+                b'G' => {
+                    skip_lines = 1;
+                    continue;
+                }
+                b'A' => {
+                    atom_number = c_strtol10(&sz_type).0 as i32;
+                    if ctab.atoms.is_some() && 0 < atom_number && atom_number <= ctab.n_atoms {
+                        multi_line_mode = ALIAS;
+                    } else {
+                        atom_number = 0;
+                        skip_lines = 1;
+                    }
+                    continue;
+                }
+                _ => {}
+            }
+            if char_m[0] == b'S' && sz_type == b"SKP" {
+                let (v, r) = read_short(3, &line, &mut pos);
+                skip_lines = if r <= 0 { 0 } else { v };
+                continue;
+            }
+            if char_m[0] != b'M' {
+                continue;
+            }
+            if sz_type == b"REG" {
+                while at(&line, pos) == b' ' {
+                    pos += 1;
+                }
+                let mut len = 0;
+                while at(&line, pos + len) != 0 && at(&line, pos + len) != b' ' {
+                    len += 1;
+                }
+                let len = len.min(MOL_FMT_MAX_VALUE_LEN as usize) as i32;
+                hdr.internal_regno = molfile_read_field_int(IntKind::Long, len, &line, &mut pos).0;
+                continue;
+            }
+            if sz_type == b"END" {
+                if !ctab.version_string.is_empty() {
+                    break;
+                }
+                continue;
+            }
+            if ctab.atoms.is_none() {
+                continue;
+            }
+            let multi = |pos: &mut usize| {
+                let (n, r) = read_short(3, &line, pos);
+                (n, r > 0 && (1..=8).contains(&n))
+            };
+            if sz_type == b"CHG" {
+                let (num_entries, ok) = multi(&mut pos);
+                if ok {
+                    if charge_encountered == 0 && radical_encountered == 0 {
+                        charge_encountered = -1;
+                    }
+                    let mut atoms = [0i16; 8];
+                    let mut charges = [0i16; 8];
+                    let mut bad = false;
+                    for j in 0..num_entries as usize {
+                        let (a, r1) = read_short(0, &line, &mut pos);
+                        atoms[j] = a;
+                        let mut r2 = 0;
+                        if r1 >= 0 {
+                            let (c, r) = read_short(0, &line, &mut pos);
+                            charges[j] = c;
+                            r2 = r;
+                        }
+                        if r1 < 0
+                            || r2 < 0
+                            || atoms[j] <= 0
+                            || atoms[j] > num_atoms
+                            || !(-15..=15).contains(&charges[j])
+                        {
+                            bad = true;
+                            break;
+                        }
+                    }
+                    let list = ctab.atoms.as_mut().unwrap();
+                    if bad {
+                        treat_err(&mut err, 0, p_str_err, "Charge not recognized:");
+                        dotify_non_printable_chars(&mut line);
+                        add_error_message(p_str_err, &String::from_utf8_lossy(&line));
+                        continue;
+                    }
+                    if charge_encountered == -1 {
+                        for a in list.iter_mut().take(num_atoms.max(0) as usize) {
+                            if a.atom_aliased_flag == 0 {
+                                a.charge = 0;
+                                a.radical = 0;
+                            }
+                        }
+                        charge_encountered = 1;
+                    }
+                    for j in 0..num_entries as usize {
+                        let a = &mut list[(atoms[j] - 1) as usize];
+                        if a.atom_aliased_flag == 0 {
+                            a.charge = charges[j] as i8;
+                        }
+                    }
+                    continue;
+                }
+            }
+            if sz_type == b"RAD" {
+                let (num_entries, ok) = multi(&mut pos);
+                if ok {
+                    if charge_encountered == 0 && radical_encountered == 0 {
+                        radical_encountered = -1;
+                    }
+                    let mut atoms = [0i16; 8];
+                    let mut rads = [0i16; 8];
+                    let mut bad = false;
+                    for j in 0..num_entries as usize {
+                        let (a, r1) = read_short(0, &line, &mut pos);
+                        atoms[j] = a;
+                        let mut r2 = 0;
+                        if r1 >= 0 {
+                            let (c, r) = read_short(0, &line, &mut pos);
+                            rads[j] = c;
+                            r2 = r;
+                        }
+                        if r1 < 0
+                            || r2 < 0
+                            || atoms[j] <= 0
+                            || atoms[j] > num_atoms
+                            || !(0..=3).contains(&rads[j])
+                        {
+                            bad = true;
+                            break;
+                        }
+                    }
+                    let list = ctab.atoms.as_mut().unwrap();
+                    if bad {
+                        treat_err(&mut err, 0, p_str_err, "Radical not recognized:");
+                        dotify_non_printable_chars(&mut line);
+                        add_error_message(p_str_err, &String::from_utf8_lossy(&line));
+                        continue;
+                    }
+                    if radical_encountered == -1 {
+                        for a in list.iter_mut().take(num_atoms.max(0) as usize) {
+                            if a.atom_aliased_flag == 0 {
+                                a.charge = 0;
+                                a.radical = 0;
+                            }
+                        }
+                        radical_encountered = 1;
+                    }
+                    for j in 0..num_entries as usize {
+                        let a = &mut list[(atoms[j] - 1) as usize];
+                        if a.atom_aliased_flag == 0 {
+                            a.radical = rads[j] as i8;
+                        }
+                    }
+                    continue;
+                }
+            }
+            if sz_type == b"ISO" {
+                let (num_entries, ok) = multi(&mut pos);
+                if ok {
+                    if isotope_encountered == 0 {
+                        isotope_encountered = -1;
+                    }
+                    let mut atoms = [0i16; 8];
+                    let mut iso_mass = [0i16; 8];
+                    for j in 0..num_entries as usize {
+                        let (a, r1) = read_short(0, &line, &mut pos);
+                        atoms[j] = a;
+                        let mut r2 = 0;
+                        if r1 >= 0 {
+                            let (c, r) = read_short(0, &line, &mut pos);
+                            iso_mass[j] = c;
+                            r2 = r;
+                        }
+                        if r1 < 0 || r2 < 0 || atoms[j] <= 0 || atoms[j] > num_atoms {
+                            atoms[j] = -1;
+                            treat_err(&mut err, 0, p_str_err, "Isotopic data not recognized:");
+                            dotify_non_printable_chars(&mut line);
+                            add_error_message(p_str_err, &String::from_utf8_lossy(&line));
+                        }
+                    }
+                    let list = ctab.atoms.as_mut().unwrap();
+                    if isotope_encountered == -1 {
+                        for a in list.iter_mut().take(num_atoms.max(0) as usize) {
+                            a.mass_difference = 0;
+                        }
+                        isotope_encountered = 1;
+                    }
+                    for j in 0..num_entries as usize {
+                        if atoms[j] <= 0 {
+                            continue;
+                        }
+                        let a = &mut list[(atoms[j] - 1) as usize];
+                        if at(&a.symbol, 1) != 0
+                            || (at(&a.symbol, 0) != b'D' && at(&a.symbol, 0) != b'T')
+                        {
+                            let atw = get_atomic_mass(&String::from_utf8_lossy(&a.symbol));
+                            let atw_diff = i32::from(iso_mass[j]) - atw;
+                            if atw != 0 && atw_diff.abs() < 20 {
+                                a.mass_difference = (if atw_diff != 0 {
+                                    atw_diff
+                                } else {
+                                    ZERO_ATW_DIFF
+                                }) as i8;
+                            }
+                        }
+                    }
+                    continue;
+                }
+            }
+            if matches!(
+                sz_type.as_slice(),
+                b"STY" | b"SST" | b"SLB" | b"SCN" | b"SAL" | b"SBL" | b"SDI" | b"SMT" | b"SBT"
+            ) {
+                if !treat_polymers {
+                    polymer_occurred = true;
+                    continue;
+                }
+                let result = molfile_read_sgroup_of_polymer(ctab, &line, &sz_type, &mut pos, err);
+                if result != 0 {
+                    treat_err(
+                        &mut err,
+                        result,
+                        p_str_err,
+                        "Could not interpret Molfile polymer data:",
+                    );
+                    dotify_non_printable_chars(&mut line);
+                    add_error_message(p_str_err, &String::from_utf8_lossy(&line));
+                    continue;
+                }
+            }
+        }
+    }
+    if !treat_polymers && polymer_occurred && !no_warnings {
+        add_error_message(p_str_err, "Ignore polymer data");
+    }
+    err
+}
+
+/// `MolfileReadDataLines` for V2000 input. `only` is the
+/// `OnlyHeaderBlock`/`OnlyCTab` mode (nothing is allocated for atoms and bonds);
+/// otherwise the data are returned. The V3000 reader is not ported yet.
+/// Returns the data (read-all mode, no error) and the error code (negative
+/// when the end of the data was met).
+pub fn molfile_read_data_lines(
+    inp: &mut InchiIostream,
+    only: Option<&mut MolFmtData>,
+    get_orig_coord: bool,
+    treat_polymers: bool,
+    p_str_err: &mut String,
+    no_warnings: bool,
+) -> (Option<MolFmtData>, i32) {
+    let should_read_all = only.is_none();
+    let mut local = MolFmtData::default();
+    let m: &mut MolFmtData = match only {
+        Some(o) => {
+            *o = MolFmtData::default();
+            o
+        }
+        None => &mut local,
+    };
+    let mut data_ended = false;
+    let mut retcode;
+    let mut prevcode;
+    'fin: {
+        retcode = molfile_read_header_lines(&mut m.hdr, inp, p_str_err);
+        if retcode != 0 {
+            retcode += 10;
+            break 'fin;
+        }
+        retcode = molfile_read_counts_line(&mut m.ctab, inp, p_str_err);
+        if retcode != 0 {
+            retcode += 20;
+            break 'fin;
+        }
+        assert!(m.ctab.v3000.is_none(), "V3000 molfiles are not ported yet");
+        if should_read_all {
+            let n_alloc = m.ctab.n_atoms.max(1) as usize;
+            m.ctab.atoms = Some(vec![MolFmtAtom::default(); n_alloc]);
+            if get_orig_coord {
+                m.ctab.coords = Some(vec![[0u8; super::ichiprt1::MOL_COORD_LEN]; n_alloc]);
+            }
+        }
+        retcode = molfile_read_atoms_block(&mut m.ctab, inp, retcode, p_str_err);
+        if retcode != 0 {
+            if retcode < 0 {
+                retcode = -retcode;
+                data_ended = true;
+            }
+            retcode += 30;
+        }
+        if should_read_all && retcode < 30 && !data_ended {
+            m.ctab.bonds = Some(vec![MolFmtBond::default(); m.ctab.n_bonds.max(1) as usize]);
+        }
+        prevcode = retcode;
+        if !data_ended {
+            retcode = molfile_read_bonds_block(&mut m.ctab, inp, retcode, p_str_err);
+            if retcode != 0 {
+                if retcode < 0 {
+                    retcode = -retcode;
+                    data_ended = true;
+                }
+                retcode = if prevcode != 0 {
+                    prevcode
+                } else {
+                    retcode + 40
+                };
+            }
+        }
+        prevcode = retcode;
+        if !data_ended {
+            retcode = molfile_read_stext_block(&m.ctab, inp, retcode, p_str_err);
+            if retcode != 0 {
+                retcode = if prevcode != 0 {
+                    prevcode
+                } else {
+                    retcode + 50
+                };
+            }
+        }
+        prevcode = retcode;
+        if !data_ended {
+            let (hdr, ctab) = (&mut m.hdr, &mut m.ctab);
+            retcode = molfile_read_prop_block(
+                ctab,
+                hdr,
+                inp,
+                treat_polymers,
+                retcode,
+                p_str_err,
+                no_warnings,
+            );
+            if retcode != 0 {
+                if retcode < 0 {
+                    retcode = -retcode;
+                    data_ended = true;
+                }
+                retcode = if prevcode != 0 {
+                    prevcode
+                } else {
+                    retcode + 60
+                };
+            }
+        }
+        if let Some(atoms) = m.ctab.atoms.as_ref() {
+            for a in atoms.iter().take(m.ctab.n_atoms.max(0) as usize) {
+                if i32::from(a.valence) > MAXVAL {
+                    retcode = 70 + 9;
+                    treat_err(&mut retcode, 0, p_str_err, "Too large input atomic valence");
+                    break;
+                }
+            }
+            for a in atoms.iter().take(m.ctab.n_atoms.max(0) as usize) {
+                let dmass = i32::from(a.mass_difference);
+                if (a.symbol == b"H" && !matches!(dmass, 0 | 1 | 2 | 127))
+                    || (a.symbol == b"D" && !(-1..=1).contains(&dmass))
+                    || (a.symbol == b"T" && !(-2..=0).contains(&dmass))
+                {
+                    retcode = 70 + 8;
+                    treat_err(
+                        &mut retcode,
+                        0,
+                        p_str_err,
+                        "Unacceptable isotope of hydrogen",
+                    );
+                    break;
+                }
+            }
+        }
+    }
+    let err = if data_ended { -retcode } else { retcode };
+    if should_read_all {
+        (if retcode != 0 { None } else { Some(local) }, err)
+    } else {
+        (None, err)
+    }
+}
