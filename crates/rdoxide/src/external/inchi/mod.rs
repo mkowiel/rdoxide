@@ -46,6 +46,7 @@ pub mod incomdef;
 pub mod inpdef;
 pub mod molfmt;
 pub mod molfmt3;
+pub mod molfmt4;
 pub mod readinch;
 pub mod runichi;
 pub mod runichi2;

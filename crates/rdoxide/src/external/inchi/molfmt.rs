@@ -1816,3 +1816,81 @@ pub fn molfile_read_data_lines(
         (None, err)
     }
 }
+
+/// the optional outputs of [`read_molfile`] (`pname`/`lname`, `Id`,
+/// `pSdfLabel`, `pSdfValue`)
+#[derive(Default, Debug)]
+pub struct ReadMolfileExtras<'a> {
+    pub name: Option<(&'a mut Vec<u8>, usize)>,
+    pub id: Option<&'a mut u64>,
+    pub sdf_label: Option<&'a [u8]>,
+    pub sdf_value: Option<&'a mut Vec<u8>>,
+}
+
+/// `ReadMolfile`: reads a Molfile / SD-file record; the data (unless only the
+/// header block was requested), with the error code. In the header-only mode
+/// the C code treats pseudo-atoms of an uninitialised structure; that part is
+/// not reproduced.
+pub fn read_molfile(
+    inp: &mut InchiIostream,
+    only: Option<&mut MolFmtData>,
+    get_orig_coord: bool,
+    treat_polymers: i32,
+    treat_np_zz: i32,
+    extras: ReadMolfileExtras,
+    p_str_err: &mut String,
+    no_warnings: bool,
+) -> (Option<MolFmtData>, i32) {
+    let ReadMolfileExtras {
+        mut name,
+        id,
+        sdf_label,
+        sdf_value,
+    } = extras;
+    if let Some((n, l)) = name.as_mut()
+        && *l > 0
+    {
+        n.clear();
+    }
+    let mut id = id;
+    if let Some(i) = id.as_deref_mut() {
+        *i = 0;
+    }
+    let header_only = only.is_some();
+    let (mfdata, mut err) = molfile_read_data_lines(
+        inp,
+        only,
+        get_orig_coord,
+        treat_polymers != 0,
+        p_str_err,
+        no_warnings,
+    );
+    if err < 0 {
+        err = -err;
+    } else {
+        let ret = super::molfmt4::sdfile_skip_extra_data(
+            inp,
+            super::molfmt4::SdfOut {
+                cas_num: id,
+                comment: None,
+                name,
+                sdf_label,
+                sdf_value,
+            },
+            err,
+            p_str_err,
+            no_warnings,
+        );
+        if ret != 0 {
+            err = ret;
+        }
+    }
+    let mut mfdata = mfdata;
+    if let Some(m) = mfdata.as_mut()
+        && !header_only
+    {
+        let pseudos_allowed = treat_np_zz == 1 || treat_polymers != 0;
+        molfile_treat_pseudo_element_atoms(&mut m.ctab, pseudos_allowed, &mut err, p_str_err);
+    }
+    (mfdata, err)
+}
