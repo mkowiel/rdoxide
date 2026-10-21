@@ -1035,6 +1035,7 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::test36SubstructMatchStr
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test37SanitException
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test38Issue266
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test38TDTSuppliers
+Code/GraphMol/nbWrap/rough_test.py::TestCase::test39Issue273
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test3Bond
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test3dChiralCxsmiles
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test3dChiralMolFile
