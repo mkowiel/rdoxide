@@ -12,8 +12,14 @@
 use super::ichican2::{TAUT_NON, TAUT_YES};
 use super::ichimake::{compare_hill_formulas, compare_hill_formulas_no_h};
 
+pub const INCHI_FLAG_ACID_TAUT: u64 = 0x0001;
 pub const INCHI_FLAG_REL_STEREO: u64 = 0x0002;
 pub const INCHI_FLAG_RAC_STEREO: u64 = 0x0004;
+pub const INCHI_FLAG_SC_IGN_ALL_UU: u64 = 0x0008;
+pub const INCHI_FLAG_SB_IGN_ALL_UU: u64 = 0x0010;
+pub const INCHI_FLAG_SC_IGN_ALL_ISO_UU: u64 = 0x0020;
+pub const INCHI_FLAG_SB_IGN_ALL_ISO_UU: u64 = 0x0040;
+pub const INCHI_FLAG_HARD_ADD_REM_PROTON: u64 = 0x0080;
 
 /// `INChI_IsotopicAtom`
 #[derive(Debug, Clone, Default, PartialEq)]

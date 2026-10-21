@@ -28,7 +28,7 @@ fn has_t(s: &InChISort) -> bool {
         .as_ref()
         .is_some_and(|c| c.n_number_of_atoms != 0)
 }
-fn has_n(s: &InChISort) -> bool {
+pub fn has_n(s: &InChISort) -> bool {
     s.p_inchi[TAUT_NON]
         .as_ref()
         .is_some_and(|c| c.n_number_of_atoms != 0)
