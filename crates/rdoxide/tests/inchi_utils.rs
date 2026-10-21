@@ -12397,3 +12397,66 @@ fn create_inchi_matches_the_c_code() {
         assert_eq!(got, want, "case {ci}");
     }
 }
+
+#[test]
+fn reversed_inchi_comparison_matches_the_c_code() {
+    use rdoxide::external::inchi::ichi::InChIAux;
+    use rdoxide::external::inchi::ichimake::{
+        Icr, compare_reversed_inchi, compare_reversed_stereo_inchi, compare_reversed_stereo_inchi2,
+    };
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_cmprev.json")).unwrap();
+    let aux = |t: &mut InchiTok| {
+        (t.i() != 0).then(|| InChIAux {
+            n_num_removed_protons: t.i() as i16,
+            n_num_removed_isotopic_h: [t.i() as i16, t.i() as i16, t.i() as i16],
+            ..InChIAux::default()
+        })
+    };
+    let dump = |nm: &str, v: &[u16]| {
+        let mut s = format!(" {nm}");
+        for x in v {
+            s += &format!(",{x}");
+        }
+        s
+    };
+    for (ci, c) in data.as_array().unwrap().iter().enumerate() {
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        let mut t = InchiTok(c["in"].as_str().unwrap().split_whitespace());
+        let (c1, c2) = (t.inchi(), t.inchi());
+        let (a1, a2) = (aux(&mut t), aux(&mut t));
+        let r = compare_reversed_inchi(c1.as_ref(), c2.as_ref(), a1.as_ref(), a2.as_ref());
+        assert_eq!(r.to_string(), want[0], "case {ci}");
+        let st = |c: &Option<InChI>| c.as_ref().and_then(|c| c.stereo.clone());
+        let si = |c: &Option<InChI>| c.as_ref().and_then(|c| c.stereo_isotopic.clone());
+        let (s1, s2, t1, t2) = (st(&c1), st(&c2), si(&c1), si(&c2));
+        let l = format!(
+            "{} {} {} {}",
+            compare_reversed_stereo_inchi(s1.as_ref(), s2.as_ref()),
+            compare_reversed_stereo_inchi(t1.as_ref(), t2.as_ref()),
+            compare_reversed_stereo_inchi(s1.as_ref(), t2.as_ref()),
+            compare_reversed_stereo_inchi(t1.as_ref(), s2.as_ref())
+        );
+        assert_eq!(l, want[1], "case {ci}");
+        let mut icr = Icr::default();
+        let r1 = compare_reversed_stereo_inchi2(s1.as_ref(), s2.as_ref(), &mut icr);
+        let r2 = compare_reversed_stereo_inchi2(t1.as_ref(), t2.as_ref(), &mut icr);
+        let l = format!(
+            "{r1} {r2}{}{}{}{}{}{}{}{}",
+            dump("sc1", &icr.sc_in1_only),
+            dump("sc2", &icr.sc_in2_only),
+            dump("sb1", &icr.sb_in1_only),
+            dump("sb2", &icr.sb_in2_only),
+            dump("sbu1", &icr.sb_undef_in1_only),
+            dump("sbu2", &icr.sb_undef_in2_only),
+            dump("scu1", &icr.sc_undef_in1_only),
+            dump("scu2", &icr.sc_undef_in2_only),
+        );
+        assert_eq!(l, want[2], "case {ci}");
+    }
+}
