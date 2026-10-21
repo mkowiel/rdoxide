@@ -294,6 +294,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 178 | done |
 | 179 | done |
 | 180 | done |
+| 181 | InChI I5h: ichister stereo geometry helpers (get_z_coord, triple products, Get2DTetrahedralAmbiguity, plane tests) verified on 4000 cases vs the C code |
 
 ## Python package files
 
@@ -644,3 +645,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-21 — Stage 178: I5g: tropolone 7-/5-member ring tautomerism (MarkTautomerGroups complete)
 * 2026-10-21 — Stage 179: I6a: mark_alt_bonds_and_taut_groups (main normalization driver)
 * 2026-10-21 — Stage 180: I6b: CountTautomerGroups, SortTautomerGroupsAndEndpoints, set_tautomer_iso_sort_keys
+* 2026-10-21 — Stage 181: InChI I5h: stereo geometry helpers ported and differentially tested

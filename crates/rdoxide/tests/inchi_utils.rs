@@ -6868,3 +6868,180 @@ fn tautomer_group_counting_matches_the_c_code() {
     }
     assert!(seen.len() == 3, "{seen:?}");
 }
+
+#[test]
+fn stereo_geometry_helpers_match_the_c_code() {
+    use rdoxide::external::inchi::ichister::*;
+    use rdoxide::external::inchi::inpdef::InpAtom;
+    fn f(v: &serde_json::Value) -> f64 {
+        f64::from_bits(v.as_u64().unwrap())
+    }
+    fn v3(v: &serde_json::Value) -> [f64; 3] {
+        let a = v.as_array().unwrap();
+        [f(&a[0]), f(&a[1]), f(&a[2])]
+    }
+    fn vs(v: &serde_json::Value) -> Vec<[f64; 3]> {
+        v.as_array().unwrap().iter().map(v3).collect()
+    }
+    fn b(x: f64) -> String {
+        x.to_bits().to_string()
+    }
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_stergeom.json")).unwrap();
+    for (n, c) in data.as_array().unwrap().iter().enumerate() {
+        let inp = &c["in"];
+        let mut got: Vec<String> = Vec::new();
+        match inp["k"].as_u64().unwrap() {
+            0 => {
+                let v = vs(&inp["v"]);
+                let (a, bb, cc) = (v[0], v[1], v[2]);
+                got.push(format!("len3 {}", b(len3(&a))));
+                got.push(format!("len2 {}", b(len2(&[a[0], a[1]]))));
+                for (i, x) in diff3(&a, &bb).iter().enumerate() {
+                    got.push(format!("d{i} {}", b(*x)));
+                }
+                for (i, x) in cross_prod3(&a, &bb).iter().enumerate() {
+                    got.push(format!("x{i} {}", b(*x)));
+                }
+                got.push(format!("dot {}", b(dot_prod3(&a, &bb))));
+                let mut s = 0.0;
+                got.push(format!("tp {}", b(triple_prod(&a, &bb, &cc, Some(&mut s)))));
+                got.push(format!("sine {}", b(s)));
+                got.push(format!("tp0 {}", b(triple_prod(&a, &bb, &cc, None))));
+            }
+            1 => {
+                let co = vs(&inp["co"]);
+                let r = get_2d_tetrahedral_ambiguity(
+                    &co,
+                    inp["add"].as_i64().unwrap() != 0,
+                    inp["fix"].as_i64().unwrap() != 0,
+                    f(&inp["ang"]),
+                );
+                got.push(format!("T {r}"));
+            }
+            2 => {
+                let co = vs(&inp["co"]);
+                let central = v3(&inp["central"]);
+                let vmin = f(&inp["vmin"]);
+                let minsine = f(&inp["minsine"]);
+                let add = inp["add"].as_i64().unwrap() != 0;
+                let mut ms = 0.0;
+                got.push(format!(
+                    "p1 {}",
+                    b(triple_prod_and_min_abs_sine(&co, Some(&mut ms)))
+                ));
+                got.push(format!("ms1 {}", b(ms)));
+                got.push(format!(
+                    "P3 {}",
+                    i32::from(are_3_vect_in_one_plane(&co, minsine))
+                ));
+                got.push(format!(
+                    "P4 {}",
+                    i32::from(are_4at_in_one_plane(&co, minsine))
+                ));
+                let mut amb = 0;
+                got.push(format!(
+                    "p2 {}",
+                    b(triple_prod_and_min_abs_sine2(
+                        &co,
+                        &central,
+                        add,
+                        Some(&mut ms),
+                        Some(&mut amb),
+                        vmin
+                    ))
+                ));
+                got.push(format!("ms2 {}", b(ms)));
+                got.push(format!("A {amb}"));
+                amb = 5;
+                got.push(format!(
+                    "p2b {}",
+                    b(triple_prod_and_min_abs_sine2(
+                        &co,
+                        &central,
+                        add,
+                        Some(&mut ms),
+                        Some(&mut amb),
+                        vmin
+                    ))
+                ));
+                got.push(format!("ms2b {}", b(ms)));
+                got.push(format!("A {amb}"));
+                got.push(format!(
+                    "p2c {}",
+                    b(triple_prod_and_min_abs_sine2(
+                        &co,
+                        &central,
+                        add,
+                        Some(&mut ms),
+                        None,
+                        vmin
+                    ))
+                ));
+                got.push(format!("ms2c {}", b(ms)));
+                got.push(format!(
+                    "p2d {}",
+                    b(triple_prod_and_min_abs_sine2(
+                        &co, &central, add, None, None, vmin
+                    ))
+                ));
+            }
+            _ => {
+                let atoms = inp["atoms"].as_array().unwrap();
+                let mut at: Vec<InpAtom> = Vec::new();
+                for a in atoms {
+                    let mut x = InpAtom::default();
+                    let p = v3(&a["xyz"]);
+                    x.x = p[0];
+                    x.y = p[1];
+                    x.z = p[2];
+                    x.b_used_0d_parity = a["u0"].as_i64().unwrap() as i8;
+                    let nb = a["nb"].as_array().unwrap();
+                    x.valence = nb.len() as i8;
+                    for (j, q) in nb.iter().enumerate() {
+                        x.neighbor[j] = q[0].as_u64().unwrap() as u16;
+                        x.bond_stereo[j] = q[1].as_i64().unwrap() as i8;
+                    }
+                    at.push(x);
+                }
+                let pe = inp["pe"].as_i64().unwrap() as i32;
+                for i in 0..at.len() {
+                    for j in 0..at[i].valence as usize {
+                        let (z, t) = get_z_coord(&at, i, j, pe);
+                        got.push(format!("z {}", b(z)));
+                        got.push(format!("Z {t}"));
+                    }
+                }
+                let z = |k: &str| -> [i8; 3] {
+                    let a = inp[k].as_array().unwrap();
+                    [
+                        a[0].as_i64().unwrap() as i8,
+                        a[1].as_i64().unwrap() as i8,
+                        a[2].as_i64().unwrap() as i8,
+                    ]
+                };
+                let (z1, z2) = (z("z1"), z("z2"));
+                got.push(format!(
+                    "C {}",
+                    triple_prod_char(
+                        &at,
+                        inp["a1"].as_u64().unwrap() as usize,
+                        inp["i1"].as_u64().unwrap() as usize,
+                        &z1,
+                        inp["a2"].as_u64().unwrap() as usize,
+                        inp["i2"].as_u64().unwrap() as usize,
+                        &z2
+                    )
+                ));
+                got.push(format!("D {}", dot_prodchar3(&z1, &z2)));
+            }
+        }
+        let want: Vec<String> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| s.as_str().unwrap().to_string())
+            .collect();
+        assert_eq!(got, want, "case {n}: {inp}");
+    }
+}
