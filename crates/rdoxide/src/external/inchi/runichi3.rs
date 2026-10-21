@@ -47,6 +47,9 @@ pub struct StructData {
     pub str_err_struct: String,
     pub taut_flags: [u64; 2],
     pub taut_flags_done: [u64; 2],
+    pub n_error_code: i32,
+    pub num_taut: [i32; 3],
+    pub num_non_taut: [i32; 3],
 }
 
 /// `OrigAtData_bCheckUnusualValences`: counts atoms with an unusual valence

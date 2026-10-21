@@ -2935,3 +2935,101 @@ pub fn set_connected_component_number(at: &mut [InpAtom], component_number: u16)
 pub fn post_fix_odd_things(_at: &mut [InpAtom]) -> i32 {
     0
 }
+
+// ---- allocation of the `INChI` / `INChI_Aux` result structures ----
+
+/// `Alloc_INChI_Stereo`
+pub fn alloc_inchi_stereo(num_at: usize, num_bonds: usize) -> super::ichi::InChIStereo {
+    super::ichi::InChIStereo {
+        n_number: vec![0; num_at],
+        t_parity: vec![0; num_at],
+        n_number_inv: vec![0; num_at],
+        t_parity_inv: vec![0; num_at],
+        n_bond_atom1: vec![0; num_bonds],
+        n_bond_atom2: vec![0; num_bonds],
+        b_parity: vec![0; num_bonds],
+        ..Default::default()
+    }
+}
+
+/// `Alloc_INChI`: returns the zeroed structure with the numbers of bonds and
+/// isotopic atoms found; `None` for no atoms.
+pub fn alloc_inchi(
+    at: &[InpAtom],
+    num_at: usize,
+    n_alloc_mode: u64,
+) -> Option<(super::ichi::InChI, usize, usize)> {
+    use super::ichi::{InChI, InChIIsotopicAtom, InChIIsotopicTGroup};
+    use super::ichiparm::REQ_MODE_ISO;
+    const INCHI_T_NUM_MOVABLE: usize = 2;
+    if num_at == 0 {
+        return None;
+    }
+    let mut num_bonds = 0usize;
+    let mut num_isotopic = 0usize;
+    for a in &at[..num_at] {
+        num_bonds += a.valence.max(0) as usize;
+        let name_end = a
+            .elname
+            .iter()
+            .position(|&c| c == 0)
+            .unwrap_or(a.elname.len());
+        let name = &a.elname[..name_end];
+        num_isotopic += usize::from(
+            a.iso_atw_diff != 0
+                || name == b"D"
+                || name == b"T"
+                || a.num_iso_h.iter().any(|&x| x != 0),
+        );
+    }
+    num_bonds /= 2;
+    let mut p = InChI {
+        n_atom: vec![0; num_at],
+        n_conn_table: vec![0; num_at + num_bonds],
+        n_tautomer: vec![0; (3 + INCHI_T_NUM_MOVABLE) * num_at / 2 + 1],
+        n_num_h: vec![0; num_at],
+        n_num_h_fixed: Some(vec![0; num_at]),
+        stereo: Some(alloc_inchi_stereo(num_at, num_bonds)),
+        ..Default::default()
+    };
+    if n_alloc_mode & REQ_MODE_ISO != 0 {
+        if num_isotopic > 0 {
+            p.isotopic_atom = vec![InChIIsotopicAtom::default(); num_isotopic];
+            p.isotopic_t_group = vec![InChIIsotopicTGroup::default(); num_isotopic];
+        }
+        p.n_possible_locations_of_isotopic_h = vec![0; num_at + 1];
+        p.stereo_isotopic = Some(alloc_inchi_stereo(num_at, num_bonds));
+    }
+    Some((p, num_bonds, num_isotopic))
+}
+
+/// `Alloc_INChI_Aux`
+pub fn alloc_inchi_aux(
+    num_at: usize,
+    _num_isotopic_atoms: usize,
+    n_alloc_mode: u64,
+) -> Option<super::ichi::InChIAux> {
+    use super::ichi::{InChIAux, OrigInfo};
+    use super::ichiparm::REQ_MODE_ISO;
+    if num_at == 0 {
+        return None;
+    }
+    let num_at_tg = num_at + num_at / 2;
+    let mut a = InChIAux {
+        n_orig_at_nos_in_canon_ord: vec![0; num_at_tg],
+        n_orig_at_nos_in_canon_ord_inv: vec![0; num_at_tg],
+        n_constit_equ_numbers: vec![0; num_at_tg],
+        orig_info: vec![OrigInfo::default(); num_at],
+        ..Default::default()
+    };
+    if num_at > 1 {
+        a.n_constit_equ_t_group_numbers = vec![0; num_at / 2 + 1];
+    }
+    if n_alloc_mode & REQ_MODE_ISO != 0 {
+        a.n_isotopic_orig_at_nos_in_canon_ord = vec![0; num_at_tg];
+        a.n_isotopic_orig_at_nos_in_canon_ord_inv = vec![0; num_at_tg];
+        a.n_constit_equ_isotopic_numbers = vec![0; num_at_tg];
+        a.n_constit_equ_isotopic_t_group_numbers = vec![0; num_at / 2 + 1];
+    }
+    Some(a)
+}
