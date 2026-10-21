@@ -10725,3 +10725,475 @@ fn canonicalization_linear_ct_helpers_match_the_c_code() {
         assert_eq!(got, want, "case {case}");
     }
 }
+
+#[test]
+fn final_canonical_numbering_matches_the_c_code() {
+    use rdoxide::external::inchi::ichican2::*;
+    use rdoxide::external::inchi::ichicano::*;
+    use rdoxide::external::inchi::ichister::{SpAtom, switch_atom_stereo_and_isotopic_stereo};
+    use rdoxide::external::inchi::ichitaut::{TGroup, TGroupInfo};
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_cano2.json")).unwrap();
+    fn ints(v: &serde_json::Value) -> Vec<i64> {
+        v.as_array()
+            .unwrap()
+            .iter()
+            .map(|x| x.as_i64().unwrap())
+            .collect()
+    }
+    fn pu(t: &str, v: &[u16], n: usize) -> String {
+        let mut s = t.to_string();
+        if v.is_empty() {
+            return s + " -";
+        }
+        for x in v.iter().take(n) {
+            s += &format!(" {x}");
+        }
+        s
+    }
+    fn slot_ptr(cs: &CanonStat, dble: bool, sl: Slot) -> usize {
+        let empty = if dble {
+            cs.dble_ref(sl).is_empty()
+        } else {
+            cs.carb_ref(sl).is_empty()
+        };
+        if empty { 0 } else { sl as usize + 1 }
+    }
+    fn slot_name(cs: &CanonStat, dble: bool, sl: Slot) -> char {
+        let p = slot_ptr(cs, dble, sl);
+        let pb = slot_ptr(cs, dble, Slot::Base);
+        let pi = slot_ptr(cs, dble, Slot::Inv);
+        let po = slot_ptr(cs, dble, Slot::Iso);
+        let pp = slot_ptr(cs, dble, Slot::IsoInv);
+        if p == pb {
+            'B'
+        } else if p == pi {
+            'I'
+        } else if p == po {
+            'O'
+        } else if p == pp {
+            'P'
+        } else {
+            '-'
+        }
+    }
+    for (case, c) in data.as_array().unwrap().iter().enumerate() {
+        let inp = &c["in"];
+        let n = inp["n"].as_u64().unwrap() as usize;
+        let ntg = inp["ntg"].as_u64().unwrap() as usize;
+        let n_e = inp["nE"].as_u64().unwrap() as usize;
+        let have_yes = inp["haveYes"].as_i64().unwrap() != 0;
+        let have_non = inp["haveNon"].as_i64().unwrap() != 0;
+        let have_tgi = inp["haveTgi"].as_i64().unwrap() != 0;
+        let edges: Vec<(usize, usize)> = inp["edges"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|e| {
+                (
+                    e[0].as_u64().unwrap() as usize,
+                    e[1].as_u64().unwrap() as usize,
+                )
+            })
+            .collect();
+        let st1: Vec<Vec<i64>> = inp["st1"].as_array().unwrap().iter().map(ints).collect();
+        let st2: Vec<Vec<i64>> = inp["st2"].as_array().unwrap().iter().map(ints).collect();
+        let build = |key: &str| {
+            let mut at = vec![SpAtom::default(); n + 1];
+            for (i, a) in inp[key].as_array().unwrap().iter().enumerate() {
+                let a = ints(a);
+                let names = ["C", "N", "O", "S", "Cl", "H"];
+                let nm = names[a[0] as usize].as_bytes();
+                at[i].elname[..nm.len()].copy_from_slice(nm);
+                at[i].num_h = a[1] as i8;
+                at[i].iso_atw_diff = a[2] as i8;
+                at[i].num_iso_h = [a[3] as i8, a[4] as i8, a[5] as i8];
+                at[i].c_flags = a[6] as i8;
+                at[i].endpoint = a[7] as u16;
+                at[i].iso_sort_key =
+                    make_iso_sort_key(a[2] as i32, a[3] as i32, a[4] as i32, a[5] as i32);
+            }
+            for &(a, b) in &edges {
+                let va = at[a].valence as usize;
+                at[a].neighbor[va] = b as u16;
+                at[a].valence += 1;
+                let vb = at[b].valence as usize;
+                at[b].neighbor[vb] = a as u16;
+                at[b].valence += 1;
+            }
+            for i in 0..n {
+                at[i].parity = st1[i][0] as i8;
+                at[i].stereo_atom_parity = st1[i][2] as i8;
+                at[i].n_ring_system = st1[i][4] as u16;
+                at[i].parity2 = st2[i][0] as i8;
+                at[i].stereo_atom_parity2 = st2[i][2] as i8;
+                for j in 0..3 {
+                    at[i].stereo_bond_neighbor[j] = st1[i][5 + 4 * j] as u16;
+                    at[i].stereo_bond_ord[j] = st1[i][6 + 4 * j] as i8;
+                    at[i].stereo_bond_z_prod[j] = st1[i][7 + 4 * j] as i8;
+                    at[i].stereo_bond_parity[j] = st1[i][8 + 4 * j] as i8;
+                    at[i].stereo_bond_neighbor2[j] = st2[i][5 + 4 * j] as u16;
+                    at[i].stereo_bond_ord2[j] = st2[i][6 + 4 * j] as i8;
+                    at[i].stereo_bond_z_prod2[j] = st2[i][7 + 4 * j] as i8;
+                    at[i].stereo_bond_parity2[j] = st2[i][8 + 4 * j] as i8;
+                }
+            }
+            at
+        };
+        let mut at_y = build("atY");
+        let mut at_n = build("atN");
+        let sz = ints(&inp["sizes"]);
+        let mut tg = vec![TGroup::default(); ntg + 2];
+        for (k, t) in inp["tgs"].as_array().unwrap().iter().enumerate() {
+            let t = ints(t);
+            tg[k].n_num_endpoints = t[0] as u16;
+            tg[k].n_first_endpoint_at_no_pos = t[1] as u16;
+            tg[k].n_group_number = k as u16 + 1;
+            for j in 0..5 {
+                tg[k].num[j] = t[2 + j] as u16;
+            }
+            tg[k].i_weight = (t[2] * 7 + t[4] * 3 + t[5]) % 5;
+        }
+        let iso = ints(&inp["iso"]);
+        let iso_list = ints(&inp["isolist"]);
+        let mut tgi = TGroupInfo {
+            t_group: (iso[5] == 0).then_some(tg),
+            n_endpoint_atom_number: ints(&inp["epl"]).iter().map(|&x| x as u16).collect(),
+            num_t_groups: ntg,
+            max_num_t_groups: ntg,
+            n_num_endpoints: n_e as i32,
+            n_num_isotopic_endpoints: iso[1] as i32,
+            b_taut_flags_done: iso[2] as u64,
+            b_ignore_isotopic: iso[4] as i32,
+            t_group_number: vec![0; 4 * ntg + 4],
+            ..Default::default()
+        };
+        tgi.tni.b_normalization_flags = iso[3] as u64;
+        tgi.n_isotopic_endpoint_atom_number = std::iter::once(iso[0] as u16)
+            .chain(iso_list.iter().map(|&x| x as u16))
+            .collect();
+        let mode_bits = inp["modeBits"].as_i64().unwrap();
+        let uu = inp["uu"].as_i64().unwrap() != 0;
+        let present = [have_non, have_yes];
+        let mut s = [AtomSizes::default(); 2];
+        for k in 0..2 {
+            let v = &sz[7 * k..7 * k + 7];
+            s[k].n_len_linear_ct_tautomer = v[4] as i32;
+            if present[k] {
+                let a = if k == TAUT_YES { &at_y } else { &at_n };
+                get_canon_lengths(n, a, &mut s[k], have_tgi.then_some(&tgi));
+            }
+            s[k].num_isotopic_atoms = v[2] as i32;
+            s[k].b_ignore_isotopic = v[3] as i32;
+            s[k].b_has_isotopic_taut_groups = v[5] as i32;
+            s[k].n_len_isotopic_endpoints = (v[6] as i32).max(s[k].n_len_isotopic_endpoints);
+        }
+        let mut bcn = Bcn::default();
+        let mut got: Vec<String> = Vec::new();
+        let at_refs: [Option<&[SpAtom]>; 2] =
+            [have_non.then_some(&at_n[..]), have_yes.then_some(&at_y[..])];
+        let ret = get_base_canon_ranking(
+            &mut || false,
+            n,
+            n + ntg,
+            at_refs,
+            have_tgi.then_some(&mut tgi),
+            &s,
+            &mut bcn,
+            inp["bfix"].as_i64().unwrap() != 0,
+            false,
+        );
+        got.push(format!("R {ret}"));
+        if ret == 0 {
+            for k in 0..2 {
+                if bcn.ftcn[k].linear_ct.is_empty() {
+                    continue;
+                }
+                let (nat, na) = (bcn.ftcn[k].num_at_tg, bcn.ftcn[k].num_atoms);
+                let (n_len_ct, n_len_ct_ao) = (
+                    bcn.ftcn[k].n_len_linear_ct,
+                    bcn.ftcn[k].n_len_linear_ct_at_only,
+                );
+                let k_present = if k == TAUT_YES { have_yes } else { have_non };
+                let use_y = if !k_present {
+                    k != TAUT_YES
+                } else {
+                    k == TAUT_YES
+                };
+                let at: &mut Vec<SpAtom> = if use_y { &mut at_y } else { &mut at_n };
+                let mut cs = CanonStat::default();
+                let mut mode = CMODE_CT | mode_bits;
+                if nat > na {
+                    mode |= CMODE_TAUT;
+                }
+                let (nds, ncs) = (
+                    s[k].n_len_linear_ct_stereo_dble,
+                    s[k].n_len_linear_ct_stereo_carb,
+                );
+                let (ids, ics);
+                {
+                    let mut si = AtomSizes::default();
+                    let mut sw = false;
+                    switch_atom_stereo_and_isotopic_stereo(at, na, &mut sw);
+                    get_canon_lengths(na, at, &mut si, None);
+                    switch_atom_stereo_and_isotopic_stereo(at, na, &mut sw);
+                    ids = si.n_len_linear_ct_stereo_dble;
+                    ics = si.n_len_linear_ct_stereo_carb;
+                }
+                let len_iso = at[..na]
+                    .iter()
+                    .filter(|a| {
+                        let k = a.endpoint == 0
+                            && a.c_flags & 1 == 0
+                            && (a.num_iso_h[0] != 0 || a.num_iso_h[1] != 0 || a.num_iso_h[2] != 0);
+                        a.iso_atw_diff != 0 || k
+                    })
+                    .count() as i32;
+                allocate_cs(
+                    &mut cs,
+                    na,
+                    nat,
+                    n_len_ct,
+                    n_len_ct_ao,
+                    nds,
+                    ids,
+                    ncs,
+                    ics,
+                    (3 * ntg + n_e + 1) as i32,
+                    if have_tgi && tgi.n_num_isotopic_endpoints != 0 {
+                        0
+                    } else {
+                        tgi.t_group.as_ref().map_or(0, |t| {
+                            t[..ntg].iter().filter(|g| g.i_weight != 0).count() as i32
+                        })
+                    },
+                    len_iso,
+                    mode,
+                    true,
+                );
+                cs.p_bcn = Some(Box::new(std::mem::take(&mut bcn)));
+                cs.t_group_info = have_tgi.then(|| std::mem::take(&mut tgi));
+                cs.b_ignore_isotopic = 0;
+                let r2 = canon_inchi(
+                    &mut || false,
+                    na,
+                    nat,
+                    at,
+                    &mut cs,
+                    mode | if uu { REQ_MODE_DIFF_UU_STEREO } else { 0 },
+                    k,
+                );
+                bcn = *cs.p_bcn.take().unwrap();
+                if let Some(t) = cs.t_group_info.take() {
+                    tgi = t;
+                }
+                got.push(format!(
+                    "C{k} {r2} {mode} {} {} {} {}",
+                    cs.n_len_linear_ct,
+                    cs.n_len_linear_ct_at_only,
+                    cs.n_canon_flags,
+                    cs.b_ignore_isotopic
+                ));
+                got.push(format!(
+                    "SL {}{}{}{}",
+                    slot_name(&cs, true, cs.stereo_slots.dble),
+                    slot_name(&cs, false, cs.stereo_slots.carb),
+                    slot_name(&cs, true, cs.stereo_slots.dble_inv),
+                    slot_name(&cs, false, cs.stereo_slots.carb_inv)
+                ));
+                got.push(pu("LC", &cs.linear_ct, cs.n_max_len_linear_ct as usize));
+                got.push(pu("L2", &cs.linear_ct2, cs.n_max_len_linear_ct as usize));
+                got.push(format!(
+                    "LE {} {} {} {} {} {} {} {}",
+                    cs.n_len_linear_ct2,
+                    cs.n_len_linear_ct_at_only2,
+                    cs.n_len_linear_ct_tautomer,
+                    cs.n_len_linear_ct_isotopic,
+                    cs.n_len_linear_ct_isotopic_tautomer,
+                    cs.b_cmp_stereo,
+                    cs.b_cmp_isotopic_stereo,
+                    cs.n_mode
+                ));
+                let mut l = String::from("NH");
+                for x in cs.n_num_h.iter().take(na) {
+                    l += &format!(" {x}");
+                }
+                got.push(l);
+                let mut l = String::from("NF");
+                for x in cs.n_num_h_fixed.iter().take(na) {
+                    l += &format!(" {x}");
+                }
+                got.push(l);
+                let mut l = String::from("NX");
+                for x in cs.n_exchg_iso_h.iter().take(na) {
+                    l += &format!(" {x}");
+                }
+                got.push(l);
+                got.push(pu(
+                    "LT",
+                    &cs.linear_ct_tautomer,
+                    cs.n_max_len_linear_ct_tautomer as usize,
+                ));
+                let mut l = String::from("IT");
+                for e in cs
+                    .linear_ct_isotopic_tautomer
+                    .iter()
+                    .take(cs.n_max_len_linear_ct_isotopic_tautomer as usize)
+                {
+                    l += &format!(" {}:{},{},{}", e.tgroup_num, e.num[0], e.num[1], e.num[2]);
+                }
+                got.push(l);
+                let mut l = String::from("IA");
+                for e in cs
+                    .linear_ct_isotopic
+                    .iter()
+                    .take(cs.n_max_len_linear_ct_isotopic as usize)
+                {
+                    l += &format!(
+                        " {},{},{},{},{}",
+                        e.at_num, e.num_1h, e.num_d, e.num_t, e.iso_atw_diff
+                    );
+                }
+                got.push(l);
+                got.push(pu("SR", &cs.n_symm_rank, nat));
+                got.push(pu("CO", &cs.n_canon_ord, nat));
+                got.push(pu("SI", &cs.n_symm_rank_isotopic, nat));
+                got.push(pu("CI", &cs.n_canon_ord_isotopic, nat));
+                got.push(pu("ST", &cs.n_canon_ord_stereo, nat));
+                got.push(pu("SV", &cs.n_canon_ord_stereo_inv, nat));
+                got.push(pu("IS", &cs.n_canon_ord_isotopic_stereo, nat));
+                got.push(pu("IV", &cs.n_canon_ord_isotopic_stereo_inv, nat));
+                let ntgs = if have_tgi { ntg } else { 0 };
+                got.push(pu("TO", &cs.n_canon_ord_taut, ntgs));
+                got.push(pu("TS", &cs.n_symm_rank_taut, ntgs));
+                got.push(pu("TI", &cs.n_canon_ord_isotopic_taut, ntgs));
+                got.push(pu("TJ", &cs.n_symm_rank_isotopic_taut, ntgs));
+                got.push(pu("TT", &cs.n_canon_ord_stereo_taut, ntgs));
+                got.push(pu("TU", &cs.n_canon_ord_isotopic_stereo_taut, ntgs));
+                got.push(format!(
+                    "CL {} {} {} {} {} {} {} {}",
+                    cs.n_len_canon_ord,
+                    cs.n_len_canon_ord_taut,
+                    cs.n_len_canon_ord_isotopic,
+                    cs.n_len_canon_ord_isotopic_taut,
+                    cs.n_len_canon_ord_stereo,
+                    cs.n_len_canon_ord_stereo_taut,
+                    cs.n_len_canon_ord_isotopic_stereo,
+                    cs.n_len_canon_ord_isotopic_stereo_taut
+                ));
+                got.push(format!(
+                    "SS {} {} {} {} {} {} {} {}",
+                    cs.n_len_linear_ct_stereo_dble,
+                    cs.n_len_linear_ct_stereo_carb,
+                    cs.n_len_linear_ct_stereo_dble_inv,
+                    cs.n_len_linear_ct_stereo_carb_inv,
+                    cs.n_len_linear_ct_isotopic_stereo_dble,
+                    cs.n_len_linear_ct_isotopic_stereo_carb,
+                    cs.n_len_linear_ct_isotopic_stereo_dble_inv,
+                    cs.n_len_linear_ct_isotopic_stereo_carb_inv
+                ));
+                got.push(format!(
+                    "SM {} {} {} {}",
+                    cs.n_max_len_linear_ct_stereo_dble,
+                    cs.n_max_len_linear_ct_stereo_carb,
+                    cs.n_max_len_linear_ct_isotopic_stereo_dble,
+                    cs.n_max_len_linear_ct_isotopic_stereo_carb
+                ));
+                let slots = [Slot::Base, Slot::Inv, Slot::Iso, Slot::IsoInv];
+                let (ad, ac) = ([nds, nds, ids, ids], [ncs, ncs, ics, ics]);
+                for q in 0..4 {
+                    let mut l = format!("D{q}");
+                    let b = cs.dble_ref(slots[q]);
+                    if !b.is_empty() {
+                        for e in b.iter().take(ad[q] as usize) {
+                            l += &format!(" {},{},{}", e.at_num1, e.at_num2, e.parity);
+                        }
+                    }
+                    got.push(l);
+                    let mut l = format!("K{q}");
+                    let b = cs.carb_ref(slots[q]);
+                    if !b.is_empty() {
+                        for e in b.iter().take(ac[q] as usize) {
+                            l += &format!(" {},{}", e.at_num, e.parity);
+                        }
+                    }
+                    got.push(l);
+                }
+                for a in at.iter().take(n) {
+                    let mut l = format!(
+                        "A {} {} {} {} {} {} {} {} |",
+                        a.parity,
+                        a.parity2,
+                        a.final_parity,
+                        a.final_parity2,
+                        a.stereo_atom_parity,
+                        a.stereo_atom_parity2,
+                        a.b_has_stereo_or_equ_to_stereo,
+                        a.b_has_stereo_or_equ_to_stereo2
+                    );
+                    for j in 0..3 {
+                        l += &format!(
+                            " {},{},{},{}",
+                            a.stereo_bond_neighbor[j],
+                            a.stereo_bond_parity[j],
+                            a.stereo_bond_ord[j],
+                            a.stereo_bond_z_prod[j]
+                        );
+                    }
+                    l += " |";
+                    for j in 0..3 {
+                        l += &format!(
+                            " {},{},{},{}",
+                            a.stereo_bond_neighbor2[j],
+                            a.stereo_bond_parity2[j],
+                            a.stereo_bond_ord2[j],
+                            a.stereo_bond_z_prod2[j]
+                        );
+                    }
+                    got.push(l);
+                }
+                let mut l = String::from("TG");
+                if have_tgi {
+                    for x in tgi.t_group_number.iter().take(4 * ntgs) {
+                        l += &format!(" {x}");
+                    }
+                    l += " |";
+                    for x in tgi.n_endpoint_atom_number.iter().take(n_e) {
+                        l += &format!(" {x}");
+                    }
+                }
+                got.push(l);
+                got.push(format!(
+                    "TI {}",
+                    if have_tgi { tgi.b_ignore_isotopic } else { -1 }
+                ));
+                got.push(format!(
+                    "PN {}",
+                    i32::from(bcn.ftcn[k].neigh_list.is_some())
+                ));
+                got.push(format!("RS {}", bcn.n_max_len_rank_stack));
+                for j in 0..(bcn.n_max_len_rank_stack / 2) as usize {
+                    let p = bcn.p_rank_stack.get(j).cloned().unwrap_or_default();
+                    let nm = bcn.num_max;
+                    got.push(pu(
+                        &format!("Q{j}"),
+                        &p.rank,
+                        if p.rank.is_empty() { 0 } else { nm },
+                    ));
+                    got.push(pu(
+                        &format!("W{j}"),
+                        &p.at_number,
+                        if p.at_number.is_empty() { 0 } else { nm },
+                    ));
+                }
+            }
+        }
+        let want: Vec<String> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| s.as_str().unwrap().to_string())
+            .collect();
+        assert_eq!(got, want, "case {case}");
+    }
+}

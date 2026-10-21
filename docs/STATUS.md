@@ -317,6 +317,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 201 | InChI port I6r: FixCanonEquivalenceInfo, make_iso_sort_key, ATOM_SIZES and canon flags with differential test against the C code |
 | 202 | InChI port I6s: ichican2 GetBaseCanonRanking (base, fixed-H and isotopic canonical numbering) with differential test against the C code |
 | 203 | InChI port I6t: ichicano GetCanonLengths, FillIsotopicAtLinearCT, FillTautLinearCT2, UpdateFullLinearCT and CANON_STAT with differential test against the C code |
+| 204 | InChI port I6u: ichicano AllocateCS, Canon_INChI3 and Canon_INChI with differential test against the C code |
 
 ## Python package files
 
@@ -690,3 +691,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-21 — Stage 201: ported FixCanonEquivalenceInfo (ichicano.c) and make_iso_sort_key (ichiisot.c) plus the ATOM_SIZES type and CANON_FLAG constants, and tested them against the upstream C on 6000 random cases.
 * 2026-10-21 — Stage 202: ported GetBaseCanonRanking of ichican2.c with the BCN/FTCN result structures, completing ichican2, and tested it against the upstream C on 3000 tautomeric and non-tautomeric structures.
 * 2026-10-21 — Stage 203: ported GetCanonLengths, FillIsotopicAtLinearCT, FillTautLinearCT2, UpdateFullLinearCT and the CANON_STAT structure of ichicano.c and tested them against the upstream C on 4000 random cases.
+* 2026-10-21 — Stage 204: ported AllocateCS, Canon_INChI3 and Canon_INChI of ichicano.c (isotopic and stereo optimization of the canonical numbering) and tested them against the upstream C on 2473 structures.
