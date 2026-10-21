@@ -175,6 +175,8 @@ pub struct BnStruct {
     pub type_tacn: u16,
     pub type_t: u16,
     pub type_cn: u16,
+    /// `*pbTautFlags`
+    pub pb_taut_flags: u32,
     pub edge_forbidden_mask: i8,
 }
 
@@ -1633,4 +1635,633 @@ pub fn add_st_cap_to_a_vertex(
         }
     }
     n as i32
+}
+
+// ---- temporary changes of the network made to check an alternating path ----
+
+pub const ALT_PATH_MODE_TAUTOM: i32 = 1;
+pub const ALT_PATH_MODE_CHARGE: i32 = 2;
+pub const ALT_PATH_MODE_4_SALT: i32 = 3;
+pub const ALT_PATH_MODE_4_SALT2: i32 = 4;
+pub const ALT_PATH_MODE_REM2H_CHG: i32 = 5;
+pub const ALT_PATH_MODE_ADD2H_CHG: i32 = 6;
+pub const ALT_PATH_MODE_REM2H_TST: i32 = 7;
+pub const ALT_PATH_MODE_ADD2H_TST: i32 = 8;
+pub const ALT_PATH_MODE_REM_PROTON: i32 = 9;
+
+pub const BNS_CHK_ALTP_NO_ALTPATH: i32 = 0;
+pub const BNS_CHK_ALTP_SAME_TGROUP: i32 = 1;
+pub const BNS_CHK_ALTP_SAME_VERTEX: i32 = 2;
+pub const BNS_CHK_ALTP_SET_SUCCESS: i32 = 4;
+
+pub const TG_FLAG_TEST_TAUT2_SALTS: u32 = 0x10;
+
+/// `ALT_PATH_CHANGES`
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct AltPathChanges {
+    pub n_old_caps_vert: [[i32; super::inpdef::MAXVAL + 1]; 2],
+    pub v_old_vert: [Vertex; 2],
+    pub b_set_old_caps_vert: [i32; 2],
+    pub v_new_vertex: [Vertex; 2],
+    pub b_set_new: [i32; 2],
+}
+
+/// `BNS_FLOW_CHANGES`; a list of them ends with `iedge == NO_VERTEX`
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BnsFlowChanges {
+    pub iedge: i32,
+    pub flow: i32,
+    pub cap: i32,
+    pub v1: Vertex,
+    pub cap_st1: i32,
+    pub flow_st1: i32,
+    pub v2: Vertex,
+    pub cap_st2: i32,
+    pub flow_st2: i32,
+}
+
+impl Default for BnsFlowChanges {
+    fn default() -> Self {
+        Self {
+            iedge: NO_VERTEX,
+            flow: 0,
+            cap: 0,
+            v1: NO_VERTEX,
+            cap_st1: 0,
+            flow_st1: 0,
+            v2: NO_VERTEX,
+            cap_st2: 0,
+            flow_st2: 0,
+        }
+    }
+}
+
+fn st_dec(x: i32, d: i32) -> i32 {
+    ((x & EDGE_FLOW_ST_MASK) - d) | (x & !EDGE_FLOW_ST_MASK)
+}
+
+/// `bRestoreFlowAfterCheckOneBond`
+pub fn restore_flow_after_check_one_bond(p: &mut BnStruct, fcd: &[BnsFlowChanges]) -> i32 {
+    let mut ifcd = 0usize;
+    while fcd[ifcd].iedge != NO_VERTEX {
+        ifcd += 1;
+    }
+    while ifcd > 0 {
+        ifcd -= 1;
+        let f = fcd[ifcd];
+        let e = &mut p.edge[f.iedge as usize];
+        e.flow = f.flow;
+        e.cap = f.cap;
+        e.pass = 0;
+        if f.v1 != NO_VERTEX {
+            let v = &mut p.vert[f.v1 as usize];
+            v.st_edge.flow = f.flow_st1;
+            v.st_edge.cap = f.cap_st1;
+            v.st_edge.pass = 0;
+        }
+        if f.v2 != NO_VERTEX {
+            let v = &mut p.vert[f.v2 as usize];
+            v.st_edge.flow = f.flow_st2;
+            v.st_edge.cap = f.cap_st2;
+            v.st_edge.pass = 0;
+        }
+    }
+    0
+}
+
+/// `bSetFlowToCheckOneBond`: forces the flow of an edge to `flow`, recording
+/// the changes in `fcd`; returns the number of dots created or an error
+pub fn set_flow_to_check_one_bond(
+    p: &mut BnStruct,
+    iedge: i32,
+    flow: i32,
+    fcd: &mut [BnsFlowChanges],
+) -> i32 {
+    let f12 = p.edge[iedge as usize].flow & EDGE_FLOW_MASK;
+    let mut ifcd = 0usize;
+    let mut n_dots = 0;
+    fcd[ifcd].iedge = NO_VERTEX;
+    if f12 < flow {
+        let v1 = i32::from(p.edge[iedge as usize].neighbor1);
+        let v2 = v1 ^ i32::from(p.edge[iedge as usize].neighbor12);
+        if (p.vert[v1 as usize].st_edge.cap & EDGE_FLOW_ST_MASK) < flow
+            || (p.vert[v2 as usize].st_edge.cap & EDGE_FLOW_ST_MASK) < flow
+        {
+            return super::ichierr::BNS_CANT_SET_BOND;
+        }
+        if (p.vert[v1 as usize].st_edge.flow & EDGE_FLOW_ST_MASK) < f12
+            || (p.vert[v2 as usize].st_edge.flow & EDGE_FLOW_ST_MASK) < f12
+        {
+            return super::ichierr::BNS_CAP_FLOW_ERR;
+        }
+        {
+            let e = p.edge[iedge as usize];
+            fcd[ifcd] = BnsFlowChanges {
+                iedge,
+                flow: e.flow,
+                cap: e.cap,
+                v1,
+                flow_st1: p.vert[v1 as usize].st_edge.flow,
+                cap_st1: p.vert[v1 as usize].st_edge.cap,
+                v2,
+                flow_st2: p.vert[v2 as usize].st_edge.flow,
+                cap_st2: p.vert[v2 as usize].st_edge.cap,
+            };
+            ifcd += 1;
+            fcd[ifcd].iedge = NO_VERTEX;
+            p.edge[iedge as usize].pass |= 64;
+        }
+        let mut delta1 = flow - f12;
+        let mut delta2 = delta1;
+        if f12 > 0 {
+            for v in [v1, v2] {
+                let st = &mut p.vert[v as usize].st_edge;
+                st.cap = st_dec(st.cap, f12);
+                st.flow = st_dec(st.flow, f12);
+            }
+            let e = &mut p.edge[iedge as usize];
+            e.flow &= !EDGE_FLOW_MASK;
+        }
+        p.edge[iedge as usize].cap &= !EDGE_FLOW_MASK;
+        for (v, delta) in [(v1, &mut delta1), (v2, &mut delta2)] {
+            let st = &mut p.vert[v as usize].st_edge;
+            let mut rescap = (st.cap & EDGE_FLOW_ST_MASK) - (st.flow & EDGE_FLOW_ST_MASK);
+            while rescap != 0 && *delta != 0 {
+                rescap -= 1;
+                *delta -= 1;
+                st.cap = st_dec(st.cap, 1);
+                n_dots -= 1;
+            }
+        }
+        for (v, delta) in [(v1, &mut delta1), (v2, &mut delta2)] {
+            let nadj = p.vert[v as usize].num_adj_edges as usize;
+            let mut i = 0;
+            while *delta != 0 && i < nadj {
+                let iedge_i = p.iedge[p.vert[v as usize].iedge + i];
+                i += 1;
+                if iedge_i == iedge {
+                    continue;
+                }
+                if p.edge[iedge_i as usize].forbidden != 0 {
+                    continue;
+                }
+                let mut f = p.edge[iedge_i as usize].flow & EDGE_FLOW_MASK;
+                if f != 0 {
+                    let v_i = i32::from(p.edge[iedge_i as usize].neighbor12) ^ v;
+                    fcd[ifcd] = BnsFlowChanges {
+                        iedge: iedge_i,
+                        flow: p.edge[iedge_i as usize].flow,
+                        cap: p.edge[iedge_i as usize].cap,
+                        v1: v_i,
+                        flow_st1: p.vert[v_i as usize].st_edge.flow,
+                        cap_st1: p.vert[v_i as usize].st_edge.cap,
+                        v2: NO_VERTEX,
+                        flow_st2: 0,
+                        cap_st2: 0,
+                    };
+                    ifcd += 1;
+                    fcd[ifcd].iedge = NO_VERTEX;
+                    p.edge[iedge_i as usize].pass |= 64;
+                    while f != 0 && *delta != 0 {
+                        f -= 1;
+                        *delta -= 1;
+                        let ef = p.edge[iedge_i as usize].flow;
+                        p.edge[iedge_i as usize].flow =
+                            ((ef & EDGE_FLOW_MASK) - 1) | (ef & !EDGE_FLOW_MASK);
+                        let sv = &mut p.vert[v_i as usize].st_edge;
+                        sv.flow = st_dec(sv.flow, 1);
+                        let s0 = &mut p.vert[v as usize].st_edge;
+                        s0.cap = st_dec(s0.cap, 1);
+                        s0.flow = st_dec(s0.flow, 1);
+                        n_dots += 1;
+                    }
+                }
+            }
+        }
+        if delta1 != 0 || delta2 != 0 {
+            return super::ichierr::BNS_CANT_SET_BOND;
+        }
+    }
+    if f12 >= flow {
+        let v1 = i32::from(p.edge[iedge as usize].neighbor1);
+        let v2 = v1 ^ i32::from(p.edge[iedge as usize].neighbor12);
+        if (p.vert[v1 as usize].st_edge.flow & EDGE_FLOW_ST_MASK) < f12
+            || (p.vert[v2 as usize].st_edge.flow & EDGE_FLOW_ST_MASK) < f12
+            || (p.vert[v1 as usize].st_edge.cap & EDGE_FLOW_ST_MASK) < flow
+            || (p.vert[v2 as usize].st_edge.cap & EDGE_FLOW_ST_MASK) < flow
+        {
+            return super::ichierr::BNS_CAP_FLOW_ERR;
+        }
+        let e = p.edge[iedge as usize];
+        fcd[ifcd] = BnsFlowChanges {
+            iedge,
+            flow: e.flow,
+            cap: e.cap,
+            v1,
+            flow_st1: p.vert[v1 as usize].st_edge.flow,
+            cap_st1: p.vert[v1 as usize].st_edge.cap,
+            v2,
+            flow_st2: p.vert[v2 as usize].st_edge.flow,
+            cap_st2: p.vert[v2 as usize].st_edge.cap,
+        };
+        ifcd += 1;
+        fcd[ifcd].iedge = NO_VERTEX;
+        p.edge[iedge as usize].pass |= 64;
+        let delta = f12 - flow;
+        for v in [v1, v2] {
+            let st = &mut p.vert[v as usize].st_edge;
+            st.flow = st_dec(st.flow, f12);
+            st.cap = st_dec(st.cap, flow);
+        }
+        let e = &mut p.edge[iedge as usize];
+        e.flow &= !EDGE_FLOW_MASK;
+        e.cap &= !EDGE_FLOW_MASK;
+        n_dots = 2 * delta;
+    }
+    n_dots
+}
+
+/// `bRestoreBnsAfterCheckAltPath`
+pub fn restore_bns_after_check_alt_path(
+    p: &mut BnStruct,
+    apc: &AltPathChanges,
+    b_change_flow: i32,
+) -> i32 {
+    fn remove_new(p: &mut BnStruct, apc: &AltPathChanges, with_flow: bool) {
+        for i in (0..2).rev() {
+            if apc.b_set_new[i] != 0 {
+                let v_new = apc.v_new_vertex[i];
+                let nv = p.vert[v_new as usize];
+                for j in 0..nv.num_adj_edges as usize {
+                    let ie = p.iedge[nv.iedge + j] as usize;
+                    let e = p.edge[ie];
+                    let v_old = (i32::from(e.neighbor12) ^ v_new) as usize;
+                    if with_flow {
+                        p.vert[v_old].st_edge.flow -= e.flow;
+                        p.vert[v_old].st_edge.cap -= e.flow;
+                    }
+                    p.vert[v_old].num_adj_edges -= 1;
+                    let at = p.vert[v_old].iedge + usize::from(p.vert[v_old].num_adj_edges);
+                    p.iedge[at] = 0;
+                    p.edge[ie] = BnsEdge::default();
+                    p.num_edges -= 1;
+                }
+                p.vert[v_new as usize] = BnsVertex::default();
+                p.num_vertices -= 1;
+            }
+        }
+    }
+    fn restore_caps(p: &mut BnStruct, apc: &AltPathChanges, check_flow: bool) {
+        for i in (0..2).rev() {
+            let mut n = apc.b_set_old_caps_vert[i];
+            if n != 0 {
+                let ov = p.vert[apc.v_old_vert[i] as usize];
+                if !check_flow || ov.st_edge.flow <= apc.n_old_caps_vert[i][0] {
+                    p.vert[apc.v_old_vert[i] as usize].st_edge.cap = apc.n_old_caps_vert[i][0];
+                    n -= 1;
+                    let mut j = 0;
+                    while j < n && j < i32::from(ov.num_adj_edges) {
+                        let ie = p.iedge[ov.iedge + j as usize] as usize;
+                        p.edge[ie].cap = apc.n_old_caps_vert[i][j as usize + 1];
+                        j += 1;
+                    }
+                }
+            }
+        }
+    }
+    if b_change_flow & BNS_EF_UPD_H_CHARGE != 0 {
+        remove_new(p, apc, true);
+        restore_caps(p, apc, true);
+    } else {
+        restore_caps(p, apc, false);
+        remove_new(p, apc, false);
+    }
+    0
+}
+
+/// `bSetBnsToCheckAltPath`: temporarily modifies the network so that an
+/// augmenting path between two vertices means that H (or a charge) can move
+/// from `v_single` to `v_double`
+#[allow(clippy::too_many_arguments)]
+pub fn set_bns_to_check_alt_path(
+    p: &mut BnStruct,
+    v_double: i32,
+    v_single: i32,
+    type_: u16,
+    path_type: i32,
+    apc: &mut AltPathChanges,
+    fcd: &mut [BnsFlowChanges],
+    n_dots: &mut i32,
+) -> i32 {
+    use super::ichierr::BNS_BOND_ERR as BOND_ERR;
+    let hmode = matches!(
+        path_type,
+        ALT_PATH_MODE_REM2H_CHG
+            | ALT_PATH_MODE_ADD2H_CHG
+            | ALT_PATH_MODE_REM2H_TST
+            | ALT_PATH_MODE_ADD2H_TST
+    );
+    if p.vert[v_double as usize].st_edge.flow == 0 && !hmode {
+        return BNS_CHK_ALTP_NO_ALTPATH;
+    }
+    let (v1, v2) = (v_single, v_double);
+    let pv1 = p.vert[v1 as usize];
+    let pv2 = p.vert[v2 as usize];
+    let neighbor_of = |p: &BnStruct, pv: &BnsVertex, i: usize, v: Vertex| -> (Vertex, i32) {
+        let ie = p.iedge[pv.iedge + i];
+        (i32::from(p.edge[ie as usize].neighbor12) ^ v, ie)
+    };
+
+    if p.pb_taut_flags & TG_FLAG_TEST_TAUT2_SALTS != 0
+        && path_type == ALT_PATH_MODE_4_SALT2
+        && type_ & BNS_VERT_TYPE_ENDPOINT != 0
+    {
+        *apc = AltPathChanges::default();
+        fcd[0].iedge = NO_VERTEX;
+        *n_dots = 0;
+        if v1 == v2 {
+            return BNS_CHK_ALTP_SAME_VERTEX;
+        }
+        let mut n = 0;
+        for i in 0..pv1.num_adj_edges as usize {
+            let (v, _) = neighbor_of(p, &pv1, i, v1);
+            if v == v2 {
+                continue;
+            }
+            n += i32::from(p.vert[v as usize].st_edge.cap > 0);
+        }
+        if n == 0 {
+            return BNS_CHK_ALTP_NO_ALTPATH;
+        }
+        let (mut v1_act, mut v2_act) = (v1, v2);
+        let (mut v1t, mut v2t) = (NO_VERTEX, NO_VERTEX);
+        if pv1.type_ & type_ == type_ {
+            v1t = get_group_vertex(p, v1, type_);
+            if is_bns_error(v1t) {
+                return v1t;
+            }
+            if v1t != NO_VERTEX {
+                v1_act = v1t;
+            }
+        }
+        if pv2.type_ & type_ == type_ {
+            v2t = get_group_vertex(p, v2, type_);
+            if is_bns_error(v2t) {
+                return v2t;
+            }
+            if v2t != NO_VERTEX {
+                v2_act = v2t;
+            }
+        }
+        if v1t != NO_VERTEX && v1t == v2t {
+            return BNS_CHK_ALTP_SAME_TGROUP;
+        }
+        let (mut set1, mut set2) = (false, false);
+        let mut iapc = 0;
+        if v1t != NO_VERTEX {
+            let v_new = add_new_vertex(p, v1t, 1, 0, 1, n_dots);
+            if is_bns_error(v_new) {
+                return v_new;
+            }
+            apc.v_new_vertex[iapc] = v_new;
+            apc.b_set_new[iapc] = 1;
+            set1 = true;
+            iapc += 1;
+        }
+        if v2t == NO_VERTEX {
+            let v_new = add_new_vertex(p, v2, 1, 0, 1, n_dots);
+            if is_bns_error(v_new) {
+                return v_new;
+            }
+            apc.v_new_vertex[iapc] = v_new;
+            apc.b_set_new[iapc] = 1;
+            set2 = true;
+        }
+        let mut iapc = 0;
+        if !set1 {
+            if v1t != NO_VERTEX {
+                return BOND_ERR;
+            }
+            let n = add_st_cap_to_a_vertex(
+                p,
+                v1,
+                v2_act,
+                &mut apc.n_old_caps_vert[iapc],
+                n_dots,
+                false,
+            );
+            apc.b_set_old_caps_vert[iapc] = n;
+            apc.v_old_vert[iapc] = v1;
+            iapc += 1;
+        }
+        if !set2 {
+            if v2t == NO_VERTEX {
+                return BOND_ERR;
+            }
+            let n = add_st_cap_to_a_vertex(
+                p,
+                v2t,
+                v1_act,
+                &mut apc.n_old_caps_vert[iapc],
+                n_dots,
+                false,
+            );
+            apc.b_set_old_caps_vert[iapc] = n;
+            apc.v_old_vert[iapc] = v2t;
+        }
+        if *n_dots < 0 || *n_dots % 2 != 0 {
+            return super::ichierr::BNS_SET_ALTP_ERR;
+        }
+        return BNS_CHK_ALTP_SET_SUCCESS;
+    }
+
+    if hmode {
+        let b_donors = path_type == ALT_PATH_MODE_REM2H_CHG || path_type == ALT_PATH_MODE_REM2H_TST;
+        *apc = AltPathChanges::default();
+        fcd[0].iedge = NO_VERTEX;
+        *n_dots = 0;
+        let mut cap = 1;
+        let mut adjacent = [0i32; 2];
+        for (k, (pv, v, other)) in [(&pv1, v1, v2), (&pv2, v2, v1)].into_iter().enumerate() {
+            let mut n = 0;
+            let mut adj = 0;
+            for i in 0..pv.num_adj_edges as usize {
+                let (w, ie) = neighbor_of(p, pv, i, v);
+                let e = &p.edge[ie as usize];
+                n += if b_donors {
+                    i32::from(p.vert[w as usize].st_edge.cap > 0)
+                } else {
+                    i32::from(e.flow > 0)
+                };
+                if b_donors && w == other && e.flow < MAX_BOND_EDGE_CAP {
+                    adj += 1;
+                }
+            }
+            adjacent[k] = adj;
+            if n == 0 && adj == 0 {
+                return BNS_CHK_ALTP_NO_ALTPATH;
+            }
+        }
+        let b_adjacent_donors = adjacent[1];
+        let (mut v1_act, mut v2_act) = (v1, v2);
+        let (mut v1t, mut v2t) = (NO_VERTEX, NO_VERTEX);
+        if pv1.type_ & type_ == type_ {
+            v1t = get_group_vertex(p, v1, type_);
+            if v1t == BOND_ERR {
+                v1t = NO_VERTEX;
+            } else if is_bns_error(v1t) {
+                return v1t;
+            } else if v1t != NO_VERTEX {
+                v1_act = v1t;
+            }
+        }
+        if pv2.type_ & type_ == type_ {
+            v2t = get_group_vertex(p, v2, type_);
+            if v2t == BOND_ERR {
+                v2t = NO_VERTEX;
+            } else if is_bns_error(v2t) {
+                return v2t;
+            } else if v2t != NO_VERTEX {
+                v2_act = v2t;
+            }
+        }
+        if v1t != NO_VERTEX && v1t == v2t {
+            cap = 2;
+        }
+        let (mut set1, mut set2) = (false, false);
+        let mut iapc = 0;
+        if b_donors == (v1t != NO_VERTEX) {
+            let v_new = add_new_vertex(p, v1_act, cap, 0, 1, n_dots);
+            if is_bns_error(v_new) {
+                return v_new;
+            }
+            apc.v_new_vertex[iapc] = v_new;
+            apc.b_set_new[iapc] = 1;
+            set1 = true;
+            iapc += 1;
+        }
+        if b_donors == (v2t != NO_VERTEX) && cap == 1 {
+            let v_new = add_new_vertex(p, v2_act, cap, 0, 1, n_dots);
+            if is_bns_error(v_new) {
+                return v_new;
+            }
+            apc.v_new_vertex[iapc] = v_new;
+            apc.b_set_new[iapc] = 1;
+            set2 = true;
+        } else if b_donors == (v2t != NO_VERTEX) {
+            set2 = true;
+        }
+        let mut iapc = 0;
+        let adj_donors = b_adjacent_donors != 0;
+        if !set1 {
+            if b_donors == (v1t != NO_VERTEX) {
+                return BOND_ERR;
+            }
+            let n = add_st_cap_to_a_vertex(
+                p,
+                v1_act,
+                v2_act,
+                &mut apc.n_old_caps_vert[iapc],
+                n_dots,
+                adj_donors,
+            );
+            apc.b_set_old_caps_vert[iapc] = n;
+            apc.v_old_vert[iapc] = v1_act;
+            iapc += 1;
+        }
+        if !set2 {
+            if b_donors == (v2t != NO_VERTEX) {
+                return BOND_ERR;
+            }
+            let n = add_st_cap_to_a_vertex(
+                p,
+                v2_act,
+                v1_act,
+                &mut apc.n_old_caps_vert[iapc],
+                n_dots,
+                adj_donors,
+            );
+            apc.b_set_old_caps_vert[iapc] = n;
+            apc.v_old_vert[iapc] = v2_act;
+        }
+        if *n_dots < 0 || *n_dots % 2 != 0 {
+            return super::ichierr::BNS_SET_ALTP_ERR;
+        }
+        return BNS_CHK_ALTP_SET_SUCCESS;
+    }
+
+    if path_type == ALT_PATH_MODE_REM_PROTON
+        && v1 >= 0
+        && v2 >= 0
+        && pv1.type_ & BNS_VERT_TYPE_ANY_GROUP != 0
+        && pv2.type_ & BNS_VERT_TYPE_ANY_GROUP != 0
+    {
+        if pv1.type_ & BNS_VERT_TYPE_C_GROUP != 0
+            && pv1.st_edge.flow == 2 * i32::from(pv1.num_adj_edges)
+        {
+            return BNS_CHK_ALTP_NO_ALTPATH;
+        }
+        *apc = AltPathChanges::default();
+        fcd[0].iedge = NO_VERTEX;
+        *n_dots = 0;
+        let v_new = add_new_vertex(p, v2, 1, 0, 1, n_dots);
+        if is_bns_error(v_new) {
+            return v_new;
+        }
+        apc.v_new_vertex[0] = v_new;
+        apc.b_set_new[0] = 1;
+        let n = add_st_cap_to_a_vertex(p, v1, v2, &mut apc.n_old_caps_vert[0], n_dots, false);
+        apc.b_set_old_caps_vert[0] = n;
+        apc.v_old_vert[0] = v1;
+        return BNS_CHK_ALTP_SET_SUCCESS;
+    }
+
+    // NEUTRALIZE_ENDPOINTS == 1, FIX_H_CHECKING_TAUT == 1
+    *n_dots = 0;
+    *apc = AltPathChanges::default();
+    fcd[0].iedge = NO_VERTEX;
+    if type_ & BNS_VERT_TYPE_ENDPOINT != 0 {
+        let mut ifcd = 0usize;
+        for (v, type2, flow) in [
+            (v1, BNS_VERT_TYPE_C_GROUP, 1),
+            (v2, BNS_VERT_TYPE_C_GROUP, 1),
+            (v1, BNS_VERT_TYPE_TGROUP, 1),
+            (v2, BNS_VERT_TYPE_TGROUP, 0),
+        ] {
+            let iedge = get_edge_to_group_vertex(p, v, type2);
+            if iedge != NO_VERTEX {
+                let ret2 = set_flow_to_check_one_bond(p, iedge, flow, &mut fcd[ifcd..]);
+                if is_bns_error(ret2) {
+                    return ret2;
+                }
+                *n_dots += ret2;
+                while fcd[ifcd].iedge != NO_VERTEX {
+                    ifcd += 1;
+                }
+            }
+        }
+        let v_new = add_new_vertex(p, v2, 1, 0, 1, n_dots);
+        if is_bns_error(v_new) {
+            return v_new;
+        }
+        apc.v_new_vertex[0] = v_new;
+        apc.b_set_new[0] = 1;
+        let n = add_st_cap_to_a_vertex(p, v1, v2, &mut apc.n_old_caps_vert[0], n_dots, false);
+        apc.b_set_old_caps_vert[0] = n;
+        apc.v_old_vert[0] = v1;
+    } else {
+        let v_new = add_new_vertex(p, v2, 1, 0, 1, n_dots);
+        if is_bns_error(v_new) {
+            return v_new;
+        }
+        apc.v_new_vertex[0] = v_new;
+        apc.b_set_new[0] = 1;
+        let n = add_st_cap_to_a_vertex(p, v1, v2, &mut apc.n_old_caps_vert[0], n_dots, false);
+        apc.b_set_old_caps_vert[0] = n;
+        apc.v_old_vert[0] = v1;
+    }
+    if *n_dots < 0 || *n_dots % 2 != 0 {
+        return super::ichierr::BNS_SET_ALTP_ERR;
+    }
+    BNS_CHK_ALTP_SET_SUCCESS
 }

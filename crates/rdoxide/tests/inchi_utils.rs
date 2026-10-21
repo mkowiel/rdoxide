@@ -2519,3 +2519,155 @@ fn balanced_network_growth_matches_the_c_code() {
         assert_eq!(got, want, "{inp}");
     }
 }
+
+#[test]
+fn alternating_path_check_matches_the_c_code() {
+    use rdoxide::external::inchi::ichi_bns::*;
+    use rdoxide::external::inchi::inpdef::InpAtom;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_bnaltpath.json")).unwrap();
+    for c in data.as_array().unwrap() {
+        let inp = &c["in"];
+        let mut at: Vec<InpAtom> = Vec::new();
+        for a in inp["atoms"].as_array().unwrap() {
+            let mut x = InpAtom {
+                valence: a["v"].as_i64().unwrap() as i8,
+                chem_bonds_valence: a["cbv"].as_i64().unwrap() as i8,
+                el_number: a["el"].as_u64().unwrap() as u8,
+                radical: a["rad"].as_i64().unwrap() as i8,
+                c_point: a["vt"].as_u64().unwrap() as u16,
+                ..Default::default()
+            };
+            for (j, e) in a["nb"].as_array().unwrap().iter().enumerate() {
+                x.neighbor[j] = e[0].as_u64().unwrap() as u16;
+                x.bond_type[j] = e[1].as_u64().unwrap() as u8;
+            }
+            at.push(x);
+        }
+        let n = at.len();
+        let (mut p, _) = allocate_and_init_bn_struct(
+            &mut at,
+            n,
+            inp["ma"].as_i64().unwrap() as i32,
+            inp["me"].as_i64().unwrap() as i32,
+            inp["mp"].as_i64().unwrap() as i32,
+        );
+        for i in 0..n {
+            let vt = u32::from(at[i].c_point);
+            p.vert[i].type_ |= (((vt & 0x1c) << 1) | ((vt & 3) << 9)) as u16;
+        }
+        let mut got: Vec<String> = Vec::new();
+        let mut fcd = vec![BnsFlowChanges::default(); 64];
+        let mut apc = AltPathChanges::default();
+        p.pb_taut_flags = inp["tf"].as_u64().unwrap() as u32;
+        for o in inp["ops"].as_array().unwrap() {
+            let o: Vec<i32> = o
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|v| v.as_i64().unwrap() as i32)
+                .collect();
+            let (op, a, b, x, y, z) = (o[0], o[1], o[2], o[3], o[4], o[5]);
+            let mut dots = 5;
+            let nv = p.num_vertices;
+            match op {
+                0 => {
+                    if p.num_edges == 0 {
+                        got.push("skip".into());
+                        continue;
+                    }
+                    let ie = a % p.num_edges;
+                    let r = set_flow_to_check_one_bond(&mut p, ie, x % 3, &mut fcd);
+                    got.push(format!("o0 {r}"));
+                }
+                1 => {
+                    got.push(format!(
+                        "o1 {}",
+                        restore_flow_after_check_one_bond(&mut p, &fcd)
+                    ));
+                    fcd[0].iedge = NO_VERTEX;
+                }
+                2 => {
+                    if a >= nv || b >= nv {
+                        got.push("skip".into());
+                        continue;
+                    }
+                    let r = set_bns_to_check_alt_path(
+                        &mut p, a, b, x as u16, y, &mut apc, &mut fcd, &mut dots,
+                    );
+                    got.push(format!("o2 {r} {dots}"));
+                }
+                3 => {
+                    got.push(format!(
+                        "o3 {}",
+                        restore_bns_after_check_alt_path(&mut p, &apc, x)
+                    ));
+                    apc = AltPathChanges::default();
+                }
+                10 => {
+                    if a >= nv {
+                        got.push("skip".into());
+                        continue;
+                    }
+                    let r = add_new_vertex(&mut p, a, x, y, z, &mut dots);
+                    got.push(format!("o10 {r} {dots}"));
+                }
+                11 => {
+                    if a < p.num_atoms || a >= nv {
+                        got.push("skip".into());
+                        continue;
+                    }
+                    p.vert[a as usize].type_ = x as u16;
+                    got.push("o11".into());
+                }
+                _ => {
+                    if a >= nv || b >= nv || a == b {
+                        got.push("skip".into());
+                        continue;
+                    }
+                    got.push(format!("o12 {}", add_new_edge(&mut p, a, b, x, y)));
+                }
+            }
+            got.push(format!("C {} {}", p.num_vertices, p.num_edges));
+            for v in p.vert.iter().take(p.num_vertices as usize) {
+                let e = &v.st_edge;
+                let mut s = format!(
+                    "V {} {} {} {} {} {} {} {} |",
+                    v.type_,
+                    e.cap,
+                    e.cap0,
+                    e.flow,
+                    e.flow0,
+                    e.pass,
+                    v.num_adj_edges,
+                    v.max_adj_edges
+                );
+                for k in 0..v.num_adj_edges as usize {
+                    s += &format!(" {}", p.iedge[v.iedge + k]);
+                }
+                got.push(s);
+            }
+            for e in p.edge.iter().take(p.num_edges as usize) {
+                got.push(format!(
+                    "E {} {} {} {} {} {} {} {} {}",
+                    e.cap,
+                    e.cap0,
+                    e.flow,
+                    e.flow0,
+                    e.pass,
+                    e.neighbor1,
+                    e.neighbor12,
+                    e.neigh_ord[0],
+                    e.neigh_ord[1]
+                ));
+            }
+        }
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        assert_eq!(got, want, "{inp}");
+    }
+}
