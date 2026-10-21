@@ -11606,3 +11606,167 @@ fn dfs_order_of_the_connection_table_matches_the_c_code() {
         assert_eq!(got, want, "case {ci}: {inp}");
     }
 }
+
+#[test]
+fn hill_formula_and_stereo_copy_match_the_c_code() {
+    use rdoxide::external::inchi::ichi::{InChI, InChIStereo};
+    use rdoxide::external::inchi::ichimak2::{
+        allocate_and_fill_hill_formula, copy_linear_ct_stereo_to_inchi_stereo,
+        get_hill_formula_counts, mark_ambiguous_stereo, unmark_all_undefined_unknown_stereo,
+    };
+    use rdoxide::external::inchi::ichister::{AtStereoCarb, AtStereoDble, SpAtom};
+    use rdoxide::external::inchi::inpdef::InpAtom;
+    fn pr_stereo(s: &InChIStereo) -> Vec<String> {
+        let mut v = vec![format!(
+            "S {} {} {} {}",
+            s.n_number_of_stereo_centers,
+            s.n_number_of_stereo_bonds,
+            s.n_comp_inv2_abs,
+            s.b_trivial_inv
+        )];
+        let mut c = "C".to_string();
+        for i in 0..s.n_number_of_stereo_centers as usize {
+            c += &format!(
+                " {} {} {} {}",
+                s.n_number[i], s.t_parity[i], s.n_number_inv[i], s.t_parity_inv[i]
+            );
+        }
+        v.push(c);
+        let mut b = "B".to_string();
+        for i in 0..s.n_number_of_stereo_bonds as usize {
+            b += &format!(
+                " {} {} {}",
+                s.n_bond_atom1[i], s.n_bond_atom2[i], s.b_parity[i]
+            );
+        }
+        v.push(b);
+        v
+    }
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_mak2a.json")).unwrap();
+    for (ci, c) in data.as_array().unwrap().iter().enumerate() {
+        let inp = c["in"].as_str().unwrap();
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        let mut t = InchiTok(inp.split_whitespace());
+        let mode = t.i();
+        let mut got: Vec<String> = Vec::new();
+        if mode == 0 {
+            let n = t.i() as usize;
+            let n_atom: Vec<u8> = (0..n).map(|_| t.i() as u8).collect();
+            let n_num_h: Vec<i8> = (0..n).map(|_| t.i() as i8).collect();
+            let lt = t.i() as usize;
+            let taut: Vec<u16> = (0..lt).map(|_| t.i() as u16).collect();
+            match get_hill_formula_counts(&n_atom, &n_num_h, n, &taut, lt as i32) {
+                None => got.push("E".to_string()),
+                Some(h) => got.push(format!(
+                    "{} {} {} {}",
+                    h.num_c, h.num_h, h.len, h.num_non_h_atoms
+                )),
+            }
+            let p = InChI {
+                n_number_of_atoms: n as i32,
+                n_atom,
+                n_num_h,
+                len_tautomer: lt as i32,
+                n_tautomer: taut,
+                ..Default::default()
+            };
+            got.push(allocate_and_fill_hill_formula(&p).unwrap_or_else(|| "NULL".to_string()));
+        } else {
+            let n = t.i() as usize;
+            let mut at = vec![SpAtom::default(); n];
+            let mut na = vec![InpAtom::default(); n];
+            for i in 0..n {
+                at[i].valence = t.i() as i8;
+                for j in 0..3 {
+                    at[i].neighbor[j] = t.i() as u16;
+                }
+                at[i].stereo_bond_parity[0] = t.i() as i8;
+                at[i].stereo_bond_parity2[0] = t.i() as i8;
+                at[i].stereo_bond_neighbor[1] = t.i() as u16;
+                at[i].stereo_bond_neighbor2[1] = t.i() as u16;
+                at[i].stereo_bond_ord[0] = t.i() as i8;
+                at[i].stereo_bond_ord2[0] = t.i() as i8;
+                at[i].b_ambiguous_stereo = t.i() as i8;
+                na[i].b_ambiguous_stereo = at[i].b_ambiguous_stereo;
+            }
+            let iso = t.i() != 0;
+            let hasord = t.i() != 0;
+            let hasordinv = t.i() != 0;
+            let v = |t: &mut InchiTok| -> Vec<u16> { (0..n).map(|_| t.i() as u16).collect() };
+            let ord = v(&mut t);
+            let rank = v(&mut t);
+            let ordi = v(&mut t);
+            let ranki = v(&mut t);
+            let nca = t.i() as usize;
+            let ndb = t.i() as usize;
+            let rc = |t: &mut InchiTok| -> Vec<AtStereoCarb> {
+                (0..nca)
+                    .map(|_| AtStereoCarb {
+                        at_num: t.i() as u16,
+                        parity: t.i() as u8,
+                    })
+                    .collect()
+            };
+            let ca = rc(&mut t);
+            let cai = rc(&mut t);
+            let rd = |t: &mut InchiTok| -> Vec<AtStereoDble> {
+                (0..ndb)
+                    .map(|_| AtStereoDble {
+                        at_num1: t.i() as u16,
+                        at_num2: t.i() as u16,
+                        parity: t.i() as u8,
+                    })
+                    .collect()
+            };
+            let db = rd(&mut t);
+            let dbi = rd(&mut t);
+            let umode = t.i() as u64;
+            let cap = 48;
+            let mut s = InChIStereo {
+                n_number: vec![0; cap],
+                t_parity: vec![0; cap],
+                n_number_inv: vec![0; cap],
+                t_parity_inv: vec![0; cap],
+                n_bond_atom1: vec![0; cap],
+                n_bond_atom2: vec![0; cap],
+                b_parity: vec![0; cap],
+                ..Default::default()
+            };
+            let r = copy_linear_ct_stereo_to_inchi_stereo(
+                Some(&mut s),
+                Some(&ca),
+                nca,
+                &db,
+                ndb,
+                hasord.then_some(&ord[..]),
+                hasord.then_some(&rank[..]),
+                &at,
+                iso,
+                Some(&cai),
+                &dbi,
+                hasordinv.then_some(&ordi[..]),
+                hasordinv.then_some(&ranki[..]),
+            );
+            got.push(format!("{r}"));
+            got.extend(pr_stereo(&s));
+            let m =
+                mark_ambiguous_stereo(&mut at, &mut na, iso, hasord.then_some(&ord[..]), &ca, &db);
+            got.push(format!("{m}"));
+            got.push(
+                (0..n)
+                    .map(|i| format!(" {}/{}", at[i].b_ambiguous_stereo, na[i].b_ambiguous_stereo))
+                    .collect(),
+            );
+            let u = unmark_all_undefined_unknown_stereo(Some(&mut s), umode);
+            got.push(format!("{u}"));
+            got.extend(pr_stereo(&s));
+        }
+        assert_eq!(got, want, "case {ci}: {inp}");
+    }
+}
