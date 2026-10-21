@@ -1,7 +1,8 @@
 """Generates tests/data/inchi_cano2.json from the InChI C code: `AllocateCS`
 and `Canon_INChI` / `Canon_INChI3` of ichicano.c (the final canonical
 numbering with the isotopic and stereo optimization) run on the result of
-`GetBaseCanonRanking`, compiled with the upstream source included.
+`GetBaseCanonRanking`, followed by `FillOutINChI` of ichimak2.c (the "FO"
+lines), compiled with the upstream source included.
 
     python tools/inchi_cano2_reference.py
 """
@@ -31,6 +32,8 @@ HARNESS = r"""
 #include <stdlib.h>
 #include <string.h>
 #include "ichicano.c"
+int FillOutINChI( INChI *pINChI, INChI_Aux *pINChI_Aux, int num_atoms, int num_at_tg, int num_removed_H, sp_ATOM *at, inp_ATOM *norm_at,
+                  CANON_STAT *pCS, CANON_GLOBALS *pCG, int bTautomeric, INCHI_MODE nUserMode, char *pStrErrStruct, int bNoWarnings );
 int CreateCompositeNormAtom() { return 0; }
 static void pu(const char *t, AT_RANK *a, int n) { printf("%s", t); if (!a) { printf(" -\n"); return; } for (int i = 0; i < n; i++) printf(" %d", a[i]); printf("\n"); }
 static void read_atoms(sp_ATOM *at, int n, int *edges, int m) {
@@ -225,6 +228,76 @@ int main(void) {
                 AT_RANK *a = bcn.pRankStack ? bcn.pRankStack[2 * j] : NULL, *b = bcn.pRankStack ? bcn.pRankStack[2 * j + 1] : NULL;
                 char t[16]; sprintf(t, "Q%d", j); pu(t, a, a ? bcn.num_max : 0);
                 sprintf(t, "W%d", j); pu(t, b, b ? bcn.num_max : 0);
+            }
+
+            if (r2 > 0) {
+                int umodes[6] = {0, 0x200, 0x400, 0x800, 0x1000, 0x1800};
+                INCHI_MODE um = umodes[c % 6];
+                INChI pi; memset(&pi, 0, sizeof(pi));
+                INChI_Aux pa; memset(&pa, 0, sizeof(pa));
+                int cap = 4 * (nat + nE) + 40;
+                pi.nAtom = calloc(nat + 2, 1); pi.nConnTable = calloc(f->nLenLinearCt + nat + 10, sizeof(AT_NUMB));
+                pi.nTautomer = calloc(cap, sizeof(AT_NUMB)); pi.nNum_H = calloc(nat + 2, 1); pi.nNum_H_fixed = calloc(nat + 2, 1);
+                pi.IsotopicAtom = calloc(nA + 2, sizeof(INChI_IsotopicAtom)); pi.IsotopicTGroup = calloc(ntg + 2, sizeof(INChI_IsotopicTGroup));
+                pi.nPossibleLocationsOfIsotopicH = calloc(nA + 3, sizeof(AT_NUMB));
+                INChI_Stereo *sts[2];
+                for (int q = 0; q < 2; q++) {
+                    INChI_Stereo *s = calloc(1, sizeof(*s));
+                    s->nNumber = calloc(64, sizeof(AT_NUMB)); s->t_parity = calloc(64, 1);
+                    s->nNumberInv = calloc(64, sizeof(AT_NUMB)); s->t_parityInv = calloc(64, 1);
+                    s->nBondAtom1 = calloc(64, sizeof(AT_NUMB)); s->nBondAtom2 = calloc(64, sizeof(AT_NUMB)); s->b_parity = calloc(64, 1);
+                    sts[q] = s;
+                }
+                pi.Stereo = sts[0]; pi.StereoIsotopic = sts[1];
+                int al = 2 * nA + 8;
+                pa.nOrigAtNosInCanonOrd = calloc(al, sizeof(AT_NUMB)); pa.nIsotopicOrigAtNosInCanonOrd = calloc(al, sizeof(AT_NUMB));
+                pa.nOrigAtNosInCanonOrdInv = calloc(al, sizeof(AT_NUMB)); pa.nIsotopicOrigAtNosInCanonOrdInv = calloc(al, sizeof(AT_NUMB));
+                pa.nConstitEquNumbers = calloc(al, sizeof(AT_NUMB)); pa.nConstitEquIsotopicNumbers = calloc(al, sizeof(AT_NUMB));
+                pa.nConstitEquTGroupNumbers = calloc(al, sizeof(AT_NUMB)); pa.nConstitEquIsotopicTGroupNumbers = calloc(al, sizeof(AT_NUMB));
+                pa.OrigInfo = calloc(al, sizeof(ORIG_INFO));
+                if (haveTgi) { pa.bNormalizationFlags = tgi.tni.bNormalizationFlags; pa.bTautFlags = tgi.bTautFlags; pa.bTautFlagsDone = tgi.bTautFlagsDone; }
+                inp_ATOM *na = calloc(nA + 2, sizeof(inp_ATOM));
+                for (int i = 0; i < nA; i++) {
+                    at[i].el_number = get_periodic_table_number(at[i].elname);
+                    at[i].charge = (i * 7 + 3) % 4 - 1;
+                    at[i].radical = i % 5 == 4 ? 1 : (i % 7 == 3 ? 2 : 0);
+                    at[i].orig_at_number = 101 + i;
+                    at[i].chem_bonds_valence = at[i].valence;
+                    na[i].valence = at[i].valence; na[i].num_H = at[i].num_H; na[i].charge = at[i].charge; na[i].radical = at[i].radical;
+                    na[i].el_number = at[i].el_number; na[i].chem_bonds_valence = at[i].chem_bonds_valence;
+                }
+                char se[STR_ERR_LEN]; se[0] = 0;
+                int fr = FillOutINChI(&pi, &pa, nA, nat, 0, at, na, &cs, &cg, k, um, se, 0);
+                printf("FO %d %d %d %lu %d %d %s\n", fr, pi.nErrorCode, pa.nErrorCode, (unsigned long)pi.nFlags, pi.nTotalCharge, pi.nNumberOfAtoms, pi.szHillFormula ? pi.szHillFormula : "NULL");
+                printf("FA"); for (int i = 0; i < nA; i++) printf(" %d", pi.nAtom[i]); printf("\n");
+                printf("FC %d", pi.lenConnTable); for (int i = 0; i < pi.lenConnTable; i++) printf(" %d", pi.nConnTable[i]); printf("\n");
+                printf("FT %d", pi.lenTautomer); for (int i = 0; i < pi.lenTautomer; i++) printf(" %d", pi.nTautomer[i]); printf("\n");
+                printf("FH"); for (int i = 0; i < nA; i++) printf(" %d/%d", pi.nNum_H[i], pi.nNum_H_fixed[i]); printf("\n");
+                printf("FI %d %d", pi.nNumberOfIsotopicAtoms, pi.nNumberOfIsotopicTGroups);
+                for (int i = 0; i < pi.nNumberOfIsotopicAtoms; i++) printf(" %d,%d,%d,%d,%d", pi.IsotopicAtom[i].nAtomNumber, pi.IsotopicAtom[i].nIsoDifference, pi.IsotopicAtom[i].nNum_H, pi.IsotopicAtom[i].nNum_D, pi.IsotopicAtom[i].nNum_T);
+                printf(" |");
+                for (int i = 0; i < pi.nNumberOfIsotopicTGroups; i++) printf(" %d,%d,%d,%d", pi.IsotopicTGroup[i].nTGroupNumber, pi.IsotopicTGroup[i].nNum_H, pi.IsotopicTGroup[i].nNum_D, pi.IsotopicTGroup[i].nNum_T);
+                printf("\n");
+                printf("FL"); for (int i = 0; i < nA + 3; i++) printf(" %d", pi.nPossibleLocationsOfIsotopicH[i]); printf("\n");
+                for (int q = 0; q < 2; q++) {
+                    INChI_Stereo *s = sts[q];
+                    printf("FS%d %d %d %d %d |", q, s->nNumberOfStereoCenters, s->nNumberOfStereoBonds, s->nCompInv2Abs, s->bTrivialInv);
+                    for (int i = 0; i < 64; i++) printf(" %d,%d,%d,%d", s->nNumber[i], s->t_parity[i], s->nNumberInv[i], s->t_parityInv[i]);
+                    printf(" |");
+                    for (int i = 0; i < 64; i++) printf(" %d,%d,%d", s->nBondAtom1[i], s->nBondAtom2[i], s->b_parity[i]);
+                    printf("\n");
+                }
+                printf("FX %d %d %d %d %d", pa.nNumberOfAtoms, pa.nNumberOfTGroups, pa.nNumRemovedProtons, pa.nNumRemovedIsotopicH[0], pa.nNumRemovedIsotopicH[1]);
+                printf(" %d\n", pa.nNumRemovedIsotopicH[2]);
+                AT_NUMB *aa[8] = {pa.nOrigAtNosInCanonOrd, pa.nIsotopicOrigAtNosInCanonOrd, pa.nOrigAtNosInCanonOrdInv, pa.nIsotopicOrigAtNosInCanonOrdInv,
+                                  pa.nConstitEquNumbers, pa.nConstitEquIsotopicNumbers, pa.nConstitEquTGroupNumbers, pa.nConstitEquIsotopicTGroupNumbers};
+                for (int q = 0; q < 8; q++) { printf("FQ%d", q); for (int i = 0; i < al; i++) printf(" %d", aa[q][i]); printf("\n"); }
+                printf("FO2"); for (int i = 0; i < nA; i++) printf(" %d,%d,%d", pa.OrigInfo[i].cCharge, pa.OrigInfo[i].cRadical, pa.OrigInfo[i].cUnusualValence); printf("\n");
+                printf("FE %s\n", se);
+                printf("FB"); for (int i = 0; i < nA; i++) printf(" %d/%d", at[i].bAmbiguousStereo, na[i].bAmbiguousStereo); printf("\n");
+                pu("FY", cs.nCanonOrdStereo, cs.nCanonOrdStereo ? nat : 0);
+                pu("FZ", cs.nCanonOrdIsotopicStereo, cs.nCanonOrdIsotopicStereo ? nat : 0);
+                printf("FG"); if (haveTgi) { for (int i = 0; i < 4 * ntgs; i++) printf(" %d", tgi.tGroupNumber[i]); printf(" |"); for (int i = 0; i < nE; i++) printf(" %d", epl[i]); } printf("\n");
             }
         }
     }

@@ -323,6 +323,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 207 | CompINChILayers, MarkUnusedAndEmptyLayers, INChI_SegmentAction, Eql_INChI_Stereo |
 | 208 | GetDfsOrder4CT, mystrrev of ichimake |
 | 209 | ichimak2 started: Hill formula, stereo copy to INChI_Stereo, ambiguous stereo marking |
+| 210 | FillOutINChI: canonicalization result to INChI/INChI_Aux |
 
 ## Python package files
 
@@ -702,3 +703,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-21 — Stage 207: I7c: layer difference marking, 10000 differential cases
 * 2026-10-21 — Stage 208: I7d: DFS order of the connection table, 6000 differential cases
 * 2026-10-21 — Stage 209: I7e: ichimak2 start (Hill formula, stereo copy helpers), 9000 differential cases
+* 2026-10-21 — Stage 210: I7f: FillOutINChI, 1955 differential canonicalization results
