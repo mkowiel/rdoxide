@@ -276,6 +276,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 160 | done |
 | 161 | done |
 | 162 | done |
+| 163 | done |
 
 ## Python package files
 
@@ -607,4 +608,5 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-19 — Stage 159: I4n: CreateCGroupInBnStruct, CreateTGroupInBnStruct, RemoveLastGroupFromBnStruct
 * 2026-10-21 — Stage 160: I4o: SimpleRemoveHplusNPO, SimpleRemoveAcidicProtons, SimpleAddAcidicProtons and the bIs*/bHas* proton predicates
 * 2026-10-21 — Stage 161: I4p: HardRemoveAcidicProtons, HardAddAcidicProtons, HardRemoveHplusNP, RemoveNPProtonsAndAcidCharges
-* 2026-10-19 — Stage 162: I4q: BnsAdjustFlowBondsRad, BnsTestAndMarkAltBonds and the flow-range helpers
+* 2026-10-21 — Stage 162: I4q: BnsAdjustFlowBondsRad, BnsTestAndMarkAltBonds and the flow-range helpers
+* 2026-10-21 — Stage 163: I4r: SetForbiddenEdges, fix_special_bonds

@@ -6072,3 +6072,366 @@ pub fn bns_test_and_mark_alt_bonds(
     }
     if b_error != 0 { b_error } else { n_changes }
 }
+
+// ---- fixing bonds around removed ion pairs ----
+
+use super::util::{
+    EL_NUMBER_C, EL_NUMBER_N, EL_NUMBER_O, get_el_valence, ion_el_group, is_el_a_metal,
+    n_no_metal_bonds_valence, n_no_metal_neigh_index, n_no_metal_num_bonds,
+    n_no_metal_other_neigh_index, n_no_metal_other_neigh_index2, num_of_h,
+};
+
+fn forbid_bond(p: &mut BnStruct, atom: usize, bond: usize, mask: i8) {
+    let ie = p.iedge[p.vert[atom].iedge + bond] as usize;
+    p.edge[ie].forbidden |= mask;
+}
+
+/// `fix_special_bonds`: forbids the edges of the bonds that were set by
+/// `remove_ion_pairs` around N(V), S(IV), S(VI) and S(VIII); returns the
+/// number of fixed bonds
+pub fn fix_special_bonds(
+    p: &mut BnStruct,
+    at: &[InpAtom],
+    num_atoms: i32,
+    forbidden_mask: i32,
+) -> i32 {
+    let mask = forbidden_mask as i8;
+    let mut num_changes = 0;
+    p.edge_forbidden_mask |= mask;
+    let bt = |i: usize, k: usize| i32::from(at[i].bond_type[k]) & BOND_TYPE_MASK;
+    let nm_bonds = |i: usize| n_no_metal_num_bonds(at, i);
+    let nm_val = |i: usize| n_no_metal_bonds_valence(at, i);
+    let group = |i: usize| ion_el_group(at[i].el_number);
+    for i in 0..num_atoms as usize {
+        let a = &at[i];
+        if a.charge != 0 || a.radical != 0 {
+            continue;
+        }
+        let ev = get_el_valence(i32::from(a.el_number), 0, 0);
+        let excess = i32::from(a.chem_bonds_valence) + a.numh() - ev;
+        let nm_excess = nm_val(i) + a.numh() - ev;
+        let no_h = num_of_h(at, i) == 0;
+        if excess >= 2 && no_h && nm_excess == 2 && group(i) == EL_NUMBER_N {
+            // N(V), no H
+            let nb = nm_bonds(i);
+            if nb == 2 {
+                let i1 = n_no_metal_neigh_index(at, i);
+                if i1 < 0 {
+                    continue;
+                }
+                let n1 = i32::from(a.neighbor[i1 as usize]);
+                let i2 = n_no_metal_other_neigh_index(at, i, n1);
+                if i2 < 0 {
+                    continue;
+                }
+                let n2 = i32::from(a.neighbor[i2 as usize]);
+                forbid_bond(p, i, i1 as usize, mask);
+                forbid_bond(p, i, i2 as usize, mask);
+                num_changes += 1;
+                // forbid the single bond beyond the neighboring =N- as in #N=N-
+                let n3 = if bt(i, i1 as usize) == BOND_TYPE_DOUBLE {
+                    n1
+                } else {
+                    n2
+                } as usize;
+                if at[n3].numh() == 0
+                    && nm_bonds(n3) == 2
+                    && nm_val(n3) == 3
+                    && group(n3) == EL_NUMBER_N
+                {
+                    let k = n_no_metal_other_neigh_index(at, n3, i as i32);
+                    if k >= 0 {
+                        forbid_bond(p, n3, k as usize, mask);
+                        num_changes += 1;
+                    }
+                }
+            } else if nb == 3 {
+                let j0 = n_no_metal_neigh_index(at, i);
+                if j0 < 0 {
+                    continue;
+                }
+                let m0 = i32::from(a.neighbor[j0 as usize]);
+                let j1 = n_no_metal_other_neigh_index(at, i, m0);
+                if j1 < 0 {
+                    continue;
+                }
+                let m1 = i32::from(a.neighbor[j1 as usize]);
+                let j2 = n_no_metal_other_neigh_index2(at, i, m0, m1);
+                if j2 < 0 {
+                    continue;
+                }
+                let j = [j0 as usize, j1 as usize, j2 as usize];
+                let m = [m0 as usize, m1 as usize, a.neighbor[j2 as usize] as usize];
+                let (mut num_o, mut num_n) = (0, 0);
+                let (mut k_o, mut k_n) = (0usize, 0usize);
+                for k in 0..3 {
+                    let n1 = m[k];
+                    if group(n1) == EL_NUMBER_N {
+                        k_n = k;
+                        num_n += 1;
+                    } else if group(n1) == EL_NUMBER_O && nm_bonds(n1) == 1 {
+                        k_o = k;
+                        num_o += 1;
+                    }
+                }
+                let mut num_other = 0;
+                if num_o == 1
+                    && at[m[k_o]].charge == 0
+                    && at[m[k_o]].radical == 0
+                    && bt(i, j[k_o]) == BOND_TYPE_DOUBLE
+                {
+                    forbid_bond(p, i, j[k_o], mask);
+                    num_changes += 1;
+                    num_other += 1;
+                }
+                if num_other == 0
+                    && num_o <= 1
+                    && num_n == 1
+                    && at[m[k_n]].charge == 0
+                    && at[m[k_n]].radical == 0
+                    && bt(i, j[k_n]) == BOND_TYPE_DOUBLE
+                {
+                    forbid_bond(p, i, j[k_n], mask);
+                    num_changes += 1;
+                }
+            } else if nb == 4 {
+                // -N=N- : fix the double bond and the single bond beyond
+                let mut num_n = 0;
+                let (mut n2, mut i2) = (0usize, 0usize);
+                for i1 in 0..a.valence as usize {
+                    let n1 = a.neighbor[i1] as usize;
+                    if bt(i, i1) == BOND_TYPE_DOUBLE
+                        && !is_el_a_metal(i32::from(at[n1].el_number))
+                        && group(n1) == EL_NUMBER_N
+                    {
+                        num_n += 1;
+                        n2 = n1;
+                        i2 = i1;
+                    }
+                }
+                if num_n == 1 && at[n2].numh() == 0 && nm_bonds(n2) == 2 && nm_val(n2) == 3 {
+                    let i3 = n_no_metal_other_neigh_index(at, n2, i as i32);
+                    if i3 >= 0 && bt(n2, i3 as usize) == BOND_TYPE_SINGLE {
+                        forbid_bond(p, n2, i3 as usize, mask);
+                        num_changes += 1;
+                        forbid_bond(p, i, i2, mask);
+                        num_changes += 1;
+                    }
+                }
+            }
+        } else if excess >= 2
+            && no_h
+            && nm_excess == 2
+            && a.el_number != EL_NUMBER_O
+            && group(i) == EL_NUMBER_O
+            && nm_bonds(i) == 3
+        {
+            // S(IV), no H, one double bond, total 3 bonds
+            let (mut num_n, mut num_oh, mut num_om, mut num_o, mut num_other) = (0, 0, 0, 0, 0);
+            let (mut n2, mut i2, mut n3, mut i4) = (0usize, 0usize, 0usize, 0usize);
+            for i1 in 0..a.valence as usize {
+                let n1 = a.neighbor[i1] as usize;
+                if is_el_a_metal(i32::from(at[n1].el_number)) {
+                    continue;
+                }
+                let b = bt(i, i1);
+                if b == BOND_TYPE_DOUBLE {
+                    num_n += 1;
+                    n2 = n1;
+                    i2 = i1;
+                    if group(n1) == EL_NUMBER_O {
+                        num_o += 1;
+                    }
+                } else if b == BOND_TYPE_SINGLE
+                    && nm_bonds(n1) == 1
+                    && nm_val(n1) == 1
+                    && group(n1) == EL_NUMBER_O
+                {
+                    if at[n1].charge == 0 {
+                        num_oh += 1;
+                        n3 = n1;
+                    } else {
+                        num_om += 1;
+                    }
+                } else {
+                    num_other += 1;
+                    i4 = i1;
+                }
+            }
+            let _ = n3;
+            if num_n == 1 && num_o == 1 && num_oh + num_om == 1 {
+                if num_other == 1 {
+                    forbid_bond(p, i, i4, mask);
+                    num_changes += 1;
+                }
+            } else if num_n == 1 && num_oh == 0 && num_om == 0 {
+                let mut found = 0;
+                let mut do_not_fix = 0;
+                let mut n3 = 0i32;
+                if group(n2) == EL_NUMBER_N {
+                    let el = at[n2].el_number;
+                    for i1 in 0..a.valence as usize {
+                        let n1 = a.neighbor[i1] as usize;
+                        if bt(i, i1) == BOND_TYPE_SINGLE
+                            && (at[n1].numh() != 0 || at[n1].charge == -1)
+                            && el == at[n1].el_number
+                        {
+                            n3 = n1 as i32;
+                            found += 1;
+                        }
+                    }
+                }
+                for i1 in 0..a.valence as usize {
+                    if i1 != i2 {
+                        let n1 = a.neighbor[i1] as usize;
+                        if at[n2].el_number == at[n1].el_number
+                            && at[n2].n_ring_system == at[n1].n_ring_system
+                        {
+                            do_not_fix += 1;
+                        }
+                    }
+                }
+                if do_not_fix != 0 {
+                } else if found != 0 {
+                    if found == 1 {
+                        let i4 = n_no_metal_other_neigh_index2(at, i, n2 as i32, n3);
+                        if i4 >= 0 {
+                            forbid_bond(p, i, i4 as usize, mask);
+                            num_changes += 1;
+                        }
+                    }
+                } else {
+                    forbid_bond(p, i, i2, mask);
+                    num_changes += 1;
+                }
+            }
+        } else if excess >= 4
+            && no_h
+            && nm_excess == 4
+            && a.el_number != EL_NUMBER_O
+            && group(i) == EL_NUMBER_O
+            && nm_bonds(i) == 4
+        {
+            num_changes += fix_hypervalent_sulfur(p, at, i, 2, mask);
+        } else if excess >= 6
+            && no_h
+            && nm_excess == 6
+            && a.el_number != EL_NUMBER_O
+            && group(i) == EL_NUMBER_O
+            && nm_bonds(i) == 5
+        {
+            num_changes += fix_hypervalent_sulfur(p, at, i, 3, mask);
+        }
+    }
+    num_changes
+}
+
+/// the S(VI) (`num_double` = 2) and S(VIII) (3) cases of `fix_special_bonds`:
+/// the single bonds to non-terminal neighbors are fixed
+fn fix_hypervalent_sulfur(
+    p: &mut BnStruct,
+    at: &[InpAtom],
+    i: usize,
+    num_double: i32,
+    mask: i8,
+) -> i32 {
+    let a = &at[i];
+    let (mut num_n, mut num_oh, mut num_om, mut num_o, mut num_x, mut num_other) =
+        (0, 0, 0, 0, 0, 0);
+    let mut idx: Vec<usize> = Vec::new();
+    for i1 in 0..a.valence as usize {
+        let n1 = a.neighbor[i1] as usize;
+        if is_el_a_metal(i32::from(at[n1].el_number)) {
+            continue;
+        }
+        let b = i32::from(a.bond_type[i1]) & BOND_TYPE_MASK;
+        let n = &at[n1];
+        let nh = num_of_h(at, n1);
+        let nb = n_no_metal_num_bonds(at, n1);
+        let is_o_group = ion_el_group(n.el_number) == EL_NUMBER_O;
+        if b == BOND_TYPE_DOUBLE {
+            num_n += 1;
+            // S_VI_O_PLUS_METAL_FIX_BOND is 1
+            if (n.charge == 0 || (n.charge == 1 && n.valence == 2))
+                && n.radical == 0
+                && nh == 0
+                && is_o_group
+                && nb == 1
+            {
+                num_o += 1;
+            }
+        } else if b == BOND_TYPE_SINGLE
+            && nb == 1
+            && is_o_group
+            && nh <= 1
+            && i32::from(n.charge == 0 && nh == 1) + i32::from(n.charge == -1 && nh == 0) == 1
+        {
+            num_oh += 1;
+        } else if b == BOND_TYPE_SINGLE && nb > 1 {
+            idx.push(i1);
+            num_om += 1;
+        } else if b == BOND_TYPE_SINGLE && nb == 1 {
+            num_x += 1;
+        } else {
+            num_other += 1;
+        }
+    }
+    let mut changes = 0;
+    if num_n == num_o && num_o == num_double && num_oh + num_om + num_x == 2 && num_other == 0 {
+        for &i1 in &idx {
+            forbid_bond(p, i, i1, mask);
+            changes += 1;
+        }
+    }
+    changes
+}
+
+/// `SetForbiddenEdges` (without the disabled explicit-bond fixing): forbids
+/// the single bonds of acetyl-like C and nitro N and the bonds of
+/// `fix_special_bonds`; returns the number of forbidden bonds
+pub fn set_forbidden_edges(
+    p: &mut BnStruct,
+    at: &[InpAtom],
+    num_atoms: i32,
+    forbidden_mask: i32,
+) -> i32 {
+    let mask = forbidden_mask as i8;
+    p.edge_forbidden_mask |= mask;
+    let mut num_found = 0;
+    for i in 0..num_atoms as usize {
+        let a = &at[i];
+        let acetyl = a.el_number == EL_NUMBER_C && a.valence == 3 && a.chem_bonds_valence == 4;
+        let nitro = a.el_number == EL_NUMBER_N
+            && a.valence == 3
+            && (a.chem_bonds_valence == 4 || a.chem_bonds_valence == 5);
+        if !acetyl && !nitro {
+            continue;
+        }
+        let mut num_o = 0;
+        let mut bond_to_o = 0;
+        let mut pos: i32 = -1;
+        let mut val = -1;
+        for j in 0..a.valence as usize {
+            let nb = &at[a.neighbor[j] as usize];
+            let b = i32::from(a.bond_type[j]) & BOND_TYPE_MASK;
+            if nb.el_number == EL_NUMBER_O && nb.valence == 1 {
+                num_o += 1;
+                bond_to_o += b;
+            } else {
+                pos = j as i32;
+                val = b;
+            }
+        }
+        let ok = if acetyl {
+            num_o == 2 && bond_to_o == 3 && val == 1
+        } else {
+            num_o == 2 && (bond_to_o == 3 || bond_to_o == 4) && val == 1
+        };
+        if ok {
+            forbid_bond(p, i, pos as usize, mask);
+            num_found += 1;
+        }
+    }
+    // REMOVE_ION_PAIRS_FIX_BONDS is 1; RESET_EDGE_FORBIDDEN_MASK is 1
+    num_found + fix_special_bonds(p, at, num_atoms, forbidden_mask)
+}
