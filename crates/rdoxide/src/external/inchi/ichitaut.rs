@@ -666,11 +666,21 @@ pub struct TGroup {
     pub n_first_endpoint_at_no_pos: u16,
 }
 
+/// `TNI`: the protons and explicit H removed by the normalization
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Tni {
+    pub n_num_removed_explicit_h: i32,
+    pub n_num_removed_protons: i32,
+    pub n_num_removed_protons_isotopic: [i32; NUM_H_ISOTOPES],
+    pub b_normalization_flags: u64,
+}
+
 /// `T_GROUP_INFO` (the t-group list)
 #[derive(Debug, Clone, Default)]
 pub struct TGroupInfo {
     pub t_group: Option<Vec<TGroup>>,
     pub num_t_groups: usize,
+    pub tni: Tni,
 }
 
 /// `C_CANDIDATE`
