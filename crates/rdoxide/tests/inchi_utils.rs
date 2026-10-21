@@ -9680,3 +9680,262 @@ fn canonical_search_helpers_match_the_c_code() {
         assert_eq!(got, want, "case {case}");
     }
 }
+
+#[test]
+fn connection_table_parts_match_the_c_code() {
+    use rdoxide::external::inchi::ichi_bns::node_set_create;
+    use rdoxide::external::inchi::ichican2::*;
+    use rdoxide::external::inchi::ichimap::create_neigh_list;
+    use rdoxide::external::inchi::ichister::SpAtom;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_can2b.json")).unwrap();
+    fn ints(v: &serde_json::Value) -> Vec<i64> {
+        v.as_array()
+            .unwrap()
+            .iter()
+            .map(|x| x.as_i64().unwrap())
+            .collect()
+    }
+    fn dump(t: &str, c: &ConTable, n: usize) -> String {
+        let mut s = format!(
+            "{t} {} {} {} {} {} |",
+            c.len_ct, c.len_pos, c.len_num_h, c.len_iso_sort_key, c.len_iso_exchg_atnos
+        );
+        let mut i = 0;
+        while i <= c.len_ct && i < c.maxlen_ct {
+            s += &format!(" {}", c.ctbl[i as usize]);
+            i += 1;
+        }
+        s += " |";
+        for i in 0..c.len_pos as usize {
+            s += &format!(" {}", c.next_ctbl_pos[i]);
+        }
+        s += " |";
+        for i in 0..c.len_pos as usize {
+            s += &format!(" {}", c.next_at_rank[i]);
+        }
+        s += " |";
+        if !c.num_h.is_empty() {
+            for i in 0..c.len_num_h as usize {
+                s += &format!(" {}", c.num_h[i]);
+            }
+        }
+        s += " |";
+        if !c.num_h_fixed.is_empty() {
+            for i in 0..n {
+                s += &format!(" {}", c.num_h_fixed[i]);
+            }
+        }
+        s += " |";
+        if !c.iso_sort_key.is_empty() {
+            for i in 0..c.len_iso_sort_key as usize {
+                s += &format!(" {}", c.iso_sort_key[i]);
+            }
+        }
+        s += " |";
+        if !c.iso_exchg_atnos.is_empty() {
+            for i in 0..c.len_iso_exchg_atnos as usize {
+                s += &format!(" {}", c.iso_exchg_atnos[i]);
+            }
+        }
+        s
+    }
+    fn layers(kl: &[KLeast]) -> String {
+        kl.iter()
+            .take(7)
+            .map(|e| format!(" {},{}", e.k, e.i))
+            .collect()
+    }
+    for (case, c) in data.as_array().unwrap().iter().enumerate() {
+        let inp = &c["in"];
+        let atoms = inp["atoms"].as_array().unwrap();
+        let n = atoms.len();
+        let mut at = vec![SpAtom::default(); n + 1];
+        let mut crank = vec![0usize; n];
+        for (i, a) in atoms.iter().enumerate() {
+            let nb = a["nb"].as_array().unwrap();
+            at[i].valence = nb.len() as i8;
+            crank[i] = a["crank"].as_u64().unwrap() as usize;
+            for (j, q) in nb.iter().enumerate() {
+                at[i].neighbor[j] = q.as_u64().unwrap() as u16;
+            }
+        }
+        let crank_b: Vec<usize> = ints(&inp["crankB"]).iter().map(|x| *x as usize).collect();
+        let ms_a: Vec<usize> = ints(&inp["msA"]).iter().map(|x| *x as usize).collect();
+        let ms_b: Vec<usize> = ints(&inp["msB"]).iter().map(|x| *x as usize).collect();
+        let fl = ints(&inp["flags"]);
+        let (b_only, b_split, at_only) = (fl[0] != 0, fl[1] != 0, fl[2] as i32);
+        let vals: Vec<Vec<i64>> = inp["vals"].as_array().unwrap().iter().map(ints).collect();
+        let perm = ints(&inp["perm"]);
+        let cd = CanonData {
+            n_max_len_linear_ct: 8 * n as i32 + 8,
+            n_len_linear_ct: fl[3] as i32,
+            n_len_ct_at_only: at_only,
+            num_h: (fl[4] & 1 != 0).then(|| vals.iter().map(|v| v[0] as i16).collect()),
+            maxlen_num_h: n as i32 + 2,
+            num_h_fixed: (fl[4] & 2 != 0).then(|| vals.iter().map(|v| v[1] as i16).collect()),
+            maxlen_num_h_fixed: n as i32 + 2,
+            iso_sort_key: (fl[4] & 4 != 0).then(|| vals.iter().map(|v| v[2]).collect()),
+            maxlen_iso_sort_key: n as i32 + 2,
+            iso_exchg_atnos: (fl[4] & 8 != 0).then(|| vals.iter().map(|v| v[3] as i8).collect()),
+            maxlen_iso_exchg_atnos: n as i32 + 2,
+            n_aux_rank: None,
+        };
+        let create = || {
+            c_table_create(
+                n,
+                cd.n_max_len_linear_ct,
+                cd.n_len_ct_at_only,
+                cd.num_h.is_some().then_some(cd.maxlen_num_h),
+                cd.num_h_fixed.is_some().then_some(cd.maxlen_num_h_fixed),
+                cd.iso_sort_key.is_some().then_some(cd.maxlen_iso_sort_key),
+                cd.iso_exchg_atnos
+                    .is_some()
+                    .then_some(cd.maxlen_iso_exchg_atnos),
+            )
+        };
+        let build = |crank: &[usize], ms: &[usize]| -> ConTable {
+            let mut ct = create();
+            let mut g = create_neigh_list(n, n, &at, false, None);
+            let mut p = Partition {
+                rank: vec![0; n + 2],
+                at_number: vec![0; n + 2],
+            };
+            for (t, &m) in ms.iter().enumerate() {
+                let mut pos = 0;
+                for r in 1..=m {
+                    for x in 0..n {
+                        if crank[x] == r {
+                            p.at_number[pos] = x as u16;
+                            pos += 1;
+                        }
+                    }
+                }
+                for x in 0..n {
+                    if crank[x] > m {
+                        p.at_number[pos] = x as u16;
+                        pos += 1;
+                    }
+                }
+                for x in 0..n {
+                    p.rank[x] = if crank[x] <= m {
+                        crank[x] as u16
+                    } else {
+                        n as u16
+                    };
+                }
+                ct_part_fill(&mut g, &cd, &p, &mut ct, t + 1, n, n, n + 2);
+            }
+            ct
+        };
+        let a = build(&crank, &ms_a);
+        let b = build(&crank_b, &ms_b);
+        let mut got = vec![dump("A", &a, n), dump("B", &b, n)];
+        {
+            let kmax = a.len_pos.min(b.len_pos) as usize;
+            let mut cmp = vec![0i8; 128];
+            let mut kl = vec![KLeast::default(); MAX_LAYERS];
+            for k in 1..=kmax {
+                let d1 = ct_part_compare(&a, &b, Some(&mut cmp), Some(&mut kl), k, b_only, b_split);
+                got.push(format!("P1 {k} {d1} {} |{}", cmp[k - 1], layers(&kl)));
+                let d2 = ct_part_compare(&a, &b, None, None, k, b_only, b_split);
+                let d3 = ct_part_compare(&b, &a, None, None, k, !b_only, b_split);
+                got.push(format!("P2 {d2} {d3}"));
+            }
+            got.push(format!(
+                "FC {} {} {} {}",
+                ct_full_compare(&a, &b, b_only, b_split),
+                ct_full_compare(&a, &b, !b_only, !b_split),
+                ct_full_compare(&b, &a, false, false),
+                ct_full_compare(&a, &a, false, false)
+            ));
+            got.push(format!("FL {}", ct_full_compare_layers(&kl)));
+            let (mut l, mut i, mut k) = (0, 0, 0);
+            let g1 = ct_compare_layers_get_first_diff(Some(&kl), 2, &mut l, &mut i, &mut k);
+            got.push(format!("GD {g1} {l} {i} {k}"));
+            let g1 = ct_compare_layers_get_first_diff(None, 2, &mut l, &mut i, &mut k);
+            got.push(format!("GN {g1}"));
+            got.push(format!(
+                "PL {} {} {}",
+                ct_part_compare_layers(Some(&kl), 5, 0),
+                ct_part_compare_layers(Some(&kl), 0, 3),
+                ct_part_compare_layers(None, 1, 1)
+            ));
+            update_compare_layers(Some(&mut kl), 2);
+            got.push(format!("UL{}", layers(&kl)));
+        }
+        {
+            let mut cc = create();
+            let mut dd = create();
+            for k in 1..=a.len_pos as usize {
+                ct_part_copy(&mut cc, &a, k);
+            }
+            got.push(dump("C", &cc, n));
+            ct_full_copy(&mut dd, &b);
+            got.push(dump("D", &dd, n));
+            let mut cmp = vec![1i8; 128];
+            ct_part_inchi_canon_infinity(&mut cc, Some(&mut cmp), a.len_pos as usize);
+            let mut s = String::from("INF");
+            for i in 0..=cc.len_ct as usize {
+                s += &format!(" {}", cc.ctbl[i]);
+            }
+            s += " |";
+            for x in &cmp[..8] {
+                s += &format!(" {x}");
+            }
+            got.push(s);
+            ct_part_inchi_canon_infinity(&mut dd, None, 1);
+            got.push(format!("INF1 {}", dd.ctbl[0]));
+            ct_part_clear(&mut cc, 1);
+            got.push(format!(
+                "CLR {}",
+                get_one_additional_layer(Some(&cd), Some(&cc))
+            ));
+            got.push(format!(
+                "GOL {} {}",
+                get_one_additional_layer(None, Some(&a)),
+                get_one_additional_layer(Some(&cd), None)
+            ));
+        }
+        {
+            let mut g = Transposition {
+                n_at_numb: vec![0; n + 2],
+            };
+            for i in 0..n {
+                g.n_at_numb[i] = perm[i] as u16;
+            }
+            let mut m = node_set_create(n, 2);
+            let mut f = node_set_create(n, 2);
+            let mut up = UnorderedPartition {
+                equ2: vec![0; n + 2],
+            };
+            transposition_get_mcr_and_fix_set_and_unordered_partition(
+                &mut g, &mut m, &mut f, n, 2, &mut up,
+            );
+            let mut s = String::from("TG");
+            for i in 0..n {
+                s += &format!(" {}", g.n_at_numb[i]);
+            }
+            s += " | M";
+            for x in &m.bitword[1] {
+                s += &format!(" {x}");
+            }
+            s += " | F";
+            for x in &f.bitword[1] {
+                s += &format!(" {x}");
+            }
+            s += " | U";
+            for i in 0..n {
+                s += &format!(" {}", up.equ2[i]);
+            }
+            got.push(s);
+        }
+        let want: Vec<String> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| s.as_str().unwrap().to_string())
+            .collect();
+        assert_eq!(got, want, "case {case}");
+    }
+}
