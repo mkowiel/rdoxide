@@ -7352,3 +7352,125 @@ fn set_stereo_bonds_parity_matches_the_c_code() {
         assert_eq!(got, want, "case {n}");
     }
 }
+
+#[test]
+fn set_stereo_parity_matches_the_c_code() {
+    use rdoxide::external::inchi::ichister::{SpAtom, set_stereo_parity};
+    use rdoxide::external::inchi::inpdef::InpAtom;
+    use rdoxide::external::inchi::util::get_periodic_table_number;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_stereo.json")).unwrap();
+    for (n, c) in data.as_array().unwrap().iter().enumerate() {
+        let inp = &c["in"];
+        let ints = |v: &serde_json::Value| -> Vec<i64> {
+            v.as_array()
+                .unwrap()
+                .iter()
+                .map(|x| x.as_i64().unwrap())
+                .collect()
+        };
+        let mut at: Vec<InpAtom> = Vec::new();
+        for a in inp["atoms"].as_array().unwrap() {
+            let mut x = InpAtom::default();
+            let el = a["el"].as_str().unwrap();
+            x.set_elname(el);
+            x.el_number = get_periodic_table_number(el) as u8;
+            x.charge = a["ch"].as_i64().unwrap() as i8;
+            x.radical = a["rad"].as_i64().unwrap() as i8;
+            x.num_h = a["nh"].as_i64().unwrap() as i8;
+            x.c_flags = a["cf"].as_i64().unwrap() as i8;
+            x.orig_at_number = a["orig"].as_u64().unwrap() as u16;
+            x.iso_atw_diff = a["adiff"].as_i64().unwrap() as i8;
+            x.b_used_0d_parity = a["u0"].as_i64().unwrap() as i8;
+            x.chem_bonds_valence = a["cv"].as_i64().unwrap() as i8;
+            x.endpoint = a["ep"].as_u64().unwrap() as u16;
+            x.c_point = a["cp"].as_u64().unwrap() as u16;
+            x.n_ring_system = a["rs"].as_u64().unwrap() as u16;
+            x.n_num_at_in_ring_system = a["nrs"].as_u64().unwrap() as u16;
+            x.p_parity = a["pp"].as_i64().unwrap() as i8;
+            let xyz = a["xyz"].as_array().unwrap();
+            x.x = f64::from_bits(xyz[0].as_u64().unwrap());
+            x.y = f64::from_bits(xyz[1].as_u64().unwrap());
+            x.z = f64::from_bits(xyz[2].as_u64().unwrap());
+            for (j, v) in ints(&a["iso"]).iter().enumerate() {
+                x.num_iso_h[j] = *v as i8;
+            }
+            for (j, v) in ints(&a["sbp"]).iter().enumerate() {
+                x.sb_parity[j] = *v as i8;
+            }
+            for (j, v) in ints(&a["sbo"]).iter().enumerate() {
+                x.sb_ord[j] = *v as i8;
+            }
+            for (j, v) in ints(&a["sno"]).iter().enumerate() {
+                x.sn_orig_at_num[j] = *v as u16;
+            }
+            for (j, v) in ints(&a["po"]).iter().enumerate() {
+                x.p_orig_at_num[j] = *v as u16;
+            }
+            let nb = a["nb"].as_array().unwrap();
+            x.valence = nb.len() as i8;
+            for (j, q) in nb.iter().enumerate() {
+                x.neighbor[j] = q[0].as_u64().unwrap() as u16;
+                x.bond_type[j] = q[1].as_u64().unwrap() as u8;
+                x.bond_stereo[j] = q[2].as_i64().unwrap() as i8;
+            }
+            at.push(x);
+        }
+        let nmain = inp["n"].as_u64().unwrap() as usize;
+        let nr = inp["nr"].as_u64().unwrap() as usize;
+        let mut out = vec![SpAtom::default(); nmain + nr + 1];
+        let (mut ma, mut mb) = (-1, -1);
+        let r = set_stereo_parity(
+            &mut at,
+            &mut out,
+            nmain,
+            nr,
+            Some(&mut ma),
+            Some(&mut mb),
+            inp["mode"].as_u64().unwrap(),
+            inp["pe"].as_i64().unwrap() as i32,
+            inp["vab"].as_i64().unwrap() as i32,
+            inp["loose"].as_i64().unwrap() != 0,
+            inp["zz"].as_i64().unwrap() as i32,
+        );
+        let mut got: Vec<String> = vec![format!("R {r} {ma} {mb}")];
+        for i in 0..nmain {
+            let o = &out[i];
+            let mut s = String::from("A");
+            for j in 0..3 {
+                s += &format!(
+                    " {} {} {} {} {} {} {} {}",
+                    o.stereo_bond_neighbor[j],
+                    o.stereo_bond_neighbor2[j],
+                    o.stereo_bond_ord[j],
+                    o.stereo_bond_ord2[j],
+                    o.stereo_bond_z_prod[j],
+                    o.stereo_bond_z_prod2[j],
+                    o.stereo_bond_parity[j],
+                    o.stereo_bond_parity2[j]
+                );
+            }
+            s += &format!(
+                " {} {} {} {} {} {} {} {} | {} {}",
+                o.parity,
+                o.parity2,
+                o.stereo_atom_parity,
+                o.stereo_atom_parity2,
+                o.b_ambiguous_stereo,
+                o.z_dir[0],
+                o.z_dir[1],
+                o.z_dir[2],
+                at[i].b_ambiguous_stereo,
+                at[i].b_used_0d_parity
+            );
+            got.push(s);
+        }
+        let want: Vec<String> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| s.as_str().unwrap().to_string())
+            .collect();
+        assert_eq!(got, want, "case {n}");
+    }
+}
