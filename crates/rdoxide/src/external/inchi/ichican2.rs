@@ -2361,6 +2361,43 @@ pub fn make_iso_sort_key(iso_atw_diff: i32, num_1h: i32, num_2h: i32, num_3h: i3
     key
 }
 
+/// `set_atom_iso_sort_keys`: sets `iso_sort_key` of every atom and returns the
+/// number of isotopic atoms; `b_has_isotopic_in_tautomer_groups` collects the
+/// count of atoms whose isotopic H go to the tautomer part.
+pub fn set_atom_iso_sort_keys(
+    at: &mut [SpAtom],
+    t_group_info: Option<&TGroupInfo>,
+    mut b_has_isotopic_in_tautomer_groups: Option<&mut i32>,
+) -> i32 {
+    let has_t_group = t_group_info.is_some_and(|t| t.t_group.is_some() && t.num_t_groups > 0);
+    if let Some(b) = b_has_isotopic_in_tautomer_groups.as_deref_mut() {
+        *b = 0;
+    }
+    let mut num_isotopic = 0;
+    for a in at.iter_mut() {
+        let merged = t_group_info.is_some_and(|t| !t.n_isotopic_endpoint_atom_number.is_empty())
+            && a.c_flags & AT_FLAG_ISO_H_POINT != 0;
+        let key = if (a.endpoint == 0 || !has_t_group) && !merged {
+            make_iso_sort_key(
+                i32::from(a.iso_atw_diff),
+                i32::from(a.num_iso_h[0]),
+                i32::from(a.num_iso_h[1]),
+                i32::from(a.num_iso_h[2]),
+            )
+        } else {
+            if let Some(b) = b_has_isotopic_in_tautomer_groups.as_deref_mut() {
+                *b += i32::from(
+                    a.num_iso_h[0] != 0 || a.num_iso_h[1] != 0 || a.num_iso_h[2] != 0 || merged,
+                );
+            }
+            make_iso_sort_key(i32::from(a.iso_atw_diff), 0, 0, 0)
+        };
+        a.iso_sort_key = key;
+        num_isotopic += i32::from(key != 0);
+    }
+    num_isotopic
+}
+
 /// `FixCanonEquivalenceInfo`: makes the current ranks agree with the
 /// equivalence information; returns the number of different ranks and
 /// `bChanged` (bit 0: symmetry ranks changed, bit 1: current ranks changed).

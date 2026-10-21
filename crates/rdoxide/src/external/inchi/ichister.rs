@@ -1706,6 +1706,24 @@ pub const MIN_SB_RING_SIZE: u16 = 8;
 pub struct SpAtom {
     /// `elname`: the element symbol (a NUL terminated string)
     pub elname: [u8; super::inpdef::ATOM_EL_LEN],
+    /// `el_number`
+    pub el_number: u8,
+    /// `chem_bonds_valence`
+    pub chem_bonds_valence: i8,
+    /// `orig_compt_at_numb`
+    pub orig_compt_at_numb: u16,
+    /// `charge`
+    pub charge: i8,
+    /// `radical`
+    pub radical: i8,
+    /// `marked`
+    pub marked: i8,
+    /// `bCutVertex`
+    pub b_cut_vertex: i8,
+    /// `nNumAtInRingSystem`
+    pub n_num_at_in_ring_system: u16,
+    /// `nBlockSystem`
+    pub n_block_system: u16,
     /// `iso_sort_key`
     pub iso_sort_key: i64,
     /// `cFlags`
