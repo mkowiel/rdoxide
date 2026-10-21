@@ -638,4 +638,5 @@ Vertex MakeBlossom( BN_STRUCT* pBNS, Vertex *ScanQ, int *pQSize, Vertex *Pu, Ver
     print(len(data), "cases ->", path)
 
 
-main()
+if __name__ == "__main__":
+    main()

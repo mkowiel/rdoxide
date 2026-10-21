@@ -4019,7 +4019,7 @@ pub const ALT_PATH_MODE_TAUTOM_PT_06_00: i32 = 13;
 pub const ALT_PATH_MODE_TAUTOM_PT_39_00: i32 = 14;
 pub const ALT_PATH_MODE_TAUTOM_PT_13_00: i32 = 15;
 pub const ALT_PATH_MODE_TAUTOM_PT_18_00: i32 = 16;
-const BNS_MAX_NUM_FLOW_CHANGES: usize = 1 + 2 * MAX_BOND_EDGE_CAP as usize;
+pub const BNS_MAX_NUM_FLOW_CHANGES: usize = 1 + 2 * MAX_BOND_EDGE_CAP as usize;
 
 type EndpointInfoFn = fn(&[InpAtom], usize, &mut EndpointInfo) -> i32;
 
