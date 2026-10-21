@@ -24,6 +24,7 @@ pub mod ichi_bns;
 pub mod ichi_io;
 pub mod ichierr;
 pub mod ichimap;
+pub mod ichimap4;
 pub mod ichinorm;
 pub mod ichiparm;
 pub mod ichiring;
