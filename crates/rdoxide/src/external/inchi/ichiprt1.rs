@@ -1736,3 +1736,356 @@ pub fn output_auxinfo_charges_radicals_and_unusual_valences(
     }
     0
 }
+
+// ---------------------------------------------------------------------------
+// The original structure for the reversibility part of the AuxInfo
+
+use super::ichi_bns::n_bonds_valence_inp_at;
+use super::ichisort::{comp_at_rank, insertions_sort};
+use super::ichister::{
+    AB_PARITY_EVEN, AB_PARITY_ODD, AB_PARITY_UNDF, AB_PARITY_UNKN, atom_parity_well_def,
+};
+use super::inpdef::{InpAtom, MAX_NUM_STEREO_ATOM_NEIGH};
+use super::util::{get_atomic_mass_from_elnum, lrtrim, needed_unusual_el_valence};
+
+pub const LEN_COORD: usize = 10;
+pub const NUM_COORD: usize = 3;
+/// `sizeof(MOL_COORD)`
+pub const MOL_COORD_LEN: usize = LEN_COORD * NUM_COORD + NUM_COORD - 1;
+pub const FLAG_INP_AT_CHIRAL: i32 = 1;
+pub const FLAG_INP_AT_NONCHIRAL: i32 = 2;
+
+pub type MolCoord = [u8; MOL_COORD_LEN];
+
+/// the longest prefix of `s` that `strtod` reads (decimal numbers only)
+fn strtod(s: &[u8]) -> (f64, usize) {
+    let n = s.len();
+    let mut i = 0;
+    if i < n && (s[i] == b'+' || s[i] == b'-') {
+        i += 1;
+    }
+    let ds = i;
+    while i < n && s[i].is_ascii_digit() {
+        i += 1;
+    }
+    let mut digits = i - ds;
+    if i < n && s[i] == b'.' {
+        let f = i + 1;
+        let mut k = f;
+        while k < n && s[k].is_ascii_digit() {
+            k += 1;
+        }
+        if digits + (k - f) > 0 {
+            digits += k - f;
+            i = k;
+        }
+    }
+    if digits == 0 {
+        return (0.0, 0);
+    }
+    if i < n && (s[i] == b'e' || s[i] == b'E') {
+        let mut k = i + 1;
+        if k < n && (s[k] == b'+' || s[k] == b'-') {
+            k += 1;
+        }
+        let es = k;
+        while k < n && s[k].is_ascii_digit() {
+            k += 1;
+        }
+        if k > es {
+            i = k;
+        }
+    }
+    let v = std::str::from_utf8(&s[..i])
+        .ok()
+        .and_then(|t| t.parse::<f64>().ok());
+    (v.unwrap_or(0.0), i)
+}
+
+/// `strtol(.., 10)`: (value, bytes read)
+fn strtol10(s: &[u8]) -> (i32, usize) {
+    let mut i = 0;
+    while i < s.len() && matches!(s[i], b' ' | 0x09..=0x0d) {
+        i += 1;
+    }
+    let mut neg = false;
+    if i < s.len() && (s[i] == b'+' || s[i] == b'-') {
+        neg = s[i] == b'-';
+        i += 1;
+    }
+    let ds = i;
+    let mut v: i64 = 0;
+    while i < s.len() && s[i].is_ascii_digit() {
+        v = (v * 10 + i64::from(s[i] - b'0')).min(i64::from(i32::MAX));
+        i += 1;
+    }
+    if i == ds {
+        return (0, 0);
+    }
+    (if neg { -v } else { v } as i32, i)
+}
+
+/// `CleanOrigCoord`: removes the insignificant characters of the three
+/// coordinates and joins them with `delim`; returns the number of zero ones
+pub fn clean_orig_coord(sz_coord: &mut MolCoord, delim: u8) -> i32 {
+    const MIN_BOND_LENGTH: f64 = 1.0e-6;
+    let mut sz_buf = [0u8; MOL_COORD_LEN];
+    let (mut len_buf, mut num_zer) = (0usize, 0);
+    for k in (0..NUM_COORD * LEN_COORD).step_by(LEN_COORD) {
+        // the value as a zero terminated string
+        let raw = &sz_coord[k..k + LEN_COORD];
+        let end = raw.iter().position(|&c| c == 0).unwrap_or(LEN_COORD);
+        let mut v = raw[..end].to_vec();
+        lrtrim(&mut v);
+        let mut sz_val = [0u8; LEN_COORD + 1];
+        sz_val[..v.len()].copy_from_slice(&v);
+        let (coord, q) = strtod(&v);
+        let mut len: usize;
+        if MIN_BOND_LENGTH > coord.abs() {
+            sz_val = [0u8; LEN_COORD + 1];
+            sz_val[0] = b'0';
+            len = 1;
+            num_zer += 1;
+        } else {
+            len = q;
+            let mut last = len;
+            if let Some(p) = v
+                .iter()
+                .position(|&c| matches!(c, b'e' | b'E' | b'd' | b'D'))
+            {
+                last = p;
+                let (e, _) = strtol10(&sz_val[last + 1..]);
+                if e != 0 {
+                    let t = e.to_string();
+                    sz_val[last + 1..last + 1 + t.len()].copy_from_slice(t.as_bytes());
+                    sz_val[last + 1 + t.len()] = 0;
+                    len = last + 1 + t.len();
+                } else {
+                    len = last;
+                }
+            }
+            let fst = usize::from(sz_val[0] != b'.' && !sz_val[0].is_ascii_digit());
+            let cstr_len = sz_val.iter().position(|&c| c == 0).unwrap_or(LEN_COORD);
+            let dec_pnt: i64 = sz_val[..cstr_len]
+                .iter()
+                .position(|&c| c == b'.')
+                .map_or(last as i64, |p| p as i64);
+            let last_i = last as i64 - 1;
+            let mut i = last_i;
+            while dec_pnt < i && sz_val[i as usize] == b'0' {
+                i -= 1;
+            }
+            if i == dec_pnt {
+                i -= 1;
+            }
+            if i < last_i {
+                let from = (last_i + 1) as usize;
+                let cnt = len as i64 - last as i64;
+                if cnt > 0 {
+                    let cnt = cnt as usize;
+                    sz_val.copy_within(from..from + cnt, (i + 1) as usize);
+                }
+                len = (len as i64 - (last_i - i)) as usize;
+            }
+            let mut i = fst;
+            while i < len && sz_val[i] == b'0' {
+                i += 1;
+            }
+            if i > fst {
+                sz_val.copy_within(i..len, fst);
+                len -= i - fst;
+            }
+        }
+        if len_buf != 0 && len_buf < MOL_COORD_LEN {
+            sz_buf[len_buf] = delim;
+            len_buf += 1;
+        }
+        sz_buf[len_buf..len_buf + len].copy_from_slice(&sz_val[..len]);
+        len_buf += len;
+    }
+    if len_buf < MOL_COORD_LEN {
+        sz_buf[len_buf..].fill(0);
+    }
+    *sz_coord = sz_buf;
+    num_zer
+}
+
+/// `WriteOrigCoord`: the coordinates of the atoms from `*i` on, each ended
+/// with `;`; returns the text (at most `buf_len - 1` characters)
+pub fn write_orig_coord(
+    num_inp_atoms: usize,
+    sz_mol_coord: &[MolCoord],
+    i: &mut usize,
+    buf_len: usize,
+) -> String {
+    let mut buf: Vec<u8> = Vec::new();
+    let mut j = *i;
+    while j < num_inp_atoms {
+        let mut cur = sz_mol_coord[j];
+        let num_zer = clean_orig_coord(&mut cur, b',');
+        let len = if NUM_COORD as i32 == num_zer {
+            0
+        } else {
+            cur.iter().position(|&c| c == 0).unwrap_or(MOL_COORD_LEN)
+        };
+        if len + buf.len() + 1 < buf_len {
+            buf.extend_from_slice(&cur[..len]);
+            buf.push(b';');
+            j += 1;
+        } else {
+            break;
+        }
+    }
+    *i = j;
+    String::from_utf8_lossy(&buf).into_owned()
+}
+
+/// `WriteOrigAtoms`: the atoms from `*i` on (element, valence, charge,
+/// radical, isotope, parity, isotopic H); the first call (`*i == 0`) starts
+/// with the number of atoms and the chirality flag
+pub fn write_orig_atoms(
+    num_inp_atoms: usize,
+    at: &[InpAtom],
+    i: &mut usize,
+    buf_len: usize,
+    chiral_flag: i32,
+) -> String {
+    const SZ_ISO_H: &[u8; 3] = b"hdt";
+    let mut buf = String::new();
+    if *i == 0 {
+        buf = format!(
+            "{num_inp_atoms}{}",
+            if chiral_flag & FLAG_INP_AT_CHIRAL != 0 {
+                "c"
+            } else if chiral_flag & FLAG_INP_AT_NONCHIRAL != 0 {
+                "n"
+            } else {
+                ""
+            }
+        );
+    }
+    let mut j = *i;
+    while j < num_inp_atoms {
+        let a = &at[j];
+        let mut parity = 0;
+        let mut num_trans = 0;
+        if a.p_parity != 0 {
+            let mut is_ok = true;
+            let mut b_self = 0;
+            let mut k = 0;
+            let mut neigh_order = [0u16; MAX_NUM_STEREO_ATOM_NEIGH];
+            for n in 0..MAX_NUM_STEREO_ATOM_NEIGH {
+                let neigh = a.p_orig_at_num[n].wrapping_sub(1);
+                let in_list = a.neighbor[..a.valence.max(0) as usize].contains(&neigh);
+                if in_list && at[usize::from(neigh)].orig_at_number == a.p_orig_at_num[n] {
+                    neigh_order[k] = a.p_orig_at_num[n];
+                    k += 1;
+                } else if usize::from(neigh) == j
+                    && at[usize::from(neigh)].orig_at_number == a.p_orig_at_num[n]
+                {
+                    num_trans = n as i32;
+                    b_self += 1;
+                } else {
+                    is_ok = false;
+                    break;
+                }
+            }
+            if is_ok && b_self <= 1 && b_self + k == MAX_NUM_STEREO_ATOM_NEIGH {
+                num_trans += insertions_sort(&mut neigh_order[..k], comp_at_rank);
+                let p = i32::from(a.p_parity);
+                if atom_parity_well_def(p) {
+                    parity = 2 - (num_trans + p) % 2;
+                } else if p == AB_PARITY_UNKN || p == AB_PARITY_UNDF {
+                    parity = p;
+                }
+            }
+        }
+        let el_end = a
+            .elname
+            .iter()
+            .position(|&c| c == 0)
+            .unwrap_or(a.elname.len());
+        let mut cur: String = String::from_utf8_lossy(&a.elname[..el_end]).into_owned();
+        let len0 = cur.len();
+        let (bonds_val, _, _) = n_bonds_valence_inp_at(a);
+        let mut val = needed_unusual_el_valence(
+            i32::from(a.el_number),
+            i32::from(a.charge),
+            i32::from(a.radical),
+            i32::from(a.chem_bonds_valence),
+            bonds_val,
+            i32::from(a.num_h),
+            i32::from(a.valence),
+        );
+        if val != 0
+            || a.charge != 0
+            || a.radical != 0
+            || a.iso_atw_diff != 0
+            || a.num_iso_h_total() != 0
+            || parity != 0
+        {
+            if val != 0 {
+                cur.push_str(&(if val > 0 { val } else { 0 }).to_string());
+            }
+            val = i32::from(a.charge);
+            if val != 0 {
+                cur.push(if val > 0 { '+' } else { '-' });
+                if val.abs() > 1 {
+                    cur.push_str(&val.abs().to_string());
+                }
+            }
+            val = i32::from(a.radical);
+            if val != 0 {
+                cur.push_str(&format!(".{val}"));
+            }
+            val = i32::from(a.iso_atw_diff);
+            if val != 0 {
+                let mw = get_atomic_mass_from_elnum(i32::from(a.el_number));
+                val = if val == 1 {
+                    mw
+                } else if val > 0 {
+                    mw + val - 1
+                } else {
+                    mw + val
+                };
+                cur.push_str(&format!(
+                    "{}i{val}",
+                    if cur.len() == len0 { "." } else { "" }
+                ));
+            }
+            if parity != 0 {
+                let s = match parity {
+                    AB_PARITY_ODD => "o",
+                    AB_PARITY_EVEN => "e",
+                    AB_PARITY_UNKN => "u",
+                    AB_PARITY_UNDF => "?",
+                    _ => "",
+                };
+                cur.push_str(&format!("{}{s}", if cur.len() == len0 { "." } else { "" }));
+            }
+            if a.num_iso_h_total() != 0 {
+                for k in 0..3 {
+                    let v = i32::from(a.num_iso_h[k]);
+                    if v != 0 {
+                        cur.push_str(&format!(
+                            "{}{}",
+                            if cur.len() == len0 { "." } else { "" },
+                            SZ_ISO_H[k] as char
+                        ));
+                        if v > 1 {
+                            cur.push_str(&v.to_string());
+                        }
+                    }
+                }
+            }
+        }
+        if cur.len() + buf.len() < buf_len {
+            buf.push_str(&cur);
+            j += 1;
+        } else {
+            break;
+        }
+        *i = j;
+    }
+    buf
+}

@@ -14002,3 +14002,85 @@ fn ichiprt1_auxinfo_layers_match_the_c_code() {
         assert_eq!(got, want, "case {ci}: {}", c["in"]);
     }
 }
+
+#[test]
+fn ichiprt1_original_structure_writers_match_the_c_code() {
+    use rdoxide::external::inchi::ichiprt1::*;
+    use rdoxide::external::inchi::inpdef::InpAtom;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_prt1e.json")).unwrap();
+    fn coord(t: &mut InchiTok) -> MolCoord {
+        let s = t.s();
+        let mut c = [b'X'; MOL_COORD_LEN];
+        for (d, b) in c.iter_mut().zip(s.bytes()) {
+            *d = match b {
+                b'_' => b' ',
+                b'~' => 0,
+                x => x,
+            };
+        }
+        c
+    }
+    for (ci, c) in data.as_array().unwrap().iter().enumerate() {
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        let mut t = InchiTok(c["in"].as_str().unwrap().split_whitespace());
+        let cmd = t.s();
+        let got = match cmd.as_str() {
+            "clean" => {
+                let mut mc = coord(&mut t);
+                let delim = t.i() as u8;
+                let nz = clean_orig_coord(&mut mc, delim);
+                let hex: String = mc.iter().map(|b| format!("{b:02x}")).collect();
+                format!("{nz} {hex}")
+            }
+            "wcoord" => {
+                let n = t.i() as usize;
+                let mut i = t.i() as usize;
+                let buf_len = t.i() as usize;
+                let mc: Vec<MolCoord> = (0..n).map(|_| coord(&mut t)).collect();
+                let s = write_orig_coord(n, &mc, &mut i, buf_len);
+                format!("{} {i} [{s}]", s.len())
+            }
+            _ => {
+                let n = t.i() as usize;
+                let mut i = t.i() as usize;
+                let buf_len = t.i() as usize;
+                let chiral = t.i() as i32;
+                let mut at = vec![InpAtom::default(); n];
+                for a in at.iter_mut() {
+                    let el = t.s();
+                    a.set_elname(&el);
+                    a.el_number = t.i() as u8;
+                    a.valence = t.i() as i8;
+                    for m in 0..a.valence as usize {
+                        a.neighbor[m] = t.i() as u16;
+                    }
+                    for m in 0..a.valence as usize {
+                        a.bond_type[m] = t.i() as u8;
+                    }
+                    a.orig_at_number = t.i() as u16;
+                    a.chem_bonds_valence = t.i() as i8;
+                    a.num_h = t.i() as i8;
+                    for m in 0..3 {
+                        a.num_iso_h[m] = t.i() as i8;
+                    }
+                    a.iso_atw_diff = t.i() as i8;
+                    a.charge = t.i() as i8;
+                    a.radical = t.i() as i8;
+                    a.p_parity = t.i() as i8;
+                    for m in 0..4 {
+                        a.p_orig_at_num[m] = t.i() as u16;
+                    }
+                }
+                let s = write_orig_atoms(n, &at, &mut i, buf_len, chiral);
+                format!("{} {i} [{s}]", s.len())
+            }
+        };
+        assert_eq!(vec![got], want, "case {ci}: {}", c["in"]);
+    }
+}
