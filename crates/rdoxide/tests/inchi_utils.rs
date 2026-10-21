@@ -11186,6 +11186,253 @@ fn final_canonical_numbering_matches_the_c_code() {
                         if p.at_number.is_empty() { 0 } else { nm },
                     ));
                 }
+                if r2 > 0 {
+                    use rdoxide::external::inchi::ichi::{
+                        InChI, InChIAux, InChIIsotopicAtom, InChIIsotopicTGroup, InChIStereo,
+                        OrigInfo,
+                    };
+                    use rdoxide::external::inchi::ichimak2::fill_out_inchi;
+                    use rdoxide::external::inchi::inpdef::InpAtom;
+                    use rdoxide::external::inchi::util::get_periodic_table_number;
+                    let umodes = [0u64, 0x200, 0x400, 0x800, 0x1000, 0x1800];
+                    let um = umodes[case % 6];
+                    let cap = 4 * (nat + n_e) + 40;
+                    let mk_stereo = || InChIStereo {
+                        n_number: vec![0; 64],
+                        t_parity: vec![0; 64],
+                        n_number_inv: vec![0; 64],
+                        t_parity_inv: vec![0; 64],
+                        n_bond_atom1: vec![0; 64],
+                        n_bond_atom2: vec![0; 64],
+                        b_parity: vec![0; 64],
+                        ..Default::default()
+                    };
+                    let mut pi = InChI {
+                        n_atom: vec![0; nat + 2],
+                        n_conn_table: vec![0; n_len_ct as usize + nat + 10],
+                        n_tautomer: vec![0; cap],
+                        n_num_h: vec![0; nat + 2],
+                        n_num_h_fixed: Some(vec![0; nat + 2]),
+                        isotopic_atom: vec![InChIIsotopicAtom::default(); na + 2],
+                        isotopic_t_group: vec![InChIIsotopicTGroup::default(); ntg + 2],
+                        n_possible_locations_of_isotopic_h: vec![0; na + 3],
+                        stereo: Some(mk_stereo()),
+                        stereo_isotopic: Some(mk_stereo()),
+                        ..Default::default()
+                    };
+                    let al = 2 * na + 8;
+                    let mut pa = InChIAux {
+                        n_orig_at_nos_in_canon_ord: vec![0; al],
+                        n_isotopic_orig_at_nos_in_canon_ord: vec![0; al],
+                        n_orig_at_nos_in_canon_ord_inv: vec![0; al],
+                        n_isotopic_orig_at_nos_in_canon_ord_inv: vec![0; al],
+                        n_constit_equ_numbers: vec![0; al],
+                        n_constit_equ_isotopic_numbers: vec![0; al],
+                        n_constit_equ_t_group_numbers: vec![0; al],
+                        n_constit_equ_isotopic_t_group_numbers: vec![0; al],
+                        orig_info: vec![OrigInfo::default(); al],
+                        ..Default::default()
+                    };
+                    if have_tgi {
+                        pa.b_normalization_flags = tgi.tni.b_normalization_flags;
+                        pa.b_taut_flags = tgi.b_taut_flags;
+                        pa.b_taut_flags_done = tgi.b_taut_flags_done;
+                    }
+                    let mut nrm = vec![InpAtom::default(); na + 2];
+                    for i in 0..na {
+                        let el = at[i].elname.iter().take_while(|&&b| b != 0).count();
+                        at[i].el_number = get_periodic_table_number(
+                            std::str::from_utf8(&at[i].elname[..el]).unwrap(),
+                        ) as u8;
+                        at[i].charge = ((i * 7 + 3) % 4) as i8 - 1;
+                        at[i].radical = if i % 5 == 4 {
+                            1
+                        } else if i % 7 == 3 {
+                            2
+                        } else {
+                            0
+                        };
+                        at[i].orig_at_number = 101 + i as u16;
+                        at[i].chem_bonds_valence = at[i].valence;
+                        nrm[i].valence = at[i].valence;
+                        nrm[i].num_h = at[i].num_h;
+                        nrm[i].charge = at[i].charge;
+                        nrm[i].radical = at[i].radical;
+                        nrm[i].el_number = at[i].el_number;
+                        nrm[i].chem_bonds_valence = at[i].chem_bonds_valence;
+                    }
+                    let mut se = String::new();
+                    let fr = fill_out_inchi(
+                        &mut pi,
+                        &mut pa,
+                        na,
+                        nat,
+                        0,
+                        at,
+                        &mut nrm,
+                        &mut cs,
+                        have_tgi.then_some(&mut tgi),
+                        k != 0,
+                        um,
+                        &mut se,
+                        false,
+                    );
+                    got.push(format!(
+                        "FO {fr} {} {} {} {} {} {}",
+                        pi.n_error_code,
+                        pa.n_error_code,
+                        pi.n_flags,
+                        pi.n_total_charge,
+                        pi.n_number_of_atoms,
+                        pi.sz_hill_formula.as_deref().unwrap_or("NULL")
+                    ));
+                    got.push(format!(
+                        "FA{}",
+                        pi.n_atom[..na]
+                            .iter()
+                            .map(|x| format!(" {x}"))
+                            .collect::<String>()
+                    ));
+                    got.push(format!(
+                        "FC {}{}",
+                        pi.len_conn_table,
+                        pi.n_conn_table[..pi.len_conn_table as usize]
+                            .iter()
+                            .map(|x| format!(" {x}"))
+                            .collect::<String>()
+                    ));
+                    got.push(format!(
+                        "FT {}{}",
+                        pi.len_tautomer,
+                        pi.n_tautomer[..pi.len_tautomer as usize]
+                            .iter()
+                            .map(|x| format!(" {x}"))
+                            .collect::<String>()
+                    ));
+                    let fixed = pi.n_num_h_fixed.as_ref().unwrap();
+                    got.push(format!(
+                        "FH{}",
+                        (0..na)
+                            .map(|i| format!(" {}/{}", pi.n_num_h[i], fixed[i]))
+                            .collect::<String>()
+                    ));
+                    let mut l = format!(
+                        "FI {} {}",
+                        pi.n_number_of_isotopic_atoms, pi.n_number_of_isotopic_t_groups
+                    );
+                    for e in pi
+                        .isotopic_atom
+                        .iter()
+                        .take(pi.n_number_of_isotopic_atoms.max(0) as usize)
+                    {
+                        l += &format!(
+                            " {},{},{},{},{}",
+                            e.n_atom_number, e.n_iso_difference, e.n_num_h, e.n_num_d, e.n_num_t
+                        );
+                    }
+                    l += " |";
+                    for e in pi
+                        .isotopic_t_group
+                        .iter()
+                        .take(pi.n_number_of_isotopic_t_groups.max(0) as usize)
+                    {
+                        l += &format!(
+                            " {},{},{},{}",
+                            e.n_t_group_number, e.n_num_h, e.n_num_d, e.n_num_t
+                        );
+                    }
+                    got.push(l);
+                    got.push(format!(
+                        "FL{}",
+                        pi.n_possible_locations_of_isotopic_h
+                            .iter()
+                            .map(|x| format!(" {x}"))
+                            .collect::<String>()
+                    ));
+                    for (q, st) in [&pi.stereo, &pi.stereo_isotopic].iter().enumerate() {
+                        let s = st.as_ref().unwrap();
+                        let mut l = format!(
+                            "FS{q} {} {} {} {} |",
+                            s.n_number_of_stereo_centers,
+                            s.n_number_of_stereo_bonds,
+                            s.n_comp_inv2_abs,
+                            s.b_trivial_inv
+                        );
+                        for i in 0..64 {
+                            l += &format!(
+                                " {},{},{},{}",
+                                s.n_number[i], s.t_parity[i], s.n_number_inv[i], s.t_parity_inv[i]
+                            );
+                        }
+                        l += " |";
+                        for i in 0..64 {
+                            l += &format!(
+                                " {},{},{}",
+                                s.n_bond_atom1[i], s.n_bond_atom2[i], s.b_parity[i]
+                            );
+                        }
+                        got.push(l);
+                    }
+                    got.push(format!(
+                        "FX {} {} {} {} {} {}",
+                        pa.n_number_of_atoms,
+                        pa.n_number_of_t_groups,
+                        pa.n_num_removed_protons,
+                        pa.n_num_removed_isotopic_h[0],
+                        pa.n_num_removed_isotopic_h[1],
+                        pa.n_num_removed_isotopic_h[2]
+                    ));
+                    let aa = [
+                        &pa.n_orig_at_nos_in_canon_ord,
+                        &pa.n_isotopic_orig_at_nos_in_canon_ord,
+                        &pa.n_orig_at_nos_in_canon_ord_inv,
+                        &pa.n_isotopic_orig_at_nos_in_canon_ord_inv,
+                        &pa.n_constit_equ_numbers,
+                        &pa.n_constit_equ_isotopic_numbers,
+                        &pa.n_constit_equ_t_group_numbers,
+                        &pa.n_constit_equ_isotopic_t_group_numbers,
+                    ];
+                    for (q, a) in aa.iter().enumerate() {
+                        got.push(format!(
+                            "FQ{q}{}",
+                            a.iter().map(|x| format!(" {x}")).collect::<String>()
+                        ));
+                    }
+                    got.push(format!(
+                        "FO2{}",
+                        (0..na)
+                            .map(|i| format!(
+                                " {},{},{}",
+                                pa.orig_info[i].c_charge,
+                                pa.orig_info[i].c_radical,
+                                pa.orig_info[i].c_unusual_valence
+                            ))
+                            .collect::<String>()
+                    ));
+                    got.push(format!("FE {se}"));
+                    got.push(format!(
+                        "FB{}",
+                        (0..na)
+                            .map(|i| format!(
+                                " {}/{}",
+                                at[i].b_ambiguous_stereo, nrm[i].b_ambiguous_stereo
+                            ))
+                            .collect::<String>()
+                    ));
+                    got.push(pu("FY", &cs.n_canon_ord_stereo, nat));
+                    got.push(pu("FZ", &cs.n_canon_ord_isotopic_stereo, nat));
+                    let mut l = String::from("FG");
+                    if have_tgi {
+                        for x in tgi.t_group_number.iter().take(4 * ntgs) {
+                            l += &format!(" {x}");
+                        }
+                        l += " |";
+                        for x in tgi.n_endpoint_atom_number.iter().take(n_e) {
+                            l += &format!(" {x}");
+                        }
+                    }
+                    got.push(l);
+                }
             }
         }
         let want: Vec<String> = c["out"]

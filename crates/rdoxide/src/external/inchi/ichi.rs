@@ -1185,3 +1185,38 @@ pub fn mark_unused_and_empty_layers(s: &mut DifSegs) -> i32 {
     }
     0
 }
+
+/// `ORIG_INFO`
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct OrigInfo {
+    pub c_charge: i8,
+    /// 0=none, 1=doublet, 2=triplet, 3=unknown
+    pub c_radical: i8,
+    pub c_unusual_valence: i8,
+}
+
+/// `INChI_Aux` (without the coordinate buffer)
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct InChIAux {
+    pub n_error_code: i32,
+    pub n_number_of_atoms: i32,
+    pub n_number_of_t_groups: i32,
+    pub b_is_isotopic: i32,
+    pub b_is_tautomeric: i32,
+    pub n_orig_at_nos_in_canon_ord: Vec<u16>,
+    pub n_isotopic_orig_at_nos_in_canon_ord: Vec<u16>,
+    pub n_orig_at_nos_in_canon_ord_inv: Vec<u16>,
+    pub n_isotopic_orig_at_nos_in_canon_ord_inv: Vec<u16>,
+    pub n_constit_equ_numbers: Vec<u16>,
+    pub n_constit_equ_t_group_numbers: Vec<u16>,
+    pub n_constit_equ_isotopic_numbers: Vec<u16>,
+    pub n_constit_equ_isotopic_t_group_numbers: Vec<u16>,
+    pub orig_info: Vec<OrigInfo>,
+    pub n_num_removed_protons: i16,
+    pub n_num_removed_isotopic_h: [i16; 3],
+    pub b_deleted: i32,
+    pub b_taut_flags: u64,
+    pub b_taut_flags_done: u64,
+    pub b_normalization_flags: u64,
+    pub n_canon_flags: i32,
+}
