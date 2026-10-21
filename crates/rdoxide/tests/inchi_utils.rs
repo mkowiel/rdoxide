@@ -7474,3 +7474,131 @@ fn set_stereo_parity_matches_the_c_code() {
         assert_eq!(got, want, "case {n}");
     }
 }
+
+#[test]
+fn sp_atom_parity_bookkeeping_matches_the_c_code() {
+    use rdoxide::external::inchi::ichister::*;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_cansparity.json")).unwrap();
+    fn dump(at: &[SpAtom]) -> String {
+        let mut s = String::new();
+        for a in at {
+            s += &format!(" |{} {} {}", a.parity, a.stereo_atom_parity, a.final_parity);
+            for j in 0..3 {
+                s += &format!(
+                    " {} {} {} {}",
+                    a.stereo_bond_neighbor[j],
+                    a.stereo_bond_ord[j],
+                    a.stereo_bond_z_prod[j],
+                    a.stereo_bond_parity[j]
+                );
+            }
+        }
+        s
+    }
+    for (n, c) in data.as_array().unwrap().iter().enumerate() {
+        let atoms = c["in"]["atoms"].as_array().unwrap();
+        let num = atoms.len();
+        let mut at = vec![SpAtom::default(); num + 1];
+        let mut rank = vec![0u16; num + 1];
+        let mut crank = vec![0u16; num + 1];
+        for (i, a) in atoms.iter().enumerate() {
+            let nb = a["nb"].as_array().unwrap();
+            at[i].valence = nb.len() as i8;
+            at[i].parity = a["par"].as_i64().unwrap() as i8;
+            at[i].stereo_atom_parity = a["sap"].as_i64().unwrap() as i8;
+            at[i].final_parity = a["fp"].as_i64().unwrap() as i8;
+            rank[i] = a["rank"].as_u64().unwrap() as u16;
+            crank[i] = a["crank"].as_u64().unwrap() as u16;
+            for (j, q) in nb.iter().enumerate() {
+                at[i].neighbor[j] = q.as_u64().unwrap() as u16;
+            }
+            for (j, s) in a["sb"].as_array().unwrap().iter().enumerate() {
+                let s: Vec<i64> = s
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|x| x.as_i64().unwrap())
+                    .collect();
+                at[i].stereo_bond_neighbor[j] = s[0] as u16;
+                at[i].stereo_bond_ord[j] = s[1] as i8;
+                at[i].stereo_bond_z_prod[j] = s[2] as i8;
+                at[i].stereo_bond_parity[j] = s[3] as i8;
+            }
+        }
+        let mut got: Vec<String> = Vec::new();
+        for i in 0..num {
+            let mut vis = vec![0i8; num + 1];
+            got.push(format!(
+                "c {} {} {}",
+                get_stereo_center_parity(&at, i, &rank),
+                i32::from(find_atoms_with_parity(&at, &mut vis, -1, i)),
+                get_permutation_parity(&at[i], (i % 3) as u16, &crank)
+            ));
+            for j in 0..3 {
+                let mut s = format!(
+                    "h {}",
+                    half_stereo_bond_parity_ranks(&at, i, j as i32, &rank)
+                );
+                if at[i].stereo_bond_neighbor[j] != 0 {
+                    let m = at[i].stereo_bond_neighbor[j] as usize - 1;
+                    s += &format!(
+                        " {} {}",
+                        get_stereo_neighbor_pos(&at, i, m),
+                        get_stereo_bond_parity(&at, i, m, &rank)
+                    );
+                }
+                got.push(s);
+            }
+            got.push(format!(
+                "p {}",
+                get_stereo_neighbor_pos(&at, i, (i + 1) % num)
+            ));
+        }
+        for i in 0..num {
+            for j in 0..3 {
+                let has = at[i].stereo_bond_neighbor[j] != 0;
+                let mut cp = at.clone();
+                let r = if has {
+                    i32::from(set_one_stereo_bond_ill_def_parity(
+                        &mut cp,
+                        i,
+                        j,
+                        1 + ((i + j) % 4) as i32,
+                    ))
+                } else {
+                    -9
+                };
+                got.push(format!("s {r}{}", dump(&cp[..num])));
+                let mut cp = at.clone();
+                let r = if has {
+                    i32::from(remove_one_stereo_bond(&mut cp, i, j))
+                } else {
+                    -9
+                };
+                got.push(format!("r {r}{}", dump(&cp[..num])));
+                let mut cp = at.clone();
+                let r = i32::from(set_half_stereo_bond_ill_def_pariy(
+                    &mut cp,
+                    i,
+                    j,
+                    3 + j as i32,
+                ));
+                got.push(format!("sh {r}{}", dump(&cp[..num])));
+                let mut cp = at.clone();
+                let r = i32::from(remove_half_stereo_bond(&mut cp, i, j));
+                got.push(format!("rh {r}{}", dump(&cp[..num])));
+            }
+            let mut cp = at.clone();
+            let r = i32::from(remove_one_stereo_center(&mut cp, i));
+            got.push(format!("rc {r}{}", dump(&cp[..num])));
+        }
+        let want: Vec<String> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| s.as_str().unwrap().to_string())
+            .collect();
+        assert_eq!(got, want, "case {n}");
+    }
+}
