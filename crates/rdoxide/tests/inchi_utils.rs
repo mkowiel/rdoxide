@@ -11432,6 +11432,24 @@ fn final_canonical_numbering_matches_the_c_code() {
                         }
                     }
                     got.push(l);
+                    cs.t_group_info = have_tgi.then(|| std::mem::take(&mut tgi));
+                    let kr = rdoxide::external::inchi::ichimake::check_canon_numbering_correctness(
+                        na, nat, at, &mut cs,
+                    );
+                    if let Some(t) = cs.t_group_info.take() {
+                        tgi = t;
+                    }
+                    got.push(format!("FK {kr}"));
+                    got.push(pu("FM", &cs.linear_ct, cs.n_len_linear_ct.max(0) as usize));
+                    got.push(pu(
+                        "FN",
+                        &cs.linear_ct2,
+                        cs.n_len_linear_ct2.max(0) as usize,
+                    ));
+                    got.push(format!(
+                        "FP {} {} {}",
+                        cs.n_len_linear_ct, cs.n_len_linear_ct2, cs.n_len_linear_ct_at_only2
+                    ));
                 }
             }
         }
