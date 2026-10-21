@@ -4878,3 +4878,247 @@ fn charge_group_marking_matches_the_c_code() {
     }
     assert!(seen.keys().any(|&k| k > 0) && seen.len() > 3, "{seen:?}");
 }
+
+#[test]
+fn end_point_registration_matches_the_c_code() {
+    use rdoxide::external::inchi::ichi_bns::*;
+    use rdoxide::external::inchi::ichitaut::{
+        CGroup, CGroupInfo, TBondPos, TEndpoint, TGroup, TGroupInfo, register_end_points,
+        set_tautomeric_bonds,
+    };
+    use rdoxide::external::inchi::inpdef::InpAtom;
+    fn ints(v: &serde_json::Value) -> Vec<i32> {
+        v.as_array()
+            .unwrap()
+            .iter()
+            .map(|x| x.as_i64().unwrap() as i32)
+            .collect()
+    }
+    fn dump_state(
+        p: &BnStruct,
+        at: &[InpAtom],
+        t: &TGroupInfo,
+        cg: &CGroupInfo,
+        got: &mut Vec<String>,
+    ) {
+        got.push(format!(
+            "C {} {} {} {} {} {}",
+            p.num_vertices,
+            p.num_edges,
+            p.num_t_groups,
+            p.num_c_groups,
+            p.num_added_atoms,
+            p.num_added_edges
+        ));
+        let mut s = String::from("V");
+        for v in p.vert.iter().take(p.num_vertices as usize) {
+            let e = &v.st_edge;
+            s += &format!(
+                " {}:{}:{}:{}:{}:{}:{}:{}|",
+                v.type_, e.cap, e.cap0, e.flow, e.flow0, v.num_adj_edges, v.max_adj_edges, v.iedge
+            );
+            for k in 0..v.num_adj_edges as usize {
+                s += &format!("{}.", p.iedge[v.iedge + k]);
+            }
+        }
+        got.push(s);
+        let mut s = String::from("E");
+        for e in p.edge.iter().take(p.num_edges as usize) {
+            s += &format!(
+                " {}:{}:{}:{}:{}:{}:{}:{}:{}:{}",
+                e.cap,
+                e.cap0,
+                e.flow,
+                e.flow0,
+                e.pass,
+                e.forbidden,
+                e.neighbor1,
+                e.neighbor12,
+                e.neigh_ord[0],
+                e.neigh_ord[1]
+            );
+        }
+        got.push(s);
+        let mut s = String::from("G");
+        for g in t.t_group.iter().flatten().take(t.num_t_groups) {
+            s += &format!(" {}", g.n_group_number);
+        }
+        s += " |";
+        for g in cg.c_group.iter().flatten().take(cg.num_c_groups) {
+            s += &format!(" {}", g.n_group_number);
+        }
+        got.push(s);
+        let mut s = String::from("A");
+        for a in at {
+            s += &format!(" {},{}", a.endpoint, a.c_point);
+        }
+        got.push(s);
+    }
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_regendp.json")).unwrap();
+    let mut codes = std::collections::HashSet::new();
+    for c in data.as_array().unwrap() {
+        let inp = &c["in"];
+        let mut at: Vec<InpAtom> = Vec::new();
+        for a in inp["atoms"].as_array().unwrap() {
+            let mut x = InpAtom {
+                valence: a["v"].as_i64().unwrap() as i8,
+                chem_bonds_valence: a["cbv"].as_i64().unwrap() as i8,
+                el_number: a["el"].as_u64().unwrap() as u8,
+                radical: a["rad"].as_i64().unwrap() as i8,
+                charge: a["chg"].as_i64().unwrap() as i8,
+                num_h: a["nh"].as_i64().unwrap() as i8,
+                endpoint: a["ep"].as_u64().unwrap() as u16,
+                c_point: a["cp"].as_u64().unwrap() as u16,
+                ..Default::default()
+            };
+            for (j, e) in a["nb"].as_array().unwrap().iter().enumerate() {
+                x.neighbor[j] = e[0].as_u64().unwrap() as u16;
+                x.bond_type[j] = e[1].as_u64().unwrap() as u8;
+            }
+            at.push(x);
+        }
+        let n = at.len();
+        let (mut p, _) = allocate_and_init_bn_struct(
+            &mut at,
+            n,
+            inp["ma"].as_i64().unwrap() as i32,
+            inp["me"].as_i64().unwrap() as i32,
+            inp["mp"].as_i64().unwrap() as i32,
+        );
+        p.pb_taut_flags = inp["tfl"].as_u64().unwrap() as u32;
+        let tg_in = inp["tg"].as_array().unwrap();
+        let max_t = inp["maxt"].as_u64().unwrap() as usize;
+        let mut t_group = vec![TGroup::default(); max_t + 2];
+        for (i, g) in tg_in.iter().enumerate() {
+            let g = g.as_array().unwrap();
+            let nums = ints(&g[2]);
+            let das = ints(&g[3]);
+            t_group[i].n_group_number = g[0].as_u64().unwrap() as u16;
+            t_group[i].n_num_endpoints = g[1].as_u64().unwrap() as u16;
+            for k in 0..5 {
+                t_group[i].num[k] = nums[k] as u16;
+            }
+            for k in 0..6 {
+                t_group[i].num_da[k] = das[k] as u16;
+            }
+        }
+        let mut tgi = TGroupInfo {
+            t_group: Some(t_group),
+            num_t_groups: tg_in.len(),
+            max_num_t_groups: max_t,
+            b_taut_flags: inp["tf"].as_u64().unwrap(),
+            ..Default::default()
+        };
+        let mut cgi = CGroupInfo {
+            c_group: Some(
+                inp["cg"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|g| {
+                        let g = ints(g);
+                        CGroup {
+                            n_group_number: g[0] as u16,
+                            num_c_points: g[1] as u16,
+                            ..Default::default()
+                        }
+                    })
+                    .collect(),
+            ),
+            num_c_groups: inp["cg"].as_array().unwrap().len(),
+            ..Default::default()
+        };
+        let use_bns = inp["usebns"].as_i64().unwrap() != 0;
+        let mut eps: Vec<TEndpoint> = inp["ep"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|e| {
+                let e = e.as_array().unwrap();
+                let nums = ints(&e[3]);
+                let das = ints(&e[4]);
+                let mut x = TEndpoint {
+                    n_atom_number: e[0].as_u64().unwrap() as u16,
+                    n_group_number: e[1].as_u64().unwrap() as u16,
+                    n_equ_number: e[2].as_u64().unwrap() as u16,
+                    ..Default::default()
+                };
+                for k in 0..5 {
+                    x.num[k] = nums[k] as u16;
+                }
+                for k in 0..6 {
+                    x.num_da[k] = das[k] as u16;
+                }
+                x
+            })
+            .collect();
+        let mut got: Vec<String> = Vec::new();
+        for _ in 0..2 {
+            let has_c = cgi.num_c_groups > 0;
+            let ret = register_end_points(
+                &mut tgi,
+                &mut eps,
+                &mut at,
+                n as i32,
+                if has_c { Some(&mut cgi) } else { None },
+                if use_bns { Some(&mut p) } else { None },
+            );
+            codes.insert(ret);
+            got.push(format!("R {ret} {}", tgi.num_t_groups));
+            for g in &tgi.t_group.as_ref().unwrap()[..tgi.num_t_groups] {
+                let nums: Vec<String> = g.num.iter().map(|x| format!(" {x}")).collect();
+                let das: Vec<String> = g.num_da.iter().map(|x| format!(" {x}")).collect();
+                got.push(format!(
+                    "T {} {} |{} |{}",
+                    g.n_group_number,
+                    g.n_num_endpoints,
+                    nums.concat(),
+                    das.concat()
+                ));
+            }
+            let mut s = String::from("I");
+            for v in &tgi.t_group_number {
+                s += &format!(" {v}");
+            }
+            got.push(s);
+            let mut s = String::from("Q");
+            for e in &eps {
+                s += &format!(
+                    " {},{},{}",
+                    e.n_atom_number, e.n_group_number, e.n_equ_number
+                );
+            }
+            got.push(s);
+            dump_state(&p, &at, &tgi, &cgi, &mut got);
+            for e in eps.iter_mut() {
+                e.n_group_number = at[e.n_atom_number as usize].endpoint;
+            }
+        }
+        let bp: Vec<TBondPos> = inp["bp"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|b| TBondPos {
+                n_atom_number: b[0].as_u64().unwrap() as u16,
+                neighbor_index: b[1].as_u64().unwrap() as u16,
+            })
+            .collect();
+        got.push(format!("S {}", set_tautomeric_bonds(&mut at, &bp)));
+        for a in at.iter().take(n) {
+            let mut s = String::from("B");
+            for j in 0..a.valence as usize {
+                s += &format!(" {}", a.bond_type[j]);
+            }
+            got.push(s);
+        }
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        assert_eq!(got, want, "{inp}");
+    }
+    assert!(codes.len() >= 3, "{codes:?}");
+}

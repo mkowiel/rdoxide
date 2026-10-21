@@ -680,6 +680,9 @@ pub struct Tni {
 pub struct TGroupInfo {
     pub t_group: Option<Vec<TGroup>>,
     pub num_t_groups: usize,
+    pub max_num_t_groups: usize,
+    /// `tGroupNumber`: index + 1 of the t-group with the given number
+    pub t_group_number: Vec<u16>,
     pub tni: Tni,
     pub b_taut_flags: u64,
 }
@@ -1172,4 +1175,303 @@ pub fn mark_charge_groups(
         cgi.num_candidates = if num_tested != 0 { n_cand as i32 } else { -1 };
     }
     n_changes
+}
+
+/// `T_BONDPOS`
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct TBondPos {
+    pub n_atom_number: u16,
+    pub neighbor_index: u16,
+}
+
+/// `BOND_MARK_ALL` (`extr_ct.h`)
+pub const BOND_MARK_ALL: i32 = 0xf0;
+
+/// `SetTautomericBonds`: changes the non-tautomeric bonds (single and double
+/// ones) at the given positions to tautomeric ones; returns their number
+pub fn set_tautomeric_bonds(at: &mut [InpAtom], bond_pos: &[TBondPos]) -> i32 {
+    let mut n = 0;
+    for bp in bond_pos {
+        let neighbor_index = bp.neighbor_index as usize;
+        let center = bp.n_atom_number as usize;
+        let bond_mark = i32::from(at[center].bond_type[neighbor_index]);
+        let bond_type = bond_mark & !BOND_MARK_ALL;
+        // REPLACE_ALT_WITH_TAUT is 1
+        if bond_type != BOND_TAUTOM {
+            let new_type = ((bond_mark & BOND_MARK_ALL) | BOND_TAUTOM) as u8;
+            at[center].bond_type[neighbor_index] = new_type;
+            let neighbor = at[center].neighbor[neighbor_index] as usize;
+            for ii in 0..at[neighbor].valence as usize {
+                if at[neighbor].neighbor[ii] as usize == center {
+                    at[neighbor].bond_type[ii] = new_type;
+                    break;
+                }
+            }
+            n += 1;
+        }
+    }
+    n
+}
+
+/// `RegisterEndPoints`: puts the endpoints into the t-groups (creating,
+/// extending and merging them) and re-builds the network groups. Returns
+/// the number of changes (> 0), 0 for none or -1 for a program error.
+pub fn register_end_points(
+    tgi: &mut TGroupInfo,
+    end_point: &mut [TEndpoint],
+    at: &mut [InpAtom],
+    num_atoms: i32,
+    cgi: Option<&mut CGroupInfo>,
+    p: Option<&mut super::ichi_bns::BnStruct>,
+) -> i32 {
+    let Some(mut tg) = tgi.t_group.take() else {
+        return -1;
+    };
+    let max_num_t = tgi.max_num_t_groups;
+    let mut num_t = tgi.num_t_groups;
+    let ret = register_end_points_inner(
+        tgi, &mut tg, &mut num_t, max_num_t, end_point, at, num_atoms, cgi, p,
+    );
+    tgi.t_group = Some(tg);
+    ret
+}
+
+#[allow(clippy::too_many_arguments)]
+fn register_end_points_inner(
+    tgi: &mut TGroupInfo,
+    t_group: &mut [TGroup],
+    pnum_t: &mut usize,
+    max_num_t: usize,
+    end_point: &mut [TEndpoint],
+    at: &mut [InpAtom],
+    num_atoms: i32,
+    cgi: Option<&mut CGroupInfo>,
+    p: Option<&mut super::ichi_bns::BnStruct>,
+) -> i32 {
+    use super::ichi_bns::{
+        add_c_groups_to_bn_struct, add_t_groups_to_bn_struct, re_init_bn_struct,
+    };
+    use super::ichierr::is_bns_error;
+    let n_end = end_point.len();
+    if n_end == 0 {
+        return 0;
+    }
+    let mut num_t = *pnum_t;
+    let mut difference = 0i32;
+    let mut next_group: u16 = 0;
+    for g in &t_group[..num_t] {
+        if next_group < g.n_group_number {
+            next_group = g.n_group_number;
+        }
+    }
+    next_group += 1;
+    let mut least_group = next_group;
+    let prev_group = end_point[0].n_group_number;
+    let prev_eqnum = end_point[0].n_equ_number;
+    let (mut j, mut k, mut n_zero_equ) = (0usize, 0usize, 0usize);
+    for e in end_point.iter() {
+        if e.n_group_number != 0 && e.n_group_number < least_group {
+            least_group = e.n_group_number;
+        }
+        j += usize::from(prev_group == e.n_group_number);
+        k += usize::from(prev_eqnum == e.n_equ_number);
+        n_zero_equ += usize::from(e.n_equ_number == 0);
+    }
+    if j == n_end && prev_group != 0 && k == n_end {
+        return 0;
+    }
+    let mut n_new_tgroups = 0usize;
+    let mut group_new_number = vec![0u16; n_end + 1];
+    let mut group_number = vec![0u16; n_end + 1];
+    if n_zero_equ == 0 {
+        for e in end_point.iter_mut() {
+            let group = e.n_equ_number;
+            if group >= next_group {
+                let jj = (0..n_new_tgroups)
+                    .find(|&q| group == group_new_number[q])
+                    .unwrap_or(n_new_tgroups);
+                if jj == n_new_tgroups {
+                    group_new_number[jj] = group;
+                    n_new_tgroups += 1;
+                }
+                e.n_equ_number = next_group + jj as u16;
+            }
+        }
+    } else if n_zero_equ == n_end {
+        if least_group == next_group {
+            n_new_tgroups = 1;
+        }
+        for e in end_point.iter_mut() {
+            e.n_equ_number = least_group;
+        }
+    } else {
+        return -1;
+    }
+    if n_new_tgroups != 0 {
+        if num_t + n_new_tgroups > max_num_t {
+            return -1;
+        }
+        for i in 0..n_new_tgroups {
+            t_group[num_t + i] = TGroup::default();
+            t_group[num_t + i].n_group_number = next_group + i as u16;
+        }
+    }
+    let mut n_groups = 0usize;
+    for i in 0..n_end {
+        let group = end_point[i].n_group_number;
+        if group != 0 {
+            if group == end_point[i].n_equ_number {
+                continue;
+            }
+            let jj = (0..n_groups)
+                .find(|&q| group == group_number[q])
+                .unwrap_or(n_groups);
+            if jj < n_groups {
+                if end_point[i].n_equ_number != group_new_number[jj] {
+                    return -1;
+                }
+            } else {
+                group_number[jj] = group;
+                group_new_number[jj] = end_point[i].n_equ_number;
+                n_groups += 1;
+            }
+        } else {
+            let group = end_point[i].n_equ_number;
+            let mut jj;
+            if group >= next_group {
+                jj = num_t + (group - next_group) as usize;
+            } else {
+                jj = 0;
+                // old t-group
+                if jj >= num_t || group != t_group[jj].n_group_number {
+                    jj = match (0..num_t).find(|&q| group == t_group[q].n_group_number) {
+                        Some(q) => q,
+                        None => return -1,
+                    };
+                }
+            }
+            t_group[jj].n_num_endpoints += 1;
+            for q in 0..t_group[jj].num.len() {
+                t_group[jj].num[q] += end_point[i].num[q];
+            }
+            for q in 0..t_group[jj].num_da.len() {
+                t_group[jj].num_da[q] += end_point[i].num_da[q];
+            }
+            at[end_point[i].n_atom_number as usize].endpoint = group;
+            difference += 1;
+        }
+    }
+    difference += n_groups as i32;
+    num_t += n_new_tgroups;
+    if difference == 0 {
+        return 0;
+    }
+    if n_groups != 0 {
+        next_group = 0;
+        for g in &t_group[..num_t] {
+            if next_group < g.n_group_number {
+                next_group = g.n_group_number;
+            }
+        }
+    }
+    for i in 0..n_groups {
+        let group1 = group_number[i];
+        let group2 = group_new_number[i];
+        let (mut i1, mut i2) = (None, None);
+        let mut jj = 0;
+        while jj < num_t && (i1.is_none() || i2.is_none()) {
+            if i1.is_none() && group1 == t_group[jj].n_group_number {
+                i1 = Some(jj);
+            }
+            if i2.is_none() && group2 == t_group[jj].n_group_number {
+                i2 = Some(jj);
+            }
+            jj += 1;
+        }
+        let (Some(i1), Some(i2)) = (i1, i2) else {
+            return -1;
+        };
+        let src = t_group[i1];
+        for q in 0..src.num.len() {
+            t_group[i2].num[q] += src.num[q];
+        }
+        for q in 0..src.num_da.len() {
+            t_group[i2].num_da[q] += src.num_da[q];
+        }
+        t_group[i2].n_num_endpoints += src.n_num_endpoints;
+        num_t -= 1;
+        if num_t > i1 {
+            t_group.copy_within(i1 + 1..num_t + 1, i1);
+        }
+    }
+    if n_groups != 0 {
+        let mut new_tg_number = vec![0u16; next_group as usize + 1];
+        for (i, g) in t_group[..num_t].iter().enumerate() {
+            new_tg_number[g.n_group_number as usize] = i as u16 + 1;
+        }
+        for jj in 0..n_groups {
+            let old = group_number[jj] as usize;
+            let new = group_new_number[jj] as usize;
+            if new_tg_number[old] == 0 && new_tg_number[new] != 0 {
+                new_tg_number[old] = new_tg_number[new];
+            } else {
+                return -1;
+            }
+        }
+        for g in t_group[..num_t].iter_mut() {
+            g.n_group_number = new_tg_number[g.n_group_number as usize];
+        }
+        for a in at.iter_mut().take(num_atoms as usize) {
+            let group = a.endpoint;
+            if group != 0 {
+                a.endpoint = new_tg_number[group as usize];
+                if a.endpoint == 0 || next_group <= new_tg_number[group as usize] {
+                    return -1;
+                }
+            }
+        }
+    }
+    tgi.t_group_number = vec![0u16; 2 * max_num_t];
+    for (i, g) in t_group[..num_t].iter().enumerate() {
+        if g.n_num_endpoints != 0 && g.n_group_number != 0 {
+            tgi.t_group_number[g.n_group_number as usize] = i as u16 + 1;
+        }
+    }
+    if let Some(p) = p {
+        // ALWAYS_ADD_TG_ON_THE_FLY is 1
+        let mut new_tgi = TGroupInfo {
+            num_t_groups: num_t,
+            t_group: Some(t_group[..num_t].to_vec()),
+            ..Default::default()
+        };
+        use super::ichiparm::{
+            TG_FLAG_KETO_ENOL_TAUT, TG_FLAG_PT_06_00, TG_FLAG_PT_13_00, TG_FLAG_PT_16_00,
+            TG_FLAG_PT_18_00, TG_FLAG_PT_22_00, TG_FLAG_PT_39_00,
+        };
+        new_tgi.b_taut_flags |= tgi.b_taut_flags
+            & (TG_FLAG_KETO_ENOL_TAUT
+                | TG_FLAG_PT_22_00
+                | TG_FLAG_PT_16_00
+                | TG_FLAG_PT_06_00
+                | TG_FLAG_PT_39_00
+                | TG_FLAG_PT_13_00
+                | TG_FLAG_PT_18_00);
+        let ret_bns = re_init_bn_struct(p, at, num_atoms as usize, false);
+        if is_bns_error(ret_bns) {
+            return ret_bns;
+        }
+        if u64::from(p.pb_taut_flags) & super::ichiparm::TG_FLAG_MOVE_POS_CHARGES != 0 {
+            let r = add_c_groups_to_bn_struct(p, at, num_atoms, cgi);
+            if is_bns_error(r) {
+                return r;
+            }
+        }
+        let r = add_t_groups_to_bn_struct(p, at, num_atoms, Some(&mut new_tgi));
+        if is_bns_error(r) {
+            return r;
+        }
+    }
+    *pnum_t = num_t;
+    tgi.num_t_groups = num_t;
+    difference
 }
