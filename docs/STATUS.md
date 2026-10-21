@@ -333,6 +333,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 217 | InChI port I8a: `ichiprt2` (Make*String, Eql_INChI_Aux_*), differential-tested on 9000 inputs vs the C library |
 | 218 | InChI port I8b: `EquString` + first `ichiprt3` str_* layers, differential-tested on 6000 structures vs the C library |
 | 219 | InChI port I8c: `ichiprt3` stereo and isotopic str_* layers, differential-tested on 7000 structures vs the C library |
+| 220 | InChI port I9a: Molfile field reader and V2000 header/counts/atoms/bonds readers, differential-tested on 3900 cases vs the C library |
 
 ## Python package files
 
@@ -734,3 +735,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-21 — Stage None: I8m ichiprt1 polymer helpers (HidePolymerZz, cano nums, pseudo-element count, plain error) differential-tested against C (6893 cases)
 * 2026-10-21 — Stage None: I8n OutputINChI1/OutputINChI2 differential-tested against C (8724 cases)
 * 2026-10-21 — Stage None: I8o SortAndPrintINChI and bIsStructChiral differential-tested against C (8651 cases)
+* 2026-10-21 — Stage 220: I9a molfmt: Molfile V2000 readers differential-tested against C (3900 cases)

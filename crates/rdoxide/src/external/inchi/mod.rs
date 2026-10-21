@@ -44,6 +44,7 @@ pub mod ikey_dll;
 pub mod inchi_dll;
 pub mod incomdef;
 pub mod inpdef;
+pub mod molfmt;
 pub mod readinch;
 pub mod runichi;
 pub mod runichi2;
