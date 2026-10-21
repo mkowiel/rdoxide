@@ -213,6 +213,18 @@ PYRAZOLES = [
     # imidazole-like N-N both NH0 / N-oxide-less variants
     ([(6, 0, 0), (7, 0, 0), (7, 0, 0), (6, 0, 1), (6, 0, 1)], [(0, 1, 2), (1, 2, 1), (2, 3, 2), (3, 4, 1), (4, 0, 1)]),
 ]
+# tropolone-like rings: (atoms, bonds, per-atom (ring size, cut vertex, in-ring flag))
+TROPS = [
+    ([(6, 0, 0), (6, 0, 1), (6, 0, 0), (8, 0, 1), (6, 0, 0), (8, 0, 0), (6, 0, 1), (6, 0, 1), (6, 0, 1)],
+     [(0, 1, 1), (1, 2, 2), (2, 3, 1), (2, 4, 1), (4, 5, 2), (4, 6, 1), (6, 7, 2), (7, 8, 1), (8, 0, 2)],
+     [(7, 0, 1), (7, 0, 1), (7, 1, 1), (1, 0, 0), (7, 1, 1), (1, 0, 0), (7, 0, 1), (7, 0, 1), (7, 0, 1)]),
+    ([(6, 0, 0), (6, 0, 1), (6, 0, 0), (8, 0, 1), (6, 0, 0), (8, 0, 0), (6, 0, 1)],
+     [(0, 1, 1), (1, 2, 2), (2, 3, 1), (2, 4, 1), (4, 5, 2), (4, 6, 1), (6, 0, 2)],
+     [(5, 0, 1), (5, 0, 1), (5, 1, 1), (1, 0, 0), (5, 1, 1), (1, 0, 0), (5, 0, 1)]),
+    ([(6, 0, 0), (6, 0, 1), (6, 0, 0), (8, 0, 0), (6, 0, 0), (8, 0, 1), (6, 0, 1), (6, 0, 1), (6, 0, 1)],
+     [(0, 1, 1), (1, 2, 1), (2, 3, 2), (2, 4, 1), (4, 5, 1), (4, 6, 2), (6, 7, 1), (7, 8, 2), (8, 0, 1)],
+     [(7, 0, 1), (7, 0, 1), (7, 1, 1), (1, 0, 0), (7, 1, 1), (1, 0, 0), (7, 0, 1), (7, 0, 1), (7, 0, 1)]),
+]
 RING_MARKS = [(0, 0), (1, 0), (2, 0), (3, 1), (4, 0), (5, 0), (6, 0)]
 GROUPS = [
     ([(6, 0, 0), (8, 0, 0), (6, 0, 1), (6, 0, 1), (7, 0, 2)], [(0, 1, 2), (0, 2, 1), (2, 3, 2), (3, 4, 1)]),   # vinylogous amide
@@ -298,11 +310,17 @@ def gen(rng):
     for _ in range(rng.randrange(1, 4)):
         ring_group = rng.random() < 0.12
         pyr_group = (not ring_group) and rng.random() < 0.12
-        els, bonds = rng.choice(RINGS) if ring_group else rng.choice(PYRAZOLES) if pyr_group else rng.choice(GROUPS + 3 * SGROUPS)
+        trop_group = (not ring_group) and (not pyr_group) and rng.random() < 0.15
+        trop = rng.choice(TROPS) if trop_group else None
+        els, bonds = rng.choice(RINGS) if ring_group else rng.choice(PYRAZOLES) if pyr_group else ((trop[0], trop[1]) if trop_group else rng.choice(GROUPS + 3 * SGROUPS))
         ids = [add(*e) for e in els]
         if ring_group:
             for k, i in enumerate(ids):
                 marks[i] = (6, RING_MARKS[k][1], 10 + len(atoms))
+        if trop_group:
+            for k, i in enumerate(ids):
+                rsz, cvx, inring = trop[2][k]
+                marks[i] = (rsz, cvx, (10 + len(atoms)) if inring else 3)
         if pyr_group:
             for k, i in enumerate(ids):
                 marks[i] = (5, 0, 10 + len(atoms))
@@ -427,12 +445,12 @@ def main():
         a = qq.rindex(start)
         return qq[a:qq.index("\n}\n", a) + 3]
     qpre = qq[qq.index("typedef int CHECK_DFS_RING("):qq.index("#endif /* TAUT_15_NON_RING */") + len("#endif /* TAUT_15_NON_RING */")]
-    qfuncs = [qpre + "\n#define REPLACE_THE_BOND(X) ( (X) == BOND_SINGLE || (X) == BOND_DOUBLE || (X) == BOND_ALTERN || (X) == BOND_ALT12NS )\n"] + [cutq(x) for x in ["int bIsCenterPointStrict( inp_ATOM *atom, int iat )\n{", "int AddBondsPos( inp_ATOM *atom,\n", "int AddEndPoints( T_ENDPOINT *EndPointTmp,\n", "int Check15TautPathCenterpoint( inp_ATOM *atom,", "int Check15TautPath( struct tagCANON_GLOBALS *pCG,\n", "int DFS_FindTautAltPath( struct tagCANON_GLOBALS *pCG,\n", "int nGet15TautInAltPath( struct tagCANON_GLOBALS *pCG,\n", "int are_alt_bonds( U_CHAR *bonds, int len )\n{", "int DFS_FindTautInARing( struct tagCANON_GLOBALS *pCG,\n", "int Check6MembTautRing( struct tagCANON_GLOBALS *pCG,\n", "int nGet15TautIn6MembAltRing( struct tagCANON_GLOBALS *pCG,\n", "int Check5MembTautRing( struct tagCANON_GLOBALS *pCG,\n", "int nGet12TautIn5MembAltRing( struct tagCANON_GLOBALS *pCG,\n"]]
+    qfuncs = [qpre + "\n#define REPLACE_THE_BOND(X) ( (X) == BOND_SINGLE || (X) == BOND_DOUBLE || (X) == BOND_ALTERN || (X) == BOND_ALT12NS )\n"] + [cutq(x) for x in ["int bIsCenterPointStrict( inp_ATOM *atom, int iat )\n{", "int AddBondsPos( inp_ATOM *atom,\n", "int AddEndPoints( T_ENDPOINT *EndPointTmp,\n", "int Check15TautPathCenterpoint( inp_ATOM *atom,", "int Check15TautPath( struct tagCANON_GLOBALS *pCG,\n", "int DFS_FindTautAltPath( struct tagCANON_GLOBALS *pCG,\n", "int nGet15TautInAltPath( struct tagCANON_GLOBALS *pCG,\n", "int are_alt_bonds( U_CHAR *bonds, int len )\n{", "int DFS_FindTautInARing( struct tagCANON_GLOBALS *pCG,\n", "int Check6MembTautRing( struct tagCANON_GLOBALS *pCG,\n", "int nGet15TautIn6MembAltRing( struct tagCANON_GLOBALS *pCG,\n", "int Check5MembTautRing( struct tagCANON_GLOBALS *pCG,\n", "int nGet12TautIn5MembAltRing( struct tagCANON_GLOBALS *pCG,\n", "int Check7MembTautRing( struct tagCANON_GLOBALS *pCG,\n", "int nGet14TautIn7MembAltRing( struct tagCANON_GLOBALS *pCG,\n", "int nGet14TautIn5MembAltRing( struct tagCANON_GLOBALS *pCG,\n"]]
 
     def cut_mark():
         a = tt.index("int MarkTautomerGroups( CANON_GLOBALS *pCG,\n")
-        b = tt.index("#if ( TAUT_TROPOLONE_7 == 1 || TAUT_TROPOLONE_5 == 1 )", a)
-        return tt[a:b] + "\n    free_memory:\n        if (nDfsPathPos) inchi_free( nDfsPathPos );\n    }\n#endif\nexit_function:\n    return nErr < 0 ? nErr : tot_changes;\n}\n"
+        b = tt.index("\n}\n", a) + 3
+        return tt[a:b]
 
     def cut_first(start):
         a = tt.index(start)

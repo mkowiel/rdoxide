@@ -2601,8 +2601,8 @@ fn allowed_edge(p: &super::ichi_bns::BnStruct, iat: usize, ibond: usize) -> bool
 /// `MarkTautomerGroups` for the 1,3 tautomerism loops (the generic one,
 /// `PT_22_00`, `PT_16_00`, `PT_06_00`, `PT_39_00`, `PT_13_00`, `PT_18_00` and
 /// keto-enol).
-/// Returns the number of changes or an error. The tropolone
-/// ring rules that follow in C are not ported yet.
+/// Returns the number of changes or an error. All the 1,3, keto-enol, 1,5
+/// and ring rules are ported.
 pub fn mark_tautomer_groups(
     at: &mut [InpAtom],
     num_atoms: i32,
@@ -3038,6 +3038,159 @@ pub fn mark_tautomer_groups(
                         }
                     } else if is_bns_error(ret) {
                         return ret;
+                    }
+                }
+            }
+        }
+        // 7- and 5-member rings (tropolones): M=Q--R--ZH where A-Q-R=B belong
+        // to an alternating ring; M=Q and R-ZH are chain bonds
+        for i1 in 0..num_atoms as usize {
+            if !(at[i1].n_num_at_in_ring_system >= 5
+                && is_center_point_strict(at, i1)
+                && at[i1].b_cut_vertex != 0
+                && at[i1].valence == 3
+                && at[i1].endpoint == 0)
+            {
+                continue;
+            }
+            for j in 0..at[i1].valence as usize {
+                let i2 = at[i1].neighbor[j] as usize;
+                if at[i2].n_ring_system != at[i1].n_ring_system
+                    || !is_center_point_strict(at, i2)
+                    || at[i2].b_cut_vertex == 0
+                    || at[i2].valence != 3
+                    || at[i2].endpoint != 0
+                {
+                    continue;
+                }
+                let bond_type = i32::from(at[i1].bond_type[j]) & !BOND_MARK_ALL;
+                if bond_type != BOND_TYPE_SINGLE
+                    && bond_type != BOND_TAUTOM
+                    && bond_type != BOND_ALT12NS
+                    && bond_type != BOND_ALTERN
+                {
+                    continue;
+                }
+                for k in 0..at[i1].valence as usize {
+                    let endpoint1 = at[i1].neighbor[k] as usize;
+                    if endpoint1 == i2 {
+                        continue;
+                    }
+                    let endpoint1_valence = n_get_endpoint_info(at, endpoint1, &mut eif1);
+                    if endpoint1_valence == 0 {
+                        continue;
+                    }
+                    if at[endpoint1].n_ring_system == at[i1].n_ring_system {
+                        continue;
+                    }
+                    let n_mobile1 =
+                        i32::from(at[endpoint1].num_h) + i32::from(at[endpoint1].charge == -1);
+                    if n_mobile1 + i32::from(at[endpoint1].chem_bonds_valence) != endpoint1_valence
+                    {
+                        continue;
+                    }
+                    let bond_type1 = i32::from(at[i1].bond_type[k]) & !BOND_MARK_ALL;
+                    if bond_type1 != BOND_TYPE_SINGLE
+                        && bond_type1 != BOND_TYPE_DOUBLE
+                        && bond_type1 != BOND_TAUTOM
+                        && bond_type1 != BOND_ALT12NS
+                        && bond_type1 != BOND_ALTERN
+                    {
+                        continue;
+                    }
+                    for m in 0..at[i2].valence as usize {
+                        let endpoint2 = at[i2].neighbor[m] as usize;
+                        if endpoint2 == i1 {
+                            continue;
+                        }
+                        if n_get_endpoint_info(at, endpoint2, &mut eif2) == 0 {
+                            continue;
+                        }
+                        if at[endpoint2].n_ring_system == at[i2].n_ring_system {
+                            continue;
+                        }
+                        let n_mobile2 =
+                            i32::from(at[endpoint2].num_h) + i32::from(at[endpoint2].charge == -1);
+                        let bond_type2 = i32::from(at[i2].bond_type[m]) & !BOND_MARK_ALL;
+                        if bond_type2 != BOND_TYPE_SINGLE
+                            && bond_type2 != BOND_TYPE_DOUBLE
+                            && bond_type2 != BOND_TAUTOM
+                            && bond_type2 != BOND_ALT12NS
+                            && bond_type2 != BOND_ALTERN
+                        {
+                            continue;
+                        }
+                        let mut n_mobile = 0;
+                        if allowed_edge(p, i1, k) && allowed_edge(p, i2, m) {
+                            n_mobile += i32::from(
+                                (at[endpoint1].endpoint != 0 || n_mobile1 != 0)
+                                    && bond_type1 != BOND_TYPE_DOUBLE
+                                    && (at[endpoint2].endpoint != 0
+                                        || i32::from(eif2.c_neutral_bonds_valence)
+                                            > i32::from(at[endpoint2].valence))
+                                    && bond_type2 != BOND_TYPE_SINGLE,
+                            );
+                            n_mobile += i32::from(
+                                (at[endpoint2].endpoint != 0 || n_mobile2 != 0)
+                                    && bond_type2 != BOND_TYPE_DOUBLE
+                                    && (at[endpoint1].endpoint != 0
+                                        || i32::from(eif1.c_neutral_bonds_valence)
+                                            > i32::from(at[endpoint1].valence))
+                                    && bond_type1 != BOND_TYPE_SINGLE,
+                            );
+                        }
+                        if n_mobile == 0 {
+                            continue;
+                        }
+                        if bond_type1 == bond_type2
+                            && (bond_type1 == BOND_TYPE_SINGLE || bond_type1 == BOND_TYPE_DOUBLE)
+                        {
+                            continue;
+                        }
+                        for cycle_len in [7usize, 5] {
+                            if cycle_len == 7 && at[i1].n_num_at_in_ring_system < 7 {
+                                continue;
+                            }
+                            let (mut n_end, mut n_bpos) = (0usize, 0usize);
+                            let ret = get_14_taut_in_memb_alt_ring(
+                                cycle_len,
+                                at,
+                                i1,
+                                [j as i32, k as i32, m as i32],
+                                &mut dfs_path_pos,
+                                &mut path,
+                                &mut end_point,
+                                &mut bond_pos,
+                                &mut n_end,
+                                &mut n_bpos,
+                                p,
+                                bd,
+                                num_atoms,
+                            );
+                            if ret > 0 {
+                                if n_end > 0 {
+                                    let num_changes = register_end_points(
+                                        tgi,
+                                        &mut end_point[..n_end],
+                                        at,
+                                        num_atoms,
+                                        cgi.as_deref_mut(),
+                                        Some(p),
+                                    );
+                                    if num_changes < 0 {
+                                        return num_changes;
+                                    }
+                                    tot_changes += i32::from(num_changes > 0);
+                                }
+                                if n_bpos > 0 {
+                                    tot_changes += i32::from(
+                                        0 < set_tautomeric_bonds(at, &bond_pos[..n_bpos]),
+                                    );
+                                }
+                            } else if is_bns_error(ret) {
+                                return ret;
+                            }
+                        }
                     }
                 }
             }
@@ -3485,7 +3638,7 @@ type CheckDfsRing = fn(
     &mut [InpAtom],
     &mut [DfsPath],
     usize,
-    i32,
+    [i32; 3],
     &mut [TEndpoint],
     &mut [TBondPos],
     &mut usize,
@@ -3495,12 +3648,13 @@ type CheckDfsRing = fn(
     i32,
 ) -> i32;
 
-/// `DFS_FindTautInARing` (called with no start-atom neighbors)
+/// `DFS_FindTautInARing`; `start_nbs` = (`nStartAtomNeighbor`,
+/// `nStartAtomNeighbor2`, `nStartAtomNeighborNeighbor`), -1 for none
 #[allow(clippy::too_many_arguments)]
 fn dfs_find_taut_in_a_ring(
     at: &mut [InpAtom],
     start_atom: usize,
-    start_nb: i32,
+    start_nbs: [i32; 3],
     cycle_len_in: usize,
     dfs_path_pos: &mut [u16],
     path: &mut [DfsPath],
@@ -3514,6 +3668,8 @@ fn dfs_find_taut_in_a_ring(
     num_atoms: i32,
 ) -> i32 {
     let cycle_len = cycle_len_in - 1;
+    let [start_nb, start_nb2, start_nbnb] = start_nbs;
+    let (mut do_not_touch1, mut do_not_touch2) = (-1i32, -1i32);
     let mut n_len: usize = 0;
     let mut n_min_len: usize = 0;
     let mut n_found = 0;
@@ -3523,6 +3679,9 @@ fn dfs_find_taut_in_a_ring(
         bond_pos: -1,
     };
     dfs_path_pos[start_atom] = 1;
+    if start_nb2 >= 0 {
+        do_not_touch1 = i32::from(at[start_atom].neighbor[start_nb2 as usize]);
+    }
     if start_nb >= 0 {
         let j = start_nb as usize;
         let cur_at = at[start_atom].neighbor[j];
@@ -3536,6 +3695,9 @@ fn dfs_find_taut_in_a_ring(
         };
         dfs_path_pos[cur_at as usize] = 2;
         n_min_len = 1;
+        if start_nbnb >= 0 {
+            do_not_touch2 = i32::from(at[cur_at as usize].neighbor[start_nbnb as usize]);
+        }
     }
     while n_len >= n_min_len {
         path[n_len].bond_pos += 1;
@@ -3544,10 +3706,12 @@ fn dfs_find_taut_in_a_ring(
         if j < at[cur_at].valence as usize {
             path[n_len].bond_type = at[cur_at].bond_type[j] & !(BOND_MARK_ALL as u8);
             let nxt_at = at[cur_at].neighbor[j] as usize;
-            if dfs_path_pos[nxt_at] != 0 {
+            if nxt_at as i32 == do_not_touch1 || nxt_at as i32 == do_not_touch2 {
+                // forbidden: ignore
+            } else if dfs_path_pos[nxt_at] != 0 {
                 if dfs_path_pos[nxt_at] == 1 && n_len == cycle_len {
                     let ret = check_ring(
-                        at, path, n_len, start_nb, end_point, bond_pos, pn_end, pn_bpos, p, bd,
+                        at, path, n_len, start_nbs, end_point, bond_pos, pn_end, pn_bpos, p, bd,
                         num_atoms,
                     );
                     if ret < 0 {
@@ -3590,7 +3754,7 @@ fn check_6memb_taut_ring(
     at: &mut [InpAtom],
     path: &mut [DfsPath],
     n_len: usize,
-    start_nb: i32,
+    start_nbs: [i32; 3],
     end_point: &mut [TEndpoint],
     bond_pos: &mut [TBondPos],
     pn_end: &mut usize,
@@ -3601,7 +3765,7 @@ fn check_6memb_taut_ring(
 ) -> i32 {
     use super::ichi_bns::exists_any_alt_path;
     const PATH_LEN: usize = 4;
-    if start_nb >= 0 || n_len != 5 {
+    if start_nbs.iter().any(|&x| x >= 0) || n_len != 5 {
         return -1;
     }
     let n_at = path[0].at_no as usize;
@@ -3786,7 +3950,7 @@ fn get_15_taut_in_6memb_alt_ring(
     dfs_find_taut_in_a_ring(
         at,
         start_atom,
-        -1,
+        [-1, -1, -1],
         6,
         dfs_path_pos,
         path,
@@ -3808,7 +3972,7 @@ fn check_5memb_taut_ring(
     at: &mut [InpAtom],
     path: &mut [DfsPath],
     n_len: usize,
-    _start_nb: i32,
+    start_nbs: [i32; 3],
     end_point: &mut [TEndpoint],
     bond_pos: &mut [TBondPos],
     pn_end: &mut usize,
@@ -3822,6 +3986,9 @@ fn check_5memb_taut_ring(
     let n1_at = path[0].at_no as usize;
     let n2_at = path[1].at_no as usize;
     if n_len != 4 {
+        return 0;
+    }
+    if start_nbs[1] >= 0 || start_nbs[2] >= 0 {
         return 0;
     }
     let mut eif1 = EndpointInfo::default();
@@ -3940,11 +4107,181 @@ fn get_12_taut_in_5memb_alt_ring(
     dfs_find_taut_in_a_ring(
         at,
         start_atom,
-        start_nb as i32,
+        [start_nb as i32, -1, -1],
         5,
         dfs_path_pos,
         path,
         check_5memb_taut_ring,
+        end_point,
+        bond_pos,
+        pn_end,
+        pn_bpos,
+        p,
+        bd,
+        num_atoms,
+    )
+}
+
+/// `Check7MembTautRing`: has a tautomeric 7-member (tropolone) or 5-member
+/// ring been found? The two endpoints hang off the ring atoms
+/// `DfsPath[1]` and `DfsPath[0]`.
+#[allow(clippy::too_many_arguments)]
+fn check_7memb_taut_ring(
+    at: &mut [InpAtom],
+    path: &mut [DfsPath],
+    n_len: usize,
+    start_nbs: [i32; 3],
+    end_point: &mut [TEndpoint],
+    bond_pos: &mut [TBondPos],
+    pn_end: &mut usize,
+    pn_bpos: &mut usize,
+    p: &mut super::ichi_bns::BnStruct,
+    bd: &mut super::ichi_bns::BnData,
+    num_atoms: i32,
+) -> i32 {
+    use super::ichi_bns::exists_any_alt_path;
+    const PATH_LEN: usize = 8;
+    let [_, start_nb2, start_nbnb] = start_nbs;
+    if n_len + 2 > PATH_LEN || (n_len != 6 && n_len != 4) {
+        return -1;
+    }
+    let o1_at = at[path[1].at_no as usize].neighbor[start_nbnb as usize] as usize;
+    let o2_at = at[path[0].at_no as usize].neighbor[start_nb2 as usize] as usize;
+    let mut eif1 = EndpointInfo::default();
+    let mut eif2 = EndpointInfo::default();
+    if n_get_endpoint_info(at, o1_at, &mut eif1) == 0
+        || n_get_endpoint_info(at, o2_at, &mut eif2) == 0
+    {
+        return 0;
+    }
+    let mut end_point_tmp = [TEndpoint::default(); 2];
+    let mut n_end_tmp = 0;
+    for j in 0..2 {
+        let endpoint = if j == 1 { o2_at } else { o1_at };
+        if at[endpoint].endpoint == 0 {
+            add_atom2num(&mut end_point_tmp[n_end_tmp].num, &at[endpoint], 2);
+            add_atom2da(&mut end_point_tmp[n_end_tmp].num_da, &at[endpoint], 2);
+        } else {
+            end_point_tmp[n_end_tmp] = TEndpoint::default();
+        }
+        end_point_tmp[n_end_tmp].n_atom_number = endpoint as u16;
+        end_point_tmp[n_end_tmp].n_group_number = at[endpoint].endpoint;
+        end_point_tmp[n_end_tmp].n_equ_number = 0;
+        n_end_tmp += 1;
+    }
+    let replace = |bt: i32| {
+        bt == BOND_TYPE_SINGLE || bt == BOND_TYPE_DOUBLE || bt == BOND_ALTERN || bt == BOND_ALT12NS
+    };
+    let mut bond_pos_tmp = [TBondPos::default(); 2 * PATH_LEN];
+    let mut n_bpos_tmp = 0;
+    let mut path_bonds = [0u8; PATH_LEN + 1];
+    let k = path[1].at_no as usize;
+    let bt = at[k].bond_type[start_nbnb as usize] & !(BOND_MARK_ALL as u8);
+    path_bonds[0] = bt;
+    if replace(i32::from(bt)) {
+        bond_pos_tmp[n_bpos_tmp].n_atom_number = k as u16;
+        bond_pos_tmp[n_bpos_tmp].neighbor_index = start_nbnb as u16;
+        n_bpos_tmp += 2;
+    }
+    let mut i = 1;
+    while i <= n_len {
+        let bt = path[i].bond_type;
+        path_bonds[i] = bt;
+        if replace(i32::from(bt)) {
+            bond_pos_tmp[n_bpos_tmp].n_atom_number = path[i].at_no;
+            bond_pos_tmp[n_bpos_tmp].neighbor_index = path[i].bond_pos as u16;
+            n_bpos_tmp += 2;
+        }
+        i += 1;
+    }
+    let bt = at[path[0].at_no as usize].bond_type[start_nb2 as usize] & !(BOND_MARK_ALL as u8);
+    path_bonds[i] = bt;
+    i += 1;
+    if replace(i32::from(bt)) {
+        bond_pos_tmp[n_bpos_tmp].n_atom_number = path[0].at_no;
+        bond_pos_tmp[n_bpos_tmp].neighbor_index = start_nb2 as u16;
+        n_bpos_tmp += 2;
+    }
+    let j = are_alt_bonds(&path_bonds[..i]);
+    if j == 0 {
+        return 0;
+    }
+    if (j == BOND_TYPE_SINGLE
+        && ((at[o2_at].endpoint == 0 && eif2.c_donor == 0)
+            || (at[o1_at].endpoint == 0 && eif1.c_acceptor == 0)))
+        || (j == BOND_TYPE_DOUBLE
+            && ((at[o2_at].endpoint == 0 && eif2.c_acceptor == 0)
+                || (at[o1_at].endpoint == 0 && eif1.c_donor == 0)))
+    {
+        return 0;
+    }
+    let max_bpos = bond_pos.len();
+    let max_end = end_point.len();
+    let nb = add_bonds_pos(
+        at,
+        &mut bond_pos_tmp,
+        n_bpos_tmp,
+        bond_pos,
+        max_bpos,
+        *pn_bpos,
+    );
+    let ne = add_end_points(&end_point_tmp, n_end_tmp, end_point, max_end, *pn_end);
+    let mut ret = 0;
+    if nb >= 0 && ne >= 0 {
+        ret = i32::from(nb as usize > *pn_bpos || ne as usize > *pn_end);
+        if ret != 0 {
+            *pn_bpos = nb as usize;
+            *pn_end = ne as usize;
+        }
+    }
+    if ret != 0 && (at[o1_at].endpoint != at[o2_at].endpoint || at[o1_at].endpoint == 0) {
+        let n_err = exists_any_alt_path(
+            p,
+            bd,
+            at,
+            num_atoms,
+            o1_at as i32,
+            o2_at as i32,
+            super::ichi_bns::ALT_PATH_MODE_TAUTOM,
+        );
+        if n_err <= 0 {
+            return n_err;
+        }
+    }
+    ret
+}
+
+/// `nGet14TautIn7MembAltRing` (`cycle_len` 7) and `nGet14TautIn5MembAltRing`
+/// (`cycle_len` 5)
+#[allow(clippy::too_many_arguments)]
+fn get_14_taut_in_memb_alt_ring(
+    cycle_len: usize,
+    at: &mut [InpAtom],
+    start_atom: usize,
+    start_nbs: [i32; 3],
+    dfs_path_pos: &mut [u16],
+    path: &mut [DfsPath],
+    end_point: &mut [TEndpoint],
+    bond_pos: &mut [TBondPos],
+    pn_end: &mut usize,
+    pn_bpos: &mut usize,
+    p: &mut super::ichi_bns::BnStruct,
+    bd: &mut super::ichi_bns::BnData,
+    num_atoms: i32,
+) -> i32 {
+    *pn_end = 0;
+    *pn_bpos = 0;
+    if path.len() <= if cycle_len == 7 { 7 } else { 5 } {
+        return -1;
+    }
+    dfs_find_taut_in_a_ring(
+        at,
+        start_atom,
+        start_nbs,
+        cycle_len,
+        dfs_path_pos,
+        path,
+        check_7memb_taut_ring,
         end_point,
         bond_pos,
         pn_end,

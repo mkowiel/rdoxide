@@ -291,6 +291,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 175 | done |
 | 176 | done |
 | 177 | done |
+| 178 | done |
 
 ## Python package files
 
@@ -638,3 +639,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-21 — Stage 175: I5d: MarkTautomerGroups 1,5 tautomerism
 * 2026-10-21 — Stage 176: I5e: 4-pyridinol 6-member ring tautomerism
 * 2026-10-21 — Stage 177: I5f: pyrazole 5-member ring tautomerism
+* 2026-10-21 — Stage 178: I5g: tropolone 7-/5-member ring tautomerism (MarkTautomerGroups complete)
