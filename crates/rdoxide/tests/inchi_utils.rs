@@ -1964,3 +1964,135 @@ fn tautomer_endpoints_match_the_c_code() {
         assert_eq!(got, want, "{inp}");
     }
 }
+
+#[test]
+fn charge_groups_and_salt_types_match_the_c_code() {
+    use rdoxide::external::inchi::ichitaut::*;
+    use rdoxide::external::inchi::inpdef::InpAtom;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_cgroups.json")).unwrap();
+    for c in data.as_array().unwrap() {
+        let inp = &c["in"];
+        let mut at: Vec<InpAtom> = Vec::new();
+        for a in inp["atoms"].as_array().unwrap() {
+            let nb = a["nb"].as_array().unwrap();
+            let mut x = InpAtom {
+                valence: a["v"].as_i64().unwrap() as i8,
+                chem_bonds_valence: a["cbv"].as_i64().unwrap() as i8,
+                el_number: a["el"].as_u64().unwrap() as u8,
+                charge: a["chg"].as_i64().unwrap() as i8,
+                radical: a["rad"].as_i64().unwrap() as i8,
+                num_h: a["nh"].as_i64().unwrap() as i8,
+                c_point: a["cp"].as_u64().unwrap() as u16,
+                endpoint: a["ep"].as_u64().unwrap() as u16,
+                n_num_at_in_ring_system: a["ring"].as_u64().unwrap() as u16,
+                ..Default::default()
+            };
+            for (k, b) in a["sym"].as_str().unwrap().bytes().enumerate() {
+                x.elname[k] = b;
+            }
+            for (j, e) in nb.iter().enumerate() {
+                x.neighbor[j] = e[0].as_u64().unwrap() as u16;
+                x.bond_type[j] = e[1].as_u64().unwrap() as u8;
+            }
+            at.push(x);
+        }
+        let hastg = inp["hastg"].as_i64().unwrap();
+        let tgs: Vec<TGroup> = inp["tgs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|g| {
+                let mut t = TGroup {
+                    n_group_number: g[0].as_u64().unwrap() as u16,
+                    ..Default::default()
+                };
+                t.num[0] = g[1].as_u64().unwrap() as u16;
+                t.num[1] = g[2].as_u64().unwrap() as u16;
+                t
+            })
+            .collect();
+        let tgi = TGroupInfo {
+            num_t_groups: tgs.len(),
+            t_group: (hastg != 0).then_some(tgs),
+        };
+        let tg_opt = (hastg != 2).then_some(&tgi);
+        let mut got: Vec<String> = Vec::new();
+        for i in 0..at.len() {
+            let (mut s1, mut s2, mut s3, mut s4) = (0, 0, 0, 0);
+            let r1 = get_salt_charge_type(&at, i, tg_opt, &mut s1);
+            let r2 = get_other_salt_charge_type(&at, i, tg_opt, &mut s2, false);
+            let r3 = get_other_salt_charge_type(&at, i, tg_opt, &mut s3, true);
+            let r4 = get_other_salt_type(&at, i, &mut s4);
+            got.push(format!(
+                "S {r1} {s1} {r2} {s2} {r3} {s3} {r4} {s4} {}",
+                i32::from(do_not_merge_non_taut_atom(&at, i))
+            ));
+        }
+        let maxc = inp["maxc"].as_u64().unwrap() as usize;
+        let mut cg = vec![CGroup::default(); maxc];
+        let mut numc = 0usize;
+        for r in inp["regs"].as_array().unwrap() {
+            let ret = register_c_points(
+                &mut cg,
+                &mut numc,
+                r[0].as_u64().unwrap() as usize,
+                r[1].as_u64().unwrap() as usize,
+                r[2].as_u64().unwrap() as u8,
+                &mut at,
+            );
+            let mut s = format!("C {ret} {numc} |");
+            for g in &cg[..numc] {
+                s += &format!(
+                    " {},{},{},{},{}",
+                    g.num[0], g.num[1], g.num_c_points, g.n_group_number, g.c_group_type
+                );
+            }
+            s += " |";
+            for a in &at {
+                s += &format!(" {}", a.c_point);
+            }
+            got.push(s);
+        }
+        let mut cc: Vec<CCandidate> = inp["cands"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|x| CCandidate {
+                atnumber: x[0].as_u64().unwrap() as u16,
+                type_: x[1].as_i64().unwrap() as i8,
+                subtype: x[2].as_i64().unwrap() as i8,
+            })
+            .collect();
+        cc.sort_by(|a, b| cmp_c_candidates(a, b).cmp(&0));
+        let mut s = String::from("Q");
+        for x in &cc {
+            s += &format!(" {},{},{}", x.atnumber, x.type_, x.subtype);
+        }
+        got.push(s);
+        let mut sc: Vec<SCandidate> = inp["scands"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|x| SCandidate {
+                atnumber: x[0].as_u64().unwrap() as u16,
+                type_: x[1].as_i64().unwrap() as i8,
+                subtype: x[2].as_i64().unwrap() as i8,
+                endpoint: x[3].as_u64().unwrap() as u16,
+            })
+            .collect();
+        sc.sort_by(|a, b| comp_candidates(a, b).cmp(&0));
+        let mut s = String::from("T");
+        for x in &sc {
+            s += &format!(" {},{},{},{}", x.atnumber, x.type_, x.subtype, x.endpoint);
+        }
+        got.push(s);
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        assert_eq!(got, want, "{inp}");
+    }
+}

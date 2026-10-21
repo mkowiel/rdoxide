@@ -261,6 +261,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 145 | done |
 | 146 | done |
 | 147 | done |
+| 148 | done |
 
 ## Python package files
 
@@ -578,3 +579,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-19 — Stage 145: InChI port I3h: PreprocessOneStructure ported (runichi3), differential test on 4000 structures
 * 2026-10-19 — Stage 146: InChI port I4a: MarkRingSystemsInp and UnMark helpers ported, differential test on 15000 graphs
 * 2026-10-19 — Stage 147: InChI port I4b: ichitaut endpoint helpers and nGetEndpointInfo variants ported, differential test on 12000 arrays
+* 2026-10-19 — Stage 148: InChI port I4c: RegisterCPoints and salt charge type helpers ported, differential test on 12000 cases
