@@ -23,6 +23,7 @@ pub mod el_data;
 pub mod ichi_bns;
 pub mod ichi_io;
 pub mod ichican2;
+pub mod ichicano;
 pub mod ichierr;
 pub mod ichimap;
 pub mod ichimap4;

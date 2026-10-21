@@ -10518,3 +10518,210 @@ fn base_canonical_ranking_matches_the_c_code() {
         assert_eq!(got, want, "case {case}");
     }
 }
+
+#[test]
+fn canonicalization_linear_ct_helpers_match_the_c_code() {
+    use rdoxide::external::inchi::ichican2::AtomSizes;
+    use rdoxide::external::inchi::ichicano::*;
+    use rdoxide::external::inchi::ichister::SpAtom;
+    use rdoxide::external::inchi::ichitaut::{TGroup, TGroupInfo};
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_cano1.json")).unwrap();
+    fn ints(v: &serde_json::Value) -> Vec<i64> {
+        v.as_array()
+            .unwrap()
+            .iter()
+            .map(|x| x.as_i64().unwrap())
+            .collect()
+    }
+    fn join<T: std::fmt::Display>(v: &[T]) -> String {
+        v.iter().map(|x| format!(" {x}")).collect()
+    }
+    for (case, c) in data.as_array().unwrap().iter().enumerate() {
+        let inp = &c["in"];
+        let n = inp["n"].as_u64().unwrap() as usize;
+        let ntg = inp["ntg"].as_u64().unwrap() as usize;
+        let n_e = inp["nE"].as_u64().unwrap() as usize;
+        let ntot = n + ntg;
+        let mut at = vec![SpAtom::default(); n + 1];
+        for (i, a) in inp["atoms"].as_array().unwrap().iter().enumerate() {
+            let a = ints(a);
+            at[i].iso_sort_key = a[0];
+            at[i].parity = a[1] as i8;
+            for j in 0..3 {
+                at[i].stereo_bond_neighbor[j] = a[2 + j] as u16;
+            }
+            at[i].endpoint = a[5] as u16;
+            at[i].num_iso_h = [a[6] as i8, a[7] as i8, a[8] as i8];
+            at[i].iso_atw_diff = a[9] as i8;
+            at[i].c_flags = a[10] as i8;
+        }
+        for e in inp["edges"].as_array().unwrap() {
+            let (a, b) = (
+                e[0].as_u64().unwrap() as usize,
+                e[1].as_u64().unwrap() as usize,
+            );
+            let va = at[a].valence as usize;
+            at[a].neighbor[va] = b as u16;
+            at[a].valence += 1;
+            let vb = at[b].valence as usize;
+            at[b].neighbor[vb] = a as u16;
+            at[b].valence += 1;
+        }
+        let mut tg = vec![TGroup::default(); ntg + 2];
+        for (k, t) in inp["tgs"].as_array().unwrap().iter().enumerate() {
+            let t = ints(t);
+            tg[k].n_num_endpoints = t[0] as u16;
+            tg[k].n_first_endpoint_at_no_pos = t[1] as u16;
+            for j in 0..5 {
+                tg[k].num[j] = t[2 + j] as u16;
+            }
+            tg[k].i_weight = t[7];
+        }
+        let sv = ints(&inp["sv"]);
+        let mut tgi = TGroupInfo {
+            t_group: (ntg > 0).then_some(tg),
+            n_endpoint_atom_number: ints(&inp["epl"]).iter().map(|&x| x as u16).collect(),
+            num_t_groups: ntg,
+            n_num_endpoints: n_e as i32,
+            n_num_isotopic_endpoints: inp["nIsoEnd"].as_i64().unwrap() as i32,
+            t_group_number: vec![0; 4 * ntg + 4],
+            ..Default::default()
+        };
+        let has_tgi = inp["hasTgi"].as_i64().unwrap() != 0;
+        let mut got: Vec<String> = Vec::new();
+        {
+            let mut s = AtomSizes {
+                n_len_bonds: sv[0] as i32,
+                n_len_ct_at_only: sv[1] as i32,
+                n_len_ct: sv[2] as i32,
+                n_len_isotopic: sv[3] as i32,
+                n_len_linear_ct_stereo_dble: sv[4] as i32,
+                n_len_linear_ct_stereo_carb: sv[5] as i32,
+                n_len_isotopic_endpoints: sv[6] as i32,
+                n_len_linear_ct_tautomer: sv[7] as i32,
+                ..Default::default()
+            };
+            let r = get_canon_lengths(n, &at, &mut s, has_tgi.then_some(&tgi));
+            got.push(format!(
+                "L {r} {} {} {} {} {} {} {}",
+                s.n_len_bonds,
+                s.n_len_ct_at_only,
+                s.n_len_ct,
+                s.n_len_isotopic,
+                s.n_len_linear_ct_stereo_dble,
+                s.n_len_linear_ct_stereo_carb,
+                s.n_len_isotopic_endpoints
+            ));
+        }
+        let mut anum: Vec<Vec<u16>> = Vec::new();
+        let mut symm: Vec<Vec<u16>> = Vec::new();
+        let mut rnk: Vec<Vec<u16>> = Vec::new();
+        for r in inp["ranks"].as_array().unwrap() {
+            let a: Vec<u16> = ints(&r[0]).iter().map(|&x| x as u16).collect();
+            let sy: Vec<u16> = ints(&r[1]).iter().map(|&x| x as u16).collect();
+            let mut rk = vec![0u16; ntot + 2];
+            for (i, &x) in a.iter().enumerate() {
+                rk[x as usize] = i as u16 + 1;
+            }
+            anum.push(a);
+            symm.push(sy);
+            rnk.push(rk);
+        }
+        let l = ints(&inp["lens"]);
+        let (nmax, plen, nmax_iso_at, plen_iso_at, nmax_t, plen_t, nmax_it, plen_it, b_iso) = (
+            l[0] as i32,
+            l[1] as i32,
+            l[2] as i32,
+            l[3] as i32,
+            l[4] as i32,
+            l[5] as i32,
+            l[6] as i32,
+            l[7] as i32,
+            l[8] != 0,
+        );
+        {
+            let mut iso = vec![AtIsotopic::default(); nmax_iso_at as usize + 2];
+            let mut len = plen_iso_at;
+            let r = fill_isotopic_at_linear_ct(
+                n,
+                &at,
+                &anum[0],
+                if nmax_iso_at != 0 { &mut iso } else { &mut [] },
+                nmax_iso_at,
+                &mut len,
+            );
+            let mut s = format!("I {r} {len} |");
+            for e in iso.iter().take(nmax_iso_at as usize) {
+                s += &format!(
+                    " {},{},{},{},{}",
+                    e.at_num, e.num_1h, e.num_d, e.num_t, e.iso_atw_diff
+                );
+            }
+            got.push(s);
+        }
+        if has_tgi {
+            let mut lt = vec![0u16; nmax_t as usize + 2];
+            let mut lit = vec![AtIsoTgroup::default(); nmax_it as usize + 2];
+            let mut len_t = plen_t;
+            let mut len_it = plen_it;
+            let r = fill_taut_linear_ct2(
+                n,
+                ntot,
+                b_iso,
+                &rnk[0],
+                &anum[0],
+                &symm[0],
+                &anum[1],
+                &symm[1],
+                &mut lt,
+                nmax_t,
+                &mut len_t,
+                &mut lit,
+                nmax_it,
+                &mut len_it,
+                Some(&mut tgi),
+            );
+            let mut s = format!("T {r} {len_t} {len_it} |{} |", join(&lt[..nmax_t as usize]));
+            for e in lit.iter().take(len_it.max(0).min(nmax_it) as usize) {
+                s += &format!(" {}:{},{},{}", e.tgroup_num, e.num[0], e.num[1], e.num[2]);
+            }
+            s += &format!(" |{} |", join(&tgi.t_group_number[..4 * ntg]));
+            s += &join(&tgi.n_endpoint_atom_number[..n_e]);
+            got.push(s);
+        }
+        {
+            let mut cs = CanonStat {
+                n_max_len_linear_ct: nmax,
+                linear_ct: vec![0; nmax as usize + 2],
+                t_group_info: has_tgi.then(|| tgi.clone()),
+                n_len_linear_ct: plen,
+                ..Default::default()
+            };
+            let nn = if has_tgi { ntot } else { n };
+            for v in 0..3 {
+                let r = update_full_linear_ct(n, nn, &at, &rnk[v], &anum[v], &mut cs, v == 0);
+                got.push(format!(
+                    "U{v} {r} {} {} |{}",
+                    cs.n_len_linear_ct,
+                    cs.n_len_linear_ct_at_only,
+                    join(&cs.linear_ct[..nmax as usize])
+                ));
+            }
+            let mut s = String::from("UE");
+            if let Some(t) = &cs.t_group_info {
+                s += &join(&t.n_endpoint_atom_number[..n_e]);
+            } else {
+                s += &join(&tgi.n_endpoint_atom_number[..n_e]);
+            }
+            got.push(s);
+        }
+        let want: Vec<String> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| s.as_str().unwrap().to_string())
+            .collect();
+        assert_eq!(got, want, "case {case}");
+    }
+}
