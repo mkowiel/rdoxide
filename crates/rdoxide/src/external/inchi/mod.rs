@@ -44,6 +44,7 @@ pub mod ikey_dll;
 pub mod inchi_dll;
 pub mod incomdef;
 pub mod inpdef;
+pub mod mol2atom;
 pub mod molfmt;
 pub mod molfmt3;
 pub mod molfmt4;

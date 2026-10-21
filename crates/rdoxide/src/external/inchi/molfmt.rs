@@ -1813,7 +1813,15 @@ pub fn molfile_read_data_lines(
     if should_read_all {
         (if retcode != 0 { None } else { Some(local) }, err)
     } else {
-        (None, err)
+        // the header-only mode returns a non-NULL marker on success
+        (
+            if retcode != 0 {
+                None
+            } else {
+                Some(MolFmtData::default())
+            },
+            err,
+        )
     }
 }
 
