@@ -2684,3 +2684,483 @@ pub fn set_bonds_after_check_one_bond(
     }
     if b_error != 0 { b_error } else { n_changes }
 }
+
+// ---- radical endpoints: radicals are replaced by temporary alternating cycles ----
+
+pub const MAX_NUM_RAD: usize = 256;
+const NUM_BIT: usize = 16; // `bitWord` is `U_SHORT`
+
+/// `NodeSet`: a list of bit sets of vertices
+#[derive(Debug, Clone, Default)]
+pub struct NodeSet {
+    pub bitword: Vec<Vec<u16>>,
+    pub len_set: usize,
+}
+
+/// `NodeSetCreate`
+pub fn node_set_create(n: usize, l: usize) -> NodeSet {
+    let len = n.div_ceil(NUM_BIT);
+    NodeSet {
+        bitword: vec![vec![0; len]; l],
+        len_set: len,
+    }
+}
+
+/// `NodeSetFromRadEndpoints`
+pub fn node_set_from_rad_endpoints(
+    s: &mut NodeSet,
+    k: usize,
+    rad_endpoints: &[Vertex],
+    num_v: usize,
+) {
+    let bits = &mut s.bitword[k];
+    bits.iter_mut().for_each(|b| *b = 0);
+    let mut i = 1;
+    while i < num_v {
+        let j = rad_endpoints[i] as usize;
+        bits[j / NUM_BIT] |= 1 << (j % NUM_BIT);
+        i += 2;
+    }
+}
+
+/// `RemoveFromNodeSet`
+pub fn remove_from_node_set(s: &mut NodeSet, k: usize, v: &[Vertex]) {
+    if !s.bitword.is_empty() {
+        for &j in v {
+            let j = j as usize;
+            s.bitword[k][j / NUM_BIT] &= !(1 << (j % NUM_BIT));
+        }
+    }
+}
+
+/// `DoNodeSetsIntersect`
+pub fn do_node_sets_intersect(s: &NodeSet, k1: usize, k2: usize) -> bool {
+    !s.bitword.is_empty() && (0..s.len_set).any(|i| s.bitword[k1][i] & s.bitword[k2][i] != 0)
+}
+
+/// `IsNodeSetEmpty`
+pub fn is_node_set_empty(s: &NodeSet, k: usize) -> bool {
+    s.bitword.is_empty() || s.bitword[k].iter().all(|&b| b == 0)
+}
+
+/// `AddNodeSet2ToNodeSet1`
+pub fn add_node_set2_to_node_set1(s: &mut NodeSet, k1: usize, k2: usize) {
+    if !s.bitword.is_empty() {
+        for i in 0..s.len_set {
+            let b = s.bitword[k2][i];
+            s.bitword[k1][i] |= b;
+        }
+    }
+}
+
+/// `AddNodesToRadEndpoints`; returns the new length or -1 on overflow
+pub fn add_nodes_to_rad_endpoints(
+    s: &NodeSet,
+    k: usize,
+    rad_endpoints: &mut [Vertex],
+    v_rad: Vertex,
+    n_start: i32,
+    n_len: i32,
+) -> i32 {
+    let mut n = n_start;
+    if !s.bitword.is_empty() {
+        let mut v: Vertex = 0;
+        for i in 0..s.len_set {
+            let bits = s.bitword[k][i];
+            if bits != 0 {
+                for j in 0..NUM_BIT {
+                    if bits & (1 << j) != 0 {
+                        if n >= n_len {
+                            return -1;
+                        }
+                        rad_endpoints[n as usize] = v_rad;
+                        n += 1;
+                        rad_endpoints[n as usize] = v;
+                        n += 1;
+                    }
+                    v += 1;
+                }
+            } else {
+                v += NUM_BIT as Vertex;
+            }
+        }
+    }
+    n
+}
+
+/// `RemoveRadEndpoints`
+pub fn remove_rad_endpoints(
+    p: &mut BnStruct,
+    bd: &mut BnData,
+    mut at: Option<&mut [InpAtom]>,
+) -> i32 {
+    for i in (0..bd.n_num_rad_edges).rev() {
+        let ie = bd.rad_edges[i as usize];
+        if ie < 0 || ie >= p.num_edges {
+            return BNS_PROGRAM_ERR;
+        }
+        let e = p.edge[ie as usize];
+        let v1 = i32::from(e.neighbor1);
+        let v2 = i32::from(e.neighbor12) ^ v1;
+        if ie + 1 != p.num_edges || v1 < 0 || v1 >= p.num_vertices || v2 < 0 || v2 >= p.num_vertices
+        {
+            return BNS_PROGRAM_ERR;
+        }
+        let (p1, p2) = (p.vert[v1 as usize], p.vert[v2 as usize]);
+        if p.iedge[p2.iedge + usize::from(p2.num_adj_edges) - 1] != ie
+            || p.iedge[p1.iedge + usize::from(p1.num_adj_edges) - 1] != ie
+        {
+            return BNS_PROGRAM_ERR;
+        }
+        for v in [v2, v1] {
+            let pv = &mut p.vert[v as usize];
+            pv.num_adj_edges -= 1;
+            let at_ = pv.iedge + usize::from(pv.num_adj_edges);
+            pv.st_edge.flow -= e.flow;
+            p.iedge[at_] = 0;
+        }
+        if p.vert[v2 as usize].num_adj_edges == 0 && v2 >= p.num_atoms {
+            if v2 + 1 != p.num_vertices {
+                return BNS_PROGRAM_ERR;
+            }
+            p.vert[v2 as usize] = BnsVertex::default();
+            p.num_vertices -= 1;
+        }
+        if p.vert[v1 as usize].num_adj_edges == 0 && v1 >= p.num_atoms {
+            if v1 + 1 != p.num_vertices {
+                return BNS_PROGRAM_ERR;
+            }
+            p.vert[v1 as usize] = BnsVertex::default();
+            p.num_vertices -= 1;
+        }
+        if let Some(at) = at.as_deref_mut() {
+            if v1 < p.num_atoms {
+                let st = p.vert[v1 as usize].st_edge;
+                let delta = st.cap - st.flow;
+                let mut rad = i32::from(at[v1 as usize].radical);
+                match delta {
+                    0 if rad == RADICAL_DOUBLET => rad = 0,
+                    1 if rad != RADICAL_DOUBLET => rad = RADICAL_DOUBLET,
+                    _ => {}
+                }
+                at[v1 as usize].radical = rad as i8;
+            }
+        }
+        p.edge[ie as usize] = BnsEdge::default();
+        p.num_edges -= 1;
+    }
+    bd.n_num_rad_edges = 0;
+    bd.n_num_radicals = 0;
+    bd.b_rad_srch_mode = RAD_SRCH_NORM;
+    0
+}
+
+/// `RestoreRadicalsOnly`
+pub fn restore_radicals_only(p: &BnStruct, bd: &BnData, mut at: Option<&mut [InpAtom]>) -> i32 {
+    for i in (0..bd.n_num_rad_edges).rev() {
+        let ie = bd.rad_edges[i as usize];
+        if ie < 0 || ie >= p.num_edges {
+            return BNS_PROGRAM_ERR;
+        }
+        let e = &p.edge[ie as usize];
+        let v1 = i32::from(e.neighbor1);
+        let v2 = i32::from(e.neighbor12) ^ v1;
+        if v1 < 0 || v1 >= p.num_atoms || v2 < p.num_atoms || v2 >= p.num_vertices {
+            return BNS_PROGRAM_ERR;
+        }
+        let (p1, p2) = (&p.vert[v1 as usize], &p.vert[v2 as usize]);
+        if p.iedge[p2.iedge + usize::from(e.neigh_ord[1])] != ie
+            || p.iedge[p1.iedge + usize::from(e.neigh_ord[0])] != ie
+        {
+            return BNS_PROGRAM_ERR;
+        }
+        if let Some(at) = at.as_deref_mut() {
+            let delta = p1.st_edge.cap - p1.st_edge.flow + e.flow;
+            let mut rad = i32::from(at[v1 as usize].radical);
+            match delta {
+                0 if rad == RADICAL_DOUBLET => rad = 0,
+                1 if rad != RADICAL_DOUBLET => rad = RADICAL_DOUBLET,
+                _ => {}
+            }
+            at[v1 as usize].radical = rad as i8;
+        }
+    }
+    0
+}
+
+fn sort_rad_pairs(r: &mut [Vertex], num: usize) {
+    let mut pairs: Vec<[Vertex; 2]> = (0..num / 2).map(|i| [r[2 * i], r[2 * i + 1]]).collect();
+    pairs.sort();
+    for (i, pr) in pairs.iter().enumerate() {
+        r[2 * i] = pr[0];
+        r[2 * i + 1] = pr[1];
+    }
+}
+
+/// `SetRadEndpoints`
+pub fn set_rad_endpoints(p: &mut BnStruct, bd: &mut BnData, rad_srch_mode: i32) -> i32 {
+    if p.tot_st_cap <= p.tot_st_flow {
+        return 0;
+    }
+    bd.n_num_rad_endpoints = 0;
+    bd.n_num_rad_edges = 0;
+    bd.b_rad_srch_mode = rad_srch_mode;
+    p.alt_path = Some(0);
+    p.b_change_flow = 0;
+    let mut ret = balanced_network_search(p, bd, BNS_EF_RAD_SRCH);
+    re_init_bn_data(bd);
+    re_init_bn_struct_alt_paths(p);
+    if ret == 0 && bd.n_num_rad_endpoints >= 2 {
+        let n = bd.n_num_rad_endpoints as usize;
+        sort_rad_pairs(&mut bd.rad_endpoints, n);
+        let mut n_num_radicals = 0;
+        let mut n_dots = 0;
+        let mut i = 0usize;
+        let mut j;
+        while i < n {
+            let w_rad = bd.rad_endpoints[i];
+            let pr = p.vert[w_rad as usize];
+            let mut delta = pr.st_edge.cap - (pr.st_edge.flow & EDGE_FLOW_ST_MASK);
+            if delta <= 0 {
+                delta = 1;
+            }
+            let mut n_edges = 0;
+            j = i;
+            while j < n && w_rad == bd.rad_endpoints[j] {
+                n_edges += 1;
+                j += 2;
+            }
+            let v_rad = add_new_vertex(p, w_rad, delta, delta, n_edges + 1, &mut n_dots);
+            if is_bns_error(v_rad) {
+                remove_rad_endpoints(p, bd, None);
+                return v_rad;
+            }
+            let pr = p.vert[v_rad as usize];
+            bd.rad_edges[bd.n_num_rad_edges as usize] =
+                p.iedge[pr.iedge + usize::from(pr.num_adj_edges) - 1];
+            bd.n_num_rad_edges += 1;
+            let mut k = i;
+            while k < j {
+                bd.rad_endpoints[k] = v_rad;
+                k += 2;
+            }
+            n_num_radicals += 1;
+            i = j;
+        }
+        i = 0;
+        while i < n {
+            let v_rad = bd.rad_endpoints[i];
+            j = i;
+            while j < n && v_rad == bd.rad_endpoints[j] {
+                let v_endp = bd.rad_endpoints[j + 1];
+                ret = add_new_edge(p, v_rad, v_endp, 1, 0);
+                if is_bns_error(ret) {
+                    remove_rad_endpoints(p, bd, None);
+                    return ret;
+                }
+                bd.rad_edges[bd.n_num_rad_edges as usize] = ret;
+                bd.n_num_rad_edges += 1;
+                j += 2;
+            }
+            i = j;
+        }
+        bd.n_num_radicals = n_num_radicals;
+        return n_num_radicals;
+    }
+    0
+}
+
+/// `SetRadEndpoints2`
+pub fn set_rad_endpoints2(p: &mut BnStruct, bd: &mut BnData, rad_srch_mode: i32) -> i32 {
+    use super::ichierr::{BNS_CAP_FLOW_ERR, BNS_RADICAL_ERR};
+    let mut delta = 1;
+    let mut ret = 0;
+    let mut v_rad_list: Vec<Vertex> = Vec::new();
+    let mut v_rad_equl: Vec<Vertex> = Vec::new();
+    let mut vert_set = NodeSet::default();
+    if p.tot_st_cap <= p.tot_st_flow {
+        return 0;
+    }
+    for i in 0..p.num_atoms as usize {
+        if p.vert[i].st_edge.cap - delta == (p.vert[i].st_edge.flow & EDGE_FLOW_ST_MASK)
+            && v_rad_list.len() < MAX_NUM_RAD
+        {
+            p.vert[i].st_edge.cap -= delta;
+            p.tot_st_cap -= delta;
+            v_rad_equl.push(v_rad_list.len() as Vertex);
+            v_rad_list.push(i as Vertex);
+        }
+    }
+    let n_num_rad = v_rad_list.len();
+    if p.tot_st_cap - p.tot_st_flow > n_num_rad as i32 {
+        return BNS_CAP_FLOW_ERR;
+    }
+    macro_rules! fail {
+        ($r:expr) => {{
+            remove_rad_endpoints(p, bd, None);
+            return $r;
+        }};
+    }
+    for j in 0..n_num_rad {
+        let i = v_rad_list[j] as usize;
+        bd.n_num_rad_endpoints = 0;
+        bd.n_num_rad_edges = 0;
+        bd.b_rad_srch_mode = rad_srch_mode;
+        p.alt_path = Some(0);
+        p.b_change_flow = 0;
+        p.vert[i].st_edge.cap += delta;
+        p.tot_st_cap += delta;
+        ret = balanced_network_search(p, bd, BNS_EF_RAD_SRCH);
+        re_init_bn_data(bd);
+        re_init_bn_struct_alt_paths(p);
+        bd.b_rad_srch_mode = RAD_SRCH_NORM;
+        p.vert[i].st_edge.cap -= delta;
+        p.tot_st_cap -= delta;
+        if is_bns_error(ret) {
+            fail!(ret);
+        } else if ret != 0 {
+            fail!(BNS_RADICAL_ERR);
+        }
+        if bd.n_num_rad_endpoints >= 2 {
+            let n = bd.n_num_rad_endpoints as usize;
+            sort_rad_pairs(&mut bd.rad_endpoints, n);
+            if bd.rad_endpoints[0] != i as Vertex || bd.rad_endpoints[n - 2] != i as Vertex {
+                fail!(BNS_RADICAL_ERR);
+            }
+            if n_num_rad > 1 {
+                if vert_set.bitword.is_empty() {
+                    vert_set = node_set_create(p.num_atoms as usize, n_num_rad);
+                }
+                node_set_from_rad_endpoints(&mut vert_set, j, &bd.rad_endpoints, n);
+                remove_from_node_set(&mut vert_set, j, &v_rad_list);
+            }
+        }
+    }
+    for &i in &v_rad_list {
+        p.vert[i as usize].st_edge.cap += delta;
+        p.tot_st_cap += delta;
+    }
+    if n_num_rad > 1 {
+        for i in 0..n_num_rad {
+            if v_rad_equl[i] != i as Vertex {
+                continue;
+            }
+            loop {
+                let mut n = 0;
+                for j in i + 1..n_num_rad {
+                    if v_rad_equl[j] != j as Vertex {
+                        continue;
+                    }
+                    if do_node_sets_intersect(&vert_set, i, j) {
+                        add_node_set2_to_node_set1(&mut vert_set, i, j);
+                        v_rad_equl[j] = i as Vertex;
+                        n += 1;
+                    }
+                }
+                if n == 0 {
+                    break;
+                }
+            }
+        }
+        let mut n: i32 = 0;
+        for i in 0..n_num_rad {
+            if i as Vertex == v_rad_equl[i] {
+                if !is_node_set_empty(&vert_set, i) {
+                    for j in i + 1..n_num_rad {
+                        if i as Vertex == v_rad_equl[j] {
+                            bd.rad_endpoints[n as usize] = v_rad_list[i];
+                            n += 1;
+                            bd.rad_endpoints[n as usize] = -v_rad_list[j] - 2;
+                            n += 1;
+                        }
+                    }
+                    n = add_nodes_to_rad_endpoints(
+                        &vert_set,
+                        i,
+                        &mut bd.rad_endpoints,
+                        v_rad_list[i],
+                        n,
+                        bd.max_len_pu_pv,
+                    );
+                    if n < 0 {
+                        fail!(BNS_RADICAL_ERR);
+                    }
+                } else {
+                    bd.rad_endpoints[n as usize] = v_rad_list[i];
+                    n += 1;
+                    bd.rad_endpoints[n as usize] = -1;
+                    n += 1;
+                }
+            }
+        }
+        bd.n_num_rad_endpoints = n;
+    } else if n_num_rad == 1 && bd.n_num_rad_endpoints == 0 {
+        bd.rad_endpoints[0] = v_rad_list[0];
+        bd.rad_endpoints[1] = -1;
+        bd.n_num_rad_endpoints = 2;
+    }
+    if ret == 0 && bd.n_num_rad_endpoints >= 2 {
+        let n = bd.n_num_rad_endpoints as usize;
+        let mut n_num_radicals = 0;
+        let mut n_dots = 0;
+        let mut i = 0usize;
+        let mut j;
+        while i < n {
+            let w_rad = bd.rad_endpoints[i];
+            let pr = p.vert[w_rad as usize];
+            delta = pr.st_edge.cap - (pr.st_edge.flow & EDGE_FLOW_ST_MASK);
+            if delta <= 0 {
+                delta = 1;
+            }
+            let mut n_edges = 0;
+            j = i;
+            while j < n && w_rad == bd.rad_endpoints[j] {
+                n_edges += i32::from(bd.rad_endpoints[j + 1] != -1);
+                j += 2;
+            }
+            let v_rad = add_new_vertex(p, w_rad, delta, delta, n_edges + 1, &mut n_dots);
+            if is_bns_error(v_rad) {
+                fail!(v_rad);
+            }
+            let pr = p.vert[v_rad as usize];
+            bd.rad_edges[bd.n_num_rad_edges as usize] =
+                p.iedge[pr.iedge + usize::from(pr.num_adj_edges) - 1];
+            bd.n_num_rad_edges += 1;
+            let mut k = i;
+            while k < j {
+                bd.rad_endpoints[k] = v_rad;
+                k += 2;
+            }
+            n_num_radicals += 1;
+            i = j;
+        }
+        i = 0;
+        while i < n {
+            let v_rad = bd.rad_endpoints[i];
+            j = i;
+            while j < n && v_rad == bd.rad_endpoints[j] {
+                let mut v_endp = bd.rad_endpoints[j + 1];
+                j += 2;
+                if v_endp == -1 {
+                    continue;
+                }
+                let edge_flow = if v_endp < 0 {
+                    v_endp = -v_endp - 2;
+                    1
+                } else {
+                    0
+                };
+                ret = add_new_edge(p, v_rad, v_endp, 1, edge_flow);
+                if is_bns_error(ret) {
+                    fail!(ret);
+                }
+                bd.rad_edges[bd.n_num_rad_edges as usize] = ret;
+                bd.n_num_rad_edges += 1;
+            }
+            i = j;
+        }
+        bd.n_num_radicals = n_num_radicals;
+        return n_num_radicals;
+    }
+    0
+}
