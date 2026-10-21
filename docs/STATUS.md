@@ -302,6 +302,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 186 | InChI I6c: ichicans sp_ATOM parity bookkeeping (Set/Remove stereo bond, GetStereoBondParity, GetPermutationParity, GetStereoCenterParity, HalfStereoBondParity) verified on 5000 random tables vs the C code |
 | 187 | InChI I6d: ichicans UnmarkNonStereo, Fill(All|Single)StereoDescriptors, InvertStereo, SwitchAtomStereoAndIsotopicStereo verified on 5000 random tables vs the C code |
 | 188 | InChI I6e: ichicans SetKnown/MarkKnownEqual/RemoveKnownNonStereo bond parities verified on 6000 random molecules vs the C code |
+| 189 | InChI I6f: ichicans SetKnown/MarkKnownEqual/RemoveKnownNonStereo center parities and FillOutStereoParities verified on 6000 random molecules vs the C code |
 
 ## Python package files
 
@@ -660,3 +661,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-21 — Stage 186: InChI I6c: ichicans parity bookkeeping ported and differentially tested
 * 2026-10-21 — Stage 187: InChI I6d: canonical stereo descriptors ported and differentially tested
 * 2026-10-21 — Stage 188: InChI I6e: known-in-advance stereo bond parities ported and differentially tested
+* 2026-10-21 — Stage 189: InChI I6f: known-in-advance stereo center parities and FillOutStereoParities ported and differentially tested

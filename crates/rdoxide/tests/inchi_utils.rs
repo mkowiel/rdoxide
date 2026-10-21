@@ -7853,3 +7853,128 @@ fn known_stereo_bond_parities_match_the_c_code() {
         assert_eq!(got, want, "case {n}");
     }
 }
+
+#[test]
+fn known_stereo_center_parities_match_the_c_code() {
+    use rdoxide::external::inchi::ichister::*;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_knownsc.json")).unwrap();
+    fn dump(at: &[SpAtom]) -> String {
+        let mut s = String::new();
+        for a in at {
+            s += &format!(
+                " |{} {} {} {}",
+                a.parity, a.stereo_atom_parity, a.final_parity, a.b_has_stereo_or_equ_to_stereo
+            );
+            for j in 0..3 {
+                s += &format!(
+                    " {} {} {} {}",
+                    a.stereo_bond_neighbor[j],
+                    a.stereo_bond_ord[j],
+                    a.stereo_bond_z_prod[j],
+                    a.stereo_bond_parity[j]
+                );
+            }
+        }
+        s
+    }
+    fn dumpcs(s: &CanonStatStereo) -> String {
+        let mut t = format!("L {} {}", s.n_len_carb, s.n_len_dble);
+        for i in 0..s.n_len_carb as usize {
+            let c = s.carb.as_ref().unwrap()[i];
+            t += &format!(" c{},{}", c.at_num, c.parity);
+        }
+        for i in 0..s.n_len_dble as usize {
+            let d = s.dble.as_ref().unwrap()[i];
+            t += &format!(" d{},{},{}", d.at_num1, d.at_num2, d.parity);
+        }
+        t
+    }
+    fn newcs() -> CanonStatStereo {
+        CanonStatStereo {
+            n_max_len_carb: 16,
+            n_max_len_dble: 16,
+            carb: Some(vec![AtStereoCarb::default(); 17]),
+            dble: Some(vec![AtStereoDble::default(); 17]),
+            ..Default::default()
+        }
+    }
+    for (n, c) in data.as_array().unwrap().iter().enumerate() {
+        let atoms = c["in"]["atoms"].as_array().unwrap();
+        let num = atoms.len();
+        let mut at = vec![SpAtom::default(); num + 1];
+        let (mut rank, mut crank, mut anum, mut acanon) = (
+            vec![0u16; num + 1],
+            vec![0u16; num + 1],
+            vec![0u16; num + 1],
+            vec![0u16; num + 1],
+        );
+        for (i, a) in atoms.iter().enumerate() {
+            let g = |k: &str| a[k].as_i64().unwrap();
+            let nb = a["nb"].as_array().unwrap();
+            at[i].valence = nb.len() as i8;
+            at[i].parity = g("par") as i8;
+            at[i].stereo_atom_parity = g("sap") as i8;
+            at[i].num_h = g("nh") as i8;
+            at[i].n_ring_system = g("rs") as u16;
+            rank[i] = g("rank") as u16;
+            crank[i] = g("crank") as u16;
+            anum[i] = g("an") as u16;
+            acanon[i] = g("ac") as u16;
+            for (j, q) in nb.iter().enumerate() {
+                at[i].neighbor[j] = q.as_u64().unwrap() as u16;
+            }
+            for (j, s) in a["sb"].as_array().unwrap().iter().enumerate() {
+                let s: Vec<i64> = s
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|x| x.as_i64().unwrap())
+                    .collect();
+                at[i].stereo_bond_neighbor[j] = s[0] as u16;
+                at[i].stereo_bond_ord[j] = s[1] as i8;
+                at[i].stereo_bond_z_prod[j] = s[2] as i8;
+                at[i].stereo_bond_parity[j] = s[3] as i8;
+            }
+        }
+        let iso = c["in"]["iso"].as_i64().unwrap() != 0;
+        let mut got: Vec<String> = Vec::new();
+        let mut w = at.clone();
+        got.push(format!(
+            "K {}{}",
+            set_known_stereo_center_parities(&mut w, num, &crank, &rank, &anum),
+            dump(&w[..num])
+        ));
+        got.push(format!(
+            "M {}{}",
+            mark_known_equal_stereo_center_parities(&mut w, num, &rank, &anum),
+            dump(&w[..num])
+        ));
+        let mut s = newcs();
+        got.push(format!(
+            "F {}",
+            fill_all_stereo_descriptors(&w, num, &crank, &acanon, &mut s)
+        ));
+        got.push(format!(
+            "R {}{}",
+            remove_known_non_stereo_center_parities(&mut w, num, &crank, &rank, &mut s),
+            dump(&w[..num])
+        ));
+        got.push(dumpcs(&s));
+        let mut w = at.clone();
+        let mut s = newcs();
+        got.push(format!(
+            "O {}{}",
+            fill_out_stereo_parities(&mut w, num, &crank, &acanon, &rank, &anum, &mut s, iso),
+            dump(&w[..num])
+        ));
+        got.push(dumpcs(&s));
+        let want: Vec<String> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| s.as_str().unwrap().to_string())
+            .collect();
+        assert_eq!(got, want, "case {n}");
+    }
+}
