@@ -3754,3 +3754,666 @@ pub fn invert_stereo(
     }
     num_changes
 }
+
+// ---------------------------------------------------------------------------
+// ichicans.c: stereo bond parities known in advance
+// ---------------------------------------------------------------------------
+
+pub const KNOWN_PARITIES_EQL: i32 = 0x40;
+const MAX_ATOMS_I: i32 = 32766;
+
+fn all_but_parity(x: i32) -> i32 {
+    x & !BITS_PARITY
+}
+
+/// the stereo bond `i1`-`i2` as seen from `i2`: the position of `i1` in the list of `i2`
+fn find_stereo_neighbor(at: &[SpAtom], i2: usize, i1: usize) -> Option<usize> {
+    for n2 in 0..MAX_NUM_STEREO_BONDS {
+        let m = at[i2].stereo_bond_neighbor[n2] as usize;
+        if m == 0 {
+            return None;
+        }
+        if m - 1 == i1 {
+            return Some(n2);
+        }
+    }
+    None
+}
+
+/// `SetKnownStereoBondParities`: calculates the parities of the stereo
+/// bonds that do not depend on breaking ties; returns the number of bonds set
+pub fn set_known_stereo_bond_parities(
+    at: &mut [SpAtom],
+    num_atoms: usize,
+    n_canon_rank: &[u16],
+    n_rank: &[u16],
+    n_atom_number: &[u16],
+) -> i32 {
+    use super::ichierr::CT_STEREOCOUNT_ERR;
+    use super::ichisort::comp_at_rank;
+    let mut num_set = 0;
+    for i1 in 0..num_atoms {
+        if at[i1].parity == 0 || at[i1].stereo_bond_neighbor[0] == 0 {
+            continue;
+        }
+        if !parity_well_def(i32::from(at[i1].parity)) {
+            continue;
+        }
+        let n_atom_rank1 = n_rank[i1];
+        let i_max1 = i32::from(n_atom_rank1) - 1;
+        let num_neigh1 = at[i1].valence as usize;
+        let mut n1 = 0;
+        while n1 < MAX_NUM_STEREO_BONDS && at[i1].stereo_bond_neighbor[n1] != 0 {
+            let i2 = at[i1].stereo_bond_neighbor[n1] as usize - 1;
+            let Some(n2) = find_stereo_neighbor(at, i2, i1) else {
+                return CT_STEREOCOUNT_ERR;
+            };
+            if at[i1].stereo_bond_parity[n1] != at[i2].stereo_bond_parity[n2] {
+                return CT_STEREOCOUNT_ERR;
+            }
+            n1 += 1;
+            if i1 < i2 {
+                continue;
+            }
+            let sbp1 = i32::from(at[i1].stereo_bond_parity[n1 - 1]);
+            if parity_known(sbp1) || parity_val(sbp1) == 0 {
+                continue;
+            }
+            if !parity_well_def(i32::from(at[i1].parity))
+                || !parity_well_def(i32::from(at[i2].parity))
+            {
+                continue;
+            }
+            if parity_val(sbp1) != AB_PARITY_CALC {
+                continue;
+            }
+            let n1 = n1 - 1;
+            let cumulene_len = bond_chain_len(sbp1);
+            let n_atom_rank2 = n_rank[i2];
+            let n_atom1_neigh_rank =
+                n_rank[at[i1].neighbor[at[i1].stereo_bond_ord[n1] as usize] as usize];
+            let num_neigh2 = at[i2].valence as usize;
+
+            let mut n_neigh_rank1 = [0u16; MAX_NUM_STEREO_BONDS];
+            let mut n_neigh_rank2 = [0u16; MAX_NUM_STEREO_BONDS];
+            let mut n_neigh_canon_rank1 = [0u16; MAX_NUM_STEREO_BONDS];
+            let mut n_neigh_canon_rank2 = [0u16; MAX_NUM_STEREO_BONDS];
+
+            let k = at[i1].stereo_bond_ord[n1] as usize;
+            let mut trans_i1 = 0;
+            let mut j = 0;
+            for i in 0..num_neigh1 {
+                if i != k {
+                    n_neigh_rank1[j] = n_rank[at[i1].neighbor[i] as usize];
+                    j += 1;
+                }
+            }
+            if j == 2 {
+                if n_neigh_rank1[0] == n_neigh_rank1[1] {
+                    continue;
+                }
+                trans_i1 = insertions_sort(&mut n_neigh_rank1[..j], comp_at_rank);
+            }
+            let k = at[i2].stereo_bond_ord[n2] as usize;
+            let mut trans_i2 = 0;
+            j = 0;
+            for i in 0..num_neigh2 {
+                if i != k {
+                    n_neigh_rank2[j] = n_rank[at[i2].neighbor[i] as usize];
+                    j += 1;
+                }
+            }
+            if j == 2 {
+                if n_neigh_rank2[0] == n_neigh_rank2[1] {
+                    continue;
+                }
+                trans_i2 = insertions_sort(&mut n_neigh_rank2[..j], comp_at_rank);
+            }
+
+            let mut prev_trans: i32 = -1;
+            let mut trans_k: i32 = -4;
+            let mut j1: i32 = 0;
+            'outer: while j1 <= i_max1 {
+                let k1 = n_atom_number[(i_max1 - j1) as usize] as usize;
+                if n_atom_rank1 != n_rank[k1] {
+                    break;
+                }
+                if at[k1].valence as usize != num_neigh1 {
+                    return CT_STEREOCOUNT_ERR;
+                }
+                for m1 in 0..num_neigh1 {
+                    let mut k2 = at[k1].neighbor[m1] as usize;
+                    if n_atom1_neigh_rank != n_rank[k2] {
+                        continue;
+                    }
+                    let mut prev = k1;
+                    if cumulene_len != 0 {
+                        let mut next = at[k1].neighbor[m1] as usize;
+                        let mut len = 0;
+                        while len < cumulene_len {
+                            if at[next].valence == 2 && at[next].num_h == 0 {
+                                let jj = usize::from(at[next].neighbor[0] as usize == prev);
+                                prev = next;
+                                next = at[next].neighbor[jj] as usize;
+                            } else {
+                                break;
+                            }
+                            len += 1;
+                        }
+                        if len != cumulene_len || n_atom_rank2 != n_rank[next] {
+                            continue;
+                        }
+                        k2 = next;
+                    }
+                    if at[k2].valence as usize != num_neigh2 {
+                        return CT_STEREOCOUNT_ERR;
+                    }
+                    let mut jc = 0;
+                    for n in 0..num_neigh1 {
+                        if n != m1 {
+                            let i = at[k1].neighbor[n] as usize;
+                            for m in 0..num_neigh1 - 1 {
+                                if n_rank[i] == n_neigh_rank1[m] {
+                                    n_neigh_canon_rank1[m] = n_canon_rank[i];
+                                    jc += 1;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if jc != num_neigh1 - 1 {
+                        return CT_STEREOCOUNT_ERR;
+                    }
+                    let trans_k1 = if jc == 2 {
+                        insertions_sort(&mut n_neigh_canon_rank1[..jc], comp_at_rank)
+                    } else {
+                        0
+                    };
+                    jc = 0;
+                    let mut m2: i32 = -1;
+                    for n in 0..num_neigh2 {
+                        let i = at[k2].neighbor[n] as usize;
+                        if i == prev {
+                            m2 = n as i32;
+                        } else {
+                            for m in 0..num_neigh2 - 1 {
+                                if n_rank[i] == n_neigh_rank2[m] {
+                                    n_neigh_canon_rank2[m] = n_canon_rank[i];
+                                    jc += 1;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if jc != num_neigh2 - 1 || m2 < 0 {
+                        return CT_STEREOCOUNT_ERR;
+                    }
+                    let trans_k2 = if jc == 2 {
+                        insertions_sort(&mut n_neigh_canon_rank2[..jc], comp_at_rank)
+                    } else {
+                        0
+                    };
+                    trans_k = (trans_k1 + trans_k2) % 2;
+                    if prev_trans < 0 {
+                        prev_trans = trans_k;
+                    } else if prev_trans != trans_k {
+                        break;
+                    }
+                }
+                if prev_trans >= 0 && prev_trans != trans_k {
+                    break 'outer;
+                }
+                j1 += 1;
+            }
+            if prev_trans == trans_k {
+                let mut parity = (i32::from(at[i1].parity)
+                    + i32::from(at[i2].parity)
+                    + prev_trans
+                    + trans_i1
+                    + trans_i2
+                    + num_neigh1 as i32
+                    + num_neigh2 as i32
+                    + i32::from(at[i1].stereo_bond_ord[n1])
+                    + i32::from(at[i2].stereo_bond_ord[n2]))
+                    % 2;
+                let z_prod = i32::from(at[i1].stereo_bond_z_prod[n1]);
+                if MIN_DOT_PROD > z_prod.abs() {
+                    parity = AB_PARITY_UNDF;
+                } else {
+                    parity = if z_prod > 0 { 2 - parity } else { 1 + parity };
+                }
+                at[i1].stereo_bond_parity[n1] =
+                    (all_but_parity(i32::from(at[i1].stereo_bond_parity[n1])) | parity) as i8;
+                at[i2].stereo_bond_parity[n2] =
+                    (all_but_parity(i32::from(at[i2].stereo_bond_parity[n2])) | parity) as i8;
+                num_set += 1;
+            }
+        }
+    }
+    num_set
+}
+
+/// `MarkKnownEqualStereoBondParities`
+pub fn mark_known_equal_stereo_bond_parities(
+    at: &mut [SpAtom],
+    num_atoms: usize,
+    n_rank: &[u16],
+    n_atom_number: &[u16],
+) -> i32 {
+    use super::ichierr::CT_STEREOCOUNT_ERR;
+    let mut num_set = 0;
+    for i1 in 0..num_atoms {
+        if at[i1].parity == 0 || at[i1].stereo_bond_neighbor[0] == 0 {
+            continue;
+        }
+        let n_atom_rank1 = n_rank[i1];
+        let i_max1 = i32::from(n_atom_rank1) - 1;
+        let num_neigh1 = at[i1].valence as usize;
+        let mut n1 = 0;
+        while n1 < MAX_NUM_STEREO_BONDS && at[i1].stereo_bond_neighbor[n1] != 0 {
+            let i2 = at[i1].stereo_bond_neighbor[n1] as usize - 1;
+            let cur_n1 = n1;
+            n1 += 1;
+            let n_atom_rank2 = n_rank[i2];
+            if n_atom_rank2 < n_atom_rank1 || (n_atom_rank2 == n_atom_rank1 && i1 < i2) {
+                continue;
+            }
+            let mut b_different_parities: i32 = -1;
+            if i32::from(at[i1].stereo_bond_parity[cur_n1]) & KNOWN_PARITIES_EQL != 0 {
+                continue;
+            }
+            let Some(n2) = find_stereo_neighbor(at, i2, i1) else {
+                return CT_STEREOCOUNT_ERR;
+            };
+            if at[i1].stereo_bond_parity[cur_n1] != at[i2].stereo_bond_parity[n2] {
+                return CT_STEREOCOUNT_ERR;
+            }
+            let sbp_i1 = i32::from(at[i1].stereo_bond_parity[cur_n1]);
+            let stereo_bond_parity = parity_val(sbp_i1);
+            let cumulene_len = bond_chain_len(sbp_i1);
+            let n_atom1_neigh_rank =
+                n_rank[at[i1].neighbor[at[i1].stereo_bond_ord[cur_n1] as usize] as usize];
+            let n_atom2_neigh_rank =
+                n_rank[at[i2].neighbor[at[i2].stereo_bond_ord[n2] as usize] as usize];
+            let num_neigh2 = at[i2].valence as usize;
+
+            let mut j1: i32 = 0;
+            while j1 <= i_max1 {
+                let k1 = n_atom_number[(i_max1 - j1) as usize] as usize;
+                if n_atom_rank1 != n_rank[k1] {
+                    break;
+                }
+                j1 += 1;
+                if at[k1].valence as usize != num_neigh1 {
+                    return CT_STEREOCOUNT_ERR;
+                }
+                if at[k1].b_has_stereo_or_equ_to_stereo == 0 {
+                    at[k1].b_has_stereo_or_equ_to_stereo = 1;
+                }
+                for m1 in 0..num_neigh1 {
+                    let mut k2 = at[k1].neighbor[m1] as usize;
+                    if n_atom1_neigh_rank != n_rank[k2] {
+                        continue;
+                    }
+                    let mut prev = k1;
+                    if cumulene_len != 0 {
+                        let mut next = at[k1].neighbor[m1] as usize;
+                        let mut len = 0;
+                        while len < cumulene_len {
+                            if at[next].valence == 2 && at[next].num_h == 0 {
+                                let jj = usize::from(at[next].neighbor[0] as usize == prev);
+                                prev = next;
+                                next = at[next].neighbor[jj] as usize;
+                            } else {
+                                break;
+                            }
+                            len += 1;
+                        }
+                        if len != cumulene_len || n_atom_rank2 != n_rank[next] {
+                            continue;
+                        }
+                        if n_atom2_neigh_rank != n_rank[prev] {
+                            return CT_STEREOCOUNT_ERR;
+                        }
+                        k2 = next;
+                    }
+                    if at[k2].valence as usize != num_neigh2 {
+                        return CT_STEREOCOUNT_ERR;
+                    }
+                    let mut m2 = -1i32;
+                    for n in 0..num_neigh2 {
+                        if prev == at[k2].neighbor[n] as usize {
+                            m2 = n as i32;
+                            break;
+                        }
+                    }
+                    if m2 < 0 {
+                        return CT_STEREOCOUNT_ERR;
+                    }
+                    if at[k2].b_has_stereo_or_equ_to_stereo == 0 {
+                        at[k2].b_has_stereo_or_equ_to_stereo = 1;
+                    }
+                    let Some(s1) = find_stereo_neighbor(at, k1, k2) else {
+                        b_different_parities = 1;
+                        at[k1].b_has_stereo_or_equ_to_stereo = 2;
+                        at[k2].b_has_stereo_or_equ_to_stereo = 2;
+                        continue;
+                    };
+                    let Some(s2) = find_stereo_neighbor(at, k2, k1) else {
+                        return CT_STEREOCOUNT_ERR;
+                    };
+                    if at[k1].stereo_bond_parity[s1] != at[k2].stereo_bond_parity[s2] {
+                        b_different_parities = 1;
+                        continue;
+                    }
+                    let stereo_bond_parity2 = parity_val(i32::from(at[k1].stereo_bond_parity[s1]));
+                    if stereo_bond_parity2 != stereo_bond_parity {
+                        b_different_parities = 1;
+                        continue;
+                    }
+                    if stereo_bond_parity2 == stereo_bond_parity && b_different_parities < 0 {
+                        b_different_parities = 0;
+                    }
+                }
+            }
+            if b_different_parities == 0 && parity_known(stereo_bond_parity) {
+                let mut j1: i32 = 0;
+                while j1 <= i_max1 {
+                    let k1 = n_atom_number[(i_max1 - j1) as usize] as usize;
+                    if n_atom_rank1 != n_rank[k1] {
+                        break;
+                    }
+                    j1 += 1;
+                    let mut s1 = 0;
+                    while s1 < MAX_NUM_STEREO_BONDS && at[k1].stereo_bond_neighbor[s1] != 0 {
+                        let k2 = at[k1].stereo_bond_neighbor[s1] as usize - 1;
+                        if n_rank[k2] == n_atom_rank2 {
+                            let Some(s2) = find_stereo_neighbor(at, k2, k1) else {
+                                return CT_STEREOCOUNT_ERR;
+                            };
+                            let b1 = i32::from(
+                                i32::from(at[k1].stereo_bond_parity[s1]) & KNOWN_PARITIES_EQL == 0,
+                            );
+                            let b2 = i32::from(
+                                i32::from(at[k2].stereo_bond_parity[s2]) & KNOWN_PARITIES_EQL == 0,
+                            );
+                            if b1 + b2 == 2 {
+                                at[k1].stereo_bond_parity[s1] |= KNOWN_PARITIES_EQL as i8;
+                                at[k2].stereo_bond_parity[s2] |= KNOWN_PARITIES_EQL as i8;
+                                num_set += 1;
+                            } else if b1 != 0 || b2 != 0 {
+                                return CT_STEREOCOUNT_ERR;
+                            }
+                        }
+                        s1 += 1;
+                    }
+                }
+            }
+        }
+    }
+    num_set
+}
+
+/// `GetNextNeighborAndRank`
+pub fn get_next_neighbor_and_rank(
+    at: &[SpAtom],
+    cur: u16,
+    prev: u16,
+    n: &mut u16,
+    cr: &mut u16,
+    n_canon_rank: &[u16],
+) -> bool {
+    let mut cr1 = (MAX_ATOMS_I + 1) as u16;
+    let mut j1 = cr1;
+    for i in 0..at[cur as usize].valence as usize {
+        let j = at[cur as usize].neighbor[i];
+        if j != prev {
+            let crj = n_canon_rank[j as usize];
+            if cr1 > crj && crj > *cr {
+                cr1 = crj;
+                j1 = j;
+            }
+        }
+    }
+    if i32::from(cr1) <= MAX_ATOMS_I {
+        *cr = cr1;
+        *n = j1;
+        return true;
+    }
+    false
+}
+
+/// `GetAndCheckNextNeighbors` (one `n_visited` array serves both paths: the
+/// only caller passes the same array twice)
+#[allow(clippy::too_many_arguments)]
+pub fn get_and_check_next_neighbors(
+    at: &[SpAtom],
+    cur1: u16,
+    prev1: u16,
+    cur2: u16,
+    prev2: u16,
+    n1: &mut u16,
+    n2: &mut u16,
+    n_visited: &[u16],
+    n_rank: &[u16],
+    n_canon_rank: &[u16],
+) -> bool {
+    let mut cr1 = if i32::from(*n1) > MAX_ATOMS_I {
+        0
+    } else {
+        n_canon_rank[*n1 as usize]
+    };
+    let mut cr2 = if i32::from(*n2) > MAX_ATOMS_I {
+        0
+    } else {
+        n_canon_rank[*n2 as usize]
+    };
+    if !get_next_neighbor_and_rank(at, cur1, prev1, n1, &mut cr1, n_canon_rank)
+        || !get_next_neighbor_and_rank(at, cur2, prev2, n2, &mut cr2, n_canon_rank)
+        || n_rank[*n1 as usize] != n_rank[*n2 as usize]
+        || n_visited[*n1 as usize] != n_visited[*n2 as usize]
+    {
+        return false;
+    }
+    let find = |cur: u16, n: u16| -> (usize, bool) {
+        let a = &at[cur as usize];
+        let mut i = 0;
+        let mut k = false;
+        while i < MAX_NUM_STEREO_BONDS && a.stereo_bond_neighbor[i] != 0 {
+            k = a.neighbor[a.stereo_bond_ord[i] as usize] == n;
+            if k {
+                break;
+            }
+            i += 1;
+        }
+        (i, k)
+    };
+    let (i1, k1) = find(cur1, *n1);
+    let (i2, k2) = find(cur2, *n2);
+    if k1 != k2 {
+        return false;
+    }
+    if k1
+        && (at[cur1 as usize].stereo_bond_parity[i1] != at[cur2 as usize].stereo_bond_parity[i2]
+            || !parity_well_def(i32::from(at[cur1 as usize].stereo_bond_parity[i1])))
+    {
+        return false;
+    }
+    true
+}
+
+/// `PathsHaveIdenticalKnownParities`
+#[allow(clippy::too_many_arguments)]
+pub fn paths_have_identical_known_parities(
+    at: &[SpAtom],
+    prev1: u16,
+    cur1: u16,
+    prev2: u16,
+    cur2: u16,
+    n_visited: &mut [u16],
+    n_rank: &[u16],
+    n_canon_rank: &[u16],
+    mut n_length: u16,
+) -> u16 {
+    n_length += 1;
+    n_visited[cur1 as usize] = n_length;
+    n_visited[cur2 as usize] = n_length;
+    let (a1, a2) = (&at[cur1 as usize], &at[cur2 as usize]);
+    if a1.stereo_atom_parity != a2.stereo_atom_parity
+        || (a1.stereo_atom_parity != 0 && !parity_well_def(i32::from(a1.stereo_atom_parity)))
+    {
+        return 0;
+    }
+    if a1.valence != a2.valence {
+        return 0;
+    }
+    if a1.valence == 1 {
+        return n_length;
+    }
+    let sentinel = (MAX_ATOMS_I + 1) as u16;
+    let (mut n1, mut n2) = (sentinel, sentinel);
+    for _ in 1..a1.valence {
+        if !get_and_check_next_neighbors(
+            at,
+            cur1,
+            prev1,
+            cur2,
+            prev2,
+            &mut n1,
+            &mut n2,
+            n_visited,
+            n_rank,
+            n_canon_rank,
+        ) {
+            return 0;
+        }
+        if n_visited[n1 as usize] == 0 {
+            n_length = paths_have_identical_known_parities(
+                at,
+                cur1,
+                n1,
+                cur2,
+                n2,
+                n_visited,
+                n_rank,
+                n_canon_rank,
+                n_length,
+            );
+            if n_length == 0 {
+                return 0;
+            }
+        }
+    }
+    let (mut n1, mut n2) = (sentinel, sentinel);
+    for _ in 1..a1.valence {
+        if !get_and_check_next_neighbors(
+            at,
+            cur1,
+            prev1,
+            cur2,
+            prev2,
+            &mut n1,
+            &mut n2,
+            n_visited,
+            n_rank,
+            n_canon_rank,
+        ) {
+            return 0;
+        }
+    }
+    n_length
+}
+
+/// `RemoveKnownNonStereoBondParities`: removes stereo bonds that are known
+/// not to be stereogenic (also from the linear CT); returns how many
+pub fn remove_known_non_stereo_bond_parities(
+    at: &mut [SpAtom],
+    num_atoms: usize,
+    n_canon_rank: &[u16],
+    n_rank: &[u16],
+    cs: &mut CanonStatStereo,
+) -> i32 {
+    use super::ichierr::{CT_STEREOBOND_ERROR, CT_STEREOCOUNT_ERR};
+    let mut ret = 0;
+    let mut n_visited: Vec<u16> = Vec::new();
+    for i1 in 0..num_atoms {
+        if at[i1].valence != 3 || at[i1].stereo_bond_neighbor[0] == 0 {
+            continue;
+        }
+        let mut n1: isize = 0;
+        while (n1 as usize) < MAX_NUM_STEREO_BONDS && at[i1].stereo_bond_neighbor[n1 as usize] != 0
+        {
+            let s2 = at[i1].stereo_bond_neighbor[n1 as usize];
+            let sbp = i32::from(at[i1].stereo_bond_parity[n1 as usize]);
+            if !(parity_val(sbp) == AB_PARITY_CALC) && parity_well_def(sbp) {
+                n1 += 1;
+                continue;
+            }
+            let opposite_atom = (s2 - 1) as usize;
+            let m = at[i1].stereo_bond_ord[n1 as usize] as usize;
+            let mut neigh = [0u16; 3];
+            let mut n = 0;
+            for j in 0..at[i1].valence as usize {
+                if j != m {
+                    neigh[n] = at[i1].neighbor[j];
+                    n += 1;
+                }
+            }
+            if n != 2 || n_rank[neigh[0] as usize] != n_rank[neigh[1] as usize] {
+                n1 += 1;
+                continue;
+            }
+            if at[i1].n_ring_system == at[neigh[0] as usize].n_ring_system {
+                n1 += 1;
+                continue;
+            }
+            n_visited.clear();
+            n_visited.resize(num_atoms, 0);
+            n_visited[i1] = 1;
+            if paths_have_identical_known_parities(
+                at,
+                i1 as u16,
+                neigh[0],
+                i1 as u16,
+                neigh[1],
+                &mut n_visited,
+                n_rank,
+                n_canon_rank,
+                1,
+            ) != 0
+            {
+                if !remove_one_stereo_bond(at, i1, n1 as usize) {
+                    return CT_STEREOBOND_ERROR;
+                }
+                n1 -= 1;
+                let n_atom_rank1 = n_canon_rank[i1].max(n_canon_rank[opposite_atom]);
+                let n_atom_rank2 = n_canon_rank[i1].min(n_canon_rank[opposite_atom]);
+                let mut mm = cs.n_len_dble - 1;
+                let mut nn = 0;
+                let mut found = false;
+                while nn <= mm {
+                    let d = cs.dble.as_ref().unwrap()[nn as usize];
+                    if d.at_num1 == n_atom_rank1 && d.at_num2 == n_atom_rank2 {
+                        if nn < mm {
+                            cs.dble
+                                .as_mut()
+                                .unwrap()
+                                .copy_within(nn as usize + 1..mm as usize + 1, nn as usize);
+                        }
+                        cs.n_len_dble -= 1;
+                        found = true;
+                        break;
+                    }
+                    nn += 1;
+                }
+                mm = if found { -1 } else { mm };
+                if mm >= 0 {
+                    return CT_STEREOCOUNT_ERR;
+                }
+                ret += 1;
+            }
+            n1 += 1;
+        }
+    }
+    ret
+}
