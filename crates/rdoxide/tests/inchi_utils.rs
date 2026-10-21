@@ -2096,3 +2096,213 @@ fn charge_groups_and_salt_types_match_the_c_code() {
         assert_eq!(got, want, "{inp}");
     }
 }
+
+fn dump_bns(p: &rdoxide::external::inchi::ichi_bns::BnStruct, out: &mut Vec<String>) {
+    use rdoxide::external::inchi::ichi_bns::*;
+    out.push(format!(
+        "H {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {}",
+        p.num_atoms,
+        p.num_added_atoms,
+        p.n_max_add_atoms,
+        p.num_c_groups,
+        p.num_t_groups,
+        p.num_vertices,
+        p.num_bonds,
+        p.num_edges,
+        p.num_added_edges,
+        p.n_max_add_edges,
+        p.max_vertices,
+        p.max_edges,
+        p.max_iedges,
+        p.tot_st_cap,
+        p.tot_st_flow,
+        p.b_not_a_simple_path
+    ));
+    for i in 0..p.num_vertices as usize {
+        let v = &p.vert[i];
+        out.push(format!(
+            "V {} {} {} {} {} {} {} {} {} 0",
+            v.type_,
+            v.num_adj_edges,
+            v.max_adj_edges,
+            v.iedge,
+            v.st_edge.cap,
+            v.st_edge.cap0,
+            v.st_edge.flow,
+            v.st_edge.flow0,
+            v.st_edge.pass
+        ));
+    }
+    for i in 0..p.num_edges as usize {
+        let e = &p.edge[i];
+        out.push(format!(
+            "E {} {} {} {} {} {} {} {} {} {}",
+            e.neighbor1,
+            e.neighbor12,
+            e.neigh_ord[0],
+            e.neigh_ord[1],
+            e.cap,
+            e.cap0,
+            e.flow,
+            e.flow0,
+            e.pass,
+            e.forbidden
+        ));
+    }
+    let mut s = String::from("I");
+    for i in 0..p.num_atoms as usize {
+        for k in 0..p.vert[i].num_adj_edges as usize {
+            s += &format!(" {}", p.iedge[p.vert[i].iedge + k]);
+        }
+    }
+    out.push(s);
+    if let Some(k) = p.alt_path {
+        let ap = &p.altp[k];
+        let len = ap[I_ALTP_PATH_LEN].number();
+        let mut s = format!(
+            "P {} {} {} {} {}",
+            ap[I_ALTP_START_ATOM].number(),
+            ap[I_ALTP_END_ATOM].number(),
+            len,
+            ap[I_ALTP_FLOW].flow[0],
+            ap[I_ALTP_FLOW].flow[1]
+        );
+        for j in 0..len as usize {
+            let e = &ap[I_ALTP_NEIGHBOR + j];
+            s += &format!(" {},{}", e.ineigh(0), e.ineigh(1));
+        }
+        out.push(s);
+    }
+}
+
+#[test]
+fn balanced_network_structure_matches_the_c_code() {
+    use rdoxide::external::inchi::ichi_bns::*;
+    use rdoxide::external::inchi::inpdef::InpAtom;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_bns.json")).unwrap();
+    for c in data.as_array().unwrap() {
+        let inp = &c["in"];
+        let mut at: Vec<InpAtom> = Vec::new();
+        for a in inp["atoms"].as_array().unwrap() {
+            let nb = a["nb"].as_array().unwrap();
+            let mut x = InpAtom {
+                valence: a["v"].as_i64().unwrap() as i8,
+                chem_bonds_valence: a["cbv"].as_i64().unwrap() as i8,
+                el_number: a["el"].as_u64().unwrap() as u8,
+                radical: a["rad"].as_i64().unwrap() as i8,
+                c_point: a["vt"].as_u64().unwrap() as u16,
+                ..Default::default()
+            };
+            for (j, e) in nb.iter().enumerate() {
+                x.neighbor[j] = e[0].as_u64().unwrap() as u16;
+                x.bond_type[j] = e[1].as_u64().unwrap() as u8;
+            }
+            at.push(x);
+        }
+        let n = at.len();
+        let (mut p, nchg) = allocate_and_init_bn_struct(
+            &mut at,
+            n,
+            inp["ma"].as_i64().unwrap() as i32,
+            inp["me"].as_i64().unwrap() as i32,
+            inp["mp"].as_i64().unwrap() as i32,
+        );
+        let mut got: Vec<String> = vec![format!("N {nchg}")];
+        for a in &at {
+            let mut s = format!("B {}", a.valence);
+            for j in 0..a.valence as usize {
+                s += &format!(" {}", a.bond_type[j]);
+            }
+            got.push(s);
+        }
+        dump_bns(&p, &mut got);
+        p.type_tacn = inp["tacn"].as_u64().unwrap() as u16;
+        p.type_t = inp["t"].as_u64().unwrap() as u16;
+        p.type_cn = inp["cn"].as_u64().unwrap() as u16;
+        for i in 0..n {
+            let vt = u32::from(at[i].c_point);
+            p.vert[i].type_ |= (((vt & 0x1c) << 1) | ((vt & 3) << 9)) as u16;
+        }
+        p.alt_path = Some(0);
+        let mut switch_edge: Vec<Edge> = vec![[NO_VERTEX, 0]; 4096];
+        let mut y = 3;
+        while y < 2 * p.num_vertices + 2 && p.num_edges > 0 {
+            if (y * 7 + n as i32) % 3 == 0 {
+                switch_edge[y as usize][0] = 2 + (y * 5 + 1) % (y - 2);
+                switch_edge[y as usize][1] = (y * 3) % p.num_edges;
+            }
+            y += 1;
+        }
+        let mut cnt = 0;
+        for u in 0..2 * p.num_vertices + 2 {
+            let deg = get_vertex_degree(&p, u);
+            got.push(format!("D {u} {deg}"));
+            for k in 0..deg {
+                let mut ie: EdgeIndex = 12345;
+                let w = get_vertex_neighbor(&p, u, k, &mut ie);
+                let mut s = format!("W {k} {w} {ie}");
+                if w != NO_VERTEX {
+                    let rc = rescap(&p, u, w, ie);
+                    s += &format!(
+                        " r{rc} a{}",
+                        i32::from(ignore_vertex_non_tacn_atom(&p, u, w))
+                    );
+                    if u > 1 && w > 1 && switch_edge[u as usize][0] != NO_VERTEX {
+                        s += &format!(
+                            " g{}",
+                            i32::from(ignore_vertex_non_tacn_group(&p, u, w, &switch_edge))
+                        );
+                        let mut iuv: EdgeIndex = -77;
+                        let pv = get_prev_vertex(&p, u, &switch_edge, &mut iuv);
+                        s += &format!(" p{pv},{iuv}");
+                    }
+                    let rm = rescap_mark(&mut p, u, w, ie);
+                    s += &format!(" m{rm}");
+                    let delta = (cnt % 4) - 1;
+                    let rv = ((cnt >> 2) & 1) == 1;
+                    let bcf = (cnt >> 3) & 1;
+                    let ar = augment_edge(&mut p, u, w, ie, delta, rv, bcf);
+                    s += &format!(" A{ar}");
+                    cnt += 1;
+                }
+                got.push(s);
+            }
+        }
+        got.push(format!("S {}", p.b_not_a_simple_path));
+        dump_bns(&p, &mut got);
+        p.alt_path = None;
+        let r = re_init_bn_struct(&mut p, &mut at, n, true);
+        got.push(format!("R {r}"));
+        dump_bns(&p, &mut got);
+        let mut bd = allocate_and_init_bn_data(n as i32 + 1);
+        bd.q_size = 2;
+        bd.scan_q[0] = 2;
+        bd.scan_q[1] = 5;
+        bd.scan_q[2] = 3;
+        bd.base_ptr[2] = 7;
+        bd.base_ptr[3] = 7;
+        bd.tree[5] = 2;
+        bd.tree[4] = 2;
+        bd.switch_edge[2][0] = 9;
+        let (mn, ml) = (bd.max_num_vertices, bd.max_len_pu_pv);
+        let rr = re_init_bn_data(&mut bd);
+        got.push(format!("Z {mn} {ml} {rr} {} {}", bd.q_size, bd.base_ptr[2]));
+        got.push(format!(
+            "T {} {} {} {}",
+            bd.tree[4], bd.tree[5], bd.switch_edge[2][0], bd.base_ptr[3]
+        ));
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        if got.len() != want.len() {
+            panic!("length {} vs {}: {inp}", got.len(), want.len());
+        }
+        for (i, (g, w)) in got.iter().zip(&want).enumerate() {
+            assert_eq!(g, w, "line {i}: {inp}");
+        }
+    }
+}
