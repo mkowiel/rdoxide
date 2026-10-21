@@ -27,6 +27,7 @@ pub mod ichiparm;
 pub mod ichiring;
 pub mod ichisort;
 pub mod ichister;
+pub mod ichitaut;
 pub mod ikey_base26;
 pub mod ikey_dll;
 pub mod inchi_dll;

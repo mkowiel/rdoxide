@@ -1834,3 +1834,133 @@ fn ring_systems_match_the_c_code() {
         assert_eq!(got, want, "{inp}");
     }
 }
+
+#[test]
+fn tautomer_endpoints_match_the_c_code() {
+    type InfoFn = fn(
+        &[rdoxide::external::inchi::inpdef::InpAtom],
+        usize,
+        &mut rdoxide::external::inchi::ichitaut::EndpointInfo,
+    ) -> i32;
+    use rdoxide::external::inchi::ichitaut::*;
+    use rdoxide::external::inchi::inpdef::InpAtom;
+    use rdoxide::external::inchi::util::get_endpoint_valence_ket;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_endpoint.json")).unwrap();
+    let pe = |e: &EndpointInfo, r: i32| {
+        if r > 0 {
+            format!(
+                " {r}:{},{},{},{},{},{},0",
+                e.c_moveable_charge,
+                e.c_neutral_bonds_valence,
+                e.c_mobile,
+                e.c_donor,
+                e.c_acceptor,
+                e.c_keto_enol_code
+            )
+        } else {
+            " 0".to_string()
+        }
+    };
+    for c in data.as_array().unwrap() {
+        let inp = &c["in"];
+        let mut at: Vec<InpAtom> = Vec::new();
+        for a in inp["atoms"].as_array().unwrap() {
+            let nb = a["nb"].as_array().unwrap();
+            let mut x = InpAtom {
+                valence: a["v"].as_i64().unwrap() as i8,
+                chem_bonds_valence: a["cbv"].as_i64().unwrap() as i8,
+                el_number: a["el"].as_u64().unwrap() as u8,
+                charge: a["chg"].as_i64().unwrap() as i8,
+                radical: a["rad"].as_i64().unwrap() as i8,
+                num_h: a["nh"].as_i64().unwrap() as i8,
+                c_point: a["cp"].as_u64().unwrap() as u16,
+                endpoint: a["ep"].as_u64().unwrap() as u16,
+                at_type: a["att"].as_u64().unwrap() as u16,
+                n_num_at_in_ring_system: a["ring"].as_u64().unwrap() as u16,
+                ..Default::default()
+            };
+            for (k, b) in a["sym"].as_str().unwrap().bytes().enumerate() {
+                x.elname[k] = b;
+            }
+            for m in 0..3 {
+                x.num_iso_h[m] = a["ih"][m].as_i64().unwrap() as i8;
+            }
+            for (j, e) in nb.iter().enumerate() {
+                x.neighbor[j] = e[0].as_u64().unwrap() as u16;
+                x.bond_type[j] = e[1].as_u64().unwrap() as u8;
+            }
+            at.push(x);
+        }
+        let mut got: Vec<String> = Vec::new();
+        for i in 0..at.len() {
+            let mut sub = 99i8;
+            let ct = get_charge_type(&at, i, &mut sub);
+            let el = at[i].el_number;
+            let mut s = format!(
+                "G {ct} {sub} {} {} {} {}",
+                i32::from(is_centerpoint_elem(el)),
+                i32::from(is_centerpoint_elem_ket(el)),
+                i32::from(is_centerpoint_elem_strict(el)),
+                get_endpoint_valence_ket(el)
+            );
+            let fs: [InfoFn; 8] = [
+                n_get_endpoint_info,
+                n_get_endpoint_info_pt_22_00,
+                n_get_endpoint_info_pt_16_00,
+                n_get_endpoint_info_pt_06_00,
+                n_get_endpoint_info_pt_39_00,
+                n_get_endpoint_info_pt_13_00,
+                n_get_endpoint_info_pt_18_00,
+                n_get_endpoint_info_ket,
+            ];
+            for f in fs {
+                let mut e = EndpointInfo::default();
+                let r = f(&at, i, &mut e);
+                s += &pe(&e, r);
+            }
+            got.push(s);
+            let mut ep = TEndpoint::default();
+            add_end_point(&mut ep, &at, i);
+            let mut s = format!(
+                "E {} {} {}",
+                ep.n_atom_number, ep.n_equ_number, ep.n_group_number
+            );
+            for v in ep.num {
+                s += &format!(" {v}");
+            }
+            for v in ep.num_da {
+                s += &format!(" {v}");
+            }
+            let mut num: [u16; 5] = [9, 8, 7, 6, 5];
+            let mut da: [u16; 6] = [9, 8, 7, 6, 5, 4];
+            for mode in 0..3 {
+                let m = add_atom2num(&mut num, &at[i], mode);
+                add_atom2da(&mut da, &at[i], mode);
+                s += &format!(" |{m}");
+                for v in num {
+                    s += &format!(" {v}");
+                }
+                for v in da {
+                    s += &format!(" {v}");
+                }
+                if mode == 1 {
+                    for (k, v) in num.iter_mut().enumerate() {
+                        *v = 9 - k as u16;
+                    }
+                    for (k, v) in da.iter_mut().enumerate() {
+                        *v = 9 - k as u16;
+                    }
+                }
+            }
+            got.push(s);
+        }
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        assert_eq!(got, want, "{inp}");
+    }
+}
