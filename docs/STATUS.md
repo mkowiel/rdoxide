@@ -297,6 +297,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 181 | InChI I5h: ichister stereo geometry helpers (get_z_coord, triple products, Get2DTetrahedralAmbiguity, plane tests) verified on 4000 cases vs the C code |
 | 182 | InChI I5i: ichister stereocenter/stereobond candidate checks (bCanInpAtomBeAStereoCenter, can_be_a_stereo_bond_with_isotopic_H, bIsOxide, half_stereo_bond_action, ...) verified on 6000 random atom graphs vs the C code |
 | 183 | InChI I5j: ichister half_stereo_bond_parity + GetHalfStereobond0DParity verified on 8000 random neighborhoods vs the C code |
+| 184 | InChI I5k: ichister set_stereo_bonds_parity + FixSb0DParities + SpAtom verified on 6000 random molecules vs the C code |
 
 ## Python package files
 
@@ -650,3 +651,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-21 — Stage 181: InChI I5h: stereo geometry helpers ported and differentially tested
 * 2026-10-21 — Stage 182: InChI I5i: stereo candidate checks ported and differentially tested
 * 2026-10-21 — Stage 183: InChI I5j: half stereo bond parity ported and differentially tested
+* 2026-10-21 — Stage 184: InChI I5k: stereo bond parity detection ported and differentially tested
