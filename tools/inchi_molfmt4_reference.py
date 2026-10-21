@@ -71,7 +71,7 @@ def sdf_tail(r):
     if r.random() < 0.3:
         L.append("M  END")
     for _ in range(r.randrange(0, 5)):
-        hdr = r.choice(["> <NAME>", ">  <NAME> 1", "> <CAS_NO>", "> <CAS>", "> <MyLabel>", "> <COMMENT>", "> <other>", ">  <MyLabel>  (1)", "> <CAS RN>", ">", "> <x y>", "> <NAME >"])
+        hdr = r.choice(["> <NAME>", ">  <NAME> 1", "> <CAS_NO>", "> <CAS>", "> <MyLabel>", "> <COMMENT>", "> <other>", ">  <MyLabel>  (1)", "> <CAS RN>", ">", "> <x y>", "> <NAME >", "> <x>", "> <x>", "> <x>"])
         L.append(hdr)
         for _ in range(r.randrange(0, 3)):
             L.append(r.choice(["ethanol", "64-17-5", "  spaced   out  ", "CAS 50-00-0 x", "-12-3", "", "9" * 25, "x" * r.randrange(1, 260), "a\tb"]))
