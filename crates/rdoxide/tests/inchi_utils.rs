@@ -13381,3 +13381,154 @@ fn ichiprt3_aux_numbering_charge_and_transposition_match_the_c_code() {
         assert_eq!(vec![got], want, "case {ci}: {}", c["in"]);
     }
 }
+
+#[test]
+fn ichiprt1_tags_and_first_layers_match_the_c_code() {
+    use rdoxide::external::inchi::ichi::{
+        DIFS_H_H_ATOMS, DIFS_P_PROTONS, DIFS_Q_CHARGE, InChISort,
+    };
+    use rdoxide::external::inchi::ichi_io::{
+        INCHI_IOS_TYPE_STRING, InchiIosString, InchiIostream, IosFile, inchi_ios_init,
+        inchi_strbuf_init, inchi_strbuf_printf,
+    };
+    use rdoxide::external::inchi::ichiprt1::*;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_prt1a.json")).unwrap();
+    let text = |b: &InchiIosString| strbuf_str(b);
+    for (ci, c) in data.as_array().unwrap().iter().enumerate() {
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        let mut t = InchiTok(c["in"].as_str().unwrap().split_whitespace());
+        let cmd = t.s();
+        let n = t.i() as usize;
+        let ot = t.i() as i32;
+        let mult = t.i() as i32;
+        let sorts = |t: &mut InchiTok| -> Vec<InChISort> {
+            (0..n)
+                .map(|i| InChISort {
+                    p_inchi: [t.inchi(), t.inchi()],
+                    ord_number: i as i16,
+                    ..Default::default()
+                })
+                .collect()
+        };
+        let a = sorts(&mut t);
+        let b = sorts(&mut t);
+        let mut io = InchiOutCtl {
+            atom_mode: t.i() as i32,
+            taut_mode: t.i() as i32,
+            n_tag: t.i() as i32,
+            b_fh_tag: t.i() as i32,
+            b_plain_text_tags: t.i() as i32,
+            b_second_non_taut_pass: t.i() as i32,
+            b_omit_repetitions: t.i() as i32,
+            i_cur_taut_mode: t.i() as usize,
+            n_cur_inchi_segment: t.i() as usize,
+            n_num_removed_protons: t.i() as i32,
+            n_pzz: t.i() as i32,
+            n_zy: t.i() as i32,
+            ..Default::default()
+        };
+        let nc2 = [t.i() as i32, t.i() as i32];
+        let rec = t.i() as i32;
+        let outopts = t.i() as i32;
+        let beta = t.i() != 0;
+        io.b_overflow = t.i() as i32;
+        let seg = io.n_cur_inchi_segment;
+        io.s_dif_segs[seg][DIFS_H_H_ATOMS] = t.i() as u8;
+        io.s_dif_segs[seg][DIFS_Q_CHARGE] = t.i() as u8;
+        io.s_dif_segs[seg][DIFS_P_PROTONS] = t.i() as u8;
+        io.b_tag1 = t.i() as i32;
+        io.b_use_multipliers = mult;
+        io.b_out_type = ot;
+        io.num_components = n;
+        io.p_inchi_sort = a;
+        io.p_inchi_sort2 = b;
+        let (lf, tab) = set_line_separators(outopts);
+        let mut sb = InchiIosString::default();
+        inchi_strbuf_init(&mut sb, 16, 16);
+        let mut out = InchiIostream::default();
+        inchi_ios_init(&mut out, INCHI_IOS_TYPE_STRING, IosFile::None);
+        let got = match cmd.as_str() {
+            "tag" => {
+                let mut always = -7;
+                let (tags, bits): (&[InchiTag], i32) = if io.b_tag1 & 0x40000 != 0 {
+                    (&AUX_LBL, io.b_tag1 & 0x3ffff)
+                } else {
+                    (&IDENT_LBL, io.b_tag1 & 0x3ffff)
+                };
+                let tag = sz_get_tag(tags, io.n_tag, bits, &mut always);
+                format!("{tag} {always}")
+            }
+            "opt" => {
+                let (l1, l2) = get_save_opt_letters(io.b_tag1 as u8);
+                format!(
+                    "{l1}{l2} {} {} {outopts}",
+                    lf.bytes().next().unwrap_or(0),
+                    tab.bytes().next().unwrap_or(0)
+                )
+            }
+            "lineend" => {
+                if io.b_tag1 & 1 != 0 {
+                    inchi_strbuf_printf(&mut sb, "x,y");
+                }
+                let tg = if io.b_tag1 & 2 != 0 {
+                    "/c"
+                } else if io.b_tag1 & 4 != 0 {
+                    "/qq"
+                } else {
+                    ""
+                };
+                let ret = str_line_end(
+                    tg,
+                    &mut io.b_overflow,
+                    &mut sb,
+                    io.n_cur_inchi_segment as i32 - 2,
+                    io.b_plain_text_tags,
+                );
+                format!(
+                    "{ret} {} [{}] {}",
+                    io.b_overflow,
+                    text(&sb),
+                    sb.n_used_length
+                )
+            }
+            "ver" => {
+                let ret = output_inchi_version_and_kind(&mut out, &mut sb, outopts, beta, lf);
+                format!("{ret} [{}] [{}]", text(&out.s), text(&sb))
+            }
+            other => {
+                let ret = match other {
+                    "formula" => {
+                        output_inchi_main_layer_formula(&mut out, &mut sb, nc2, rec, &mut io, lf)
+                    }
+                    "conn" => output_inchi_main_layer_connections(&mut out, &mut sb, &mut io, lf),
+                    "hyd" => output_inchi_main_layer_hydrogens(&mut out, &mut sb, &mut io, lf),
+                    "charge" => output_inchi_charge_and_removed_added_protons_layers(
+                        &mut out, &mut sb, &mut io, lf,
+                    ),
+                    _ => panic!("{other}"),
+                };
+                format!(
+                    "{ret} {} {} {} {} {} {} {} [{}] [{}] [{}]",
+                    io.b_overflow,
+                    io.tot_len,
+                    io.tot_len2,
+                    io.b_tag1,
+                    io.b_always,
+                    io.b_non_taut_non_iso_identifier_not_empty,
+                    io.n_segm_action,
+                    io.sz_tag1,
+                    text(&out.s),
+                    text(&sb)
+                )
+            }
+        };
+        let got: Vec<&str> = got.split('\n').filter(|l| !l.is_empty()).collect();
+        assert_eq!(got, want, "case {ci}: {}", c["in"]);
+    }
+}

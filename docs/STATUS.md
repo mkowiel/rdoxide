@@ -724,3 +724,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-21 — Stage 219: InChI port I8c: ichiprt3 stereo/isotopic layers; 7000 differential cases match
 * 2026-10-21 — Stage None: I8d AuxInfo equ/inversion builders of ichiprt3 differential-tested against C (7000 cases)
 * 2026-10-21 — Stage None: I8e remaining AuxInfo builders of ichiprt3 differential-tested against C (6870 cases)
+* 2026-10-21 — Stage None: I8f ichiprt1 tag helpers and formula/connection/H/charge output layers differential-tested against C (7000 cases)

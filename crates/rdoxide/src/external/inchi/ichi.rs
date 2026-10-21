@@ -633,6 +633,7 @@ pub const DIFL_LENGTH: usize = 4;
 pub const DIFS_F_FORMULA: usize = 0;
 pub const DIFS_H_H_ATOMS: usize = 2;
 pub const DIFS_Q_CHARGE: usize = 3;
+pub const DIFS_P_PROTONS: usize = 4;
 pub const DIFS_B_SBONDS: usize = 5;
 pub const DIFS_T_SATOMS: usize = 6;
 pub const DIFS_M_SP3INV: usize = 7;
