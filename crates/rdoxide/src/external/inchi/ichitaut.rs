@@ -4291,3 +4291,482 @@ fn get_14_taut_in_memb_alt_ring(
         num_atoms,
     )
 }
+
+// ---- the main normalization driver of `ichi_bns.c` ----
+
+const TG_FLAG_MOVE_POS_CHARGES_DONE: u64 = 0x0000_0010;
+const TG_FLAG_TEST_TAUT__ATOMS_DONE: u64 = 0x0000_0002;
+const TG_FLAG_TEST_TAUT__SALTS_DONE: u64 = 0x0000_0008;
+const TG_FLAG_TEST_TAUT2_SALTS_DONE: u64 = 0x0000_0020;
+const TG_FLAG_TEST_TAUT3_SALTS_DONE: u64 = 0x0000_1000;
+const TG_FLAG_MERGE_TAUT_SALTS_DONE: u64 = 0x0000_0080;
+const FLAG_PROTON_SINGLE_REMOVED: u64 = 0x0080;
+
+/// `fix_explicitly_indicated_bonds` (with its index quirks: the bond list
+/// is read as `ebend[2*j]` for `j` stepping by 2 and the edge is taken from
+/// `vert[i]` with the leftover loop index)
+pub fn fix_explicitly_indicated_bonds(
+    nebend: usize,
+    ebend: &[i32],
+    p: &mut super::ichi_bns::BnStruct,
+    at: &[InpAtom],
+    num_atoms: i32,
+) -> i32 {
+    p.edge_forbidden_mask |= super::ichi_bns::BNS_EDGE_FORBIDDEN_MASK;
+    if nebend < 1 || ebend.is_empty() {
+        return 0;
+    }
+    let mut num_changes = 0;
+    let (mut i1, mut i2, mut index): (i32, i32, i32) = (-1, -1, -1);
+    for j in (0..nebend).step_by(2) {
+        let ia1 = ebend[2 * j];
+        let ia2 = ebend[2 * j + 1];
+        for i in 0..num_atoms as usize {
+            if i32::from(at[i].orig_at_number) == ia1 {
+                i1 = i as i32;
+            } else if i32::from(at[i].orig_at_number) == ia2 {
+                i2 = i as i32;
+            }
+            if i1 > 0 && i2 > 0 {
+                break;
+            }
+        }
+        if i1 < 0 || i2 < 0 {
+            return 0;
+        }
+        if i2 < i1 {
+            std::mem::swap(&mut i1, &mut i2);
+        }
+        let a = &at[i1 as usize];
+        let mut i = 0;
+        while i < a.valence as usize {
+            if i32::from(a.neighbor[i]) == i2 {
+                index = i as i32;
+                break;
+            }
+            i += 1;
+        }
+        if index > -1 {
+            let iedge = p.iedge[p.vert[i].iedge + index as usize] as usize;
+            p.edge[iedge].forbidden |= super::ichi_bns::BNS_EDGE_FORBIDDEN_MASK;
+            num_changes += 1;
+        }
+    }
+    num_changes
+}
+
+/// `mark_alt_bonds_and_taut_groups`: the main normalization procedure;
+/// finds alternating bonds, tautomeric and charge groups, (de)protonates.
+/// `tgi` is `t_group_info` (None when tautomerism is not requested; the
+/// flags then come from `inp_taut_flags`/`inp_taut_flags_done`).
+/// Returns `num_atoms` on success or an error code.
+#[allow(clippy::too_many_arguments)]
+pub fn mark_alt_bonds_and_taut_groups(
+    at: &mut [InpAtom],
+    mut at_fixed_bonds_out: Option<&mut [InpAtom]>,
+    num_atoms: usize,
+    mut tgi: Option<&mut TGroupInfo>,
+    inp_taut_flags: u64,
+    inp_taut_flags_done: &mut u64,
+    ebend: &[i32],
+) -> i32 {
+    use super::ichi_bns::*;
+    use super::ichierr::{BNS_PROGRAM_ERR, is_bns_error};
+    use super::ichiparm::{
+        TG_FLAG_MERGE_TAUT_SALTS, TG_FLAG_MOVE_POS_CHARGES, TG_FLAG_TEST_TAUT__SALTS,
+        TG_FLAG_TEST_TAUT2_SALTS, TG_FLAG_VARIABLE_PROTONS,
+    };
+    use super::incomdef::RADICAL_DOUBLET;
+
+    let flags: u64 = tgi.as_ref().map_or(inp_taut_flags, |t| t.b_taut_flags);
+    macro_rules! add_done {
+        ($f:expr) => {
+            if let Some(t) = tgi.as_deref_mut() {
+                t.b_taut_flags_done |= $f;
+            } else {
+                *inp_taut_flags_done |= $f;
+            }
+        };
+    }
+    let n = num_atoms as i32;
+    let max_altp = 16;
+    let mut b_change_flow = BNS_EF_CHNG_RSTR | BNS_EF_ALTR_BONDS;
+    let mut c_group_info = CGroupInfo::default();
+    let mut s_group_info = SGroupInfo::default();
+    let mut b_error = 0;
+    let mut ret;
+
+    // FIX_AROM_RADICAL: only the first aromatic radical is temporarily changed
+    let mut stored_radicals: Option<(usize, i32)> = None;
+    let mut n_arom_radicals = 0;
+    for i in 0..num_atoms {
+        if i32::from(at[i].radical) == RADICAL_DOUBLET
+            && at[i].valence == 2
+            && i32::from(at[i].bond_type[0]) == BOND_ALTERN
+            && i32::from(at[i].bond_type[1]) == BOND_ALTERN
+        {
+            n_arom_radicals += 1;
+            if stored_radicals.is_none() {
+                stored_radicals = Some((i, RADICAL_DOUBLET));
+                at[i].radical = 0;
+                at[i].num_h += 1;
+            }
+        }
+    }
+
+    'body: {
+        if flags & TG_FLAG_MOVE_POS_CHARGES != 0 && num_atoms > 1 {
+            c_group_info.c_group = Some(vec![CGroup::default(); num_atoms / 2]);
+            c_group_info.c_candidate = vec![CCandidate::default(); num_atoms];
+            c_group_info.max_num_c_groups = num_atoms / 2;
+            c_group_info.max_num_candidates = n;
+        }
+        if flags & TG_FLAG_TEST_TAUT__SALTS != 0 && tgi.is_some() {
+            s_group_info.s_candidate = vec![SCandidate::default(); num_atoms];
+            s_group_info.max_num_candidates = n;
+        }
+        if let Some(t) = tgi.as_deref_mut() {
+            t.t_group_number = vec![0u16; 2 * num_atoms + 1];
+            let num = t.tni.n_num_removed_explicit_h;
+            t.tni = Tni::default();
+            t.tni.n_num_removed_explicit_h = num;
+        }
+
+        let (mut p, _num_changed_bonds) =
+            allocate_and_init_bn_struct(at, num_atoms, 2, 1, max_altp);
+        let mut bd = allocate_and_init_bn_data(p.max_vertices);
+        p.pb_taut_flags = flags as u32;
+
+        // BNS_PROTECT_FROM_TAUT
+        set_forbidden_edges(&mut p, at, n, i32::from(BNS_EDGE_FORBIDDEN_MASK));
+        if ebend.len() > 2 {
+            fix_explicitly_indicated_bonds(ebend.len() / 2, ebend, &mut p, at, n);
+        }
+
+        if n_arom_radicals != 0 {
+            let r = bns_adjust_flow_bonds_rad(&mut p, &mut bd, at, n);
+            if let Some((i, rad)) = stored_radicals {
+                at[i].radical = rad as _;
+                at[i].num_h -= 1;
+            }
+            if is_bns_error(r) {
+                b_error = r;
+                break 'body;
+            }
+        }
+        ret = bns_adjust_flow_bonds_rad(&mut p, &mut bd, at, n);
+        if is_bns_error(ret) {
+            b_error = ret;
+            break 'body;
+        }
+        p.tot_st_flow += 2 * ret;
+        if p.tot_st_cap > p.tot_st_flow {
+            b_change_flow |= BNS_EF_SET_NOSTEREO;
+        }
+
+        // (de)protonation
+        let mut totals = vec![0i32; attot::ARRAY_LEN];
+        if flags & TG_FLAG_VARIABLE_PROTONS != 0
+            && tgi.is_some()
+            && mark_at_type(at, n, Some(&mut totals)) != 0
+            && totals[attot::NUM_CHARGES] != 0
+        {
+            let t = tgi.as_deref_mut().unwrap();
+            let n_orig_tot_atoms = (t.tni.n_num_removed_explicit_h + n) as usize;
+            let mut aatg = BnAatg {
+                n_at_type_totals: Some(totals.clone()),
+                t_group_info: Some(std::mem::take(t)),
+                ..Default::default()
+            };
+            ret = remove_np_protons_and_acid_charges(at, n, &mut aatg, &mut p, &mut bd);
+            *t = aatg.t_group_info.take().unwrap();
+            if is_bns_error(ret) {
+                b_error = ret;
+                break 'body;
+            }
+            if t.tni.b_normalization_flags != 0 {
+                set_init_cap_flow_to_current(&mut p);
+                if let Some(out) = at_fixed_bonds_out.as_deref_mut() {
+                    let m = n_orig_tot_atoms.min(at.len()).min(out.len());
+                    out[..m].clone_from_slice(&at[..m]);
+                }
+            }
+        }
+
+        // initial bonds normalization
+        if flags & TG_FLAG_MOVE_POS_CHARGES != 0 {
+            loop {
+                ret = mark_charge_groups(at, n, &mut c_group_info, &mut p, &mut bd);
+                if is_bns_error(ret) {
+                    b_error = ret;
+                    break 'body;
+                }
+                if ret != 0 {
+                    let ret2 = add_c_groups_to_bn_struct(&mut p, at, n, Some(&mut c_group_info));
+                    if is_bns_error(ret2) {
+                        b_error = ret2;
+                        break 'body;
+                    }
+                    add_done!(TG_FLAG_MOVE_POS_CHARGES_DONE);
+                }
+                if ret <= 0 {
+                    break;
+                }
+            }
+            // BNS_RAD_SEARCH == 1: nothing to do here
+        }
+
+        let mut fcd = vec![BnsFlowChanges::default(); BNS_MAX_NUM_FLOW_CHANGES + 1];
+        ret = bns_test_and_mark_alt_bonds(&mut p, &mut bd, at, n, &mut fcd, b_change_flow, 0);
+        if is_bns_error(ret) {
+            b_error = ret;
+            break 'body;
+        }
+
+        let mut salt_pass = 0;
+        let mut salt_step = 0;
+        let mut salt_found = 0;
+        let mut n_changes;
+        loop {
+            n_changes = 0;
+            // regular bond/H/(-)/positive charges tautomerism cycle
+            loop {
+                let mut taut_found = 0;
+                loop {
+                    ret = match tgi.as_deref_mut() {
+                        Some(t) => {
+                            mark_tautomer_groups(at, n, t, Some(&mut c_group_info), &mut p, &mut bd)
+                        }
+                        None => 0,
+                    };
+                    if ret <= 0 {
+                        break;
+                    }
+                    taut_found += 1;
+                }
+                if ret < 0 {
+                    b_error = ret;
+                }
+                if taut_found != 0 && salt_pass == 0 {
+                    add_done!(TG_FLAG_TEST_TAUT__ATOMS_DONE);
+                }
+                if taut_found != 0 || salt_found != 0 {
+                    ret = re_init_bn_struct_add_groups(
+                        &mut p,
+                        at,
+                        num_atoms,
+                        tgi.as_deref_mut(),
+                        Some(&mut c_group_info),
+                    );
+                    if is_bns_error(ret) {
+                        b_error = ret;
+                        break 'body;
+                    }
+                    if flags & TG_FLAG_MOVE_POS_CHARGES != 0 {
+                        loop {
+                            ret = mark_charge_groups(at, n, &mut c_group_info, &mut p, &mut bd);
+                            if is_bns_error(ret) {
+                                b_error = ret;
+                                break 'body;
+                            }
+                            n_changes += ret;
+                            if ret > 0 {
+                                let ret2 = re_init_bn_struct_add_groups(
+                                    &mut p,
+                                    at,
+                                    num_atoms,
+                                    tgi.as_deref_mut(),
+                                    Some(&mut c_group_info),
+                                );
+                                if is_bns_error(ret2) {
+                                    b_error = ret2;
+                                    break 'body;
+                                }
+                                add_done!(TG_FLAG_MOVE_POS_CHARGES_DONE);
+                            }
+                            if ret <= 0 {
+                                break;
+                            }
+                        }
+                    }
+                    ret = bns_test_and_mark_alt_bonds(
+                        &mut p,
+                        &mut bd,
+                        at,
+                        n,
+                        &mut fcd,
+                        b_change_flow,
+                        0,
+                    );
+                    if is_bns_error(ret) {
+                        b_error = ret;
+                        break 'body;
+                    }
+                    n_changes += ret;
+                }
+                salt_found = 0;
+                if !(taut_found != 0 && b_error == 0) {
+                    break;
+                }
+            }
+            if b_error != 0 {
+                break;
+            }
+            // 'salt' tautomerism
+            if flags & TG_FLAG_TEST_TAUT__SALTS != 0 {
+                if flags & TG_FLAG_TEST_TAUT2_SALTS != 0 {
+                    if n_changes == 0 && salt_pass != 0 && salt_step != 0 {
+                        break;
+                    }
+                    if salt_step == 0 {
+                        salt_found = match tgi.as_deref_mut() {
+                            Some(t) => mark_salt_charge_groups(
+                                at,
+                                n,
+                                &mut s_group_info,
+                                t,
+                                Some(&mut c_group_info),
+                                &mut p,
+                                &mut bd,
+                            ),
+                            None => 0,
+                        };
+                        if salt_found < 0 {
+                            b_error = salt_found;
+                            break;
+                        } else if salt_found > 0 {
+                            add_done!(TG_FLAG_TEST_TAUT__SALTS_DONE);
+                        }
+                        salt_step = i32::from(salt_found == 0);
+                    }
+                    if salt_step != 0 {
+                        salt_found = match tgi.as_deref_mut() {
+                            Some(t) => mark_salt_charge_groups2(
+                                at,
+                                n,
+                                &mut s_group_info,
+                                t,
+                                Some(&mut c_group_info),
+                                &mut p,
+                                &mut bd,
+                            ),
+                            None => 0,
+                        };
+                        if salt_found < 0 {
+                            b_error = salt_found;
+                            break;
+                        } else if salt_found == 1 || salt_found == 5 {
+                            add_done!(TG_FLAG_TEST_TAUT2_SALTS_DONE);
+                            if salt_found == 5 {
+                                add_done!(TG_FLAG_TEST_TAUT3_SALTS_DONE);
+                            }
+                        }
+                    }
+                    salt_pass += 1;
+                } else {
+                    if n_changes == 0 && salt_pass != 0 {
+                        break;
+                    }
+                    salt_found = match tgi.as_deref_mut() {
+                        Some(t) => mark_salt_charge_groups(
+                            at,
+                            n,
+                            &mut s_group_info,
+                            t,
+                            Some(&mut c_group_info),
+                            &mut p,
+                            &mut bd,
+                        ),
+                        None => 0,
+                    };
+                    if salt_found < 0 {
+                        b_error = salt_found;
+                        break;
+                    } else if salt_found > 0 {
+                        add_done!(TG_FLAG_TEST_TAUT__SALTS_DONE);
+                    }
+                    salt_pass += 1;
+                }
+            }
+            if !(salt_found != 0 && b_error == 0) {
+                break;
+            }
+        }
+
+        if flags & TG_FLAG_MERGE_TAUT_SALTS != 0 && b_error == 0 {
+            if let Some(t) = tgi.as_deref_mut() {
+                ret = merge_salt_taut_groups(
+                    at,
+                    n,
+                    &mut s_group_info,
+                    t,
+                    Some(&mut c_group_info),
+                    &mut p,
+                );
+                if ret < 0 {
+                    b_error = ret;
+                } else if ret > 0 {
+                    add_done!(TG_FLAG_MERGE_TAUT_SALTS_DONE);
+                }
+            }
+        }
+        if b_error == 0 {
+            if let Some(t) = tgi.as_deref_mut() {
+                if t.b_taut_flags & TG_FLAG_VARIABLE_PROTONS != 0
+                    && t.b_taut_flags_done
+                        & (super::runichi3::TG_FLAG_FOUND_ISOTOPIC_ATOM_DONE
+                            | super::runichi3::TG_FLAG_FOUND_ISOTOPIC_H_DONE)
+                        != 0
+                {
+                    ret = make_isotopic_h_group(at, n, &mut s_group_info, t);
+                    if ret < 0 {
+                        b_error = ret;
+                    }
+                }
+            }
+        }
+
+        // remove_alt_bond_marks
+        for a in at.iter_mut().take(num_atoms) {
+            for j in 0..a.valence as usize {
+                a.bond_type[j] &= BOND_TYPE_MASK as u8;
+            }
+        }
+        // temporarily ignore all non-alternating bonds and mark non-ring alt
+        // bonds non-stereogenic
+        re_init_bn_struct_for_alt_bns(&mut p, at, n, false);
+        mark_ring_systems_alt_bns(&mut p);
+        mark_non_stereo_alt_bns(&p, at, n, false);
+    }
+
+    if let Some(t) = tgi.as_deref_mut() {
+        t.t_group_number = Vec::new();
+    }
+    if b_error == 0
+        && num_atoms == 1
+        && at[0].at_type == super::inpdef::ATT_PROTON
+        && tgi
+            .as_ref()
+            .is_some_and(|t| t.tni.n_num_removed_explicit_h == 0)
+    {
+        let t = tgi.unwrap();
+        t.tni.n_num_removed_protons = 1;
+        t.tni.b_normalization_flags |= FLAG_PROTON_SINGLE_REMOVED;
+        if at[0].iso_atw_diff != 0 && at[0].iso_atw_diff as usize <= NUM_H_ISOTOPES {
+            t.tni.n_num_removed_protons_isotopic[at[0].iso_atw_diff as usize - 1] += 1;
+        }
+        if let Some(out) = at_fixed_bonds_out {
+            let m = num_atoms.min(out.len());
+            out[..m].clone_from_slice(&at[..m]);
+        }
+    }
+    if b_error != 0 {
+        if is_bns_error(b_error) {
+            b_error
+        } else {
+            BNS_PROGRAM_ERR
+        }
+    } else {
+        n
+    }
+}

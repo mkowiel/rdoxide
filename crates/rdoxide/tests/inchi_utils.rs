@@ -6615,3 +6615,144 @@ fn tautomer_groups_match_the_c_code() {
     }
     assert!(seen.keys().any(|&k| k > 0) && seen.len() > 3, "{seen:?}");
 }
+
+#[test]
+fn main_normalization_matches_the_c_code() {
+    use rdoxide::external::inchi::ichitaut::{TGroupInfo, mark_alt_bonds_and_taut_groups};
+    use rdoxide::external::inchi::inpdef::InpAtom;
+    fn dumpat(tag: &str, at: &[InpAtom], n: usize) -> String {
+        let mut s = String::from(tag);
+        for a in at.iter().take(n) {
+            s += &format!(
+                " {},{},{},{},{},{},{},{},{},{},{}:",
+                a.charge,
+                a.num_h,
+                a.radical,
+                a.chem_bonds_valence,
+                a.endpoint,
+                a.c_point,
+                a.at_type,
+                a.num_iso_h[0],
+                a.num_iso_h[1],
+                a.num_iso_h[2],
+                a.c_flags
+            );
+            for j in 0..a.valence as usize {
+                s += &format!("{}.{}.", a.neighbor[j], a.bond_type[j]);
+            }
+        }
+        s
+    }
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_markalt.json")).unwrap();
+    let mut seen = std::collections::BTreeMap::new();
+    for c in data.as_array().unwrap() {
+        let inp = &c["in"];
+        let mut at: Vec<InpAtom> = Vec::new();
+        for a in inp["atoms"].as_array().unwrap() {
+            let mut x = InpAtom {
+                valence: a["v"].as_i64().unwrap() as i8,
+                chem_bonds_valence: a["cbv"].as_i64().unwrap() as i8,
+                el_number: a["el"].as_u64().unwrap() as u8,
+                radical: a["rad"].as_i64().unwrap() as i8,
+                charge: a["chg"].as_i64().unwrap() as i8,
+                num_h: a["nh"].as_i64().unwrap() as i8,
+                orig_at_number: a["orig"].as_u64().unwrap() as u16,
+                n_num_at_in_ring_system: a["ring"].as_u64().unwrap() as u16,
+                b_cut_vertex: a["cv"].as_i64().unwrap() as i8,
+                n_ring_system: a["rs"].as_u64().unwrap() as u16,
+                ..Default::default()
+            };
+            for k in 0..3 {
+                x.num_iso_h[k] = a["iso"][k].as_i64().unwrap() as i8;
+            }
+            x.set_elname(match x.el_number {
+                1 => "H",
+                6 => "C",
+                7 => "N",
+                8 => "O",
+                15 => "P",
+                16 => "S",
+                17 => "Cl",
+                35 => "Br",
+                _ => "Xx",
+            });
+            for (j, e) in a["nb"].as_array().unwrap().iter().enumerate() {
+                x.neighbor[j] = e[0].as_u64().unwrap() as u16;
+                x.bond_type[j] = e[1].as_u64().unwrap() as u8;
+            }
+            at.push(x);
+        }
+        let n = at.len();
+        let nrem = inp["nrem"].as_i64().unwrap() as i32;
+        at.resize_with(n + 8, InpAtom::default);
+        let mut out: Vec<InpAtom> = vec![InpAtom::default(); n + 8];
+        let flags = inp["flags"].as_u64().unwrap();
+        let done = inp["done"].as_u64().unwrap();
+        let use_tgi = inp["use_tgi"].as_i64().unwrap() != 0;
+        let mut tgi = TGroupInfo {
+            b_taut_flags: flags,
+            b_taut_flags_done: done,
+            ..Default::default()
+        };
+        tgi.tni.n_num_removed_explicit_h = nrem;
+        let mut inp_done = done;
+        let ret = mark_alt_bonds_and_taut_groups(
+            &mut at,
+            Some(&mut out),
+            n,
+            if use_tgi { Some(&mut tgi) } else { None },
+            flags,
+            &mut inp_done,
+            &[],
+        );
+        *seen.entry(ret.min(100)).or_insert(0) += 1;
+        let mut got = vec![format!("R {ret}"), dumpat("A", &at, n)];
+        got.push(dumpat("O", &out, (n + nrem as usize).min(n + 8)));
+        got.push(format!(
+            "F {} {}",
+            if use_tgi {
+                tgi.b_taut_flags_done
+            } else {
+                inp_done
+            },
+            if use_tgi { tgi.b_taut_flags } else { flags }
+        ));
+        if use_tgi {
+            got.push(format!(
+                "I {} {} {} {} {} {} {} {} {} | {} |{}",
+                tgi.tni.n_num_removed_explicit_h,
+                tgi.tni.n_num_removed_protons,
+                tgi.tni.n_num_removed_protons_isotopic[0],
+                tgi.tni.n_num_removed_protons_isotopic[1],
+                tgi.tni.n_num_removed_protons_isotopic[2],
+                tgi.tni.b_normalization_flags,
+                tgi.num_iso_h[0],
+                tgi.num_iso_h[1],
+                tgi.num_iso_h[2],
+                tgi.n_num_isotopic_endpoints,
+                tgi.n_isotopic_endpoint_atom_number
+                    .iter()
+                    .map(|x| format!(" {x}"))
+                    .collect::<String>()
+            ));
+            got.push(format!("G {}", tgi.num_t_groups));
+            for g in tgi.t_group.iter().flatten().take(tgi.num_t_groups) {
+                let nums: String = g.num.iter().map(|x| format!(" {x}")).collect();
+                let das: String = g.num_da.iter().map(|x| format!(" {x}")).collect();
+                got.push(format!(
+                    "T {} {} |{} |{}",
+                    g.n_group_number, g.n_num_endpoints, nums, das
+                ));
+            }
+        }
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        assert_eq!(got, want, "{inp}");
+    }
+    assert!(seen.len() > 6, "{seen:?}");
+}
