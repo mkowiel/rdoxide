@@ -1704,6 +1704,10 @@ pub const MIN_SB_RING_SIZE: u16 = 8;
 /// The stereo part of `sp_ATOM` (extr_ct.h) used by the stereo detection
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct SpAtom {
+    /// `elname`: the element symbol (a NUL terminated string)
+    pub elname: [u8; super::inpdef::ATOM_EL_LEN],
+    /// `iso_sort_key`
+    pub iso_sort_key: i64,
     pub neighbor: [u16; super::inpdef::MAXVAL],
     pub bond_type: [u8; super::inpdef::MAXVAL],
     pub init_rank: u16,
