@@ -686,6 +686,11 @@ pub struct TGroupInfo {
     pub tni: Tni,
     pub b_taut_flags: u64,
     pub b_taut_flags_done: u64,
+    /// `nIsotopicEndpointAtomNumber`: [0] = count, then non-tautomeric atoms
+    pub n_isotopic_endpoint_atom_number: Vec<u16>,
+    pub n_num_isotopic_endpoints: i32,
+    /// `num_iso_H`
+    pub num_iso_h: [i16; super::incomdef::NUM_H_ISOTOPES],
 }
 
 /// `C_GROUP_INFO` (the c-group list)
@@ -2419,4 +2424,105 @@ pub fn merge_salt_taut_groups(
     }
     let ret = register_end_points(tgi, &mut end_points[..j], at, num_atoms, cgi, Some(p));
     if ret == -1 { BNS_PROGRAM_ERR } else { ret }
+}
+
+/// `MakeIsotopicHGroup`: collects the atoms that may exchange isotopic H and
+/// totals their isotopic H counts. Returns the number of such atoms or an
+/// error.
+pub fn make_isotopic_h_group(
+    at: &mut [InpAtom],
+    num_atoms: i32,
+    sgi: &mut SGroupInfo,
+    tgi: &mut TGroupInfo,
+) -> i32 {
+    use super::ichi_bns::{b_has_acidic_hydrogen, b_has_acidic_minus, b_has_other_exchangable_h};
+    use super::ichierr::{BNS_PROGRAM_ERR, BNS_VERT_EDGE_OVFL};
+    use super::inpdef::AT_FLAG_ISO_H_POINT;
+    if sgi.s_candidate.is_empty() || tgi.t_group.is_none() {
+        return 0;
+    }
+    let max_cand = sgi.max_num_candidates;
+    tgi.num_iso_h = [0; super::incomdef::NUM_H_ISOTOPES];
+    let mut n_cand = 0i32;
+    let mut n_non_taut = 0i32;
+    for i in 0..num_atoms as usize {
+        let mut s_subtype = 0i32;
+        let mut s_type = 0i32;
+        let has_h: i32;
+        if at[i].endpoint != 0 {
+            let tg = tgi
+                .t_group_number
+                .get(at[i].endpoint as usize)
+                .copied()
+                .unwrap_or(0) as usize;
+            let tgr = tgi.t_group.as_ref().unwrap();
+            if tg != 0 && at[i].endpoint == tgr[tg - 1].n_group_number {
+                has_h = i32::from(tgr[tg - 1].num[0]) - i32::from(tgr[tg - 1].num[1]);
+            } else {
+                return BNS_PROGRAM_ERR;
+            }
+        } else {
+            has_h = i32::from(at[i].num_h);
+        }
+        let mut cand = has_h != 0 && at[i].endpoint != 0;
+        if !cand && has_h != 0 {
+            s_type = get_salt_charge_type(at, i, Some(tgi), &mut s_subtype);
+            cand = s_type == 0;
+            if !cand {
+                s_type = get_other_salt_charge_type(at, i, Some(tgi), &mut s_subtype, true);
+                cand = s_type == 1;
+            }
+            if !cand {
+                s_type = get_other_salt_type(at, i, &mut s_subtype);
+                cand = s_type == 2;
+            }
+            if !cand && b_has_acidic_hydrogen(at, i) != 0 {
+                s_type = 3;
+                s_subtype = SALT_P_DONOR;
+                cand = true;
+            }
+            if !cand && b_has_acidic_minus(at, i) != 0 {
+                s_type = 3;
+                s_subtype = SALT_P_ACCEPTOR;
+                cand = true;
+            }
+            if !cand && b_has_other_exchangable_h(at, i) != 0 {
+                s_type = 3;
+                s_subtype = SALT_DONOR_H;
+                cand = true;
+            }
+        }
+        if cand {
+            if n_cand >= max_cand {
+                return BNS_VERT_EDGE_OVFL;
+            }
+            sgi.s_candidate[n_cand as usize] = SCandidate {
+                atnumber: i as u16,
+                type_: s_type as i8,
+                subtype: s_subtype as i8,
+                endpoint: at[i].endpoint,
+            };
+            n_cand += 1;
+            n_non_taut += i32::from(at[i].endpoint == 0);
+        }
+    }
+    if n_cand > 0 {
+        let mut v = vec![0u16; n_non_taut as usize + 1];
+        v[0] = n_non_taut as u16;
+        let mut n = 1;
+        for i in 0..n_cand as usize {
+            let k = sgi.s_candidate[i].atnumber as usize;
+            if at[k].endpoint == 0 {
+                v[n] = k as u16;
+                n += 1;
+            }
+            for j in 0..super::incomdef::NUM_H_ISOTOPES {
+                tgi.num_iso_h[j] += i16::from(at[k].num_iso_h[j]);
+            }
+            at[k].c_flags |= AT_FLAG_ISO_H_POINT;
+        }
+        tgi.n_isotopic_endpoint_atom_number = v;
+        tgi.n_num_isotopic_endpoints = n_non_taut + 1;
+    }
+    n_cand
 }

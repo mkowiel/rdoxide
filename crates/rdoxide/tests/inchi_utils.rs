@@ -6112,3 +6112,269 @@ fn salt_merge_groups_match_the_c_code() {
     }
     assert!(seen.keys().any(|&k| k > 0) && seen.len() > 3, "{seen:?}");
 }
+
+#[test]
+fn isotopic_h_group_matches_the_c_code() {
+    use rdoxide::external::inchi::ichi_bns::*;
+    use rdoxide::external::inchi::ichitaut::{
+        CGroup, CGroupInfo, SCandidate, SGroupInfo, TGroup, TGroupInfo, make_isotopic_h_group,
+    };
+    use rdoxide::external::inchi::inpdef::InpAtom;
+    fn ints(v: &serde_json::Value) -> Vec<i32> {
+        v.as_array()
+            .unwrap()
+            .iter()
+            .map(|x| x.as_i64().unwrap() as i32)
+            .collect()
+    }
+    fn dump_state(p: &BnStruct, at: &[InpAtom], n: usize, got: &mut Vec<String>) {
+        got.push(format!(
+            "C {} {} {} {}",
+            p.num_vertices, p.num_edges, p.tot_st_cap, p.tot_st_flow
+        ));
+        let mut s = String::from("V");
+        for v in p.vert.iter().take(p.num_vertices as usize) {
+            let e = &v.st_edge;
+            s += &format!(
+                " {}:{}:{}:{}:{}:{}",
+                v.type_, e.cap, e.cap0, e.flow, e.flow0, v.num_adj_edges
+            );
+        }
+        got.push(s);
+        let mut s = String::from("F");
+        for e in p.edge.iter().take(p.num_edges as usize) {
+            s += &format!(" {}:{}:{}:{}", e.cap, e.cap0, e.flow, e.flow0);
+        }
+        got.push(s);
+        let mut s = String::from("A");
+        for a in at.iter().take(n) {
+            s += &format!(
+                " {},{},{},{},{},{},{},{},{}:",
+                a.charge,
+                a.num_h,
+                a.radical,
+                a.chem_bonds_valence,
+                a.num_iso_h[0],
+                a.num_iso_h[1],
+                a.num_iso_h[2],
+                a.at_type,
+                a.endpoint
+            );
+            for j in 0..a.valence as usize {
+                s += &format!("{}.", a.bond_type[j]);
+            }
+        }
+        got.push(s);
+    }
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_isoh.json")).unwrap();
+    let mut seen = std::collections::HashMap::new();
+    for c in data.as_array().unwrap() {
+        let inp = &c["in"];
+        let mut at: Vec<InpAtom> = Vec::new();
+        for a in inp["atoms"].as_array().unwrap() {
+            let iso = ints(&a["iso"]);
+            let mut x = InpAtom {
+                valence: a["v"].as_i64().unwrap() as i8,
+                chem_bonds_valence: a["cbv"].as_i64().unwrap() as i8,
+                el_number: a["el"].as_u64().unwrap() as u8,
+                radical: a["rad"].as_i64().unwrap() as i8,
+                c_point: a["vt"].as_u64().unwrap() as u16,
+                charge: a["chg"].as_i64().unwrap() as i8,
+                num_h: a["nh"].as_i64().unwrap() as i8,
+                orig_at_number: a["orig"].as_u64().unwrap() as u16,
+                endpoint: a["ep"].as_u64().unwrap() as u16,
+                at_type: a["att"].as_u64().unwrap() as u16,
+                n_num_at_in_ring_system: a["ring"].as_u64().unwrap() as u16,
+                ..Default::default()
+            };
+            for k in 0..3 {
+                x.num_iso_h[k] = iso[k] as i8;
+            }
+            x.set_elname(match x.el_number {
+                1 => "H",
+                6 => "C",
+                7 => "N",
+                8 => "O",
+                15 => "P",
+                16 => "S",
+                17 => "Cl",
+                35 => "Br",
+                _ => "Xx",
+            });
+            for (j, e) in a["nb"].as_array().unwrap().iter().enumerate() {
+                x.neighbor[j] = e[0].as_u64().unwrap() as u16;
+                x.bond_type[j] = e[1].as_u64().unwrap() as u8;
+            }
+            at.push(x);
+        }
+        for (i, a) in at.iter_mut().enumerate() {
+            a.n_ring_system = (i % 2) as u16;
+        }
+        let n = at.len();
+        let hs = inp["hs"].as_array().unwrap();
+        for h in hs {
+            let mut x = InpAtom {
+                el_number: 1,
+                valence: 1,
+                orig_at_number: h[1].as_u64().unwrap() as u16,
+                ..Default::default()
+            };
+            x.neighbor[0] = h[0].as_u64().unwrap() as u16;
+            at.push(x);
+        }
+        let (mut p, _) = allocate_and_init_bn_struct(
+            &mut at,
+            n,
+            inp["ma"].as_i64().unwrap() as i32,
+            inp["me"].as_i64().unwrap() as i32,
+            inp["mp"].as_i64().unwrap() as i32,
+        );
+        for i in 0..n {
+            let vt = u32::from(at[i].c_point);
+            p.vert[i].type_ |= (((vt & 0x1c) << 1) | ((vt & 3) << 9)) as u16;
+        }
+        let tf_packed = inp["tf"].as_u64().unwrap();
+        p.pb_taut_flags = (tf_packed & 0xffff) as u32;
+        for o in inp["ops"].as_array().unwrap() {
+            let o = ints(o);
+            let (op, a, b, x, y, z) = (o[0], o[1], o[2], o[3], o[4], o[5]);
+            let mut dots = 5;
+            let nv = p.num_vertices;
+            if op == 10 {
+                if a >= nv {
+                    continue;
+                }
+                add_new_vertex(&mut p, a, x, y, z, &mut dots);
+            } else if op == 11 {
+                if a < p.num_atoms || a >= nv {
+                    continue;
+                }
+                p.vert[a as usize].type_ = x as u16;
+            } else {
+                if a >= nv || b >= nv || a == b {
+                    continue;
+                }
+                add_new_edge(&mut p, a, b, x, y);
+            }
+        }
+        let mut bd = allocate_and_init_bn_data(p.max_vertices);
+        let len = 2 * p.max_vertices as usize + 8;
+        bd.rad_endpoints = vec![0; len];
+        bd.rad_edges = vec![0; len];
+        let mut got: Vec<String> = Vec::new();
+        dump_state(&p, &at, n, &mut got);
+        let ni = n as i32;
+        bns_adjust_flow_bonds_rad(&mut p, &mut bd, &mut at, ni);
+        dump_state(&p, &at, n, &mut got);
+        let max_cp = at.iter().take(n).map(|a| a.c_point).max().unwrap_or(0) as usize;
+        let max_ep = at.iter().take(n).map(|a| a.endpoint).max().unwrap_or(0) as usize;
+        let mut cgi = CGroupInfo {
+            num_c_groups: max_cp,
+            max_num_c_groups: max_cp,
+            ..Default::default()
+        };
+        let mut groups = vec![CGroup::default(); max_cp + 1];
+        for g in 1..=max_cp {
+            groups[g - 1].n_group_number = g as u16;
+            for a in at.iter().take(n) {
+                if a.c_point as usize == g {
+                    groups[g - 1].num_c_points += 1;
+                    groups[g - 1].num[0] += u16::from(a.charge == 1);
+                }
+            }
+        }
+        cgi.c_group = Some(groups);
+        let fch = (tf_packed >> 16) & 0xff;
+        let mut t_group = vec![TGroup::default(); max_ep + 5];
+        for g in 1..=max_ep {
+            t_group[g - 1].n_group_number = g as u16;
+            for a in at.iter().take(n) {
+                if a.endpoint as usize == g {
+                    t_group[g - 1].n_num_endpoints += 1;
+                    t_group[g - 1].num[0] += u16::from(a.num_h > 0);
+                    t_group[g - 1].num[1] += u16::from(a.charge == -1);
+                }
+            }
+        }
+        let mut tgi = TGroupInfo {
+            t_group_number: (0..max_ep + 5)
+                .map(|g| {
+                    if g >= 1 && g <= max_ep && !(fch >= 60 && g == 1) {
+                        g as u16
+                    } else {
+                        0
+                    }
+                })
+                .collect(),
+            t_group: Some(t_group),
+            num_t_groups: max_ep,
+            max_num_t_groups: max_ep + 3,
+            b_taut_flags: if fch & 1 != 0 { 0x20 } else { 0 },
+            b_taut_flags_done: if fch & 2 != 0 { 0x2000 } else { 0 },
+            ..Default::default()
+        };
+        tgi.tni.b_normalization_flags = [0u64, 0x2, 0x10, 0x20][((fch >> 2) & 3) as usize];
+        let max_cand = ((tf_packed >> 24) & 0xff) as i32;
+        let mut sgi = SGroupInfo {
+            s_candidate: vec![SCandidate::default(); max_cand as usize + 2],
+            max_num_candidates: max_cand,
+            ..Default::default()
+        };
+        for _ in inp["calls"].as_array().unwrap() {
+            let ret = make_isotopic_h_group(&mut at, ni, &mut sgi, &mut tgi);
+            *seen.entry(ret).or_insert(0) += 1;
+            got.push(format!(
+                "R {ret} {} {}",
+                sgi.num_candidates, tgi.num_t_groups
+            ));
+            for c in &sgi.s_candidate[..max_cand as usize + 1] {
+                got.push(format!(
+                    "K {} {} {} {}",
+                    c.atnumber, c.type_, c.subtype, c.endpoint
+                ));
+            }
+            for g in &tgi.t_group.as_ref().unwrap()[..tgi.num_t_groups] {
+                let nums: Vec<String> = g.num.iter().map(|x| format!(" {x}")).collect();
+                let das: Vec<String> = g.num_da.iter().map(|x| format!(" {x}")).collect();
+                got.push(format!(
+                    "T {} {} |{} |{}",
+                    g.n_group_number,
+                    g.n_num_endpoints,
+                    nums.concat(),
+                    das.concat()
+                ));
+            }
+            got.push(format!("F {}", tgi.b_taut_flags_done));
+            got.push(format!(
+                "I {} {} {} {} |{} |{}",
+                tgi.num_iso_h[0],
+                tgi.num_iso_h[1],
+                tgi.num_iso_h[2],
+                tgi.n_num_isotopic_endpoints,
+                tgi.n_isotopic_endpoint_atom_number
+                    .iter()
+                    .map(|x| format!(" {x}"))
+                    .collect::<String>(),
+                at.iter()
+                    .take(n)
+                    .map(|a| format!(" {}", a.c_flags))
+                    .collect::<String>()
+            ));
+            let mut s = String::from("P");
+            for a in at.iter().take(n) {
+                s += &format!(" {},{}", a.endpoint, a.c_point);
+            }
+            got.push(s);
+            dump_state(&p, &at, n, &mut got);
+        }
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        assert_eq!(got, want, "{inp}");
+    }
+    assert!(seen.keys().any(|&k| k > 0) && seen.len() > 3, "{seen:?}");
+}
