@@ -26,6 +26,7 @@ pub mod ichi_io;
 pub mod ichican2;
 pub mod ichicano;
 pub mod ichierr;
+pub mod ichimak2;
 pub mod ichimake;
 pub mod ichimap;
 pub mod ichimap4;
