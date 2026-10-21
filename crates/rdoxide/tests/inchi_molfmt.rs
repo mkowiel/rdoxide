@@ -532,3 +532,196 @@ fn read_molfile_with_sdf_data_matches_c() {
         assert_eq!(out, want, "case {ci}: {inp}");
     }
 }
+
+fn dump_inp_atoms(
+    at: &[rdoxide::external::inchi::inpdef::InpAtom],
+    n: usize,
+    out: &mut Vec<String>,
+) {
+    for (i, a) in at.iter().enumerate().take(n.min(100)) {
+        let name = &a.elname[..a
+            .elname
+            .iter()
+            .position(|&c| c == 0)
+            .unwrap_or(a.elname.len())];
+        let mut l = format!(
+            "A {i} {} {} {} {} {} {} {} {} {} {} {} {} {} {}",
+            hex(name),
+            a.el_number,
+            a.orig_at_number,
+            a.valence,
+            a.chem_bonds_valence,
+            a.num_h,
+            a.num_iso_h[0],
+            a.num_iso_h[1],
+            a.num_iso_h[2],
+            a.iso_atw_diff,
+            a.charge,
+            a.radical,
+            pd(a.x),
+            pd(a.y)
+        );
+        l += &format!(" {}", pd(a.z));
+        for j in 0..a.valence.max(0) as usize {
+            l += &format!(" {}:{}:{}", a.neighbor[j], a.bond_type[j], a.bond_stereo[j]);
+        }
+        out.push(l);
+    }
+}
+
+#[test]
+fn molfile_to_inp_atoms_matches_c() {
+    use rdoxide::external::inchi::mol2atom::*;
+    use rdoxide::external::inchi::strutil::OrigAtomData;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_mol2atom.json")).unwrap();
+    for (ci, c) in data.as_array().unwrap().iter().enumerate() {
+        let inp = c["in"].as_str().unwrap();
+        let t: Vec<&str> = inp.split(' ').collect();
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        let p = |k: usize| t[k].parse::<i32>().unwrap();
+        let (use_od, merge, bcoord, noaddh) = (p(0) == 1, p(1) == 1, p(2) == 1, p(3) == 1);
+        let (polymers, npzz, large, label_kind) = (p(4), p(5), p(6) == 1, p(7) as usize);
+        let (use_val, use_id, nowarn) = (p(8) == 1, p(9) == 1, p(10) == 1);
+        let labels: [Option<&[u8]>; 8] = [
+            None,
+            Some(b""),
+            Some(b"CAS"),
+            Some(b"x"),
+            Some(b"MolfileName"),
+            Some(b"MolfileLine2"),
+            Some(b"MolfileComment"),
+            Some(b"MolfileIntRegNo"),
+        ];
+        let mut ios = stream(&unhex(t[11]));
+        let mut perr = String::new();
+        let mut value = Vec::new();
+        let mut id: u64 = 777;
+        let mut molnum: i64 = -5;
+        let mut flags: u64 = if large { FLAG_SET_INP_LARGE_MOLS } else { 0 };
+        let mut od = use_od.then(OrigAtomData::default);
+        let mut err = 0;
+        let na = create_orig_inp_data_from_molfile(
+            &mut ios,
+            &mut od,
+            merge,
+            bcoord,
+            noaddh,
+            polymers,
+            npzz,
+            MolfileAtomsArgs {
+                sdf_label: labels[label_kind],
+                sdf_value: use_val.then_some(&mut value),
+                id: use_id.then_some(&mut id),
+                inp_atom_flags: Some(&mut flags),
+            },
+            &mut molnum,
+            &mut err,
+            &mut perr,
+            nowarn,
+        );
+        let mut out = vec![format!(
+            "R {na} {err} {molnum} {flags} {id} {} {}",
+            hex(&value),
+            hex(perr.as_bytes())
+        )];
+        if let (true, 0, Some(od)) = (use_od, err, od.as_ref()) {
+            out.push(format!(
+                "O {} {} {}",
+                od.num_inp_atoms, od.num_inp_bonds, od.num_dimensions
+            ));
+            dump_inp_atoms(&od.at, od.num_inp_atoms, &mut out);
+            if let Some(co) = &od.sz_coord {
+                for i in 0..od.num_inp_atoms.min(100) {
+                    let n = co[i].iter().position(|&x| x == 0).unwrap_or(32);
+                    out.push(format!("K {i} {}", hex(&co[i][..n])));
+                }
+            }
+            if let Some(pl) = &od.polymer {
+                out.push(format!(
+                    "P {} {} {} {} {} {} {}",
+                    pl.n,
+                    pl.n_pzz,
+                    pl.really_do_frame_shift,
+                    pl.frame_shift_scheme,
+                    pl.treat,
+                    pl.is_in_reconn,
+                    pl.edit_repeats
+                ));
+                for u in &pl.units {
+                    let mut l = format!(
+                        "U {} {} {} {} {} {} {} ",
+                        u.id, u.type_, u.subtype, u.conn, u.label, u.na, u.nb
+                    );
+                    for x in u.xbr1.iter().chain(u.xbr2.iter()) {
+                        l += &format!("{} ", pd(*x));
+                    }
+                    l += &hex(&u.smt);
+                    for x in &u.alist {
+                        l += &format!(" {x}");
+                    }
+                    l += " |";
+                    for x in &u.blist {
+                        l += &format!(" {x}");
+                    }
+                    out.push(l);
+                }
+            }
+            if let Some(v) = &od.v3000 {
+                let mut l = format!(
+                    "V {} {} {} {} {} {} {} {} {} {} {} {}",
+                    v.n_non_star_atoms,
+                    v.n_star_atoms,
+                    v.n_sgroups,
+                    v.n_3d_constraints,
+                    v.n_collections,
+                    v.n_non_haptic_bonds,
+                    v.n_haptic_bonds,
+                    v.n_steabs,
+                    v.n_sterel,
+                    v.n_sterac,
+                    i32::from(!v.atom_index_orig.is_empty()),
+                    i32::from(!v.atom_index_fin.is_empty())
+                );
+                if !v.atom_index_orig.is_empty() {
+                    let raw: Vec<u8> = v
+                        .atom_index_orig
+                        .iter()
+                        .flat_map(|x| x.to_le_bytes())
+                        .collect();
+                    for k in 0..16 {
+                        l += &format!(" {}", raw.get(k).copied().unwrap_or(0));
+                    }
+                }
+                out.push(l);
+                fn lists(ls: &[Vec<i32>], n: i32, len_at: usize, add: i32) -> String {
+                    let mut s = format!(" {n}");
+                    for x in ls.iter().take(n.max(0) as usize) {
+                        s += " [";
+                        for k in 0..((x[len_at] + add).max(0) as usize).min(40) {
+                            s += &format!("{},", x[k]);
+                        }
+                        s += "]";
+                    }
+                    s
+                }
+                out.push(format!(
+                    "W{}",
+                    lists(&v.lists_haptic_bonds, v.n_haptic_bonds, 2, 3)
+                ));
+                out.push(format!(
+                    "S{}{}{}",
+                    lists(&v.lists_steabs, v.n_steabs, 1, 2),
+                    lists(&v.lists_sterel, v.n_sterel, 1, 2),
+                    lists(&v.lists_sterac, v.n_sterac, 1, 2)
+                ));
+            }
+        }
+        assert_eq!(out, want, "case {ci}: {inp}");
+    }
+}

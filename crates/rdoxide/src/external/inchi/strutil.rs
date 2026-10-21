@@ -1895,6 +1895,14 @@ pub struct OrigAtomData {
     pub num_components: i32,
     /// `bDisconnectSalts`
     pub b_disconnect_salts: i32,
+    /// `szCoord`: the original coordinate strings
+    pub sz_coord: Option<Vec<super::ichiprt1::MolCoord>>,
+    /// `num_dimensions`
+    pub num_dimensions: i32,
+    /// `polymer` (v. 1.05 extension)
+    pub polymer: Option<super::mol2atom::OadPolymer>,
+    /// `v3000` (v. 1.05 extension)
+    pub v3000: Option<super::mol2atom::OadV3000>,
 }
 
 /// Heteroatoms that may take a charge after a ligand is disconnected: the
