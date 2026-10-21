@@ -6476,7 +6476,7 @@ fn tautomer_groups_match_the_c_code() {
             at.push(x);
         }
         for (i, a) in at.iter_mut().enumerate() {
-            a.n_ring_system = (i % 2) as u16;
+            a.n_ring_system = inp["atoms"][i]["rs"].as_u64().unwrap_or((i % 2) as u64) as u16;
         }
         let n = at.len();
         let hs = inp["hs"].as_array().unwrap();
