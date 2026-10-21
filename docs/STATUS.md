@@ -271,6 +271,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 155 | done |
 | 156 | done |
 | 157 | done |
+| 158 | done |
 
 ## Python package files
 
@@ -598,3 +599,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-19 — Stage 155: I4j: GetAtomChargeType, IsZOX
 * 2026-10-19 — Stage 156: I4k: SubtractOrChangeAtHChargeBNS, MarkAtomsAtTautGroups, AddOrRemoveExplOrImplH
 * 2026-10-19 — Stage 157: I4l: bExistsAltPath, bExistsAnyAltPath
+* 2026-10-19 — Stage 158: I4m: AddTGroups2BnStruct, AddCGroups2BnStruct, ReInitBnStructAddGroups
