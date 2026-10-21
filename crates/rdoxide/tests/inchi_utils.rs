@@ -14084,3 +14084,51 @@ fn ichiprt1_original_structure_writers_match_the_c_code() {
         assert_eq!(vec![got], want, "case {ci}: {}", c["in"]);
     }
 }
+
+#[test]
+fn ichiprt1_bond_writer_matches_the_c_code() {
+    use rdoxide::external::inchi::ichiprt1::write_orig_bonds;
+    use rdoxide::external::inchi::inpdef::InpAtom;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_prt1f.json")).unwrap();
+    for (ci, c) in data.as_array().unwrap().iter().enumerate() {
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        let mut t = InchiTok(c["in"].as_str().unwrap().split_whitespace());
+        let n = t.i() as usize;
+        let mut i = t.i() as usize;
+        let buf_len = t.i() as usize;
+        let mut at = vec![InpAtom::default(); n];
+        for a in at.iter_mut() {
+            a.el_number = t.i() as u8;
+            a.valence = t.i() as i8;
+            for m in 0..a.valence as usize {
+                a.neighbor[m] = t.i() as u16;
+            }
+            for m in 0..a.valence as usize {
+                a.bond_type[m] = t.i() as u8;
+            }
+            for m in 0..a.valence as usize {
+                a.bond_stereo[m] = t.i() as i8;
+            }
+            a.chem_bonds_valence = t.i() as i8;
+            for m in 0..3 {
+                a.sb_parity[m] = t.i() as i8;
+            }
+            for m in 0..3 {
+                a.sb_ord[m] = t.i() as i8;
+            }
+            for m in 0..3 {
+                a.sn_ord[m] = t.i() as i8;
+            }
+        }
+        let mut err = String::new();
+        let s = write_orig_bonds(n, &at, &mut i, buf_len, &mut err);
+        let got = format!("{} {i} [{s}] [{err}]", s.len());
+        assert_eq!(vec![got], want, "case {ci}: {}", c["in"]);
+    }
+}

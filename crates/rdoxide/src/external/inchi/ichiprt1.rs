@@ -2089,3 +2089,217 @@ pub fn write_orig_atoms(
     }
     buf
 }
+
+/// `WriteOrigBonds`: the bonds of the atoms from `*i` on, in ascending order
+/// of the neighbor numbers, each atom ended with `;`; `err` receives the
+/// structure error messages (`pStrErrStruct`)
+pub fn write_orig_bonds(
+    num_inp_atoms: usize,
+    at: &[InpAtom],
+    i: &mut usize,
+    buf_len: usize,
+    err: &mut String,
+) -> String {
+    use super::ichister::{
+        STEREO_DBLE_EITHER, STEREO_SNGL_DOWN, STEREO_SNGL_EITHER, STEREO_SNGL_UP,
+        get_opposite_sb_atom,
+    };
+    use super::inpdef::{MAX_NUM_STEREO_BONDS, sb_parity_1, sb_parity_2};
+    use super::util::is_el_a_metal;
+    let mut buf = String::new();
+    let mut j = *i;
+    while j < num_inp_atoms {
+        let aj = &at[j];
+        let val = aj.valence.max(0) as usize;
+        let mut neigh_order: Vec<u16> = (0..val as u16).collect();
+        insertions_sort(&mut neigh_order, |a, b| {
+            i32::from(aj.neighbor[usize::from(*a)]) - i32::from(aj.neighbor[usize::from(*b)])
+        });
+        let mut cur = String::new();
+        for &kk in &neigh_order {
+            let k = usize::from(kk);
+            let j2 = usize::from(aj.neighbor[k]);
+            let (mut bond_parity, mut bond_parity_nm) = (0, 0);
+            if j2 >= j {
+                continue;
+            }
+            let bond_stereo = i32::from(aj.bond_stereo[k]);
+            let bond_char = match i32::from(aj.bond_type[k]) {
+                1 => match bond_stereo {
+                    x if x == STEREO_SNGL_UP => 'p',
+                    x if x == -STEREO_SNGL_UP => 'P',
+                    x if x == STEREO_SNGL_DOWN => 'n',
+                    x if x == -STEREO_SNGL_DOWN => 'N',
+                    x if x == STEREO_SNGL_EITHER => 'v',
+                    x if x == -STEREO_SNGL_EITHER => 'V',
+                    _ => 's',
+                },
+                2 => {
+                    if bond_stereo == i32::from(STEREO_DBLE_EITHER)
+                        || bond_stereo == -i32::from(STEREO_DBLE_EITHER)
+                    {
+                        'w'
+                    } else {
+                        'd'
+                    }
+                }
+                3 => 't',
+                4 => 'a',
+                _ => 's',
+            };
+            let a2 = &at[j2];
+            let k2 = a2.neighbor[..a2.valence.max(0) as usize]
+                .iter()
+                .position(|&x| usize::from(x) == j)
+                .unwrap_or(0);
+            let (mut chain_len, mut chain_len2) = (0, 0);
+            let (mut pnxt_atom, mut pinxt2cur, mut pinxt_sb_parity_ord) = (0usize, 0usize, 0usize);
+            let (mut pnxt_atom2, mut pinxt2cur2, mut pinxt_sb_parity_ord2) =
+                (0usize, 0usize, 0usize);
+            if aj.sb_parity[0] != 0 {
+                let mut m1 = 0;
+                while m1 < MAX_NUM_STEREO_BONDS && aj.sb_parity[m1] != 0 {
+                    if k == aj.sb_ord[m1] as usize {
+                        (chain_len, pnxt_atom, pinxt2cur, pinxt_sb_parity_ord) =
+                            get_opposite_sb_atom(at, j, k);
+                        break;
+                    }
+                    m1 += 1;
+                }
+            }
+            if a2.sb_parity[0] != 0 {
+                let mut m2 = 0;
+                while m2 < MAX_NUM_STEREO_BONDS && a2.sb_parity[m2] != 0 {
+                    if k2 == a2.sb_ord[m2] as usize {
+                        (chain_len2, pnxt_atom2, pinxt2cur2, pinxt_sb_parity_ord2) =
+                            get_opposite_sb_atom(at, j2, k2);
+                        break;
+                    }
+                    m2 += 1;
+                }
+            }
+            let (mut pcur_atom, mut picur2nxt, mut picur_sb_parity_ord) = (0usize, 0usize, -1i32);
+            if (chain_len == 1 && chain_len2 == 1) || (chain_len > 1 && j > pnxt_atom) {
+                pcur_atom = j;
+                picur2nxt = k;
+                let mut m = 0;
+                while m < MAX_NUM_STEREO_BONDS && at[pcur_atom].sb_parity[m] != 0 {
+                    if at[pcur_atom].sb_ord[m] as usize == k {
+                        picur_sb_parity_ord = m as i32;
+                        break;
+                    }
+                    m += 1;
+                }
+            } else if chain_len2 > 1 && j2 > pnxt_atom2 {
+                pcur_atom = j2;
+                picur2nxt = k2;
+                pnxt_atom = pnxt_atom2;
+                pinxt2cur = pinxt2cur2;
+                pinxt_sb_parity_ord = pinxt_sb_parity_ord2;
+                let mut m = 0;
+                while m < MAX_NUM_STEREO_BONDS && at[pcur_atom].sb_parity[m] != 0 {
+                    if at[pcur_atom].sb_ord[m] as usize == k2 {
+                        picur_sb_parity_ord = m as i32;
+                    }
+                    m += 1;
+                }
+                chain_len = chain_len2;
+            } else {
+                chain_len = 0;
+            }
+            if chain_len != 0 {
+                let (mut p1, mut p1_nm) = (0, 0);
+                if picur_sb_parity_ord >= 0 {
+                    let sp = at[pcur_atom].sb_parity[picur_sb_parity_ord as usize];
+                    p1 = sb_parity_1(sp);
+                    p1_nm = sb_parity_2(sp);
+                }
+                let p2 = sb_parity_1(at[pnxt_atom].sb_parity[pinxt_sb_parity_ord]);
+                let p2_nm = sb_parity_2(at[pnxt_atom].sb_parity[pinxt_sb_parity_ord]);
+                let well_def = atom_parity_well_def(p1) && atom_parity_well_def(p2);
+                let has_metal = atom_parity_well_def(p1_nm) && atom_parity_well_def(p2_nm);
+                let (mut switched1, mut switched2) = (0, 0);
+                if well_def || has_metal {
+                    let lowest = |atom: usize, skip: usize| -> usize {
+                        let mut n1 = num_inp_atoms;
+                        for kc in 0..at[atom].valence.max(0) as usize {
+                            if kc == skip {
+                                continue;
+                            }
+                            let neigh = usize::from(at[atom].neighbor[kc]);
+                            if has_metal && is_el_a_metal(i32::from(at[neigh].el_number)) {
+                                continue;
+                            }
+                            n1 = n1.min(neigh);
+                        }
+                        n1
+                    };
+                    let neigh1 = lowest(pcur_atom, picur2nxt);
+                    if neigh1 < num_inp_atoms {
+                        let sn = at[pcur_atom].sn_ord[picur_sb_parity_ord as usize] as usize;
+                        switched1 = i32::from(neigh1 != usize::from(at[pcur_atom].neighbor[sn]));
+                    } else {
+                        super::ichierr::add_error_message(
+                            err,
+                            "Cannot find 0D stereobond neighbor",
+                        );
+                    }
+                    let neigh2 = lowest(pnxt_atom, pinxt2cur);
+                    if neigh2 < num_inp_atoms {
+                        let sn = at[pnxt_atom].sn_ord[pinxt_sb_parity_ord] as usize;
+                        switched2 = i32::from(neigh2 != usize::from(at[pnxt_atom].neighbor[sn]));
+                    } else {
+                        super::ichierr::add_error_message(
+                            err,
+                            "Cannot find 0D stereobond neighbor",
+                        );
+                    }
+                    if neigh1 < num_inp_atoms && neigh2 < num_inp_atoms {
+                        if atom_parity_well_def(p1) && atom_parity_well_def(p2) {
+                            bond_parity = 2 - (p1 + p2 + switched1 + switched2) % 2;
+                        } else {
+                            bond_parity = p1.min(p2);
+                        }
+                        if has_metal {
+                            bond_parity_nm = 2 - (p1_nm + p2_nm + switched1 + switched2) % 2;
+                        } else if p1_nm != 0 && p2_nm != 0 {
+                            bond_parity_nm = p1_nm.min(p2_nm);
+                        }
+                    }
+                } else {
+                    if p1 != 0 && p2 != 0 {
+                        bond_parity = p1.min(p2);
+                    }
+                    if p1_nm != 0 && p2_nm != 0 {
+                        bond_parity_nm = p1_nm.min(p2_nm);
+                    }
+                    if bond_parity_nm != 0 && bond_parity == 0 {
+                        bond_parity = AB_PARITY_UNDF;
+                    }
+                }
+            }
+            let ps = |p: i32| match p {
+                AB_PARITY_ODD => "-",
+                AB_PARITY_EVEN => "+",
+                AB_PARITY_UNKN => "u",
+                AB_PARITY_UNDF => "?",
+                _ => "",
+            };
+            cur.push_str(&format!(
+                "{bond_char}{}{}{}",
+                ps(bond_parity),
+                ps(bond_parity_nm),
+                j2 + 1
+            ));
+        }
+        if cur.len() + buf.len() + 2 < buf_len {
+            buf.push_str(&cur);
+            buf.push(';');
+            j += 1;
+        } else {
+            break;
+        }
+    }
+    *i = if num_inp_atoms > 0 { j } else { 0 };
+    buf
+}
