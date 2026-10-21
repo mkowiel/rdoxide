@@ -4884,3 +4884,295 @@ pub fn set_init_cap_flow_to_current(p: &mut BnStruct) -> i32 {
     }
     0
 }
+
+// ---- simple proton addition and removal ----
+
+use super::ichitaut::{SALT_ACCEPTOR, SALT_DONOR_H, SALT_DONOR_NEG};
+
+const PR_SIMPLE_MSK: i32 = atbit::NP_PROTON | atbit::OH_PLUS;
+const PR_SIMPLE_TYP: i32 = (ATT_ATOM_N | ATT_ATOM_P | ATT_O_PLUS) as i32;
+const ATBIT_MSK_NP: i32 =
+    atbit::NP_PLUS | atbit::NP_PROTON | atbit::NP_H | atbit::N_MINUS | atbit::NP;
+const ATBIT_MSK_OS: i32 = atbit::COH
+    | atbit::CSH
+    | atbit::ZOH
+    | atbit::OOH
+    | atbit::ZOOH
+    | atbit::NOH
+    | atbit::N_OH
+    | atbit::CO
+    | atbit::ZO
+    | atbit::NO
+    | atbit::N_O
+    | atbit::CO_MINUS
+    | atbit::CS_MINUS
+    | atbit::ZO_MINUS
+    | atbit::OO_MINUS
+    | atbit::ZOO_MINUS
+    | atbit::NO_MINUS
+    | atbit::N_O_MINUS;
+const ATTYP_OS: i32 =
+    (ATT_ACIDIC_CO | ATT_ACIDIC_S | ATT_OO | ATT_ZOO | ATT_NO | ATT_OTHER_ZO) as i32;
+const ATTYP_N: i32 = ATT_ATOM_N as i32;
+const PR_HARD_MSK_NEG: i32 = ATBIT_MSK_NP | ATBIT_MSK_OS;
+const PR_HARD_TYP_NEG: i32 = ATTYP_N | ATTYP_OS;
+const PR_HARD_MSK_H: i32 = ATBIT_MSK_NP | ATBIT_MSK_OS;
+const PR_HARD_TYP_H: i32 = ATTYP_N | ATTYP_OS;
+
+/// `ArTypMask` (type, mask) pairs of the acidic H groups (`AR_SIMPLE_*`;
+/// the pairs 2 and 3 are 0 because `AR_ANY_OH` is 0)
+const AR_TYP_MASK: [(i32, i32); 1] = [(
+    (ATT_ACIDIC_CO | ATT_ACIDIC_S | ATT_OO | ATT_ZOO | ATT_NO | ATT_HAL_ACID) as i32,
+    atbit::COH | atbit::CSH | atbit::OOH | atbit::ZOOH | atbit::NOH | atbit::HAL_ACID,
+)];
+
+/// `AaTypMask` (type, mask) pairs of the acidic anions (`AA_SIMPLE_*`; the
+/// pairs 2 and 3 are 0 because `AA_ANY_O_Minus` is 0)
+const AA_TYP_MASK: [(i32, i32); 2] = [
+    (
+        (ATT_ACIDIC_CO | ATT_ACIDIC_S | ATT_OO | ATT_ZOO | ATT_NO | ATT_OH_MINUS | ATT_HAL_ANION)
+            as i32,
+        atbit::CO_MINUS
+            | atbit::CS_MINUS
+            | atbit::OO_MINUS
+            | atbit::ZOO_MINUS
+            | atbit::NO_MINUS
+            | atbit::O_MINUS
+            | atbit::HAL_ANION,
+    ),
+    (ATT_NP_MINUS_V23 as i32, atbit::N_MINUS),
+];
+
+/// `SimpleRemoveHplusNPO`: removes H(+) from the N, P and O atoms that carry
+/// it; returns the number of removed protons
+pub fn simple_remove_hplus_npo(
+    at: &mut [InpAtom],
+    num_atoms: i32,
+    mut totals: Option<&mut [i32]>,
+    tgi: &mut TGroupInfo,
+) -> i32 {
+    let mut num_removed = 0;
+    for i in 0..num_atoms as usize {
+        let (type_, mask) = get_atom_charge_type(at, i, None, 0);
+        if PR_SIMPLE_TYP & type_ != 0 && PR_SIMPLE_MSK & mask.unwrap_or(0) != 0 {
+            get_atom_charge_type(at, i, totals.as_deref_mut(), 1);
+            at[i].charge = 0;
+            add_or_remove_expl_or_impl_h(-1, at, num_atoms, i, tgi);
+            num_removed += 1;
+            get_atom_charge_type(at, i, totals.as_deref_mut(), 0);
+        }
+    }
+    num_removed
+}
+
+/// `bIsAtomTypeHard` (`OPPOSITE_CHARGE_IN_CGROUP` is 1: the charge is not
+/// checked)
+pub fn b_is_atom_type_hard(at: &[InpAtom], endpoint: usize, n_type: i32, n_mask: i32) -> bool {
+    let (type_, mask) = get_atom_charge_type(at, endpoint, None, 0);
+    n_type & type_ != 0 && mask.unwrap_or(0) & n_mask != 0
+}
+
+/// `bIsHDonorAccAtomType`
+pub fn b_is_h_donor_acc_atom_type(at: &[InpAtom], endpoint: usize, c_sub_type: &mut i32) -> i32 {
+    if b_is_atom_type_hard(at, endpoint, PR_HARD_TYP_H, PR_HARD_MSK_H) {
+        let a = &at[endpoint];
+        let neutral_valence =
+            i32::from(a.chem_bonds_valence) + i32::from(a.num_h) - i32::from(a.charge);
+        if neutral_valence != 2 && neutral_valence != 3 {
+            return -1;
+        }
+        let mut edge_flow = i32::from(a.num_h);
+        let edge_cap = neutral_valence - i32::from(a.valence);
+        edge_flow = edge_flow.min(edge_cap);
+        if edge_cap != 0 {
+            if edge_cap > edge_flow {
+                *c_sub_type |= SALT_ACCEPTOR;
+            }
+            if edge_flow != 0 {
+                *c_sub_type |= SALT_DONOR_H;
+            }
+            return 4;
+        }
+    }
+    -1
+}
+
+/// `bIsNegAtomType`
+pub fn b_is_neg_atom_type(at: &[InpAtom], endpoint: usize, c_sub_type: &mut i32) -> i32 {
+    let mut sub_type = 0;
+    if b_is_atom_type_hard(at, endpoint, PR_HARD_TYP_NEG, PR_HARD_MSK_NEG) {
+        let a = &at[endpoint];
+        let neutral_valence =
+            i32::from(a.chem_bonds_valence) + i32::from(a.num_h) - i32::from(a.charge);
+        if neutral_valence != 2 && neutral_valence != 3 {
+            return -1;
+        }
+        let mut edge_flow = i32::from(a.charge == -1);
+        let edge_cap = neutral_valence - i32::from(a.valence) - i32::from(a.num_h);
+        edge_flow = edge_flow.min(edge_cap);
+        if edge_cap != 0 {
+            if edge_cap > edge_flow {
+                sub_type |= SALT_ACCEPTOR;
+            }
+            if edge_flow != 0 {
+                sub_type |= SALT_DONOR_NEG;
+            }
+            if sub_type != 0 {
+                *c_sub_type |= sub_type;
+                return 4;
+            }
+        }
+    }
+    -1
+}
+
+/// `bIsHardRemHCandidate`
+pub fn b_is_hard_rem_h_candidate(at: &[InpAtom], i: usize, c_sub_type: &mut i32) -> i32 {
+    let mut sub_type = 0;
+    let ret1 = b_is_h_donor_acc_atom_type(at, i, &mut sub_type);
+    let ret2 = b_is_neg_atom_type(at, i, &mut sub_type);
+    let ret = ret1.max(ret2);
+    if ret > 0 && sub_type != 0 {
+        *c_sub_type |= sub_type;
+        return ret;
+    }
+    -1
+}
+
+/// `SimpleRemoveAcidicProtons` / `SimpleAddAcidicProtons`: the first
+/// `num` atoms of the earliest matching class lose (`remove`) a proton or
+/// get one; the C code tests the mask with `&&`, i.e. for being non-zero
+fn simple_move_acidic_protons(
+    at: &mut [InpAtom],
+    num_atoms: i32,
+    aatg: &mut BnAatg,
+    num: i32,
+    classes: &[(i32, i32)],
+    remove: bool,
+) -> i32 {
+    let selected = |a: &InpAtom| {
+        if remove {
+            a.charge == 0 && a.num_h != 0
+        } else {
+            a.charge == -1
+        }
+    };
+    let mut count = vec![0i32; classes.len()];
+    let mut max_j = classes.len() - 1;
+    for i in 0..num_atoms as usize {
+        if selected(&at[i]) {
+            let (type_, mask) = get_atom_charge_type(at, i, None, 0);
+            if type_ != 0 {
+                for (j, c) in classes.iter().enumerate().take(max_j + 1) {
+                    if type_ & c.0 != 0 && mask.unwrap_or(0) != 0 {
+                        count[j] += 1;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    let mut num_tot = 0;
+    for j in 0..=max_j {
+        num_tot += count[j];
+        if num_tot >= num {
+            max_j = j;
+            break;
+        }
+    }
+    if num_tot == 0 {
+        return 0;
+    }
+    let mut num_done = 0;
+    let mut i = 0usize;
+    while i < num_atoms as usize && num_done < num {
+        if selected(&at[i]) {
+            let (type_, mask) = get_atom_charge_type(at, i, None, 0);
+            if type_ != 0 {
+                for j in 0..=max_j {
+                    if count[j] != 0 && type_ & classes[j].0 != 0 && mask.unwrap_or(0) != 0 {
+                        get_atom_charge_type(at, i, aatg.n_at_type_totals.as_deref_mut(), 1);
+                        count[j] -= 1;
+                        at[i].charge += if remove { -1 } else { 1 };
+                        let tgi = aatg.t_group_info.as_mut().expect("t_group_info");
+                        add_or_remove_expl_or_impl_h(
+                            if remove { -1 } else { 1 },
+                            at,
+                            num_atoms,
+                            i,
+                            tgi,
+                        );
+                        num_done += 1;
+                        get_atom_charge_type(at, i, aatg.n_at_type_totals.as_deref_mut(), 0);
+                        break;
+                    }
+                }
+            }
+        }
+        i += 1;
+    }
+    num_done
+}
+
+/// `SimpleRemoveAcidicProtons`: removes up to `num2remove` protons from acids
+pub fn simple_remove_acidic_protons(
+    at: &mut [InpAtom],
+    num_atoms: i32,
+    aatg: &mut BnAatg,
+    num2remove: i32,
+) -> i32 {
+    simple_move_acidic_protons(at, num_atoms, aatg, num2remove, &AR_TYP_MASK, true)
+}
+
+/// `SimpleAddAcidicProtons`: adds up to `num2add` protons to acidic anions
+pub fn simple_add_acidic_protons(
+    at: &mut [InpAtom],
+    num_atoms: i32,
+    aatg: &mut BnAatg,
+    num2add: i32,
+) -> i32 {
+    simple_move_acidic_protons(at, num_atoms, aatg, num2add, &AA_TYP_MASK, false)
+}
+
+fn has_class(at: &[InpAtom], i: usize, classes: &[(i32, i32)]) -> i32 {
+    let (type_, mask) = get_atom_charge_type(at, i, None, 0);
+    if type_ != 0 {
+        let mask = mask.unwrap_or(0);
+        for c in classes {
+            if type_ & c.0 != 0 && mask & c.1 != 0 {
+                return 1;
+            }
+        }
+    }
+    0
+}
+
+/// `bHasAcidicHydrogen`
+pub fn b_has_acidic_hydrogen(at: &[InpAtom], i: usize) -> i32 {
+    if at[i].charge == 0 && at[i].num_h != 0 {
+        has_class(at, i, &AR_TYP_MASK)
+    } else {
+        0
+    }
+}
+
+/// `bHasOtherExchangableH`
+pub fn b_has_other_exchangable_h(at: &[InpAtom], i: usize) -> i32 {
+    if at[i].num_h != 0 {
+        let (type_, mask) = get_atom_charge_type(at, i, None, 0);
+        if type_ != 0 && type_ & i32::from(ATT_ATOM_N) != 0 && mask.unwrap_or(0) & atbit::NP_H != 0
+        {
+            return 1;
+        }
+    }
+    0
+}
+
+/// `bHasAcidicMinus`
+pub fn b_has_acidic_minus(at: &[InpAtom], i: usize) -> i32 {
+    if at[i].charge == -1 {
+        has_class(at, i, &AA_TYP_MASK)
+    } else {
+        0
+    }
+}
