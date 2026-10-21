@@ -1352,3 +1352,260 @@ pub fn get_one_additional_layer(cd: Option<&CanonData>, pzb_rho_fix: Option<&Con
     }
     if num_last == 1 { last } else { 0 }
 }
+
+// ---------------------------------------------------------------------------
+// initial ranks and atom invariants, clean-up of the canonical CT arrays
+// ---------------------------------------------------------------------------
+
+use super::ichimap::{
+    AT_INV_HILL_ORDER, AT_INV_NUM_CONNECTIONS, AT_INV_NUM_H, AT_INV_NUM_H_FIX,
+    AT_INV_NUM_TG_ENDPOINTS, AT_INV_TAUT_ISO, AT_INV_TG_NUMBERS, AtomInvariant2,
+    comp_atom_invariants2, comp_atom_invariants2_only,
+};
+use super::ichisort::{comp_chem_elem_lex, inchi_qsort};
+use super::ichister::SpAtom;
+use super::ichitaut::{T_NUM_ISOTOPIC, TGroupInfo};
+use super::inpdef::MAXVAL;
+
+pub const EMPTY_H_NUMBER: i16 = INCHI_CANON_INFINITY as i16 - 1;
+pub const BASE_H_NUMBER: i16 = (INCHI_CANON_INFINITY as i16 - 1) / 2;
+pub const EMPTY_ISO_SORT_KEY: i64 = i64::MAX;
+const ELEM_NAME_LEN: usize = 2;
+const NUM_CHEM_ELEMENTS: usize = 127;
+
+/// `SetInitialRanks2`: sorts the atoms by their invariants and assigns the
+/// initial ranks; returns the number of different ranks
+pub fn set_initial_ranks2(
+    num_atoms: usize,
+    atom_invariant2: &[AtomInvariant2],
+    n_new_rank: &mut [u16],
+    n_atom_number: &mut [u16],
+) -> i32 {
+    for (i, a) in n_atom_number[..num_atoms].iter_mut().enumerate() {
+        *a = i as u16;
+    }
+    inchi_qsort(&mut n_atom_number[..num_atoms], |a, b| {
+        comp_atom_invariants2(atom_invariant2, *a, *b)
+    });
+    let mut n_num_diff_ranks = 1;
+    if num_atoms > 0 {
+        let mut n_current_rank = num_atoms as u16;
+        n_new_rank[n_atom_number[num_atoms - 1] as usize] = n_current_rank;
+        for i in (1..num_atoms).rev() {
+            if comp_atom_invariants2_only(
+                &atom_invariant2[n_atom_number[i - 1] as usize],
+                &atom_invariant2[n_atom_number[i] as usize],
+            ) != 0
+            {
+                n_num_diff_ranks += 1;
+                n_current_rank = i as u16;
+            }
+            n_new_rank[n_atom_number[i - 1] as usize] = n_current_rank;
+        }
+    }
+    n_num_diff_ranks
+}
+
+/// the part of a NUL terminated byte string before the NUL
+fn c_str(b: &[u8]) -> &[u8] {
+    let n = b.iter().position(|&c| c == 0).unwrap_or(b.len());
+    &b[..n]
+}
+
+/// `strstr`: the position of `needle` in the C string `hay`
+fn c_strstr(hay: &[u8], needle: &[u8]) -> Option<usize> {
+    let hay = c_str(hay);
+    let needle = c_str(needle);
+    if needle.is_empty() {
+        return Some(0);
+    }
+    hay.windows(needle.len()).position(|w| w == needle)
+}
+
+/// `FillOutAtomInvariant2`
+#[allow(clippy::too_many_arguments)]
+pub fn fill_out_atom_invariant2(
+    at: &[SpAtom],
+    num_atoms: usize,
+    num_at_tg: usize,
+    atom_invariant: &mut [AtomInvariant2],
+    b_ignore_isotopic: bool,
+    b_hydrogens_in_ranks: bool,
+    b_hydrogens_fixed_in_ranks: bool,
+    b_digraph: bool,
+    b_taut_groups_only: bool,
+    t_group_info: Option<&TGroupInfo>,
+) {
+    let mut chem_elements = [0u8; ELEM_NAME_LEN * NUM_CHEM_ELEMENTS + ELEM_NAME_LEN];
+    let mut num_chem_elements = 0usize;
+    let mut num_hydrogen_atoms = 0usize;
+    let mut num_carbon_atoms = 0usize;
+    let mut t_group: &[super::ichitaut::TGroup] = &[];
+    let mut have_t_group = false;
+    let mut num_t_groups = 0usize;
+    let mut num_tautomer_iso = 0usize;
+    if num_at_tg > num_atoms
+        && let Some(tgi) = t_group_info
+    {
+        if let Some(tg) = tgi.t_group.as_deref() {
+            t_group = tg;
+            have_t_group = true;
+        }
+        num_t_groups = tgi.num_t_groups;
+        num_tautomer_iso = if tgi.b_ignore_isotopic != 0 {
+            0
+        } else {
+            T_NUM_ISOTOPIC
+        };
+    }
+    if !b_taut_groups_only {
+        for a in &at[..num_atoms] {
+            let el = c_str(&a.elname);
+            if el == b"C" {
+                num_carbon_atoms += 1;
+            } else if el == b"H" || el == b"D" || el == b"T" {
+                num_hydrogen_atoms += 1;
+            } else {
+                let cur = [
+                    a.elname[0],
+                    if a.elname[1] != 0 { a.elname[1] } else { b' ' },
+                ];
+                if c_strstr(&chem_elements, &cur).is_none() {
+                    // strcat
+                    let len = c_str(&chem_elements).len();
+                    chem_elements[len] = cur[0];
+                    chem_elements[len + 1] = cur[1];
+                    num_chem_elements += 1;
+                }
+            }
+        }
+        if num_chem_elements > 1 {
+            let mut recs: Vec<[u8; 2]> = (0..num_chem_elements)
+                .map(|i| [chem_elements[2 * i], chem_elements[2 * i + 1]])
+                .collect();
+            recs.sort_by(|a, b| comp_chem_elem_lex(a, b).cmp(&0));
+            for (i, r) in recs.iter().enumerate() {
+                chem_elements[2 * i] = r[0];
+                chem_elements[2 * i + 1] = r[1];
+            }
+        }
+        if num_carbon_atoms != 0 {
+            if num_chem_elements != 0 {
+                chem_elements.copy_within(0..ELEM_NAME_LEN * num_chem_elements, ELEM_NAME_LEN);
+            }
+            chem_elements[0] = b'C';
+            chem_elements[1] = b' ';
+            num_chem_elements += 1;
+        }
+        if num_hydrogen_atoms != 0 {
+            chem_elements[ELEM_NAME_LEN * num_chem_elements] = b'H';
+            chem_elements[ELEM_NAME_LEN * num_chem_elements + 1] = b' ';
+            num_chem_elements += 1;
+        }
+        for i in 0..num_atoms {
+            atom_invariant[i] = AtomInvariant2::default();
+            let cur = [
+                at[i].elname[0],
+                if at[i].elname[1] != 0 {
+                    at[i].elname[1]
+                } else {
+                    b' '
+                },
+            ];
+            let j = match c_strstr(&chem_elements, &cur) {
+                Some(p) => p / ELEM_NAME_LEN + 1,
+                None => num_chem_elements,
+            };
+            atom_invariant[i].val[AT_INV_HILL_ORDER] = j as u16;
+            atom_invariant[i].val[AT_INV_NUM_CONNECTIONS] = at[i].valence as u16;
+            if b_hydrogens_in_ranks {
+                atom_invariant[i].val[AT_INV_NUM_H] = if have_t_group && at[i].endpoint > 0 {
+                    0
+                } else {
+                    at[i].num_h as u16
+                };
+            }
+            if b_hydrogens_fixed_in_ranks {
+                atom_invariant[i].val[AT_INV_NUM_H_FIX] = if have_t_group && at[i].endpoint > 0 {
+                    at[i].num_h as u16
+                } else {
+                    0
+                };
+            }
+            let i_t_group = i32::from(at[i].endpoint) - 1;
+            if !b_digraph && have_t_group && i_t_group >= 0 && (i_t_group as usize) < num_t_groups {
+                let g = &t_group[i_t_group as usize];
+                atom_invariant[i].val[AT_INV_NUM_TG_ENDPOINTS] = g.n_num_endpoints;
+                for j in 0..T_NUM_NO_ISOTOPIC {
+                    atom_invariant[i].val[AT_INV_TG_NUMBERS + j] = g.num[j];
+                }
+                for j in 0..num_tautomer_iso {
+                    atom_invariant[i].val[AT_INV_TAUT_ISO + j] = g.num[j + T_NUM_NO_ISOTOPIC];
+                }
+            }
+            atom_invariant[i].iso_sort_key = if b_ignore_isotopic {
+                0
+            } else {
+                at[i].iso_sort_key
+            };
+        }
+    } else {
+        for a in atom_invariant[..num_at_tg].iter_mut() {
+            *a = AtomInvariant2::default();
+        }
+    }
+    // tautomeric groups
+    for i in num_atoms..num_at_tg {
+        let k = i - num_atoms;
+        atom_invariant[i] = AtomInvariant2::default();
+        if !have_t_group {
+            continue;
+        }
+        atom_invariant[i].val[AT_INV_HILL_ORDER] = if b_taut_groups_only {
+            num_at_tg as u16
+        } else {
+            num_chem_elements as u16 + 1
+        };
+        atom_invariant[i].val[AT_INV_NUM_CONNECTIONS] = MAXVAL as u16 + 1;
+        if k < num_t_groups {
+            let g = &t_group[k];
+            atom_invariant[i].val[AT_INV_NUM_TG_ENDPOINTS] = g.n_num_endpoints;
+            for j in 0..T_NUM_NO_ISOTOPIC {
+                atom_invariant[i].val[AT_INV_TAUT_ISO + j] = g.num[j];
+            }
+            for j in 0..num_tautomer_iso {
+                atom_invariant[i].val[AT_INV_TAUT_ISO + j] = g.num[j + T_NUM_NO_ISOTOPIC];
+            }
+        }
+    }
+}
+
+/// `CleanNumH`
+pub fn clean_num_h(num_h: &mut [i16], len: usize) {
+    for h in num_h[..len].iter_mut() {
+        if *h == EMPTY_H_NUMBER {
+            *h = 0;
+        } else {
+            *h = h.wrapping_sub(BASE_H_NUMBER);
+        }
+    }
+}
+
+/// `CleanCt`: replaces the terminating `EMPTY_CT` at `ct[len]` by 0
+pub fn clean_ct(ct: &mut [u16], len: usize) -> i32 {
+    if ct[len] == EMPTY_CT {
+        ct[len] = 0;
+        1
+    } else {
+        0
+    }
+}
+
+/// `CleanIsoSortKeys`
+pub fn clean_iso_sort_keys(isk: &mut [i64], len: usize) {
+    for k in isk[..len].iter_mut() {
+        if *k == EMPTY_ISO_SORT_KEY {
+            *k = 0;
+        }
+    }
+}

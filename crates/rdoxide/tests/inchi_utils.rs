@@ -9939,3 +9939,120 @@ fn connection_table_parts_match_the_c_code() {
         assert_eq!(got, want, "case {case}");
     }
 }
+
+#[test]
+fn canonical_ranking_setup_matches_the_c_code() {
+    use rdoxide::external::inchi::ichican2::*;
+    use rdoxide::external::inchi::ichimap::AT_INV_LENGTH;
+    use rdoxide::external::inchi::ichister::SpAtom;
+    use rdoxide::external::inchi::ichitaut::{TGroup, TGroupInfo};
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_can2c.json")).unwrap();
+    for (case, c) in data.as_array().unwrap().iter().enumerate() {
+        let inp = &c["in"];
+        let n = inp["n"].as_u64().unwrap() as usize;
+        let nat = inp["nat"].as_u64().unwrap() as usize;
+        let ntg = inp["ntg"].as_u64().unwrap() as usize;
+        let f: Vec<bool> = inp["flags"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|x| x.as_i64().unwrap() != 0)
+            .collect();
+        let mut at = vec![SpAtom::default(); n + 1];
+        for (i, a) in inp["atoms"].as_array().unwrap().iter().enumerate() {
+            let el = a[0].as_str().unwrap();
+            if el != "-" {
+                at[i].elname[..el.len()].copy_from_slice(el.as_bytes());
+            }
+            at[i].valence = a[1].as_i64().unwrap() as i8;
+            at[i].endpoint = a[2].as_i64().unwrap() as u16;
+            at[i].num_h = a[3].as_i64().unwrap() as i8;
+            at[i].iso_sort_key = a[4].as_i64().unwrap();
+        }
+        let mut tgs = vec![TGroup::default(); ntg + 8];
+        for (k, t) in inp["tg"].as_array().unwrap().iter().enumerate() {
+            tgs[k].n_num_endpoints = t[0].as_u64().unwrap() as u16;
+            for j in 0..5 {
+                tgs[k].num[j] = t[1 + j].as_u64().unwrap() as u16;
+            }
+        }
+        let tgi = TGroupInfo {
+            t_group: (inp["hasArr"].as_i64().unwrap() != 0).then_some(tgs),
+            num_t_groups: ntg,
+            b_ignore_isotopic: inp["ign"].as_i64().unwrap() as _,
+            ..Default::default()
+        };
+        let mut inv = vec![Default::default(); nat + 2];
+        fill_out_atom_invariant2(
+            &at,
+            n,
+            nat,
+            &mut inv,
+            f[0],
+            f[1],
+            f[2],
+            f[3],
+            f[4],
+            f[5].then_some(&tgi),
+        );
+        let mut got: Vec<String> = Vec::new();
+        for v in &inv[..nat] {
+            let mut s = String::from("INV");
+            for j in 0..AT_INV_LENGTH {
+                s += &format!(" {}", v.val[j]);
+            }
+            s += &format!(" {}", v.iso_sort_key);
+            got.push(s);
+        }
+        let mut rk = vec![0u16; nat + 2];
+        let mut an = vec![0u16; nat + 2];
+        let nd = set_initial_ranks2(nat, &inv, &mut rk, &mut an);
+        let join = |v: &[u16]| v.iter().map(|x| format!(" {x}")).collect::<String>();
+        got.push(format!(
+            "SR {nd} |{} |{}",
+            join(&rk[..nat]),
+            join(&an[..nat])
+        ));
+        let mut nh: Vec<i16> = inp["nh"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|x| x.as_i64().unwrap() as i16)
+            .collect();
+        let l = nh.len();
+        clean_num_h(&mut nh, l);
+        got.push(format!(
+            "CNH{}",
+            nh.iter().map(|x| format!(" {x}")).collect::<String>()
+        ));
+        let mut ct: Vec<u16> = inp["ct"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|x| x.as_u64().unwrap() as u16)
+            .collect();
+        let r = clean_ct(&mut ct, inp["ctlen"].as_u64().unwrap() as usize);
+        got.push(format!("CCT {r}{}", join(&ct)));
+        got.push("CCN 0".to_string());
+        let mut k: Vec<i64> = inp["isk"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|x| x.as_i64().unwrap())
+            .collect();
+        let l = k.len();
+        clean_iso_sort_keys(&mut k, l);
+        got.push(format!(
+            "CIK{}",
+            k.iter().map(|x| format!(" {x}")).collect::<String>()
+        ));
+        let want: Vec<String> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| s.as_str().unwrap().to_string())
+            .collect();
+        assert_eq!(got, want, "case {case}");
+    }
+}
