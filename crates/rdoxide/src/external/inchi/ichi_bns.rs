@@ -4585,3 +4585,302 @@ pub fn re_init_bn_struct_add_groups(
     }
     add_t_groups_to_bn_struct(p, at, num_atoms as i32, tgi)
 }
+
+// ---- creating and removing single groups ----
+
+pub const KNOWN_ACIDIC_TYPE: i32 =
+    (ATT_ACIDIC_CO | ATT_ACIDIC_S | ATT_OO | ATT_ZOO | ATT_NO) as i32;
+
+/// `CreateCGroupInBnStruct`: adds one c-group of the atoms of type `n_type` and
+/// mask `n_mask`; returns the new vertex number, 0 if there are no atoms
+/// or an error
+pub fn create_c_group_in_bn_struct(
+    at: &[InpAtom],
+    num_atoms: i32,
+    p: &mut BnStruct,
+    n_type: i32,
+    n_mask: i32,
+    n_charge: i32,
+) -> i32 {
+    let mut num_edges = p.num_edges;
+    let num_vertices = p.num_vertices;
+    if num_vertices + 1 >= p.max_vertices {
+        return BNS_VERT_EDGE_OVFL;
+    }
+    let selected = |i: usize| -> Option<i32> {
+        let (t, m) = get_atom_charge_type(at, i, None, 0);
+        (n_type & t != 0 && m.unwrap_or(0) & n_mask != 0).then_some(t)
+    };
+    let num_c_points = (0..num_atoms as usize)
+        .filter(|&i| selected(i).is_some())
+        .count() as i32;
+    if num_c_points == 0 {
+        return 0;
+    }
+    let prev = (num_vertices - 1) as usize;
+    let cur = num_vertices as usize;
+    let iedge = p.vert[prev].iedge + usize::from(p.vert[prev].max_adj_edges);
+    p.vert[cur] = BnsVertex {
+        iedge,
+        max_adj_edges: (num_c_points + BNS_ADD_EDGES) as u16,
+        type_: BNS_VERT_TYPE_C_GROUP
+            | if n_charge < 0 {
+                BNS_VERT_TYPE_C_NEGATIVE
+            } else {
+                0
+            },
+        ..Default::default()
+    };
+    let fictpoint = 1 + num_vertices - 1;
+    let fp = fictpoint as usize;
+    for c_point in 0..num_atoms {
+        let cp = c_point as usize;
+        let Some(type_) = selected(cp) else { continue };
+        if fictpoint >= p.max_vertices
+            || num_edges >= p.max_edges
+            || p.vert[fp].num_adj_edges >= p.vert[fp].max_adj_edges
+            || p.vert[cp].num_adj_edges >= p.vert[cp].max_adj_edges
+        {
+            break;
+        }
+        p.vert[cp].type_ |= BNS_VERT_TYPE_C_POINT;
+        if KNOWN_ACIDIC_TYPE & type_ != 0 && n_charge < 0 {
+            p.vert[cp].type_ |= p.type_tacn;
+        }
+        let ne = num_edges as usize;
+        p.edge[ne].cap = 1;
+        p.edge[ne].flow = 0;
+        p.edge[ne].pass = 0;
+        p.edge[ne].forbidden &= p.edge_forbidden_mask;
+        let charge = i32::from(at[cp].charge);
+        if (n_charge == 1 && charge != 1) || (n_charge == -1 && charge == -1) {
+            p.edge[ne].flow += 1;
+            p.vert[fp].st_edge.flow += 1;
+            p.vert[fp].st_edge.cap += 1;
+            p.vert[cp].st_edge.flow += 1;
+            p.vert[cp].st_edge.cap += 1;
+        }
+        for k in 0..p.vert[cp].num_adj_edges as usize {
+            let iedge = p.iedge[p.vert[cp].iedge + k] as usize;
+            let mut new_cap = p.vert[cp].st_edge.cap;
+            let centerpoint = i32::from(p.edge[iedge].neighbor12) ^ c_point;
+            if p.edge[iedge].cap == 0
+                && centerpoint < p.num_atoms
+                && p.vert[centerpoint as usize].st_edge.cap >= 1
+            {
+                new_cap = new_cap
+                    .min(p.vert[centerpoint as usize].st_edge.cap)
+                    .min(MAX_BOND_EDGE_CAP);
+                p.edge[iedge].cap = new_cap;
+            }
+        }
+        p.edge[ne].neighbor1 = c_point as u16;
+        p.edge[ne].neighbor12 = (c_point ^ fictpoint) as u16;
+        let o1 = p.vert[cp].num_adj_edges;
+        let o2 = p.vert[fp].num_adj_edges;
+        let (i1, i2) = (p.vert[cp].iedge, p.vert[fp].iedge);
+        p.iedge[i1 + usize::from(o1)] = num_edges;
+        p.iedge[i2 + usize::from(o2)] = num_edges;
+        num_edges += 1;
+        p.edge[ne].neigh_ord[0] = o1;
+        p.edge[ne].neigh_ord[1] = o2;
+        p.vert[cp].num_adj_edges += 1;
+        p.vert[fp].num_adj_edges += 1;
+        p.edge[ne].cap0 = p.edge[ne].cap;
+        p.edge[ne].flow0 = p.edge[ne].flow;
+    }
+    p.num_edges = num_edges;
+    p.num_vertices += 1;
+    p.num_c_groups += 1;
+    num_vertices
+}
+
+/// `CreateTGroupInBnStruct`: adds one t-group of the atoms of type `n_type` and
+/// mask `n_mask`; returns the new vertex number, 0 if there are no atoms
+/// or an error
+pub fn create_t_group_in_bn_struct(
+    at: &[InpAtom],
+    num_atoms: i32,
+    p: &mut BnStruct,
+    n_type: i32,
+    n_mask: i32,
+) -> i32 {
+    let mut num_edges = p.num_edges;
+    let num_vertices = p.num_vertices;
+    if num_vertices + 1 >= p.max_vertices {
+        return BNS_VERT_EDGE_OVFL;
+    }
+    let selected = |i: usize| -> bool {
+        let (t, m) = get_atom_charge_type(at, i, None, 0);
+        n_type & t != 0 && m.unwrap_or(0) & n_mask != 0
+    };
+    let num_endpoints = (0..num_atoms as usize).filter(|&i| selected(i)).count() as i32;
+    if num_endpoints == 0 {
+        return 0;
+    }
+    p.vert[num_vertices as usize] = BnsVertex::default();
+    let prev = (num_vertices - 1) as usize;
+    let cur = num_vertices as usize;
+    let iedge = p.vert[prev].iedge + usize::from(p.vert[prev].max_adj_edges);
+    p.vert[cur].iedge = iedge;
+    p.vert[cur].max_adj_edges = (num_endpoints + BNS_ADD_EDGES + BNS_ADD_SUPER_TGROUP) as u16;
+    p.vert[cur].type_ |= BNS_VERT_TYPE_TGROUP;
+    let fictpoint = 1 + num_vertices - 1;
+    let fp = fictpoint as usize;
+    for endpoint in 0..num_atoms {
+        let ep = endpoint as usize;
+        if !selected(ep) {
+            continue;
+        }
+        if fictpoint >= p.max_vertices
+            || num_edges >= p.max_edges
+            || p.vert[fp].num_adj_edges >= p.vert[fp].max_adj_edges
+            || p.vert[ep].num_adj_edges >= p.vert[ep].max_adj_edges
+        {
+            break;
+        }
+        let a = &at[ep];
+        let neutral_valence =
+            i32::from(a.chem_bonds_valence) + i32::from(a.num_h) - i32::from(a.charge);
+        if neutral_valence != 2 && neutral_valence != 3 {
+            break;
+        }
+        let num_bonds = i32::from(a.valence);
+        let mut edge_cap = neutral_valence - num_bonds;
+        if neutral_valence == 3 && num_bonds > 1 {
+            edge_cap += 1;
+        }
+        let edge_flow = i32::from(a.num_h).min(edge_cap);
+        p.vert[ep].type_ |= BNS_VERT_TYPE_ENDPOINT;
+        let ne = num_edges as usize;
+        p.edge[ne].cap = edge_cap;
+        p.edge[ne].flow = edge_flow;
+        p.edge[ne].pass = 0;
+        p.edge[ne].forbidden &= p.edge_forbidden_mask;
+        p.vert[fp].st_edge.flow += edge_flow;
+        p.vert[fp].st_edge.cap += edge_flow;
+        p.vert[ep].st_edge.flow += edge_flow;
+        p.vert[ep].st_edge.cap += edge_flow;
+        for k in 0..p.vert[ep].num_adj_edges as usize {
+            let iedge = p.iedge[p.vert[ep].iedge + k] as usize;
+            let mut new_cap = p.vert[ep].st_edge.cap;
+            if p.edge[iedge].cap == 0 {
+                let centerpoint = i32::from(p.edge[iedge].neighbor12) ^ endpoint;
+                if centerpoint < p.num_atoms && p.vert[centerpoint as usize].st_edge.cap >= 1 {
+                    new_cap = new_cap
+                        .min(p.vert[centerpoint as usize].st_edge.cap)
+                        .min(MAX_BOND_EDGE_CAP);
+                    p.edge[iedge].cap = new_cap;
+                }
+            }
+        }
+        p.edge[ne].neighbor1 = endpoint as u16;
+        p.edge[ne].neighbor12 = (endpoint ^ fictpoint) as u16;
+        let o1 = p.vert[ep].num_adj_edges;
+        let o2 = p.vert[fp].num_adj_edges;
+        let (i1, i2) = (p.vert[ep].iedge, p.vert[fp].iedge);
+        p.iedge[i1 + usize::from(o1)] = num_edges;
+        p.iedge[i2 + usize::from(o2)] = num_edges;
+        num_edges += 1;
+        p.edge[ne].neigh_ord[0] = o1;
+        p.edge[ne].neigh_ord[1] = o2;
+        p.vert[ep].num_adj_edges += 1;
+        p.vert[fp].num_adj_edges += 1;
+        p.edge[ne].cap0 = p.edge[ne].cap;
+        p.edge[ne].flow0 = p.edge[ne].flow;
+    }
+    p.num_edges = num_edges;
+    p.num_vertices += 1;
+    p.num_t_groups += 1;
+    num_vertices
+}
+
+/// `RemoveLastGroupFromBnStruct`: removes the last t-group or c-group vertex
+pub fn remove_last_group_from_bn_struct(
+    at: &mut [InpAtom],
+    num_atoms: i32,
+    tg: i32,
+    p: &mut BnStruct,
+) -> i32 {
+    let mut num_edges = p.num_edges;
+    let num_vertices = p.num_vertices;
+    if p.num_added_atoms + p.num_c_groups + p.num_t_groups + num_atoms >= p.max_vertices {
+        return BNS_VERT_EDGE_OVFL;
+    }
+    if tg + 1 != num_vertices {
+        return BNS_VERT_EDGE_OVFL;
+    }
+    let fp = tg as usize;
+    let ftype = p.vert[fp].type_;
+    let is_t_group = ftype & BNS_VERT_TYPE_TGROUP != 0;
+    let mut is_c_group = 0;
+    if ftype & BNS_VERT_TYPE_C_GROUP != 0 {
+        is_c_group = if ftype & BNS_VERT_TYPE_C_NEGATIVE != 0 {
+            2
+        } else {
+            1
+        };
+    }
+    let mut k = i32::from(p.vert[fp].num_adj_edges) - 1;
+    while k >= 0 {
+        let iedge = p.iedge[p.vert[fp].iedge + k as usize];
+        if iedge + 1 != num_edges {
+            return BNS_VERT_EDGE_OVFL;
+        }
+        let e = p.edge[iedge as usize];
+        let endpoint = i32::from(e.neighbor12) ^ tg;
+        let ve = &mut p.vert[endpoint as usize];
+        ve.st_edge.cap -= e.flow;
+        ve.st_edge.cap0 = ve.st_edge.cap;
+        ve.st_edge.flow -= e.flow;
+        ve.st_edge.flow0 = ve.st_edge.flow;
+        if p.type_tacn != 0 && ve.type_ & p.type_tacn == p.type_tacn {
+            ve.type_ ^= p.type_tacn;
+        }
+        if is_t_group {
+            ve.type_ ^= ftype & BNS_VERT_TYPE_ENDPOINT;
+        }
+        if is_c_group != 0 {
+            ve.type_ ^= ftype & BNS_VERT_TYPE_C_POINT;
+        }
+        if i32::from(e.neigh_ord[0]) + 1 != i32::from(ve.num_adj_edges) {
+            return BNS_VERT_EDGE_OVFL;
+        }
+        ve.num_adj_edges -= 1;
+        p.edge[iedge as usize] = BnsEdge::default();
+        num_edges -= 1;
+        if is_t_group && endpoint < num_atoms {
+            at[0].endpoint = 0;
+        }
+        if is_c_group == 1 && endpoint < num_atoms {
+            at[0].c_point = 0;
+        }
+        k -= 1;
+    }
+    p.vert[fp] = BnsVertex::default();
+    p.num_edges = num_edges;
+    p.num_vertices = num_vertices - 1;
+    if is_t_group {
+        p.num_t_groups -= 1;
+    }
+    if is_c_group != 0 {
+        p.num_c_groups -= 1;
+    }
+    0
+}
+
+/// `SetInitCapFlowToCurrent`
+pub fn set_init_cap_flow_to_current(p: &mut BnStruct) -> i32 {
+    for i in 0..p.num_vertices as usize {
+        let st = &mut p.vert[i].st_edge;
+        st.flow0 = st.flow;
+        st.cap0 = st.cap;
+        let v = p.vert[i];
+        for j in 0..v.num_adj_edges as usize {
+            let e = &mut p.edge[p.iedge[v.iedge + j] as usize];
+            e.cap0 = e.cap;
+            e.flow0 = e.flow;
+        }
+    }
+    0
+}

@@ -3654,3 +3654,132 @@ fn group_vertices_match_the_c_code() {
     }
     assert!(codes.len() >= 3, "{codes:?}");
 }
+
+#[test]
+fn single_group_creation_and_removal_match_the_c_code() {
+    use rdoxide::external::inchi::ichi_bns::*;
+    use rdoxide::external::inchi::inpdef::InpAtom;
+    fn dump_state(p: &BnStruct, at: &[InpAtom], n: usize, got: &mut Vec<String>) {
+        got.push(format!(
+            "C {} {} {} {} {} {}",
+            p.num_vertices,
+            p.num_edges,
+            p.num_t_groups,
+            p.num_c_groups,
+            p.num_added_atoms,
+            p.num_added_edges
+        ));
+        let mut s = String::from("V");
+        for v in p.vert.iter().take(p.num_vertices as usize) {
+            let e = &v.st_edge;
+            s += &format!(
+                " {}:{}:{}:{}:{}:{}:{}:{}|",
+                v.type_, e.cap, e.cap0, e.flow, e.flow0, v.num_adj_edges, v.max_adj_edges, v.iedge
+            );
+            for k in 0..v.num_adj_edges as usize {
+                s += &format!("{}.", p.iedge[v.iedge + k]);
+            }
+        }
+        got.push(s);
+        let mut s = String::from("E");
+        for e in p.edge.iter().take(p.num_edges as usize) {
+            s += &format!(
+                " {}:{}:{}:{}:{}:{}:{}:{}:{}:{}",
+                e.cap,
+                e.cap0,
+                e.flow,
+                e.flow0,
+                e.pass,
+                e.forbidden,
+                e.neighbor1,
+                e.neighbor12,
+                e.neigh_ord[0],
+                e.neigh_ord[1]
+            );
+        }
+        got.push(s);
+        let mut s = String::from("A");
+        for a in at.iter().take(n) {
+            s += &format!(" {},{}", a.endpoint, a.c_point);
+        }
+        got.push(s);
+    }
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_bncreate.json")).unwrap();
+    let (mut created, mut removed) = (0, 0);
+    for c in data.as_array().unwrap() {
+        let inp = &c["in"];
+        let mut at: Vec<InpAtom> = Vec::new();
+        for a in inp["atoms"].as_array().unwrap() {
+            let mut x = InpAtom {
+                valence: a["v"].as_i64().unwrap() as i8,
+                chem_bonds_valence: a["cbv"].as_i64().unwrap() as i8,
+                el_number: a["el"].as_u64().unwrap() as u8,
+                radical: a["rad"].as_i64().unwrap() as i8,
+                charge: a["chg"].as_i64().unwrap() as i8,
+                num_h: a["nh"].as_i64().unwrap() as i8,
+                endpoint: a["ep"].as_u64().unwrap() as u16,
+                c_point: a["cp"].as_u64().unwrap() as u16,
+                ..Default::default()
+            };
+            for (j, e) in a["nb"].as_array().unwrap().iter().enumerate() {
+                x.neighbor[j] = e[0].as_u64().unwrap() as u16;
+                x.bond_type[j] = e[1].as_u64().unwrap() as u8;
+            }
+            at.push(x);
+        }
+        let n = at.len();
+        let (mut p, _) = allocate_and_init_bn_struct(
+            &mut at,
+            n,
+            inp["ma"].as_i64().unwrap() as i32,
+            inp["me"].as_i64().unwrap() as i32,
+            inp["mp"].as_i64().unwrap() as i32,
+        );
+        p.type_tacn = inp["tacn"].as_u64().unwrap() as u16;
+        let mut got: Vec<String> = Vec::new();
+        dump_state(&p, &at, n, &mut got);
+        for o in inp["ops"].as_array().unwrap() {
+            let o: Vec<i32> = o
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|x| x.as_i64().unwrap() as i32)
+                .collect();
+            let (op, ty, mask, chg) = (o[0], o[1], o[2], o[3]);
+            let r = match op {
+                0 => create_c_group_in_bn_struct(&at, n as i32, &mut p, ty, mask, chg),
+                1 => create_t_group_in_bn_struct(&at, n as i32, &mut p, ty, mask),
+                2 => {
+                    let tg = if ty < 0 {
+                        if p.num_vertices > p.num_atoms {
+                            p.num_vertices - 1
+                        } else {
+                            1000
+                        }
+                    } else {
+                        ty
+                    };
+                    remove_last_group_from_bn_struct(&mut at, n as i32, tg, &mut p)
+                }
+                _ => set_init_cap_flow_to_current(&mut p),
+            };
+            if op < 2 && r > 0 {
+                created += 1;
+            }
+            if op == 2 && r == 0 {
+                removed += 1;
+            }
+            got.push(format!("R {r}"));
+            dump_state(&p, &at, n, &mut got);
+        }
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        assert_eq!(got, want, "{inp}");
+    }
+    assert!(created > 100 && removed > 50, "{created} {removed}");
+}
