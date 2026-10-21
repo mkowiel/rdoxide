@@ -9,6 +9,7 @@
 //! not modelled; there is no time limit.
 
 use super::ichi::{InChI, InChIAux};
+use super::ichi_io::{InchiIosString, InchiIostream, inchi_ios_eprint};
 use super::ichierr::{CT_OUT_OF_RAM, CT_USER_QUIT_ERR};
 use super::ichimake::{InpAtomData, create_inchi};
 use super::ichiparm::{
@@ -78,6 +79,9 @@ pub fn create_one_component_inchi(
                 inp_cur_data.num_isotopic = ni as i32;
                 cur_inchi[k] = Some(p);
                 cur_aux[k] = alloc_inchi_aux(n, ni, alloc_mode);
+                if let Some(a) = cur_aux[k].as_mut() {
+                    a.b_is_isotopic = ni as i32;
+                }
             }
             create_inp_atom_data(&mut inp_norm_data[k], n, k == 1);
         } else {
@@ -191,6 +195,8 @@ pub struct StructResults {
 pub fn create_one_structure_inchi(
     sd: &mut StructData,
     ip: &InputParms,
+    log: &mut InchiIostream,
+    num_inp: i64,
     i_inchi: usize,
     orig: &mut OrigAtomData,
     prep: &mut [OrigAtomData; 2],
@@ -225,7 +231,7 @@ pub fn create_one_structure_inchi(
             let f = sd.taut_flags_done[INCHI_BAS] | ip.b_taut_flags_done;
             nc_flags.b_taut_flags_done[i_inchi] = [f, f];
             if sd.n_error_type == IS_ERROR || sd.n_error_type == IS_FATAL {
-                n_ret = treat_errors_in_read_the_structure(sd, ip, &prep[0], 1);
+                n_ret = treat_errors_in_read_the_structure(sd, ip, log, &prep[0], num_inp);
                 break 'cycle;
             }
         }
@@ -283,7 +289,7 @@ pub fn create_one_structure_inchi(
                     return n_ret;
                 }
             }
-            n_ret = get_one_component(sd, &mut inp_cur_data, &prep[i_inchi], i);
+            n_ret = get_one_component(sd, log, &mut inp_cur_data, &prep[i_inchi], i, num_inp);
             if n_ret == IS_ERROR || n_ret == IS_FATAL {
                 break 'cycle;
             }
@@ -302,10 +308,263 @@ pub fn create_one_structure_inchi(
             res.p_inchi[i_inchi][i] = pi;
             res.p_aux[i_inchi][i] = pa;
             if n_ret != 0 {
-                n_ret = treat_errors_in_create_one_component_inchi(sd);
+                n_ret = treat_errors_in_create_one_component_inchi(sd, log, i, num_inp);
                 break;
             }
         }
     }
     n_ret
+}
+
+/// `PrepareSaveOptBits` (`SAVE_OPT_*` of `ichi.h`; the bits above 0xFF are
+/// lost in the `unsigned char`, as in C)
+pub fn prepare_save_opt_bits(ip: &InputParms) -> u8 {
+    use super::ichiparm::{
+        INCHI_OUT_SAVEOPT, REQ_MODE_DIFF_UU_STEREO, REQ_MODE_SB_IGN_ALL_UU, REQ_MODE_SC_IGN_ALL_UU,
+        REQ_MODE_STEREO, TG_FLAG_1_5_TAUT, TG_FLAG_KETO_ENOL_TAUT, TG_FLAG_PT_06_00,
+        TG_FLAG_PT_13_00, TG_FLAG_PT_16_00, TG_FLAG_PT_18_00, TG_FLAG_PT_22_00, TG_FLAG_PT_39_00,
+        TG_FLAG_RECONNECT_COORD,
+    };
+    let mut bits: u8 = 0;
+    if ip.b_inchi_output_options & INCHI_OUT_SAVEOPT == 0 {
+        return bits;
+    }
+    let tf = |f: u64| ip.b_taut_flags & f != 0;
+    if tf(TG_FLAG_RECONNECT_COORD) {
+        bits |= 0x0008;
+    }
+    if ip.n_mode & REQ_MODE_BASIC != 0 {
+        bits |= 0x0004;
+    }
+    if ip.n_mode & REQ_MODE_DIFF_UU_STEREO != 0 {
+        bits |= 0x0001;
+    }
+    if ip.n_mode & (REQ_MODE_SB_IGN_ALL_UU | REQ_MODE_SC_IGN_ALL_UU) == 0 {
+        bits |= 0x0002;
+    }
+    if tf(TG_FLAG_KETO_ENOL_TAUT) {
+        bits |= 0x0010;
+    }
+    if tf(TG_FLAG_1_5_TAUT) {
+        bits |= 0x0020;
+    }
+    if tf(TG_FLAG_PT_22_00) {
+        bits |= 0x0040;
+    }
+    if tf(TG_FLAG_PT_16_00) {
+        bits |= 0x0080;
+    }
+    // SAVE_OPT_PT_06_00 .. SAVE_OPT_PT_18_00 do not fit into the unsigned char
+    let _ = (
+        TG_FLAG_PT_06_00,
+        TG_FLAG_PT_39_00,
+        TG_FLAG_PT_13_00,
+        TG_FLAG_PT_18_00,
+    );
+    if ip.n_mode & REQ_MODE_STEREO == 0 {
+        bits &= !0x0002;
+        bits &= !0x0001;
+    }
+    bits
+}
+
+/// `ProcessOneStructure` for a structure without polymer data: creates the
+/// `INChI` of the (disconnected and reconnected) structure and prints the
+/// InChI string and the AuxInfo into `out_file`. The Molfile output
+/// (`OrigAtData_SaveMolfile`), the displays and the problem-file copies of
+/// the C code are not modelled.
+#[allow(clippy::too_many_arguments)]
+pub fn process_one_structure(
+    sd: &mut StructData,
+    ip: &InputParms,
+    log: &mut InchiIostream,
+    out_file: &mut InchiIostream,
+    strbuf: &mut InchiIosString,
+    orig: &mut OrigAtomData,
+    prep: &mut [OrigAtomData; 2],
+    num_inp: i64,
+) -> i32 {
+    use super::ichierr::add_error_message;
+    use super::ichiparm::{
+        REQ_MODE_RACEMIC_STEREO, REQ_MODE_RELATIVE_STEREO, REQ_MODE_STEREO, TG_FLAG_RECONNECT_COORD,
+    };
+    use super::ichiprt1::{FLAG_INP_AT_CHIRAL, OrigStruct, OutputInput, orig_struct_fill_out};
+    use super::runichi3::{INCHI_REC, IS_FATAL, TG_FLAG_DISCONNECT_COORD_DONE};
+    use super::runichi4::{
+        PInChI2, PInChIAux2, SortPrintParams, is_struct_chiral, sort_and_print_inchi,
+        treat_create_inchi_warning,
+    };
+
+    let mut n_ret = 0;
+    sd.b_user_quit_component = 0;
+    let mut res = StructResults::default();
+    let mut nc = NormCanonFlags::default();
+
+    // OrigAtData_StoreNativeInput
+    let mut orig_struct = OrigStruct::default();
+    match orig_struct_fill_out(
+        orig.num_inp_atoms,
+        orig.n_zy,
+        orig.sz_coord.as_deref(),
+        &orig.at,
+        sd.b_chiral_flag,
+        &mut sd.str_err_struct,
+    ) {
+        Ok(o) => {
+            orig_struct = o;
+            orig.sz_coord = None;
+        }
+        Err(_) => {
+            add_error_message(
+                &mut sd.str_err_struct,
+                "Cannot interpret reversibility information",
+            );
+            sd.n_struct_read_error = 99;
+            sd.n_error_type = IS_ERROR;
+            n_ret = IS_ERROR;
+        }
+    }
+    let ok = |n: i32| n != IS_FATAL && n != IS_ERROR;
+
+    // 2. INChI of the whole disconnected or original structure
+    if ok(n_ret) {
+        let n1 = create_one_structure_inchi(
+            sd, ip, log, num_inp, INCHI_BAS, orig, prep, &mut res, &mut nc,
+        );
+        n_ret = n_ret.max(n1);
+    }
+    // 3. INChI of the whole metal-reconnected structure
+    if ok(n_ret)
+        && sd.taut_flags_done[INCHI_BAS] & TG_FLAG_DISCONNECT_COORD_DONE != 0
+        && ip.b_taut_flags & TG_FLAG_RECONNECT_COORD != 0
+    {
+        let n1 = create_one_structure_inchi(
+            sd, ip, log, num_inp, INCHI_REC, orig, prep, &mut res, &mut nc,
+        );
+        n_ret = n_ret.max(n1);
+    }
+    let mut pinchi: [PInChI2; 2] = [
+        std::mem::take(&mut res.p_inchi[0]),
+        std::mem::take(&mut res.p_inchi[1]),
+    ];
+    let mut pinchi_aux: [PInChIAux2; 2] = [
+        std::mem::take(&mut res.p_aux[0]),
+        std::mem::take(&mut res.p_aux[1]),
+    ];
+    let num_components = [sd.num_components[0], sd.num_components[1]];
+    if ok(n_ret) {
+        if sd.b_chiral_flag & FLAG_INP_AT_CHIRAL != 0
+            && ip.n_mode & REQ_MODE_STEREO != 0
+            && ip.n_mode & (REQ_MODE_RELATIVE_STEREO | REQ_MODE_RACEMIC_STEREO) == 0
+            && !is_struct_chiral(&pinchi, num_components)
+            && ip.b_no_warnings == 0
+        {
+            add_error_message(&mut sd.str_err_struct, "Not chiral");
+        }
+        if sd.b_user_quit_component == 0 {
+            let n1 = treat_create_inchi_warning(sd, log, num_inp);
+            n_ret = n_ret.max(n1);
+        }
+    }
+
+    // 4. sort and print
+    let save_opt_bits = prepare_save_opt_bits(ip);
+    if ok(n_ret) {
+        let params = SortPrintParams {
+            inchi_output_options: ip.b_inchi_output_options,
+            compare_components: ip.b_compare_components,
+            input: OutputInput {
+                abc_numbers: ip.b_abc_numbers != 0,
+                ct_predecessors: ip.b_ct_predecessors != 0,
+                polymers: ip.b_polymers,
+                large_molecules: ip.b_large_molecules != 0,
+                sdf_label: String::new(),
+                sdf_value: String::new(),
+                orig_present: true,
+                n_zy: orig.n_zy,
+                n_pzz: 0,
+            },
+        };
+        let mut flags = 0;
+        let mut taut_flags = [sd.taut_flags[0], sd.taut_flags[1]];
+        let mut taut_flags_done = [sd.taut_flags_done[0], sd.taut_flags_done[1]];
+        let nc_tf = [nc.b_taut_flags[0], nc.b_taut_flags[1]];
+        let nc_tfd = [nc.b_taut_flags_done[0], nc.b_taut_flags_done[1]];
+        sort_and_print_inchi(
+            out_file,
+            strbuf,
+            Some(log),
+            &params,
+            Some(&orig_struct),
+            num_components,
+            &mut taut_flags,
+            &mut taut_flags_done,
+            nc_tf,
+            nc_tfd,
+            num_inp as i32,
+            &mut pinchi,
+            &mut pinchi_aux,
+            &mut flags,
+            save_opt_bits,
+        );
+        sd.taut_flags[0] = taut_flags[0];
+        sd.taut_flags[1] = taut_flags[1];
+        sd.taut_flags_done[0] = taut_flags_done[0];
+        sd.taut_flags_done[1] = taut_flags_done[1];
+    }
+    n_ret
+}
+
+/// `ProcessOneStructureExCore` + `ProcessOneStructureEx` for structures
+/// without polymer data (the CRU frame-shift and folding code is not ported)
+#[allow(clippy::too_many_arguments)]
+pub fn process_one_structure_ex(
+    sd: &mut StructData,
+    ip: &InputParms,
+    log: &mut InchiIostream,
+    out_file: &mut InchiIostream,
+    strbuf: &mut InchiIosString,
+    orig: &mut OrigAtomData,
+    prep: &mut [OrigAtomData; 2],
+    num_inp: i64,
+) -> i32 {
+    use super::ichiparm::{INCHI_OUT_INCHI_GEN_ERROR, INCHI_OUT_STDINCHI};
+    use super::runichi3::oad_validate_polymer_and_pseudo_element_data;
+    // PreprocessPolymerCRUData
+    orig.valid_polymer = 0;
+    assert!(orig.polymer.is_none(), "polymer data is not ported");
+
+    // ProcessOneStructureExCore
+    let mut res = oad_validate_polymer_and_pseudo_element_data(
+        orig,
+        ip.b_polymers,
+        ip.b_np_zz,
+        &mut sd.str_err_struct,
+    );
+    if res != 0 {
+        sd.n_error_code = res;
+        inchi_ios_eprint(
+            Some(log),
+            &format!(
+                "Error {} ({}) structure #{}.\n",
+                sd.n_error_code, sd.str_err_struct, num_inp
+            ),
+        );
+        res = IS_ERROR;
+        orig.num_inp_atoms = 0;
+    } else {
+        res = process_one_structure(sd, ip, log, out_file, strbuf, orig, prep, num_inp);
+    }
+
+    if ip.b_inchi_output_options2 & INCHI_OUT_INCHI_GEN_ERROR != 0
+        && (res == IS_FATAL || res == IS_ERROR)
+    {
+        let t = if ip.b_inchi_output_options & INCHI_OUT_STDINCHI != 0 {
+            "InChI=1S//\n"
+        } else {
+            "InChI=1//\n"
+        };
+        inchi_ios_eprint(Some(out_file), t);
+    }
+    res
 }

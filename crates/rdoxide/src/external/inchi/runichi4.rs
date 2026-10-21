@@ -63,13 +63,29 @@ pub fn get_processing_warnings_one_component_inchi(
     ret
 }
 
-/// `TreatErrorsInCreateOneComponentINChI` (without the logging): sets the
-/// error message and `nErrorType`; returns it
-pub fn treat_errors_in_create_one_component_inchi(sd: &mut super::runichi3::StructData) -> i32 {
+/// `TreatErrorsInCreateOneComponentINChI` (without the problem-file copies):
+/// sets the error message and `nErrorType`, logs the error for the component
+/// `i` (from 0) of the structure `num_inp`; returns the error type
+pub fn treat_errors_in_create_one_component_inchi(
+    sd: &mut super::runichi3::StructData,
+    log: &mut InchiIostream,
+    i: usize,
+    num_inp: i64,
+) -> i32 {
     use super::ichierr::{CT_OUT_OF_RAM, CT_USER_QUIT_ERR, err_msg};
     use super::runichi3::{IS_ERROR, IS_FATAL};
     if sd.n_error_code != 0 {
         add_error_message(&mut sd.str_err_struct, &err_msg(sd.n_error_code));
+        super::ichi_io::inchi_ios_eprint(
+            Some(log),
+            &format!(
+                "Error {} ({}) structure #{} component {}.\n",
+                sd.n_error_code,
+                sd.str_err_struct,
+                num_inp,
+                i + 1
+            ),
+        );
         sd.n_error_type = if sd.n_error_code == CT_OUT_OF_RAM || sd.n_error_code == CT_USER_QUIT_ERR
         {
             IS_FATAL
@@ -260,4 +276,22 @@ pub fn sort_and_print_inchi(
     }
     let _ = CMP_COMPONENTS;
     if ret != 0 { 0 } else { IS_FATAL }
+}
+
+/// `TreatCreateINChIWarning` (without the problem-file copies and the
+/// timing line): logs the warnings of the structure `num_inp`; returns
+/// `sd.n_error_type`
+pub fn treat_create_inchi_warning(
+    sd: &mut super::runichi3::StructData,
+    log: &mut InchiIostream,
+    num_inp: i64,
+) -> i32 {
+    if sd.n_error_code == 0 && !sd.str_err_struct.is_empty() {
+        super::ichi_io::inchi_ios_eprint(
+            Some(log),
+            &format!("Warning ({}) structure #{}.\n", sd.str_err_struct, num_inp),
+        );
+        sd.n_error_type = super::runichi3::IS_WARNING;
+    }
+    sd.n_error_type
 }

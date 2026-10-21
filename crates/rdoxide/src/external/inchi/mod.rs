@@ -42,6 +42,7 @@ pub mod ichitaut;
 pub mod ikey_base26;
 pub mod ikey_dll;
 pub mod inchi_dll;
+pub mod inchi_dll_b;
 pub mod incomdef;
 pub mod inpdef;
 pub mod mol2atom;

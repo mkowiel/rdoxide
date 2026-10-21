@@ -1903,6 +1903,10 @@ pub struct OrigAtomData {
     pub polymer: Option<super::mol2atom::OadPolymer>,
     /// `v3000` (v. 1.05 extension)
     pub v3000: Option<super::mol2atom::OadV3000>,
+    /// `n_zy`: number of non-polymer-related pseudoelement atoms
+    pub n_zy: i32,
+    /// `valid_polymer`
+    pub valid_polymer: i32,
 }
 
 /// Heteroatoms that may take a charge after a ligand is disconnected: the
