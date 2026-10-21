@@ -89,12 +89,12 @@ int main(void) {
         scanf("%d %d %d %d %d %d %d %d %llu", &n, &nH, &maxadd_a, &maxadd_e, &maxaltp, &nops, &ncalls, &tflags, &tgfl);
         inp_ATOM *at = calloc(n + nH + 1, sizeof(inp_ATOM));
         for (int i = 0; i < n; i++) {
-            int v, cbv, el, rad, vt, chg, nh, i0, i1, i2, orig, ep, att, ring, cv, sp[3], so[3], sn[3], sg[3];
-            scanf("%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d", &v, &cbv, &el, &rad, &vt, &chg, &nh, &i0, &i1, &i2, &orig, &ep, &att, &ring, &cv);
+            int v, cbv, el, rad, vt, chg, nh, i0, i1, i2, orig, ep, att, ring, cv, rsys, sp[3], so[3], sn[3], sg[3];
+            scanf("%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d", &v, &cbv, &el, &rad, &vt, &chg, &nh, &i0, &i1, &i2, &orig, &ep, &att, &ring, &cv, &rsys);
             scanf("%d %d %d %d %d %d %d %d %d %d %d %d", sp, sp + 1, sp + 2, so, so + 1, so + 2, sn, sn + 1, sn + 2, sg, sg + 1, sg + 2);
             at[i].valence = v; at[i].chem_bonds_valence = cbv; at[i].el_number = el; strcpy(at[i].elname, elsym(el)); at[i].radical = rad; at[i].c_point = vt;
             at[i].charge = chg; at[i].num_H = nh; at[i].num_iso_H[0] = i0; at[i].num_iso_H[1] = i1; at[i].num_iso_H[2] = i2; at[i].orig_at_number = orig;
-            at[i].endpoint = ep; at[i].at_type = att; at[i].nNumAtInRingSystem = ring; at[i].bCutVertex = cv; at[i].nRingSystem = i % 2;
+            at[i].endpoint = ep; at[i].at_type = att; at[i].nNumAtInRingSystem = ring; at[i].bCutVertex = cv; at[i].nRingSystem = rsys;
             for (int k = 0; k < 3; k++) { at[i].sb_parity[k] = sp[k]; at[i].sb_ord[k] = so[k]; at[i].sn_ord[k] = sn[k]; at[i].sn_orig_at_num[k] = sg[k]; }
             for (int j = 0; j < v; j++) { int q, b; scanf("%d %d", &q, &b); at[i].neighbor[j] = q; at[i].bond_type[j] = b; }
         }
@@ -206,6 +206,13 @@ RINGS = [
     ([(6, 0, 0), (7, 0, 0), (6, 0, 1), (6, 0, 0), (8, 0, 1), (6, 0, 1), (6, 0, 1)],
      [(0, 1, 2), (0, 2, 1), (2, 3, 2), (3, 4, 1), (3, 5, 1), (5, 6, 2), (6, 1, 1)]),
 ]
+PYRAZOLES = [
+    # pyrazole (attach on C3), 1H and tautomer
+    ([(6, 0, 0), (7, 0, 0), (7, 0, 1), (6, 0, 1), (6, 0, 1)], [(0, 1, 2), (1, 2, 1), (2, 3, 1), (3, 4, 2), (4, 0, 1)]),
+    ([(6, 0, 0), (7, 0, 1), (7, 0, 0), (6, 0, 1), (6, 0, 1)], [(0, 1, 1), (1, 2, 1), (2, 3, 2), (3, 4, 1), (4, 0, 2)]),
+    # imidazole-like N-N both NH0 / N-oxide-less variants
+    ([(6, 0, 0), (7, 0, 0), (7, 0, 0), (6, 0, 1), (6, 0, 1)], [(0, 1, 2), (1, 2, 1), (2, 3, 2), (3, 4, 1), (4, 0, 1)]),
+]
 RING_MARKS = [(0, 0), (1, 0), (2, 0), (3, 1), (4, 0), (5, 0), (6, 0)]
 GROUPS = [
     ([(6, 0, 0), (8, 0, 0), (6, 0, 1), (6, 0, 1), (7, 0, 2)], [(0, 1, 2), (0, 2, 1), (2, 3, 2), (3, 4, 1)]),   # vinylogous amide
@@ -290,11 +297,15 @@ def gen(rng):
         skel.append(c)
     for _ in range(rng.randrange(1, 4)):
         ring_group = rng.random() < 0.12
-        els, bonds = rng.choice(RINGS) if ring_group else rng.choice(GROUPS + 3 * SGROUPS)
+        pyr_group = (not ring_group) and rng.random() < 0.12
+        els, bonds = rng.choice(RINGS) if ring_group else rng.choice(PYRAZOLES) if pyr_group else rng.choice(GROUPS + 3 * SGROUPS)
         ids = [add(*e) for e in els]
         if ring_group:
             for k, i in enumerate(ids):
-                marks[i] = (6, RING_MARKS[k][1])
+                marks[i] = (6, RING_MARKS[k][1], 10 + len(atoms))
+        if pyr_group:
+            for k, i in enumerate(ids):
+                marks[i] = (5, 0, 10 + len(atoms))
         for i, j, t in bonds:
             bond(ids[i], ids[j], t)
         bond(rng.choice(skel), ids[0], 1)
@@ -328,7 +339,8 @@ def main():
             a["vt"] = 0
             a["ep"] = 0
             a["att"] = 0
-            a["ring"], a["cv"] = a.get("mk") or (rng.choice([0, 1, 5, 6]), 0)
+            a["ring"], a["cv"] = (a["mk"][0], a["mk"][1]) if a.get("mk") else (rng.choice([0, 1, 5, 6]), 0)
+            a["rs"] = a["mk"][2] if a.get("mk") else i % 2
             a["sbp"] = [0, 0, 0]
             a["sbo"] = [0, 0, 0]
             a["sno"] = [0, 0, 0]
@@ -338,6 +350,10 @@ def main():
         for a in atoms:
             a["ep"] = rng.randrange(1, ntg + 1) if ntg and rng.random() < 0.08 else 0
             a["vt"] = rng.randrange(1, 3) if rng.random() < 0.25 else 0
+        used = sorted({a["ep"] for a in atoms if a["ep"]})
+        for a in atoms:
+            if a["ep"]:
+                a["ep"] = used.index(a["ep"]) + 1
         calls = [(0, 0, 0)] * rng.randrange(1, 3)
         fch = rng.randrange(0, 64)
         mcand = rng.choice([2, 3, n, n + 2, 2 * n])
@@ -346,7 +362,7 @@ def main():
     def fmt(c):
         t = f"{len(c['atoms'])} {len(c['hs'])} {c['ma']} {c['me']} {c['mp']} {len(c['ops'])} {len(c['calls'])} {c['tf']} {c['tg']}\n"
         for a in c["atoms"]:
-            t += f"{a['v']} {a['cbv']} {a['el']} {a['rad']} {a['vt']} {a['chg']} {a['nh']} {a['iso'][0]} {a['iso'][1]} {a['iso'][2]} {a['orig']} {a['ep']} {a['att']} {a['ring']} {a.get('cv', 0)}\n"
+            t += f"{a['v']} {a['cbv']} {a['el']} {a['rad']} {a['vt']} {a['chg']} {a['nh']} {a['iso'][0]} {a['iso'][1]} {a['iso'][2]} {a['orig']} {a['ep']} {a['att']} {a['ring']} {a.get('cv', 0)} {a.get('rs', 0)}\n"
             t += " ".join(map(str, a["sbp"] + a["sbo"] + a["sno"] + a["sng"])) + "\n"
             t += " ".join(f"{x} {t2}" for x, t2 in a["nb"]) + "\n"
         for h in c["hs"]:
@@ -411,11 +427,11 @@ def main():
         a = qq.rindex(start)
         return qq[a:qq.index("\n}\n", a) + 3]
     qpre = qq[qq.index("typedef int CHECK_DFS_RING("):qq.index("#endif /* TAUT_15_NON_RING */") + len("#endif /* TAUT_15_NON_RING */")]
-    qfuncs = [qpre + "\n#define REPLACE_THE_BOND(X) ( (X) == BOND_SINGLE || (X) == BOND_DOUBLE || (X) == BOND_ALTERN || (X) == BOND_ALT12NS )\n"] + [cutq(x) for x in ["int bIsCenterPointStrict( inp_ATOM *atom, int iat )\n{", "int AddBondsPos( inp_ATOM *atom,\n", "int AddEndPoints( T_ENDPOINT *EndPointTmp,\n", "int Check15TautPathCenterpoint( inp_ATOM *atom,", "int Check15TautPath( struct tagCANON_GLOBALS *pCG,\n", "int DFS_FindTautAltPath( struct tagCANON_GLOBALS *pCG,\n", "int nGet15TautInAltPath( struct tagCANON_GLOBALS *pCG,\n", "int are_alt_bonds( U_CHAR *bonds, int len )\n{", "int DFS_FindTautInARing( struct tagCANON_GLOBALS *pCG,\n", "int Check6MembTautRing( struct tagCANON_GLOBALS *pCG,\n", "int nGet15TautIn6MembAltRing( struct tagCANON_GLOBALS *pCG,\n"]]
+    qfuncs = [qpre + "\n#define REPLACE_THE_BOND(X) ( (X) == BOND_SINGLE || (X) == BOND_DOUBLE || (X) == BOND_ALTERN || (X) == BOND_ALT12NS )\n"] + [cutq(x) for x in ["int bIsCenterPointStrict( inp_ATOM *atom, int iat )\n{", "int AddBondsPos( inp_ATOM *atom,\n", "int AddEndPoints( T_ENDPOINT *EndPointTmp,\n", "int Check15TautPathCenterpoint( inp_ATOM *atom,", "int Check15TautPath( struct tagCANON_GLOBALS *pCG,\n", "int DFS_FindTautAltPath( struct tagCANON_GLOBALS *pCG,\n", "int nGet15TautInAltPath( struct tagCANON_GLOBALS *pCG,\n", "int are_alt_bonds( U_CHAR *bonds, int len )\n{", "int DFS_FindTautInARing( struct tagCANON_GLOBALS *pCG,\n", "int Check6MembTautRing( struct tagCANON_GLOBALS *pCG,\n", "int nGet15TautIn6MembAltRing( struct tagCANON_GLOBALS *pCG,\n", "int Check5MembTautRing( struct tagCANON_GLOBALS *pCG,\n", "int nGet12TautIn5MembAltRing( struct tagCANON_GLOBALS *pCG,\n"]]
 
     def cut_mark():
         a = tt.index("int MarkTautomerGroups( CANON_GLOBALS *pCG,\n")
-        b = tt.index("#if ( TAUT_PYRAZOLE_RINGS == 1 )", a)
+        b = tt.index("#if ( TAUT_TROPOLONE_7 == 1 || TAUT_TROPOLONE_5 == 1 )", a)
         return tt[a:b] + "\n    free_memory:\n        if (nDfsPathPos) inchi_free( nDfsPathPos );\n    }\n#endif\nexit_function:\n    return nErr < 0 ? nErr : tot_changes;\n}\n"
 
     def cut_first(start):
