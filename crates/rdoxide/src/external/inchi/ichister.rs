@@ -2387,3 +2387,555 @@ pub fn set_stereo_bonds_parity(
     }
     num_stored_isotopic_stereo_bonds
 }
+
+// ---------------------------------------------------------------------------
+// stereo atoms (stereocenters)
+// ---------------------------------------------------------------------------
+
+pub const MIN_ANGLE_RELAXED: f64 = 0.001;
+pub const MIN_SINE_RELAXED: f64 = 0.001;
+pub const ZERO_FLOAT: f64 = 1.0e-12;
+pub const AMBIGUOUS_STEREO_ERROR: i32 = 32;
+pub const FLAG_SC_0D: i8 = 1;
+pub const REQ_MODE_MIN_SB_RING_MASK: u64 = 0x0F0000;
+pub const REQ_MODE_MIN_SB_RING_SHFT: u32 = 16;
+const ADD_EXPLICIT_HYDROGEN_NEIGH: i32 = 1;
+const ADD_EXPLICIT_LONE_PAIR_NEIGH: i32 = 2;
+
+/// `can_be_a_stereo_atom_with_isotopic_H`
+pub fn can_be_a_stereo_atom_with_isotopic_h(
+    at: &[InpAtom],
+    cur_at: usize,
+    b_pointed_edge_stereo: i32,
+    b_stereo_at_zz: i32,
+) -> i32 {
+    let n = b_can_inp_atom_be_a_stereo_center(at, cur_at, b_pointed_edge_stereo, b_stereo_at_zz);
+    i32::from(
+        n != 0
+            && i32::from(at[cur_at].valence) + i32::from(at[cur_at].num_h) == n
+            && at[cur_at].num_h as usize <= super::incomdef::NUM_H_ISOTOPES,
+    )
+}
+
+/// `GetStereocenter0DParity`; `sb_neigh_orig_at_numb[..j1]` gets sorted
+pub fn get_stereocenter_0d_parity(
+    at: &mut [InpAtom],
+    cur_at: usize,
+    j1: usize,
+    sb_neigh_orig_at_numb: &mut [u16],
+    n_flag: i8,
+) -> i32 {
+    let mut parity = AB_PARITY_NONE;
+    let n4 = MAX_NUM_STEREO_ATOM_NEIGH;
+    if at[cur_at].p_parity != 0 && (j1 == n4 - 1 || j1 == n4) {
+        let mut inp = [0u16; MAX_NUM_STEREO_ATOM_NEIGH];
+        for i in 0..n4 {
+            inp[i] = at[cur_at].p_orig_at_num[i];
+            if inp[i] == at[cur_at].orig_at_number {
+                inp[i] = 0;
+            }
+        }
+        let cmp = |a: &u16, b: &u16| i32::from(*a) - i32::from(*b);
+        let num_trans_inp = insertions_sort(&mut inp[..], cmp);
+        let num_trans_neigh = insertions_sort(&mut sb_neigh_orig_at_numb[..j1], cmp);
+        if inp[n4 - j1..] == sb_neigh_orig_at_numb[..j1] {
+            let pp = i32::from(at[cur_at].p_parity);
+            parity = if atom_parity_well_def(pp) {
+                2 - (num_trans_inp + num_trans_neigh + pp) % 2
+            } else {
+                pp
+            };
+            at[cur_at].b_used_0d_parity |= n_flag;
+        }
+    }
+    parity
+}
+
+/// `set_stereo_atom_parity`: the parity of a stereocenter in `out_at[cur_at]`;
+/// returns `out_at[cur_at].parity2`
+#[allow(clippy::too_many_arguments)]
+pub fn set_stereo_atom_parity(
+    out_at: &mut [SpAtom],
+    at: &mut [InpAtom],
+    cur_at: usize,
+    removed_h_start: usize,
+    num_removed_h: usize,
+    b_pointed_edge_stereo: i32,
+    v_ab_parity_unknown: i32,
+    loose_tsa_check: bool,
+    b_stereo_at_zz: i32,
+) -> i32 {
+    use super::incomdef::NUM_H_ISOTOPES;
+    use super::inpdef::AT_FLAG_ISO_H_POINT;
+    let n4 = MAX_NUM_STEREO_ATOM_NEIGH;
+    let mut num_explicit_iso_h = [0i32; NUM_H_ISOTOPES + 1];
+    let mut index_h = [0usize; MAX_NUM_STEREO_ATOM_NEIGH];
+    let mut num_explicit_h = 0usize;
+    let mut at_coord = [[0.0f64; 3]; MAX_NUM_STEREO_ATOM_NEIGH];
+    let mut bond_len_xy = [0.0f64; 4];
+    let (mut rmax, mut rmin) = (0.0f64, 0.0f64);
+    let mut sum_xyz = [0.0f64; 3];
+    let mut at_coord_center = [0.0f64; 3];
+    let mut parity = AB_PARITY_NONE;
+    let mut b_ambiguous = 0i32;
+    let mut b_add_explicit_neighbor = 0;
+    let mut b2d = 0;
+    let mut n2d_tetrahedral_ambiguity = 0;
+    let b_ignore_isotopic_h = at[cur_at].c_flags & AT_FLAG_ISO_H_POINT != 0;
+    let mut sb_neigh_orig_at_numb = [0u16; MAX_NUM_STEREO_ATOM_NEIGH];
+    let mut v_min_angle = MIN_ANGLE;
+    let mut v_min_sine = MIN_SINE;
+    if loose_tsa_check && at[cur_at].n_num_at_in_ring_system >= 3 {
+        v_min_angle = MIN_ANGLE_RELAXED;
+        v_min_sine = MIN_SINE_RELAXED;
+    }
+    out_at[cur_at].parity = 0;
+    out_at[cur_at].parity2 = 0;
+    out_at[cur_at].stereo_atom_parity = 0;
+    out_at[cur_at].stereo_atom_parity2 = 0;
+    let mut tot_num_iso_h = 0;
+    let mut j1 = 0usize;
+
+    'body: {
+        let n_must_have_num_neigh =
+            b_can_inp_atom_be_a_stereo_center(at, cur_at, b_pointed_edge_stereo, b_stereo_at_zz)
+                as usize;
+        if n_must_have_num_neigh == 0 || at[cur_at].num_h as usize > NUM_H_ISOTOPES {
+            break 'body;
+        }
+        for j in 0..NUM_H_ISOTOPES {
+            if at[cur_at].num_iso_h[j] > 1 {
+                break 'body;
+            }
+            tot_num_iso_h += i32::from(at[cur_at].num_iso_h[j]);
+        }
+        if b_ignore_isotopic_h {
+            tot_num_iso_h = 0;
+        }
+        if i32::from(at[cur_at].num_h) - tot_num_iso_h > 1 {
+            break 'body;
+        }
+        if num_removed_h > 0 {
+            for j in 0..num_removed_h {
+                let h = &at[removed_h_start + j];
+                if h.neighbor[0] as usize == cur_at {
+                    let mut k = i32::from(h.iso_atw_diff);
+                    if k < 0 || k > NUM_H_ISOTOPES as i32 || b_ignore_isotopic_h {
+                        k = 0;
+                    }
+                    num_explicit_iso_h[k as usize] += 1;
+                    // (C: index_H[4] could overflow with more than 4 removed H on one atom)
+                    if num_explicit_h < index_h.len() {
+                        index_h[num_explicit_h] = j;
+                    }
+                    num_explicit_h += 1;
+                }
+            }
+        }
+        let mut num_z = 0;
+        // coordinates of the neighbors
+        'coords: for k in 0..2 {
+            let count = if k == 0 {
+                num_explicit_h
+            } else {
+                at[cur_at].valence as usize
+            };
+            for j in 0..count {
+                let (z, mut n_type, nbr_idx);
+                if k == 0 {
+                    let nx = removed_h_start + index_h[j];
+                    nbr_idx = nx;
+                    let (zz, t) = get_z_coord(
+                        at,
+                        nx,
+                        0,
+                        -(b_pointed_edge_stereo & PES_BIT_POINT_EDGE_STEREO),
+                    );
+                    z = -zz;
+                    n_type = t;
+                } else {
+                    nbr_idx = at[cur_at].neighbor[j] as usize;
+                    let (zz, t) = get_z_coord(
+                        at,
+                        cur_at,
+                        j,
+                        b_pointed_edge_stereo & PES_BIT_POINT_EDGE_STEREO,
+                    );
+                    z = zz;
+                    n_type = t;
+                }
+                match n_type {
+                    ZTYPE_EITHER => {
+                        parity = v_ab_parity_unknown;
+                        break 'body;
+                    }
+                    ZTYPE_UP | ZTYPE_DOWN => {
+                        if k == 0 {
+                            n_type = -n_type;
+                        }
+                        b2d += 1;
+                        num_z += 1;
+                    }
+                    ZTYPE_3D => num_z += 1,
+                    _ => {}
+                }
+                if j1 < n4 {
+                    sb_neigh_orig_at_numb[j1] = at[nbr_idx].orig_at_number;
+                    at_coord[j1][0] = at[nbr_idx].x - at[cur_at].x;
+                    at_coord[j1][1] = at[nbr_idx].y - at[cur_at].y;
+                    bond_len_xy[j1] = len2(&[at_coord[j1][0], at_coord[j1][1]]);
+                    at_coord[j1][2] = if n_type == ZTYPE_3D {
+                        z
+                    } else if n_type == ZTYPE_UP {
+                        bond_len_xy[j1]
+                    } else if n_type == ZTYPE_DOWN {
+                        -bond_len_xy[j1]
+                    } else {
+                        0.0
+                    };
+                    j1 += 1;
+                } else {
+                    continue 'coords;
+                }
+            }
+        }
+        let b2d_flag = b2d == num_z && num_z != 0;
+        b2d = i32::from(b2d_flag);
+        let valence = at[cur_at].valence as usize;
+        if n4 != valence + num_explicit_h && n4 - 1 != valence + num_explicit_h {
+            if n_must_have_num_neigh == valence + at[cur_at].num_h as usize && at[cur_at].num_h > 1
+            {
+                parity = if parity == v_ab_parity_unknown {
+                    -v_ab_parity_unknown
+                } else {
+                    -AB_PARITY_UNDF
+                };
+            } else {
+                parity = AB_PARITY_NONE;
+            }
+            break 'body;
+        }
+        for j in 0..j1 {
+            let z = len3(&at_coord[j]);
+            if z < MIN_BOND_LEN {
+                parity = get_stereocenter_0d_parity(
+                    at,
+                    cur_at,
+                    j1,
+                    &mut sb_neigh_orig_at_numb,
+                    FLAG_SC_0D,
+                );
+                if parity == AB_PARITY_NONE {
+                    parity = AB_PARITY_UNDF;
+                }
+                break 'body;
+            }
+            at_coord[j] = mult3(&at_coord[j], 1.0 / z);
+            rmax = if j != 0 { rmax.max(z) } else { z };
+            rmin = if j != 0 { rmin.min(z) } else { z };
+        }
+        if rmin / rmax < MIN_SINE {
+            parity =
+                get_stereocenter_0d_parity(at, cur_at, j1, &mut sb_neigh_orig_at_numb, FLAG_SC_0D);
+            if parity == AB_PARITY_NONE {
+                parity = AB_PARITY_UNDF;
+            }
+            break 'body;
+        }
+        for j in 0..j1 {
+            sum_xyz = add3(&sum_xyz, &at_coord[j]);
+        }
+        let j = j1;
+        if j1 == n4 - 1 {
+            if n_must_have_num_neigh == n4 - 1 {
+                b_add_explicit_neighbor = ADD_EXPLICIT_LONE_PAIR_NEIGH;
+            } else if n_must_have_num_neigh == n4
+                && 1 == i32::from(at[cur_at].num_h) - num_explicit_h as i32
+                && 1 == i32::from(at[cur_at].num_h) - tot_num_iso_h
+            {
+                b_add_explicit_neighbor = ADD_EXPLICIT_HYDROGEN_NEIGH;
+            }
+        }
+        if b_add_explicit_neighbor != 0 {
+            if parity == v_ab_parity_unknown {
+                break 'body;
+            }
+            if num_z == 0 || are_3_vect_in_one_plane(&at_coord, v_min_sine) {
+                if num_z > 0 {
+                    b_ambiguous |= AMBIGUOUS_STEREO;
+                }
+                // (APPLY_IMPLICIT_H_DOWN_RULE is 0, ALWAYS_SET_STEREO_PARITY is 0)
+                parity = get_stereocenter_0d_parity(
+                    at,
+                    cur_at,
+                    j1,
+                    &mut sb_neigh_orig_at_numb,
+                    FLAG_SC_0D,
+                );
+                if parity == AB_PARITY_NONE {
+                    parity = AB_PARITY_UNDF;
+                }
+                break 'body;
+            } else {
+                at_coord[j] = change_sign3(&sum_xyz);
+                let z = len3(&at_coord[j]);
+                // (FIX_STEREO_SCALING_BUG is 0)
+                if b_pointed_edge_stereo & PES_BIT_FIX_SP3_BUG != 0 {
+                    if z > 1.0 {
+                        rmax *= z;
+                    } else {
+                        rmin *= z;
+                    }
+                } else {
+                    rmax = rmax.max(z);
+                    rmin = rmin.min(z);
+                }
+                if z < MIN_BOND_LEN || rmin / rmax < MIN_SINE {
+                    parity = get_stereocenter_0d_parity(
+                        at,
+                        cur_at,
+                        j1,
+                        &mut sb_neigh_orig_at_numb,
+                        FLAG_SC_0D,
+                    );
+                    if parity == AB_PARITY_NONE {
+                        parity = AB_PARITY_UNDF;
+                    }
+                    break 'body;
+                }
+            }
+        } else if j1 != n4 {
+            if parity == v_ab_parity_unknown {
+                parity = -AB_PARITY_UNDF;
+            }
+            break 'body;
+        } else if num_z == 0 || are_4at_in_one_plane(&at_coord, v_min_sine) {
+            if num_z > 0 {
+                b_ambiguous |= AMBIGUOUS_STEREO;
+            }
+            if parity != v_ab_parity_unknown {
+                parity = get_stereocenter_0d_parity(
+                    at,
+                    cur_at,
+                    j1,
+                    &mut sb_neigh_orig_at_numb,
+                    FLAG_SC_0D,
+                );
+                if parity == AB_PARITY_NONE {
+                    parity = AB_PARITY_UNDF;
+                } else if atom_parity_well_def(parity) {
+                    b_ambiguous &= !AMBIGUOUS_STEREO;
+                }
+            }
+            break 'body;
+        }
+        // 4 neighbors; the 2D tetrahedral ambiguity
+        if b2d != 0 {
+            n2d_tetrahedral_ambiguity = get_2d_tetrahedral_ambiguity(
+                &at_coord,
+                b_add_explicit_neighbor != 0,
+                b_pointed_edge_stereo & PES_BIT_FIX_SP3_BUG != 0,
+                v_min_angle,
+            );
+            if n2d_tetrahedral_ambiguity > 0 {
+                if T2D_WARN & n2d_tetrahedral_ambiguity != 0 {
+                    b_ambiguous |= AMBIGUOUS_STEREO;
+                }
+                if T2D_UNDF & n2d_tetrahedral_ambiguity != 0 {
+                    if parity != v_ab_parity_unknown {
+                        parity = AB_PARITY_UNDF;
+                    }
+                    break 'body;
+                }
+            } else if n2d_tetrahedral_ambiguity < 0 {
+                b_ambiguous |= AMBIGUOUS_STEREO_ERROR;
+                parity = AB_PARITY_UNDF;
+                break 'body;
+            }
+        }
+        // origin to the neighbor #0
+        let c0 = at_coord[0];
+        for j in 1..n4 {
+            at_coord[j] = diff3(&at_coord[j], &c0);
+        }
+        at_coord_center = diff3(&at_coord_center, &c0);
+        let mut min_sine = 0.0;
+        let mut amb = b_ambiguous;
+        let triple_product = triple_prod_and_min_abs_sine2(
+            &at_coord[1..],
+            &at_coord_center,
+            b_add_explicit_neighbor != 0,
+            Some(&mut min_sine),
+            Some(&mut amb),
+            v_min_sine,
+        );
+        b_ambiguous = amb;
+        if triple_product.abs() > ZERO_FLOAT
+            && (min_sine > v_min_sine
+                || (min_sine.abs() > ZERO_FLOAT && (n2d_tetrahedral_ambiguity & T2D_OKAY) != 0))
+        {
+            parity = if triple_product > 0.0 {
+                AB_PARITY_EVEN
+            } else {
+                AB_PARITY_ODD
+            };
+            if j1 == n4 - 1 {
+                parity = 3 - parity;
+            }
+        } else {
+            if num_z > 0 {
+                b_ambiguous |= AMBIGUOUS_STEREO;
+            }
+            parity = AB_PARITY_UNDF;
+        }
+    }
+
+    // exit_function
+    if parity != 0 {
+        out_at[cur_at].b_ambiguous_stereo |= b_ambiguous as i8;
+        at[cur_at].b_ambiguous_stereo |= b_ambiguous as i8;
+    }
+    if at[cur_at].num_h > 1 || parity <= 0 {
+    } else {
+        out_at[cur_at].parity = parity as i8;
+    }
+    if parity == -AB_PARITY_UNDF || parity == -v_ab_parity_unknown {
+        parity = -parity;
+    }
+    if parity < 0 {
+        parity = AB_PARITY_NONE;
+    }
+    out_at[cur_at].parity2 = parity as i8;
+    let p = i32::from(out_at[cur_at].parity) & 0x07;
+    out_at[cur_at].stereo_atom_parity = (if atom_parity_well_def(p) {
+        AB_PARITY_CALC
+    } else {
+        p
+    }) as i8;
+    let p = i32::from(out_at[cur_at].parity2) & 0x07;
+    out_at[cur_at].stereo_atom_parity2 = (if atom_parity_well_def(p) {
+        AB_PARITY_CALC
+    } else {
+        p
+    }) as i8;
+    let _ = num_explicit_iso_h;
+    i32::from(out_at[cur_at].parity2)
+}
+
+/// `set_stereo_parity`: the stereo descriptors of all atoms in `at_output`.
+/// `at[num_at..num_at + num_removed_h]` are the removed explicit H atoms.
+/// Returns the number of well-defined stereocenters or a negative error code.
+#[allow(clippy::too_many_arguments)]
+pub fn set_stereo_parity(
+    at: &mut [InpAtom],
+    at_output: &mut [SpAtom],
+    num_at: usize,
+    num_removed_h: usize,
+    n_max_num_stereo_atoms: Option<&mut i32>,
+    n_max_num_stereo_bonds: Option<&mut i32>,
+    n_mode: u64,
+    b_pointed_edge_stereo: i32,
+    v_ab_parity_unknown: i32,
+    b_loose_tsa_check: bool,
+    b_stereo_at_zz: i32,
+) -> i32 {
+    use super::ichierr::{CT_ERR_MAX, CT_ERR_MIN};
+    use super::ichiring::Queue;
+    let mut num_3d_stereo_atoms = 0;
+    let mut num_stereo_bonds = 0;
+    let (mut max_stereo_atoms, mut max_stereo_bonds) = (0, 0);
+    for s in at_output.iter_mut().take(num_at) {
+        s.parity = 0;
+        s.parity2 = 0;
+        s.stereo_bond_neighbor = Default::default();
+        s.stereo_bond_neighbor2 = Default::default();
+        s.stereo_bond_ord = Default::default();
+        s.stereo_bond_ord2 = Default::default();
+        s.stereo_bond_z_prod = Default::default();
+        s.stereo_bond_z_prod2 = Default::default();
+        s.stereo_bond_parity = Default::default();
+        s.stereo_bond_parity2 = Default::default();
+    }
+    let (mut want_atoms, mut want_bonds) = (n_max_num_stereo_atoms, n_max_num_stereo_bonds);
+    if want_atoms.is_some() || want_bonds.is_some() {
+        for i in 0..num_at {
+            let num =
+                can_be_a_stereo_atom_with_isotopic_h(at, i, b_pointed_edge_stereo, b_stereo_at_zz);
+            if num != 0 {
+                max_stereo_atoms += num;
+            } else {
+                let num = can_be_a_stereo_bond_with_isotopic_h(at, i, n_mode);
+                if num != 0 {
+                    max_stereo_bonds += num;
+                }
+            }
+        }
+        if let Some(a) = want_atoms.as_deref_mut() {
+            *a = max_stereo_atoms;
+        }
+        if let Some(b) = want_bonds.as_deref_mut() {
+            *b = max_stereo_bonds;
+        }
+    }
+    let mut min_sb_ring_size =
+        ((n_mode & REQ_MODE_MIN_SB_RING_MASK) >> REQ_MODE_MIN_SB_RING_SHFT) as u16;
+    let (mut q, mut n_atom_level, mut c_source);
+    if min_sb_ring_size >= 3 {
+        q = Queue::create(num_at as i32 + 1).unwrap();
+        n_atom_level = vec![0u16; num_at];
+        c_source = vec![0i8; num_at];
+    } else {
+        min_sb_ring_size = 2;
+        // not used: the ring search returns at once for sizes below 3
+        q = Queue::create(1).unwrap();
+        n_atom_level = Vec::new();
+        c_source = Vec::new();
+    }
+    for i in 0..num_at {
+        let mut is_stereo = set_stereo_atom_parity(
+            at_output,
+            at,
+            i,
+            num_at,
+            num_removed_h,
+            b_pointed_edge_stereo,
+            v_ab_parity_unknown,
+            b_loose_tsa_check,
+            b_stereo_at_zz,
+        );
+        if is_stereo != 0 {
+            num_3d_stereo_atoms += i32::from(atom_parity_well_def(is_stereo));
+        } else {
+            is_stereo = set_stereo_bonds_parity(
+                at_output,
+                at,
+                i,
+                num_at,
+                num_removed_h,
+                n_mode,
+                &mut q,
+                &mut n_atom_level,
+                &mut c_source,
+                min_sb_ring_size,
+                b_pointed_edge_stereo,
+                v_ab_parity_unknown,
+            );
+            if (CT_ERR_MIN..=CT_ERR_MAX).contains(&is_stereo) {
+                num_3d_stereo_atoms = is_stereo;
+                break;
+            }
+            num_stereo_bonds += i32::from(is_stereo != 0);
+        }
+    }
+    if let Some(a) = want_atoms {
+        if max_stereo_atoms < num_3d_stereo_atoms {
+            *a = num_3d_stereo_atoms;
+        }
+    }
+    if let Some(b) = want_bonds {
+        if max_stereo_bonds < num_stereo_bonds {
+            *b = num_stereo_bonds;
+        }
+    }
+    num_3d_stereo_atoms
+}

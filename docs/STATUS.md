@@ -298,6 +298,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 182 | InChI I5i: ichister stereocenter/stereobond candidate checks (bCanInpAtomBeAStereoCenter, can_be_a_stereo_bond_with_isotopic_H, bIsOxide, half_stereo_bond_action, ...) verified on 6000 random atom graphs vs the C code |
 | 183 | InChI I5j: ichister half_stereo_bond_parity + GetHalfStereobond0DParity verified on 8000 random neighborhoods vs the C code |
 | 184 | InChI I5k: ichister set_stereo_bonds_parity + FixSb0DParities + SpAtom verified on 6000 random molecules vs the C code |
+| 185 | InChI I5l: ichister set_stereo_parity, set_stereo_atom_parity, GetStereocenter0DParity verified on 8000 random molecules vs the C code |
 
 ## Python package files
 
@@ -652,3 +653,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-21 — Stage 182: InChI I5i: stereo candidate checks ported and differentially tested
 * 2026-10-21 — Stage 183: InChI I5j: half stereo bond parity ported and differentially tested
 * 2026-10-21 — Stage 184: InChI I5k: stereo bond parity detection ported and differentially tested
+* 2026-10-21 — Stage 185: InChI I5l: stereocenter parity and set_stereo_parity driver ported and differentially tested
