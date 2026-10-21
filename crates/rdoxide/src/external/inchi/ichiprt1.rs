@@ -372,6 +372,8 @@ pub struct InchiOutCtl {
     pub b_isotopic_taut_equ: [i32; 2],
     pub b_inv_isotopic_stereo: [i32; 2],
     pub b_inv_isotopic_stereo_orig_numb: [i32; 2],
+    pub b_ign_uu_sp3: [i32; 2],
+    pub b_ign_uu_sp2: [i32; 2],
     pub b_ign_uu_sp3_iso: [i32; 2],
     pub b_ign_uu_sp2_iso: [i32; 2],
     pub b_charges_rad_val: [i32; 2],
@@ -2797,4 +2799,843 @@ pub fn edit_inchi_hide_polymer_zz(out: &mut InchiIostream, n_pzz: i32, n_zy: i32
         if eol_was_consumed { "\n" } else { "" }
     );
     inchi_ios_print_nodisplay(Some(out), &text);
+}
+
+// ---------------------------------------------------------------------------
+// The serialization of a whole InChI (`OutputINChI1`, `OutputINChI2`)
+
+use super::ichi::{
+    DIFL_M, DIFL_MI, DIFV_BOTH_EMPTY, DIFV_NEQ2PRECED, INCHI_FLAG_ACID_TAUT,
+    INCHI_FLAG_HARD_ADD_REM_PROTON, INCHI_FLAG_RAC_STEREO, INCHI_FLAG_REL_STEREO,
+    INCHI_FLAG_SB_IGN_ALL_ISO_UU, INCHI_FLAG_SB_IGN_ALL_UU, INCHI_FLAG_SC_IGN_ALL_ISO_UU,
+    INCHI_FLAG_SC_IGN_ALL_UU, comp_inchi_layers, comp_inchi_taut_vs_non_taut, eql_inchi_stereo,
+    mark_unused_and_empty_layers,
+};
+use super::ichi::{EQL_SP2, EQL_SP3};
+use super::ichi_io::inchi_ios_eprint;
+use super::ichimake::CT_MODE_PREDECESSORS;
+use super::ichiprt2::{
+    CT_MODE_ABC_NUM_CLOSURES, CT_MODE_ABC_NUMBERS, CT_MODE_ATOM_COUNTS, CT_MODE_EQL_H_TOGETHER,
+    CT_MODE_NO_ORPHANS, has_equ_string, has_orig_info,
+};
+use super::ichiprt3::{OUT_N1, OUT_NT, OUT_T1, get_ii, has_n};
+
+pub const INCHI_OUT_NO_AUX_INFO: i32 = 0x0001;
+pub const INCHI_OUT_ONLY_AUX_INFO: i32 = 0x0004;
+pub const INCHI_OUT_EMBED_REC: i32 = 0x0008;
+pub const INCHI_OUT_FIX_TRANSPOSITION_CHARGE_BUG: i32 = 0x2000;
+pub const INCHI_OUT_SAVEOPT: i32 = 0x8000;
+const NORMALLY_ALLOWED_INP_MAX_ATOMS: i32 = 1024;
+const TAUT_NUM: usize = 2;
+
+/// the parts of `INPUT_PARMS` and of the original input data used by the
+/// serialization; `orig_present` is false for a NULL `ORIG_ATOM_DATA`
+#[derive(Debug, Clone, Default)]
+pub struct OutputInput {
+    pub abc_numbers: bool,
+    pub ct_predecessors: bool,
+    pub polymers: i32,
+    pub large_molecules: bool,
+    pub sdf_label: String,
+    pub sdf_value: String,
+    pub orig_present: bool,
+    pub n_zy: i32,
+    pub n_pzz: i32,
+}
+
+/// `SDF_LBL_VAL` as one string
+fn sdf_lbl_val(label: &str, value: &str) -> String {
+    let l = !label.is_empty();
+    let v = !value.is_empty();
+    format!(
+        "{}{}{}{}",
+        if l { " " } else { "" },
+        if l { label } else { "" },
+        if l { if v { "=" } else { " " } } else { "" },
+        if v {
+            value
+        } else if l {
+            "is missing"
+        } else {
+            ""
+        }
+    )
+}
+
+/// the first `n` elements differ (the arrays are zero padded)
+fn differ(a: &[u16], b: &[u16], n: i32) -> bool {
+    (0..n.max(0) as usize).any(|i| a.get(i).copied().unwrap_or(0) != b.get(i).copied().unwrap_or(0))
+}
+
+/// `OutputINChI2`: calls `OutputINChI1` for each requested plain text kind
+#[allow(clippy::too_many_arguments)]
+pub fn output_inchi2(
+    strbuf: &mut InchiIosString,
+    sorts: &[[Vec<InChISort>; 2]; 2],
+    basic_or_reconnected: i32,
+    orig_struct: Option<&OrigStruct>,
+    ip: &OutputInput,
+    disconnected_coord: bool,
+    output_type: i32,
+    output_options: i32,
+    num_components2: [i32; 2],
+    out_file: &mut InchiIostream,
+    mut log_file: Option<&mut InchiIostream>,
+    num_input_struct: i32,
+    flags: &mut i32,
+    save_opt_bits: u8,
+) -> i32 {
+    let options0 = output_options & !(INCHI_OUT_PLAIN_TEXT | INCHI_OUT_PLAIN_TEXT_COMMENTS);
+    let mut ret = 0;
+    for i in 0..3 {
+        let cur = match i {
+            1 => INCHI_OUT_PLAIN_TEXT,
+            2 => INCHI_OUT_PLAIN_TEXT_COMMENTS,
+            _ => continue,
+        };
+        if output_options & cur != 0 {
+            let mut options_cur = options0 | cur;
+            if i != 1 {
+                options_cur &= !INCHI_OUT_TABBED_OUTPUT;
+            }
+            ret |= output_inchi1(
+                strbuf,
+                sorts,
+                basic_or_reconnected,
+                orig_struct,
+                ip,
+                disconnected_coord,
+                output_type,
+                options_cur,
+                num_components2,
+                out_file,
+                log_file.as_deref_mut(),
+                num_input_struct,
+                flags,
+                save_opt_bits,
+            );
+        }
+    }
+    ret
+}
+
+/// `OutputINChI1`: serializes the InChI (and the AuxInfo) of the structure;
+/// returns 1 on success, 0 on failure. The polymer layers are not ported
+/// yet, they are skipped as for a structure without polymers.
+#[allow(clippy::too_many_arguments)]
+pub fn output_inchi1(
+    strbuf: &mut InchiIosString,
+    sorts: &[[Vec<InChISort>; 2]; 2],
+    basic_or_reconnected: i32,
+    orig_struct: Option<&OrigStruct>,
+    ip: &OutputInput,
+    disconnected_coord: bool,
+    output_type: i32,
+    output_options: i32,
+    num_components2: [i32; 2],
+    out_file: &mut InchiIostream,
+    mut log_file: Option<&mut InchiIostream>,
+    num_input_struct: i32,
+    flags: &mut i32,
+    save_opt_bits: u8,
+) -> i32 {
+    let mut io = InchiOutCtl::default();
+    let plain_text = output_options & (INCHI_OUT_PLAIN_TEXT | INCHI_OUT_PLAIN_TEXT_COMMENTS) != 0;
+    let plain_text_comments = output_options & INCHI_OUT_PLAIN_TEXT_COMMENTS != 0;
+    let fix_transp_charge_bug =
+        i32::from(output_options & INCHI_OUT_FIX_TRANSPOSITION_CHARGE_BUG != 0);
+    io.b_abc_numbers = i32::from(ip.abc_numbers);
+    io.atom_mode = (if io.b_abc_numbers != 0 {
+        CT_MODE_ABC_NUMBERS
+    } else {
+        0
+    }) | CT_MODE_ATOM_COUNTS
+        | CT_MODE_NO_ORPHANS
+        | CT_MODE_EQL_H_TOGETHER
+        | (if io.b_abc_numbers != 0 && ip.ct_predecessors {
+            CT_MODE_ABC_NUM_CLOSURES
+        } else {
+            0
+        })
+        | (if ip.ct_predecessors {
+            CT_MODE_PREDECESSORS
+        } else {
+            0
+        });
+    io.taut_mode = if io.b_abc_numbers != 0 {
+        CT_MODE_ABC_NUMBERS
+    } else {
+        0
+    };
+    io.sort_print_inchi_flags = *flags;
+    io.num_components = num_components2[basic_or_reconnected as usize] as usize;
+    io.p_inchi_sort_taut_and_non_taut = sorts[basic_or_reconnected as usize].clone();
+    io.p_inchi_sort = io.p_inchi_sort_taut_and_non_taut[TAUT_YES].clone();
+    io.p_inchi_sort2 = io.p_inchi_sort_taut_and_non_taut[TAUT_YES].clone();
+    io.b_always = 0;
+    io.b_use_multipliers = 1;
+    io.b_omit_repetitions = 1;
+    io.b_plain_text_tags = 2;
+    io.b_output_type = output_type;
+    io.b_out_type = output_type;
+    io.b_non_taut_is_identical_to_taut = 1;
+    io.n_tag = if plain_text_comments {
+        3
+    } else if plain_text {
+        2
+    } else {
+        0
+    };
+    if ip.orig_present {
+        io.n_zy = ip.n_zy;
+        io.n_pzz = ip.n_pzz;
+    }
+    io.b_polymers = ip.polymers;
+    let (lf, tab) = set_line_separators(output_options);
+    io.s_dif_segs = [[DIFV_BOTH_EMPTY; super::ichi::DIFS_LENGTH]; super::ichi::DIFL_LENGTH];
+    if strbuf.p_str.is_none() || strbuf.n_allocated_length <= 0 {
+        inchi_ios_eprint(
+            log_file.as_deref_mut(),
+            &format!(
+                "Cannot allocate output buffer. No output for structure #{num_input_struct}.{}\n",
+                sdf_lbl_val(&ip.sdf_label, &ip.sdf_value)
+            ),
+        );
+        return 0;
+    }
+
+    let (mut b_taut_iso_h_num, mut b_taut_iso_at) = (0, 0);
+    let (mut b_taut_and_non_taut, mut b_taut_is_non_taut) = (0, 0);
+    let (mut b_taut_acid, mut b_hard_add_rem_proton) = (0, 0);
+    let (mut req_racemic, mut req_relative) = (false, false);
+    let mut b_has_iso_h = 0;
+    io.b_tautomeric_output_allowed = i32::from(io.b_out_type == OUT_T1 || io.b_out_type == OUT_TN);
+    let allowed = io.b_tautomeric_output_allowed != 0;
+    io.p_inchi_sort =
+        io.p_inchi_sort_taut_and_non_taut[if allowed { TAUT_YES } else { TAUT_NON }].clone();
+    let nc = io.num_components;
+    let (sort, sort2) = (
+        io.p_inchi_sort.clone(),
+        io.p_inchi_sort_taut_and_non_taut[TAUT_NON].clone(),
+    );
+
+    for i in 0..nc {
+        let is = &sort[i];
+        let is2 = sort2.get(i).unwrap_or(is);
+        comp_inchi_layers(is, is2, &mut io.s_dif_segs, fix_transp_charge_bug);
+        io.b_non_taut_is_identical_to_taut = i32::from(
+            io.b_non_taut_is_identical_to_taut != 0
+                && comp_inchi_taut_vs_non_taut(is, is2, true) == 0,
+        );
+        if let Some(aux) = is.p_inchi_aux[TAUT_YES].as_ref() {
+            for j in 0..3 {
+                b_has_iso_h += i32::from(aux.n_num_removed_isotopic_h[j]).abs();
+                io.num_iso_h[j] += i32::from(aux.n_num_removed_isotopic_h[j]);
+            }
+            io.n_num_removed_protons += i32::from(aux.n_num_removed_protons);
+        }
+        if allowed {
+            for j in TAUT_YES..TAUT_NUM {
+                let jj: i32;
+                match io.b_out_type {
+                    OUT_N1 | OUT_T1 | OUT_NT => {
+                        jj = get_ii(io.b_out_type, is);
+                        if jj != j as i32 {
+                            continue;
+                        }
+                    }
+                    OUT_TN => {
+                        jj = if j == TAUT_YES {
+                            get_ii(OUT_T1, is)
+                        } else if j == TAUT_NON {
+                            get_ii(OUT_NT, is)
+                        } else {
+                            -1
+                        };
+                        if jj == TAUT_YES as i32 {
+                            if let Some(c) = is.p_inchi[jj as usize].as_ref() {
+                                if c.len_tautomer > 0 {
+                                    b_taut_and_non_taut += i32::from(c.b_deleted == 0 && has_n(is));
+                                } else {
+                                    b_taut_is_non_taut += 1;
+                                }
+                            }
+                        }
+                        if jj < 0 {
+                            continue;
+                        }
+                    }
+                    _ => continue,
+                }
+                if jj != j as i32 {
+                    continue;
+                }
+                if let Some(c) = is.p_inchi[jj as usize]
+                    .as_ref()
+                    .filter(|c| c.n_number_of_atoms > 0)
+                    && let Some(aux) = is.p_inchi_aux[jj as usize].as_ref()
+                {
+                    b_taut_iso_h_num += i32::from(aux.n_num_removed_isotopic_h[0])
+                        + i32::from(aux.n_num_removed_isotopic_h[1])
+                        + i32::from(aux.n_num_removed_isotopic_h[2]);
+                    b_taut_iso_at += i32::from(
+                        c.n_number_of_isotopic_atoms > 0 || c.n_number_of_isotopic_t_groups > 0,
+                    );
+                }
+            }
+        }
+    }
+    io.s_dif_segs[DIFL_M][DIFS_P_PROTONS] = if io.n_num_removed_protons != 0 {
+        DIFV_NEQ2PRECED
+    } else {
+        DIFV_BOTH_EMPTY
+    };
+    io.s_dif_segs[DIFL_MI][DIFS_H_H_ATOMS] = if b_has_iso_h != 0 {
+        DIFV_NEQ2PRECED
+    } else {
+        DIFV_BOTH_EMPTY
+    };
+    mark_unused_and_empty_layers(&mut io.s_dif_segs);
+    io.b_non_taut_is_identical_to_taut =
+        i32::from(io.b_non_taut_is_identical_to_taut != 0 && b_taut_iso_h_num == 0);
+    let (mut n_atoms_all1, mut n_atoms_all2) = (0, 0);
+
+    for is in sort.iter().take(nc) {
+        let mut comp_exists = 0;
+        for j in TAUT_NON..TAUT_NUM {
+            let (jj, ii): (i32, usize);
+            match io.b_out_type {
+                OUT_N1 | OUT_NT => {
+                    jj = get_ii(io.b_out_type, is);
+                    if jj != j as i32 {
+                        continue;
+                    }
+                    ii = TAUT_NON;
+                }
+                OUT_T1 => {
+                    jj = get_ii(io.b_out_type, is);
+                    if jj != j as i32 {
+                        continue;
+                    }
+                    ii = TAUT_YES;
+                }
+                OUT_TN => {
+                    let mut j2 = if j == TAUT_YES {
+                        get_ii(OUT_T1, is)
+                    } else if j == TAUT_NON {
+                        get_ii(OUT_NT, is)
+                    } else {
+                        -1
+                    };
+                    if j2 < 0 {
+                        let alt = get_ii(OUT_T1, is);
+                        if b_taut_and_non_taut != 0
+                            && b_taut_is_non_taut != 0
+                            && j == TAUT_NON
+                            && alt >= 0
+                            && is.p_inchi[alt as usize]
+                                .as_ref()
+                                .is_some_and(|c| c.b_deleted == 0 && c.len_tautomer == 0)
+                        {
+                            j2 = alt;
+                        } else {
+                            continue;
+                        }
+                    }
+                    jj = j2;
+                    ii = j;
+                }
+                _ => continue,
+            }
+            let Some(c) = is.p_inchi[jj as usize]
+                .as_ref()
+                .filter(|c| c.n_number_of_atoms > 0)
+            else {
+                continue;
+            };
+            comp_exists += 1;
+            if j == TAUT_NON {
+                n_atoms_all1 += c.n_number_of_atoms;
+            } else if j == TAUT_YES {
+                n_atoms_all2 += c.n_number_of_atoms;
+            }
+            let cur_taut = c.len_tautomer > 0;
+            let cur_iso = c.n_number_of_isotopic_atoms > 0 || c.n_number_of_isotopic_t_groups > 0;
+            let cur_iso_h_pos = c
+                .n_possible_locations_of_isotopic_h
+                .first()
+                .is_some_and(|&v| v > 1)
+                || c.len_tautomer > 1;
+            let cur_iso_h_stereo =
+                (cur_iso_h_pos && (b_taut_iso_h_num != 0 || b_taut_iso_at != 0)) || cur_iso;
+            if jj == j as i32 && c.b_deleted != 0 {
+                io.num_comp[j] -= 1;
+                if cur_taut {
+                    io.b_tautomeric |= 1;
+                    io.b_non_tautomeric |= i32::from(has_n(is));
+                }
+                io.b_isotopic |= i32::from(cur_iso);
+                continue;
+            }
+            let st = c.stereo.as_ref();
+            let sti = c.stereo_isotopic.as_ref();
+            let cur_stereo_sp2 = st.is_some_and(|s| s.n_number_of_stereo_bonds > 0);
+            let cur_has_iso_stereo = st.is_some_and(|s| s.n_number_of_stereo_centers > 0);
+            let mut cur_stereo_sp3 = cur_has_iso_stereo;
+            let mut cur_iso_stereo_sp2 =
+                cur_iso_h_stereo && sti.is_some_and(|s| s.n_number_of_stereo_bonds > 0);
+            let mut cur_iso_stereo_sp3 =
+                cur_iso_h_stereo && sti.is_some_and(|s| s.n_number_of_stereo_centers > 0);
+            let mut cur_iso_stereo_sp3_inv =
+                cur_iso_stereo_sp3 && sti.is_some_and(|s| s.n_comp_inv2_abs != 0);
+            req_racemic |= c.n_flags & INCHI_FLAG_RAC_STEREO != 0;
+            req_relative |= c.n_flags & INCHI_FLAG_REL_STEREO != 0;
+            if cur_stereo_sp2 && cur_iso_stereo_sp2 {
+                cur_iso_stereo_sp2 = !eql_inchi_stereo(st, EQL_SP2, sti, EQL_SP2);
+            }
+            if cur_stereo_sp3 && cur_iso_stereo_sp3 {
+                cur_iso_stereo_sp3 = !eql_inchi_stereo(st, EQL_SP3, sti, EQL_SP3);
+                if !cur_iso_stereo_sp3 {
+                    cur_iso_stereo_sp3_inv &=
+                        sti.map(|s| s.n_comp_inv2_abs) != st.map(|s| s.n_comp_inv2_abs);
+                }
+            }
+            let cur_relative = req_relative && cur_stereo_sp3;
+            let cur_iso_relative = req_relative && (cur_iso_stereo_sp3 || cur_iso_stereo_sp3_inv);
+            let cur_racemic = req_racemic && cur_stereo_sp3;
+            let cur_iso_racemic = req_racemic && (cur_iso_stereo_sp3 || cur_iso_stereo_sp3_inv);
+            let n_centers = st.map_or(0, |s| s.n_number_of_stereo_centers);
+            if req_relative {
+                cur_stereo_sp3 = cur_relative || (cur_stereo_sp3 && n_centers > 1);
+                cur_iso_stereo_sp3 = cur_iso_relative && cur_iso_stereo_sp3;
+            } else if req_racemic {
+                // `bCurRacemic > 1` is never true while REL_RAC_STEREO_IGN_1_SC is 0
+                cur_stereo_sp3 = cur_stereo_sp3 && n_centers > 1;
+                cur_iso_stereo_sp3 = false;
+            }
+            io.b_isotopic |= i32::from(cur_iso);
+            io.b_ign_uu_sp3[ii] |=
+                i32::from(!cur_stereo_sp3 && c.n_flags & INCHI_FLAG_SC_IGN_ALL_UU != 0);
+            io.b_ign_uu_sp2[ii] |=
+                i32::from(!cur_stereo_sp2 && c.n_flags & INCHI_FLAG_SB_IGN_ALL_UU != 0);
+            io.b_ign_uu_sp3_iso[ii] |=
+                i32::from(!cur_iso_stereo_sp3 && c.n_flags & INCHI_FLAG_SC_IGN_ALL_ISO_UU != 0);
+            io.b_ign_uu_sp2_iso[ii] |=
+                i32::from(!cur_iso_stereo_sp2 && c.n_flags & INCHI_FLAG_SB_IGN_ALL_ISO_UU != 0);
+            io.b_relative_stereo[ii] |= i32::from(cur_relative);
+            io.b_isotopic_relative_stereo[ii] |= i32::from(cur_iso_relative);
+            io.b_racemic_stereo[ii] |= i32::from(cur_racemic);
+            io.b_isotopic_racemic_stereo[ii] |= i32::from(cur_iso_racemic);
+            b_taut_acid |= i32::from(c.n_flags & INCHI_FLAG_ACID_TAUT != 0);
+            b_hard_add_rem_proton |= i32::from(c.n_flags & INCHI_FLAG_HARD_ADD_REM_PROTON != 0);
+            if cur_taut {
+                io.b_tautomeric |= 1;
+                io.b_non_tautomeric |= i32::from(has_n(is));
+            }
+            if output_options & INCHI_OUT_NO_AUX_INFO == 0
+                && let Some(aux) = is.p_inchi_aux[jj as usize].as_ref()
+            {
+                io.b_atom_equ[ii] |= i32::from(has_equ_string(
+                    &aux.n_constit_equ_numbers,
+                    aux.n_number_of_atoms,
+                ));
+                if cur_taut {
+                    io.b_taut_equ[ii] |= i32::from(has_equ_string(
+                        &aux.n_constit_equ_t_group_numbers,
+                        aux.n_number_of_t_groups,
+                    ));
+                }
+                if cur_iso {
+                    io.b_isotopic_atom_equ[ii] |= i32::from(has_equ_string(
+                        &aux.n_constit_equ_isotopic_numbers,
+                        aux.n_number_of_atoms,
+                    ));
+                    if cur_taut {
+                        io.b_isotopic_taut_equ[ii] |= i32::from(has_equ_string(
+                            &aux.n_constit_equ_isotopic_t_group_numbers,
+                            aux.n_number_of_t_groups,
+                        ));
+                    }
+                    io.b_isotopic_orig_numb[ii] |= i32::from(
+                        cur_has_iso_stereo
+                            && !aux.n_orig_at_nos_in_canon_ord_inv.is_empty()
+                            && !aux.n_isotopic_orig_at_nos_in_canon_ord.is_empty()
+                            && differ(
+                                &aux.n_orig_at_nos_in_canon_ord_inv,
+                                &aux.n_isotopic_orig_at_nos_in_canon_ord,
+                                aux.n_number_of_atoms,
+                            ),
+                    );
+                }
+                if cur_stereo_sp3 && st.is_some_and(|s| s.n_comp_inv2_abs != 0) {
+                    io.b_inv_stereo[ii] |= 1;
+                    io.b_inv_stereo_orig_numb[ii] |= i32::from(
+                        !aux.n_orig_at_nos_in_canon_ord.is_empty()
+                            && !aux.n_orig_at_nos_in_canon_ord_inv.is_empty()
+                            && differ(
+                                &aux.n_orig_at_nos_in_canon_ord,
+                                &aux.n_orig_at_nos_in_canon_ord_inv,
+                                aux.n_number_of_atoms,
+                            ),
+                    );
+                }
+                if cur_iso_stereo_sp3 && sti.is_some_and(|s| s.n_comp_inv2_abs != 0) {
+                    io.b_inv_isotopic_stereo[ii] |= 1;
+                    io.b_inv_isotopic_stereo_orig_numb[ii] |= i32::from(
+                        !aux.n_isotopic_orig_at_nos_in_canon_ord.is_empty()
+                            && !aux.n_isotopic_orig_at_nos_in_canon_ord_inv.is_empty()
+                            && differ(
+                                &aux.n_isotopic_orig_at_nos_in_canon_ord,
+                                &aux.n_isotopic_orig_at_nos_in_canon_ord_inv,
+                                aux.n_number_of_atoms,
+                            ),
+                    );
+                }
+                if has_orig_info(&aux.orig_info, aux.n_number_of_atoms) {
+                    io.b_charges_rad_val[ii] |= 1;
+                }
+            }
+        }
+        if comp_exists != 0 {
+            for j in 0..TAUT_NUM {
+                io.num_comp[j] += 1;
+            }
+        }
+    }
+    if io.b_tautomeric != 0 {
+        io.b_tautomeric += b_taut_acid;
+        io.b_tautomeric += if b_hard_add_rem_proton != 0 { 4 } else { 0 };
+    }
+    if req_racemic || req_relative {
+        for i in 0..TAUT_NUM {
+            io.b_inv_stereo[i] = 0;
+            io.b_inv_stereo_orig_numb[i] = 0;
+            io.b_inv_isotopic_stereo[i] = 0;
+            io.b_inv_isotopic_stereo_orig_numb[i] = 0;
+        }
+    }
+    let cur_mode: i32 = match io.b_out_type {
+        OUT_N1 | OUT_NT => TAUT_NON as i32,
+        OUT_T1 | OUT_TN => TAUT_YES as i32,
+        _ => -1,
+    };
+    if cur_mode < 0 {
+        return 0;
+    }
+    io.i_cur_taut_mode = cur_mode as usize;
+    io.b_overflow = 0;
+    io.num_components = io.num_comp[io.i_cur_taut_mode] as usize;
+
+    let mut ret = 0;
+    let mut intermediate_result = 0;
+    'main: {
+        if output_options & INCHI_OUT_ONLY_AUX_INFO == 0 {
+            io.n_cur_inchi_segment = DIFL_M;
+            if basic_or_reconnected == INCHI_BAS || output_options & INCHI_OUT_EMBED_REC == 0 {
+                let n_atoms_all = n_atoms_all1.max(n_atoms_all2);
+                let is_beta = n_atoms_all > NORMALLY_ALLOWED_INP_MAX_ATOMS
+                    || (orig_struct.is_none() && (ip.large_molecules || ip.polymers != 0))
+                    || orig_struct.is_some_and(|o| o.n_zy != 0);
+                output_inchi_version_and_kind(out_file, strbuf, output_options, is_beta, lf);
+            }
+            intermediate_result = output_inchi_main_layer_formula(
+                out_file,
+                strbuf,
+                num_components2,
+                basic_or_reconnected,
+                &mut io,
+                lf,
+            );
+            if intermediate_result != 0 {
+                break 'main;
+            }
+            intermediate_result =
+                output_inchi_main_layer_connections(out_file, strbuf, &mut io, lf);
+            if intermediate_result != 0 {
+                break 'main;
+            }
+            intermediate_result = output_inchi_main_layer_hydrogens(out_file, strbuf, &mut io, lf);
+            if intermediate_result != 0 {
+                break 'main;
+            }
+            io.b_fh_tag = 0;
+            let mut npass = 0;
+            loop {
+                intermediate_result = output_inchi_charge_and_removed_added_protons_layers(
+                    out_file, strbuf, &mut io, lf,
+                );
+                if intermediate_result != 0 {
+                    break 'main;
+                }
+                // (the polymer layer: nothing to do without polymers)
+                intermediate_result = output_inchi_stereo_layer(out_file, strbuf, &mut io, lf);
+                if intermediate_result != 0 {
+                    break 'main;
+                }
+                io.n_cur_inchi_segment += 1;
+                intermediate_result = output_inchi_isotopic_layer(
+                    out_file,
+                    strbuf,
+                    basic_or_reconnected,
+                    &mut io,
+                    lf,
+                );
+                if intermediate_result != 0 {
+                    break 'main;
+                }
+                let mut then_goto_repeat = 0;
+                intermediate_result = output_inchi_fixed_h_layer_with_sublayers(
+                    out_file,
+                    strbuf,
+                    basic_or_reconnected,
+                    &mut io,
+                    lf,
+                    &mut then_goto_repeat,
+                );
+                if intermediate_result != 0 {
+                    break 'main;
+                }
+                if then_goto_repeat != 0 {
+                    npass += 1;
+                    continue;
+                }
+                break;
+            }
+            let _ = npass;
+
+            let mut embedded = false;
+            if disconnected_coord
+                && basic_or_reconnected == INCHI_BAS
+                && output_options & INCHI_OUT_EMBED_REC != 0
+                && num_components2[INCHI_REC as usize] != 0
+            {
+                embedded = true;
+                inchi_ios_print_nodisplay(Some(out_file), lf);
+                *flags = io.sort_print_inchi_flags;
+                let n_ret = output_inchi1(
+                    strbuf,
+                    sorts,
+                    INCHI_REC,
+                    orig_struct,
+                    ip,
+                    false,
+                    output_type,
+                    output_options | INCHI_OUT_NO_AUX_INFO,
+                    num_components2,
+                    out_file,
+                    log_file.as_deref_mut(),
+                    num_input_struct,
+                    flags,
+                    save_opt_bits,
+                );
+                io.sort_print_inchi_flags = *flags;
+                if n_ret == 0 {
+                    break 'main;
+                }
+            }
+            if !embedded
+                && output_options & INCHI_OUT_SAVEOPT != 0
+                && output_options & INCHI_OUT_STDINCHI == 0
+            {
+                let (l1, l2) = get_save_opt_letters(save_opt_bits);
+                inchi_ios_print_nodisplay(Some(out_file), &format!("\\{l1}{l2}"));
+            }
+            if !embedded && !plain_text_comments {
+                inchi_ios_print_nodisplay(
+                    Some(out_file),
+                    &format!(
+                        "{}{}",
+                        if num_components2[0] == 0 && num_components2[1] == 0 {
+                            "//"
+                        } else {
+                            ""
+                        },
+                        if output_options & INCHI_OUT_NO_AUX_INFO != 0 {
+                            "\n"
+                        } else {
+                            tab
+                        }
+                    ),
+                );
+            }
+            inchi_strbuf_reset(strbuf);
+        }
+
+        // output_aux_info:
+        io.b_fh_tag = 0;
+        if output_options & INCHI_OUT_NO_AUX_INFO == 0 {
+            io.num_components = io.num_comp[io.i_cur_taut_mode] as usize;
+            intermediate_result = output_auxinfo_header_and_normalization_type(
+                out_file,
+                strbuf,
+                output_options,
+                basic_or_reconnected,
+                num_components2,
+                &mut io,
+                lf,
+            );
+            if intermediate_result != 0 {
+                break 'main;
+            }
+            let no_nfix = if basic_or_reconnected == INCHI_BAS {
+                FLAG_SORT_PRINT_NO_NFIX_H_BAS
+            } else {
+                FLAG_SORT_PRINT_NO_NFIX_H_REC
+            };
+            let no_ifix = if basic_or_reconnected == INCHI_BAS {
+                FLAG_SORT_PRINT_NO_IFIX_H_BAS
+            } else {
+                FLAG_SORT_PRINT_NO_IFIX_H_REC
+            };
+            let mut skip_to_iso = false;
+            loop {
+                if !skip_to_iso {
+                    intermediate_result = output_auxinfo_original_numbers_and_equivalence_classes(
+                        out_file,
+                        strbuf,
+                        num_components2,
+                        &mut io,
+                        lf,
+                    );
+                    if intermediate_result != 0 {
+                        break 'main;
+                    }
+                    intermediate_result =
+                        output_auxinfo_tautomeric_groups_equivalence(out_file, strbuf, &mut io);
+                    if intermediate_result != 0 {
+                        break 'main;
+                    }
+                    intermediate_result = output_auxinfo_stereo(out_file, strbuf, &mut io, lf);
+                    if intermediate_result != 0 {
+                        break 'main;
+                    }
+                }
+                intermediate_result = output_auxinfo_isotopic_info(
+                    out_file,
+                    strbuf,
+                    basic_or_reconnected,
+                    &mut io,
+                    lf,
+                );
+                if intermediate_result != 0 {
+                    break 'main;
+                }
+                if io.b_out_type == OUT_TN
+                    && io.b_tautomeric != 0
+                    && io.b_non_tautomeric != 0
+                    && io.sort_print_inchi_flags & no_nfix != 0
+                    && io.sort_print_inchi_flags & no_ifix != 0
+                {
+                    io.b_non_tautomeric = 0;
+                }
+                if io.b_out_type == OUT_TN && io.b_tautomeric != 0 && io.b_non_tautomeric != 0 {
+                    io.b_out_type = OUT_NN;
+                    io.i_cur_taut_mode = TAUT_NON;
+                    io.p_inchi_sort = io.p_inchi_sort_taut_and_non_taut[TAUT_NON].clone();
+                    io.b_second_non_taut_pass = 1;
+                    io.num_components = io.num_comp[io.i_cur_taut_mode] as usize;
+                    io.b_fh_tag = AL_FIXH;
+                    inchi_strbuf_reset(strbuf);
+                    skip_to_iso = io.sort_print_inchi_flags & no_nfix != 0;
+                    continue;
+                }
+                if io.b_out_type == OUT_NN
+                    && io.b_output_type == OUT_TN
+                    && io.b_tautomeric != 0
+                    && io.b_non_tautomeric != 0
+                {
+                    io.b_out_type = OUT_TN;
+                    io.i_cur_taut_mode = TAUT_YES;
+                    io.p_inchi_sort = io.p_inchi_sort_taut_and_non_taut[TAUT_YES].clone();
+                    io.b_second_non_taut_pass = 0;
+                    io.num_components = io.num_comp[io.i_cur_taut_mode] as usize;
+                    io.b_fh_tag = 0;
+                }
+                break;
+            }
+            intermediate_result =
+                output_auxinfo_charges_radicals_and_unusual_valences(out_file, strbuf, &mut io, lf);
+            if intermediate_result != 0 {
+                break 'main;
+            }
+            intermediate_result =
+                output_auxinfo_reversibility_info(out_file, strbuf, orig_struct, &mut io, lf);
+            if intermediate_result != 0 {
+                break 'main;
+            }
+            // (the polymer AuxInfo: nothing to do without polymers)
+            let mut embedded = false;
+            if disconnected_coord
+                && basic_or_reconnected == INCHI_BAS
+                && output_options & INCHI_OUT_EMBED_REC != 0
+                && num_components2[INCHI_REC as usize] != 0
+                && output_options & INCHI_OUT_NO_AUX_INFO == 0
+            {
+                embedded = true;
+                inchi_ios_print(Some(out_file), lf);
+                *flags = io.sort_print_inchi_flags;
+                let no_polymers = OutputInput {
+                    orig_present: false,
+                    ..ip.clone()
+                };
+                let n_ret = output_inchi1(
+                    strbuf,
+                    sorts,
+                    INCHI_REC,
+                    None,
+                    &no_polymers,
+                    false,
+                    output_type,
+                    INCHI_OUT_ONLY_AUX_INFO | output_options,
+                    num_components2,
+                    out_file,
+                    log_file.as_deref_mut(),
+                    num_input_struct,
+                    flags,
+                    save_opt_bits,
+                );
+                io.sort_print_inchi_flags = *flags;
+                if n_ret == 0 {
+                    break 'main;
+                }
+            }
+            if !embedded && !plain_text_comments {
+                inchi_ios_print(
+                    Some(out_file),
+                    &format!(
+                        "{}\n",
+                        if num_components2[0] == 0 && num_components2[1] == 0 {
+                            "//"
+                        } else {
+                            ""
+                        }
+                    ),
+                );
+            }
+            inchi_ios_print(
+                Some(out_file),
+                if output_options & INCHI_OUT_WINCHI_WINDOW != 0 {
+                    "\n"
+                } else {
+                    ""
+                },
+            );
+        }
+        ret = 1;
+    }
+    *flags = io.sort_print_inchi_flags;
+    if io.b_overflow != 0 {
+        inchi_ios_print(Some(out_file), "\nFATAL ERROR: Output buffer overflow\n");
+    }
+    if intermediate_result != 0 {
+        ret = 0;
+        inchi_ios_eprint(
+            log_file,
+            &format!(
+                "InChI serialization error for structure #{num_input_struct}.{}\n",
+                sdf_lbl_val(&ip.sdf_label, &ip.sdf_value)
+            ),
+        );
+    }
+    ret
 }
