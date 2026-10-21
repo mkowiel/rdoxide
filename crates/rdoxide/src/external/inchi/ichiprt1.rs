@@ -104,15 +104,21 @@ pub fn equ_string(equ_val: i32) -> &'static str {
 // (`INCHI_BASE/src/ichiprt1.c`)
 
 use super::ichi::{
-    DIFS_H_H_ATOMS, DIFS_P_PROTONS, DIFS_Q_CHARGE, DifSegs, INCHI_SEGM_FILL, InChISort,
-    inchi_segment_action,
+    DIFL_F, DIFS_B_SBONDS, DIFS_H_H_ATOMS, DIFS_I_IATOMS, DIFS_M_SP3INV, DIFS_O_TRANSP,
+    DIFS_P_PROTONS, DIFS_Q_CHARGE, DIFS_S_STYPE, DIFS_T_SATOMS, DifSegs, INCHI_SEGM_FILL,
+    InChISort, inchi_segment_action,
 };
 use super::ichi_io::{
     InchiIosString, InchiIostream, inchi_ios_print_nodisplay, inchi_strbuf_printf,
     inchi_strbuf_reset, inchi_strbuf_update,
 };
 use super::ichican2::TAUT_YES;
-use super::ichiprt3::{str_charge2, str_connections, str_h_atoms, str_hill_formula};
+use super::ichiprt2::{make_delim, make_iso_h_string};
+use super::ichiprt3::{
+    OUT_NN, OUT_TN, bin_aux_taut_trans, str_aux_taut_trans, str_charge2, str_connections,
+    str_h_atoms, str_hill_formula, str_iso_atoms, str_iso_sp2, str_iso_sp3, str_iso_stereo_abs_inv,
+    str_sp2, str_sp3, str_stereo_abs_inv,
+};
 
 pub const INCHI_BAS: i32 = 0;
 pub const INCHI_REC: i32 = 1;
@@ -356,6 +362,12 @@ pub struct InchiOutCtl {
     pub n_segm_action: i32,
     pub num_comp: [i32; 2],
     pub num_iso_h: [i32; 3],
+    pub b_relative_stereo: [i32; 2],
+    pub b_racemic_stereo: [i32; 2],
+    pub b_isotopic_relative_stereo: [i32; 2],
+    pub b_isotopic_racemic_stereo: [i32; 2],
+    /// `*pSortPrintINChIFlags`
+    pub sort_print_inchi_flags: i32,
     pub s_dif_segs: DifSegs,
     pub sz_tag1: String,
     pub sz_tag2: String,
@@ -622,6 +634,463 @@ pub fn output_inchi_charge_and_removed_added_protons_layers(
             inchi_ios_print_nodisplay(Some(out_file), &format!("{}{lf}", strbuf_str(strbuf)));
         } else if io.b_plain_text_tags == 1 {
             inchi_ios_print_nodisplay(Some(out_file), "/");
+        }
+    }
+    0
+}
+
+pub const FLAG_SORT_PRINT_TRANSPOS_BAS: i32 = 1;
+pub const FLAG_SORT_PRINT_TRANSPOS_REC: i32 = 2;
+const X_REL: &str = "2";
+const X_RAC: &str = "3";
+const X_ABS: &str = "1";
+
+fn seg_action(io: &InchiOutCtl, seg: usize) -> i32 {
+    inchi_segment_action(io.s_dif_segs[io.n_cur_inchi_segment][seg])
+}
+
+fn print_layer(out_file: &mut InchiIostream, strbuf: &InchiIosString, lf: &str) {
+    inchi_ios_print_nodisplay(Some(out_file), &format!("{}{lf}", strbuf_str(strbuf)));
+}
+
+fn any_stereo_segment(io: &InchiOutCtl) -> bool {
+    seg_action(io, DIFS_B_SBONDS) != 0
+        || seg_action(io, DIFS_T_SATOMS) != 0
+        || seg_action(io, DIFS_M_SP3INV) != 0
+        || seg_action(io, DIFS_S_STYPE) != 0
+}
+
+/// `OutputINCHI_StereoLayer`
+pub fn output_inchi_stereo_layer(
+    out_file: &mut InchiIostream,
+    strbuf: &mut InchiIosString,
+    io: &mut InchiOutCtl,
+    lf: &str,
+) -> i32 {
+    let slash = |out_file: &mut InchiIostream, io: &InchiOutCtl, s: &str| {
+        if io.b_plain_text_tags == 1 {
+            inchi_ios_print_nodisplay(Some(out_file), s);
+        }
+    };
+    if !any_stereo_segment(io) {
+        slash(out_file, io, "////");
+        return 0;
+    }
+    io.b_tag1 = IL_STER | io.b_fh_tag;
+    io.sz_tag1 = sz_get_tag(&IDENT_LBL, io.n_tag, io.b_tag1, &mut io.b_always);
+    let cur = io.i_cur_taut_mode;
+
+    // sp2
+    io.n_segm_action = seg_action(io, DIFS_B_SBONDS);
+    if io.n_segm_action != 0 {
+        io.b_tag2 = io.b_tag1 | IL_DBND;
+        io.sz_tag2 = sz_get_tag(&IDENT_LBL, io.n_tag, io.b_tag2, &mut io.b_always);
+        inchi_strbuf_reset(strbuf);
+        io.tot_len = 0;
+        if io.n_segm_action == INCHI_SEGM_FILL {
+            io.tot_len = str_sp2(
+                &io.p_inchi_sort,
+                &io.p_inchi_sort2,
+                strbuf,
+                &mut io.b_overflow,
+                io.b_out_type,
+                io.taut_mode,
+                io.num_components,
+                io.b_second_non_taut_pass != 0,
+                io.b_omit_repetitions != 0,
+                io.b_use_multipliers != 0,
+            );
+            io.b_non_taut_non_iso_identifier_not_empty += io.b_second_non_taut_pass;
+        }
+        if str_line_end(
+            &io.sz_tag2,
+            &mut io.b_overflow,
+            strbuf,
+            -io.n_segm_action,
+            io.b_plain_text_tags,
+        ) != 0
+        {
+            return 1;
+        }
+        print_layer(out_file, strbuf, lf);
+    } else {
+        slash(out_file, io, "/");
+    }
+
+    // sp3
+    io.n_segm_action = seg_action(io, DIFS_T_SATOMS);
+    if io.n_segm_action != 0 {
+        io.b_rel_rac = i32::from(io.b_relative_stereo[cur] != 0 || io.b_racemic_stereo[cur] != 0);
+        io.b_tag2 = io.b_tag1 | IL_SP3S;
+        io.sz_tag2 = sz_get_tag(&IDENT_LBL, io.n_tag, io.b_tag2, &mut io.b_always);
+        inchi_strbuf_reset(strbuf);
+        io.tot_len = 0;
+        if io.n_segm_action == INCHI_SEGM_FILL {
+            io.tot_len = str_sp3(
+                &io.p_inchi_sort,
+                &io.p_inchi_sort2,
+                strbuf,
+                &mut io.b_overflow,
+                io.b_out_type,
+                io.taut_mode,
+                io.num_components,
+                io.b_second_non_taut_pass != 0,
+                io.b_omit_repetitions != 0,
+                io.b_use_multipliers != 0,
+            );
+            io.b_non_taut_non_iso_identifier_not_empty += io.b_second_non_taut_pass;
+        }
+        if str_line_end(
+            &io.sz_tag2,
+            &mut io.b_overflow,
+            strbuf,
+            -io.n_segm_action,
+            io.b_plain_text_tags,
+        ) != 0
+        {
+            return 2;
+        }
+        print_layer(out_file, strbuf, lf);
+    } else {
+        slash(out_file, io, "/");
+    }
+
+    // inverted absolute stereo
+    io.n_segm_action = seg_action(io, DIFS_M_SP3INV);
+    if io.n_segm_action != 0 {
+        io.b_tag2 = io.b_tag1 | IL_INVS;
+        io.sz_tag2 = sz_get_tag(&IDENT_LBL, io.n_tag, io.b_tag2, &mut io.b_always);
+        inchi_strbuf_reset(strbuf);
+        io.tot_len = 0;
+        if io.n_segm_action == INCHI_SEGM_FILL {
+            io.tot_len = str_stereo_abs_inv(
+                &io.p_inchi_sort,
+                strbuf,
+                &mut io.b_overflow,
+                io.b_out_type,
+                io.num_components,
+            );
+            io.b_non_taut_non_iso_identifier_not_empty += io.b_second_non_taut_pass;
+        }
+        if str_line_end(
+            &io.sz_tag2,
+            &mut io.b_overflow,
+            strbuf,
+            -io.n_segm_action,
+            io.b_plain_text_tags,
+        ) != 0
+        {
+            return 3;
+        }
+        print_layer(out_file, strbuf, lf);
+    } else {
+        slash(out_file, io, "/");
+    }
+
+    // stereo type
+    io.n_segm_action = seg_action(io, DIFS_S_STYPE);
+    if io.n_segm_action != 0 {
+        let p_stereo = if io.b_relative_stereo[cur] != 0 {
+            X_REL
+        } else if io.b_racemic_stereo[cur] != 0 {
+            X_RAC
+        } else {
+            X_ABS
+        };
+        io.b_tag2 = io.b_tag1 | IL_TYPS;
+        io.sz_tag2 = sz_get_tag(&IDENT_LBL, io.n_tag, io.b_tag2, &mut io.b_always);
+        inchi_strbuf_reset(strbuf);
+        io.tot_len = 0;
+        if io.n_segm_action == INCHI_SEGM_FILL {
+            io.tot_len += make_delim(Some(p_stereo), strbuf, &mut io.b_overflow);
+            io.b_non_taut_non_iso_identifier_not_empty += io.b_second_non_taut_pass;
+        }
+        if str_line_end(
+            &io.sz_tag2,
+            &mut io.b_overflow,
+            strbuf,
+            -io.n_segm_action,
+            io.b_plain_text_tags,
+        ) != 0
+        {
+            return 1;
+        }
+        print_layer(out_file, strbuf, lf);
+    }
+    slash(out_file, io, "/");
+    0
+}
+
+/// `OutputINCHI_IsotopicLayer`
+pub fn output_inchi_isotopic_layer(
+    out_file: &mut InchiIostream,
+    strbuf: &mut InchiIosString,
+    basic_or_reconnected: i32,
+    io: &mut InchiOutCtl,
+    lf: &str,
+) -> i32 {
+    let slash = |out_file: &mut InchiIostream, io: &InchiOutCtl, s: &str| {
+        if io.b_plain_text_tags == 1 {
+            inchi_ios_print_nodisplay(Some(out_file), s);
+        }
+    };
+    let cur = io.i_cur_taut_mode;
+    if seg_action(io, DIFS_I_IATOMS) != 0 {
+        io.b_tag1 = IL_ISOT | io.b_fh_tag;
+        io.sz_tag1 = sz_get_tag(&IDENT_LBL, io.n_tag, io.b_tag1, &mut io.b_always);
+        io.n_segm_action = seg_action(io, DIFS_I_IATOMS);
+        if io.n_segm_action != 0 {
+            io.b_tag2 = io.b_tag1 | IL_ATMS;
+            io.sz_tag2 = sz_get_tag(&IDENT_LBL, io.n_tag, io.b_tag2, &mut io.b_always);
+            inchi_strbuf_reset(strbuf);
+            io.tot_len = 0;
+            if io.n_segm_action == INCHI_SEGM_FILL {
+                io.tot_len2 = str_iso_atoms(
+                    &io.p_inchi_sort,
+                    &io.p_inchi_sort2,
+                    strbuf,
+                    &mut io.b_overflow,
+                    io.b_out_type,
+                    io.taut_mode,
+                    io.num_components,
+                    io.b_abc_numbers != 0,
+                    io.b_second_non_taut_pass != 0,
+                    io.b_omit_repetitions != 0,
+                    io.b_use_multipliers != 0,
+                );
+                io.b_non_taut_iso_identifier_not_empty += io.b_second_non_taut_pass;
+            } else {
+                io.tot_len2 = io.tot_len;
+            }
+            io.tot_len = io.tot_len2;
+            if str_line_end(
+                &io.sz_tag2,
+                &mut io.b_overflow,
+                strbuf,
+                -io.n_segm_action,
+                io.b_plain_text_tags,
+            ) != 0
+            {
+                return 1;
+            }
+            print_layer(out_file, strbuf, lf);
+        }
+
+        // exchangeable isotopic H (mobile H only)
+        io.n_segm_action = seg_action(io, DIFS_H_H_ATOMS);
+        if io.n_segm_action != 0 {
+            io.b_tag2 = io.b_tag1 | IL_XCGA;
+            io.sz_tag2 = sz_get_tag(&IDENT_LBL, io.n_tag, io.b_tag2, &mut io.b_always);
+            inchi_strbuf_reset(strbuf);
+            io.tot_len = 0;
+            io.tot_len +=
+                make_iso_h_string(&io.num_iso_h, strbuf, io.taut_mode, &mut io.b_overflow);
+            io.b_non_taut_iso_identifier_not_empty += io.b_second_non_taut_pass;
+            if str_line_end(
+                &io.sz_tag2,
+                &mut io.b_overflow,
+                strbuf,
+                -io.n_segm_action,
+                io.b_plain_text_tags,
+            ) != 0
+            {
+                return 2;
+            }
+            print_layer(out_file, strbuf, lf);
+        }
+
+        // isotopic stereo
+        if any_stereo_segment(io) {
+            io.b_tag2 = io.b_tag1 | IL_STER;
+            io.sz_tag2 = sz_get_tag(&IDENT_LBL, io.n_tag, io.b_tag2, &mut io.b_always);
+
+            io.n_segm_action = seg_action(io, DIFS_B_SBONDS);
+            if io.n_segm_action != 0 {
+                io.b_tag3 = io.b_tag2 | IL_DBND;
+                io.sz_tag3 = sz_get_tag(&IDENT_LBL, io.n_tag, io.b_tag3, &mut io.b_always);
+                inchi_strbuf_reset(strbuf);
+                io.tot_len = 0;
+                if io.n_segm_action == INCHI_SEGM_FILL {
+                    io.tot_len = str_iso_sp2(
+                        &io.p_inchi_sort,
+                        &io.p_inchi_sort2,
+                        strbuf,
+                        &mut io.b_overflow,
+                        io.b_out_type,
+                        io.taut_mode,
+                        io.num_components,
+                        io.b_second_non_taut_pass != 0,
+                        io.b_omit_repetitions != 0,
+                        io.b_use_multipliers != 0,
+                    );
+                    io.b_non_taut_iso_identifier_not_empty += io.b_second_non_taut_pass;
+                }
+                if str_line_end(
+                    &io.sz_tag3,
+                    &mut io.b_overflow,
+                    strbuf,
+                    -io.n_segm_action,
+                    io.b_plain_text_tags,
+                ) != 0
+                {
+                    return 3;
+                }
+                print_layer(out_file, strbuf, lf);
+            } else {
+                slash(out_file, io, "/");
+            }
+
+            io.n_segm_action = seg_action(io, DIFS_T_SATOMS);
+            if io.n_segm_action != 0 {
+                io.b_rel_rac = i32::from(
+                    io.b_isotopic_relative_stereo[cur] != 0
+                        || io.b_isotopic_racemic_stereo[cur] != 0,
+                );
+                io.b_tag3 = io.b_tag2 | IL_SP3S;
+                io.sz_tag3 = sz_get_tag(&IDENT_LBL, io.n_tag, io.b_tag3, &mut io.b_always);
+                inchi_strbuf_reset(strbuf);
+                io.tot_len = 0;
+                if io.n_segm_action == INCHI_SEGM_FILL {
+                    io.tot_len = str_iso_sp3(
+                        &io.p_inchi_sort,
+                        &io.p_inchi_sort2,
+                        strbuf,
+                        &mut io.b_overflow,
+                        io.b_out_type,
+                        io.taut_mode,
+                        io.num_components,
+                        io.b_second_non_taut_pass != 0,
+                        io.b_omit_repetitions != 0,
+                        io.b_use_multipliers != 0,
+                    );
+                    io.b_non_taut_iso_identifier_not_empty += io.b_second_non_taut_pass;
+                }
+                if str_line_end(
+                    &io.sz_tag3,
+                    &mut io.b_overflow,
+                    strbuf,
+                    -io.n_segm_action,
+                    io.b_plain_text_tags,
+                ) != 0
+                {
+                    return 5;
+                }
+                print_layer(out_file, strbuf, lf);
+            } else {
+                slash(out_file, io, "/");
+            }
+
+            io.n_segm_action = seg_action(io, DIFS_M_SP3INV);
+            if io.n_segm_action != 0 {
+                io.b_tag3 = io.b_tag2 | IL_INVS;
+                io.sz_tag3 = sz_get_tag(&IDENT_LBL, io.n_tag, io.b_tag3, &mut io.b_always);
+                inchi_strbuf_reset(strbuf);
+                io.tot_len = 0;
+                if io.n_segm_action == INCHI_SEGM_FILL {
+                    io.tot_len = str_iso_stereo_abs_inv(
+                        &io.p_inchi_sort,
+                        strbuf,
+                        &mut io.b_overflow,
+                        io.b_out_type,
+                        io.num_components,
+                    );
+                    io.b_non_taut_iso_identifier_not_empty += io.b_second_non_taut_pass;
+                }
+                if str_line_end(
+                    &io.sz_tag3,
+                    &mut io.b_overflow,
+                    strbuf,
+                    -io.n_segm_action,
+                    io.b_plain_text_tags,
+                ) != 0
+                {
+                    return 5;
+                }
+                print_layer(out_file, strbuf, lf);
+            } else {
+                slash(out_file, io, "/");
+            }
+
+            io.n_segm_action = seg_action(io, DIFS_S_STYPE);
+            if io.n_segm_action != 0 {
+                let p_stereo = if io.b_isotopic_relative_stereo[cur] != 0 {
+                    X_REL
+                } else if io.b_isotopic_racemic_stereo[cur] != 0 {
+                    X_RAC
+                } else {
+                    X_ABS
+                };
+                io.b_tag3 = io.b_tag2 | IL_TYPS;
+                io.sz_tag3 = sz_get_tag(&IDENT_LBL, io.n_tag, io.b_tag3, &mut io.b_always);
+                inchi_strbuf_reset(strbuf);
+                io.tot_len = 0;
+                if io.n_segm_action == INCHI_SEGM_FILL {
+                    io.tot_len += make_delim(Some(p_stereo), strbuf, &mut io.b_overflow);
+                    io.b_non_taut_iso_identifier_not_empty += io.b_second_non_taut_pass;
+                }
+                if str_line_end(
+                    &io.sz_tag3,
+                    &mut io.b_overflow,
+                    strbuf,
+                    -io.n_segm_action,
+                    io.b_plain_text_tags,
+                ) != 0
+                {
+                    return 6;
+                }
+                print_layer(out_file, strbuf, lf);
+            }
+            slash(out_file, io, "/");
+        } else {
+            slash(out_file, io, "////");
+        }
+    } else {
+        slash(out_file, io, "///");
+        slash(out_file, io, "//");
+    }
+
+    // CANON_FIXH_TRANS: the transposition of the non-tautomeric components
+    if io.b_out_type == OUT_NN
+        && io.b_output_type == OUT_TN
+        && io.b_second_non_taut_pass != 0
+        && inchi_segment_action(io.s_dif_segs[DIFL_F][DIFS_O_TRANSP]) == INCHI_SEGM_FILL
+    {
+        let trans = bin_aux_taut_trans(
+            &io.p_inchi_sort,
+            &io.p_inchi_sort2,
+            io.b_out_type,
+            io.num_components,
+        );
+        if trans.is_some() {
+            io.b_tag1 = IL_TRNS | io.b_fh_tag;
+            io.sz_tag1 = sz_get_tag(&IDENT_LBL, io.n_tag, io.b_tag1, &mut io.b_always);
+            inchi_strbuf_reset(strbuf);
+            io.tot_len = str_aux_taut_trans(
+                trans,
+                strbuf,
+                &mut io.b_overflow,
+                io.taut_mode,
+                io.num_components,
+            );
+            io.b_non_taut_iso_identifier_not_empty += io.b_second_non_taut_pass;
+            if str_line_end(
+                &io.sz_tag1,
+                &mut io.b_overflow,
+                strbuf,
+                -1,
+                io.b_plain_text_tags,
+            ) != 0
+            {
+                return 7;
+            }
+            print_layer(out_file, strbuf, lf);
+            io.sort_print_inchi_flags |= if basic_or_reconnected == INCHI_BAS {
+                FLAG_SORT_PRINT_TRANSPOS_BAS
+            } else {
+                FLAG_SORT_PRINT_TRANSPOS_REC
+            };
+        } else {
+            slash(out_file, io, "/");
         }
     }
     0
