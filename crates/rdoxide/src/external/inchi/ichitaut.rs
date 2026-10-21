@@ -1475,3 +1475,297 @@ fn register_end_points_inner(
     tgi.num_t_groups = num_t;
     difference
 }
+
+/// `GetNeutralRepsIfNeeded`: if `*pri` and `*prj` are in one charge group
+/// that has only one neutral atom, replaces them with neutral
+/// representatives of their t-groups. (As in the C code, only the first
+/// charge group is examined: the loop breaks after its first pass.)
+pub fn get_neutral_reps_if_needed(
+    pri: &mut u16,
+    prj: &mut u16,
+    at: &[InpAtom],
+    num_atoms: i32,
+    end_point: &[TEndpoint],
+    cgi: Option<&CGroupInfo>,
+) -> i32 {
+    let mut ri = *pri as usize;
+    let mut rj = *prj as usize;
+    let c_point = at[ri].c_point;
+    let Some(cgi) = cgi else { return 0 };
+    if c_point == 0
+        || at[rj].c_point != c_point
+        || !(at[ri].charge == 1 || at[rj].charge == 1)
+        || cgi.num_c_groups == 0
+    {
+        return 0;
+    }
+    let cg = cgi.c_group.as_ref().expect("c_group");
+    if cg[0].n_group_number == c_point
+        && i32::from(cg[0].num_c_points) - i32::from(cg[0].num[0]) < 2
+    {
+        let endpoint = at[rj].endpoint;
+        if endpoint != 0 {
+            for e in end_point {
+                let r = e.n_atom_number as usize;
+                if r == *prj as usize {
+                    continue;
+                }
+                if at[r].endpoint != endpoint {
+                    continue;
+                }
+                if at[r].c_point == 0 {
+                    rj = r;
+                    break;
+                }
+                if at[r].c_point != c_point && c_point == at[rj].c_point {
+                    rj = r;
+                }
+            }
+            if rj == *prj as usize {
+                for i in 0..num_atoms as usize {
+                    if at[i].endpoint != endpoint || i == *prj as usize {
+                        continue;
+                    }
+                    if at[i].c_point == 0 {
+                        rj = i;
+                        break;
+                    }
+                    if at[i].c_point != c_point && c_point == at[rj].c_point {
+                        rj = i;
+                    }
+                }
+            }
+        }
+        let endpoint = at[ri].endpoint;
+        if endpoint != 0 {
+            for e in end_point {
+                let r = e.n_atom_number as usize;
+                if r == *pri as usize {
+                    continue;
+                }
+                if at[r].endpoint != endpoint {
+                    continue;
+                }
+                if at[r].c_point == 0 {
+                    ri = r;
+                    break;
+                }
+                if at[r].c_point != c_point
+                    && c_point == at[ri].c_point
+                    && at[r].c_point != at[rj].c_point
+                {
+                    ri = r;
+                }
+            }
+            if ri == *pri as usize && at[rj].endpoint != 0 {
+                for i in 0..num_atoms as usize {
+                    if at[i].endpoint != endpoint || i == *pri as usize {
+                        continue;
+                    }
+                    if at[i].c_point == 0 {
+                        ri = i;
+                        break;
+                    }
+                    if at[i].c_point != c_point
+                        && c_point == at[ri].c_point
+                        && at[i].c_point != at[rj].c_point
+                    {
+                        ri = i;
+                    }
+                }
+            }
+        }
+    }
+    *prj = rj as u16;
+    *pri = ri as u16;
+    0
+}
+
+/// `FindAccessibleEndPoints`: finds which of the endpoints are connected by
+/// alternating paths (possibly through t-groups), sets their `n_equ_number`
+/// and drops the endpoints that are not connected to any other. Returns the
+/// number of kept endpoints or an error.
+#[allow(clippy::too_many_arguments)]
+pub fn find_accessible_end_points(
+    end_point: &mut [TEndpoint],
+    num_end_points: &mut usize,
+    bond_pos: &mut [TBondPos],
+    num_bond_pos: &mut usize,
+    p: &mut super::ichi_bns::BnStruct,
+    bd: &mut super::ichi_bns::BnData,
+    at: &mut [InpAtom],
+    num_atoms: i32,
+    cgi: Option<&CGroupInfo>,
+    taut_mode: i32,
+) -> i32 {
+    use super::ichi_bns::exists_any_alt_path;
+    use super::ichierr::is_bns_error;
+    if *num_end_points != *num_bond_pos {
+        return 0;
+    }
+    let n_end = *num_end_points;
+    let cap = n_end + 1;
+    let mut representative = vec![0u16; cap];
+    let mut equ = vec![0u16; cap];
+    let mut ep_no = vec![0usize; cap];
+    let mut n_diff = 0usize;
+    for i in 0..n_end {
+        end_point[i].n_equ_number = end_point[i].n_group_number;
+        let cur = end_point[i].n_equ_number;
+        if cur != 0 && !(0..n_diff).any(|j| equ[j] == cur) {
+            representative[n_diff] = end_point[i].n_atom_number;
+            equ[n_diff] = end_point[i].n_group_number;
+            ep_no[n_diff] = i;
+            n_diff += 1;
+        }
+    }
+    let mut n_found_equ = 0;
+    for i in 0..n_diff {
+        for j in i + 1..n_diff {
+            let (mut ri, mut rj) = (representative[i], representative[j]);
+            get_neutral_reps_if_needed(&mut ri, &mut rj, at, num_atoms, &end_point[..n_end], cgi);
+            let err = exists_any_alt_path(
+                p,
+                bd,
+                at,
+                num_atoms,
+                i32::from(ri),
+                i32::from(rj),
+                taut_mode,
+            );
+            if is_bns_error(err) {
+                return err;
+            }
+            if err == 0 {
+                continue;
+            }
+            let cur = equ[i].min(equ[j]);
+            let max = equ[i].max(equ[j]);
+            for k in 0..n_diff {
+                if equ[k] == max {
+                    equ[k] = cur;
+                    n_found_equ += 1;
+                }
+            }
+            for e in end_point[..n_end].iter_mut() {
+                if e.n_equ_number == max {
+                    e.n_equ_number = cur;
+                }
+            }
+        }
+    }
+    if n_found_equ != 0 {
+        for i in 1..n_diff {
+            if (0..i).any(|j| equ[j] == equ[i]) {
+                equ[i] = 0;
+            }
+        }
+        let mut j = 0;
+        for i in 0..n_diff {
+            if equ[i] != 0 {
+                if i != j {
+                    equ[j] = equ[i];
+                    representative[j] = representative[i];
+                    ep_no[j] = ep_no[i];
+                }
+                j += 1;
+            }
+        }
+        n_diff = j;
+    }
+    // endpoints that have not been assigned to t-groups
+    let mut j = n_diff;
+    let mut equ_all = equ.clone();
+    equ_all.resize(cap + n_end, 0);
+    representative.resize(cap + n_end, 0);
+    ep_no.resize(cap + n_end, 0);
+    for i in 0..n_end {
+        if end_point[i].n_equ_number != 0 {
+            continue;
+        }
+        equ_all[j] = 0;
+        representative[j] = end_point[i].n_atom_number;
+        ep_no[j] = i;
+        j += 1;
+    }
+    let equ = &mut equ_all;
+    let n_tg = j;
+    let mut max_equ = (num_atoms + 1) as u16;
+    for i in 0..n_tg {
+        for j in i + 1..n_tg {
+            if (equ[i] != equ[j] && (i >= n_diff || j >= n_diff)) || (equ[i] == 0 && equ[j] == 0) {
+                let (mut ri, mut rj) = (representative[i], representative[j]);
+                get_neutral_reps_if_needed(
+                    &mut ri,
+                    &mut rj,
+                    at,
+                    num_atoms,
+                    &end_point[..n_end],
+                    cgi,
+                );
+                let err = exists_any_alt_path(
+                    p,
+                    bd,
+                    at,
+                    num_atoms,
+                    i32::from(ri),
+                    i32::from(rj),
+                    taut_mode,
+                );
+                if is_bns_error(err) {
+                    return err;
+                }
+                if err <= 0 {
+                    continue;
+                }
+                if equ[i] != 0 && equ[j] != 0 {
+                    let cur = equ[i].min(equ[j]);
+                    let max = equ[i].max(equ[j]);
+                    for k in 0..n_tg {
+                        if equ[k] == max {
+                            equ[k] = cur;
+                        }
+                    }
+                    for e in end_point[..n_end].iter_mut() {
+                        if e.n_equ_number == max {
+                            e.n_equ_number = cur;
+                        }
+                    }
+                } else if equ[i] != 0 {
+                    equ[j] = equ[i];
+                    end_point[ep_no[j]].n_equ_number = equ[i];
+                } else if equ[j] != 0 {
+                    equ[i] = equ[j];
+                    end_point[ep_no[i]].n_equ_number = equ[j];
+                } else {
+                    equ[i] = max_equ;
+                    equ[j] = max_equ;
+                    end_point[ep_no[i]].n_equ_number = max_equ;
+                    end_point[ep_no[j]].n_equ_number = max_equ;
+                    max_equ += 1;
+                }
+            }
+        }
+    }
+    // IGNORE_SINGLE_ENDPOINTS is 1: endpoints with no equivalent are dropped
+    let mut j = 0;
+    for i in 0..n_end {
+        if end_point[i].n_equ_number != 0 {
+            let same = end_point[..n_end]
+                .iter()
+                .filter(|e| e.n_equ_number == end_point[i].n_equ_number)
+                .count();
+            if same <= 1 {
+                continue;
+            }
+            if i != j {
+                end_point[j] = end_point[i];
+                bond_pos[j] = bond_pos[i];
+            }
+            j += 1;
+        }
+    }
+    *num_end_points = j;
+    *num_bond_pos = j;
+    j as i32
+}
