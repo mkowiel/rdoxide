@@ -288,6 +288,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 172 | done |
 | 173 | done |
 | 174 | done |
+| 175 | done |
 
 ## Python package files
 
@@ -632,3 +633,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-21 — Stage 172: I5a: MakeIsotopicHGroup
 * 2026-10-21 — Stage 173: I5b: MarkTautomerGroups (1,3 rules + PT variants)
 * 2026-10-21 — Stage 174: I5c: MarkTautomerGroups keto-enol rule
+* 2026-10-21 — Stage 175: I5d: MarkTautomerGroups 1,5 tautomerism
