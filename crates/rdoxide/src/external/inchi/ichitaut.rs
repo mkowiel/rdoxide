@@ -638,3 +638,386 @@ pub fn n_get_endpoint_info_ket(atom: &[InpAtom], iat: usize, eif: &mut EndpointI
         charge_point_info(atom, iat, v, eif, code)
     }
 }
+
+// ---- charge groups and salt charge types ----
+
+use super::ichierr::BNS_CPOINT_ERR;
+use super::incomdef::{BOND_TYPE_DOUBLE, BOND_TYPE_SINGLE};
+use super::inpdef::BOND_TYPE_MASK;
+use super::util::get_el_valence;
+
+pub const SALT_DONOR_H: i32 = 1;
+pub const SALT_DONOR_NEG: i32 = 2;
+pub const SALT_ACCEPTOR: i32 = 4;
+pub const SALT_P_DONOR: i32 = 8;
+pub const SALT_P_ACCEPTOR: i32 = 16;
+
+pub const BOND_ALTERN: i32 = 4;
+pub const BOND_TAUTOM: i32 = 8;
+pub const BOND_ALT12NS: i32 = 9;
+
+/// `T_GROUP` (the members the charge/salt code uses)
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct TGroup {
+    pub num: [u16; T_NUM_NO_ISOTOPIC + T_NUM_ISOTOPIC],
+    pub num_da: [u16; TG_NUM_DA],
+    pub n_group_number: u16,
+    pub n_num_endpoints: u16,
+    pub n_first_endpoint_at_no_pos: u16,
+}
+
+/// `T_GROUP_INFO` (the t-group list)
+#[derive(Debug, Clone, Default)]
+pub struct TGroupInfo {
+    pub t_group: Option<Vec<TGroup>>,
+    pub num_t_groups: usize,
+}
+
+/// `C_CANDIDATE`
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct CCandidate {
+    pub atnumber: u16,
+    pub type_: i8,
+    pub subtype: i8,
+}
+
+/// `C_GROUP`
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct CGroup {
+    pub num: [u16; 2],
+    pub num_c_points: u16,
+    pub n_group_number: u16,
+    pub c_group_type: u8,
+}
+
+/// `S_CANDIDATE`
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct SCandidate {
+    pub atnumber: u16,
+    pub type_: i8,
+    pub subtype: i8,
+    pub endpoint: u16,
+}
+
+/// `CmpCCandidates`
+pub fn cmp_c_candidates(c1: &CCandidate, c2: &CCandidate) -> i32 {
+    let ret = i32::from(c1.type_) - i32::from(c2.type_);
+    if ret != 0 {
+        return ret;
+    }
+    let ret = i32::from(c1.subtype) - i32::from(c2.subtype);
+    if ret != 0 {
+        return ret;
+    }
+    i32::from(c1.atnumber) - i32::from(c2.atnumber)
+}
+
+/// `RegisterCPoints`: registers the charge points `point1` and `point2` in
+/// the charge groups (new group, add to a group, or merge two groups);
+/// `c_group` holds `max_num_c` elements, `pnum_c` the number in use.
+pub fn register_c_points(
+    c_group: &mut [CGroup],
+    pnum_c: &mut usize,
+    point1: usize,
+    point2: usize,
+    ctype: u8,
+    at: &mut [InpAtom],
+) -> i32 {
+    let max_num_c = c_group.len();
+    let mut num_c = *pnum_c;
+    let (mut point1, mut point2) = (point1, point2);
+    let charged = |a: &InpAtom| u16::from(a.charge == 1);
+
+    if at[point1].c_point == at[point2].c_point {
+        if at[point1].c_point != 0 {
+            return 0;
+        }
+        if num_c < max_num_c {
+            c_group[num_c] = CGroup::default();
+            c_group[num_c].num[0] = charged(&at[point1]) + charged(&at[point2]);
+            c_group[num_c].num_c_points += 2;
+            c_group[num_c].c_group_type = ctype;
+            let mut n_group_number = 0u16;
+            for g in &c_group[..num_c] {
+                if n_group_number < g.n_group_number {
+                    n_group_number = g.n_group_number;
+                }
+            }
+            n_group_number += 1;
+            c_group[num_c].n_group_number = n_group_number;
+            at[point1].c_point = n_group_number;
+            at[point2].c_point = n_group_number;
+            *pnum_c = num_c + 1;
+            if at[point1].num_h != 0 || at[point2].num_h != 0 {
+                c_group[num_c].num[1] += 1;
+            }
+            return 1;
+        }
+        return BNS_CPOINT_ERR;
+    }
+    if at[point1].c_point > at[point2].c_point {
+        std::mem::swap(&mut point1, &mut point2);
+    }
+    if at[point1].c_point == 0 {
+        let n_group_number = at[point2].c_point;
+        for g in c_group[..num_c].iter_mut() {
+            if n_group_number == g.n_group_number {
+                at[point1].c_point = at[point2].c_point;
+                g.num_c_points += 1;
+                g.num[0] += u16::from(at[point1].charge == 1);
+                return 1;
+            }
+        }
+        return BNS_CPOINT_ERR;
+    }
+    // merge two c-groups
+    let n_new_group_number = at[point1].c_point;
+    let n_group_number = at[point2].c_point;
+    let (mut i1, mut i2): (Option<usize>, Option<usize>) = (None, None);
+    let mut i = 0;
+    while i < num_c && (i1.is_none() || i2.is_none()) {
+        if n_new_group_number == c_group[i].n_group_number {
+            i1 = Some(i);
+        } else if n_group_number == c_group[i].n_group_number {
+            i2 = Some(i);
+        }
+        i += 1;
+    }
+    let (Some(i1), Some(i2)) = (i1, i2) else {
+        return BNS_CPOINT_ERR;
+    };
+    let (n0, np) = (c_group[i2].num[0], c_group[i2].num_c_points);
+    c_group[i1].num[0] += n0;
+    c_group[i1].num_c_points += np;
+    num_c -= 1;
+    if num_c > i2 {
+        c_group.copy_within(i2 + 1..num_c + 1, i2);
+    }
+    *pnum_c = num_c;
+    for g in c_group[..num_c].iter_mut() {
+        if g.n_group_number > n_group_number {
+            g.n_group_number -= 1;
+        }
+    }
+    for a in at.iter_mut() {
+        if a.c_point > n_group_number {
+            a.c_point -= 1;
+        } else if a.c_point == n_group_number {
+            a.c_point = n_new_group_number;
+        }
+    }
+    1
+}
+
+/// `GetSaltChargeType`: the "salt" role of a terminal O, S, Se, Te attached to
+/// a trigonal carbon: returns the type (0) or -1; `s_subtype` receives
+/// `SALT_*` bits
+pub fn get_salt_charge_type(
+    at: &[InpAtom],
+    at_no: usize,
+    t_group_info: Option<&TGroupInfo>,
+    s_subtype: &mut i32,
+) -> i32 {
+    *s_subtype = 0;
+    let a = &at[at_no];
+    if a.valence != 1
+        || (a.radical != 0 && i32::from(a.radical) != RADICAL_SINGLET)
+        || a.charge < -1
+        || (a.charge > 0 && a.c_point == 0)
+    {
+        return -1;
+    }
+    let el = a.el_number;
+    if !(el == EL_NUMBER_O || el == EL_NUMBER_S || el == EL_NUMBER_SE || el == EL_NUMBER_TE)
+        || i32::from(a.chem_bonds_valence) + i32::from(a.num_h)
+            != get_el_valence(i32::from(el), i32::from(a.charge), 0)
+    {
+        return -1;
+    }
+    let ic = a.neighbor[0] as usize;
+    let c = &at[ic];
+    // SALT_WITH_PROTONS == 1
+    if c.el_number != EL_NUMBER_C
+        || i32::from(c.chem_bonds_valence) + i32::from(c.num_h) != 4
+        || c.charge != 0
+        || (c.radical != 0 && i32::from(c.radical) != RADICAL_SINGLET)
+        || c.valence == c.chem_bonds_valence
+    {
+        return -1;
+    }
+    let tg = a.endpoint;
+    if tg != 0
+        && let Some(info) = t_group_info
+        && let Some(groups) = &info.t_group
+    {
+        for g in groups.iter().take(info.num_t_groups) {
+            if tg == g.n_group_number {
+                if g.num[0] > g.num[1] {
+                    *s_subtype |= SALT_DONOR_H;
+                }
+                if g.num[1] != 0 {
+                    *s_subtype |= SALT_DONOR_NEG;
+                }
+                *s_subtype |= SALT_ACCEPTOR;
+                return 0;
+            }
+        }
+        return -1;
+    }
+    if a.charge == -1 {
+        *s_subtype |= SALT_DONOR_NEG;
+    }
+    if a.charge <= 0 && a.num_h != 0 {
+        *s_subtype |= SALT_DONOR_H;
+    }
+    if a.charge == 0 && a.chem_bonds_valence == 2 {
+        *s_subtype |= SALT_ACCEPTOR;
+    }
+    if a.charge == 1 && a.c_point != 0 && a.chem_bonds_valence == 2 && a.num_h != 0 {
+        *s_subtype |= SALT_DONOR_H;
+    }
+    0
+}
+
+/// `bDoNotMergeNonTautAtom`
+pub fn do_not_merge_non_taut_atom(at: &[InpAtom], at_no: usize) -> bool {
+    at[at_no].el_number == EL_NUMBER_N
+}
+
+/// `GetOtherSaltChargeType`: type 1 for a tautomeric endpoint next to a
+/// possible centerpoint, -1 to ignore
+pub fn get_other_salt_charge_type(
+    at: &[InpAtom],
+    at_no: usize,
+    t_group_info: Option<&TGroupInfo>,
+    s_subtype: &mut i32,
+    b_accept_o: bool,
+) -> i32 {
+    *s_subtype = 0;
+    let a = &at[at_no];
+    if !b_accept_o
+        && (a.el_number == EL_NUMBER_O
+            || a.el_number == EL_NUMBER_S
+            || a.el_number == EL_NUMBER_SE
+            || a.el_number == EL_NUMBER_TE)
+    {
+        return -1;
+    }
+    let mut eif = EndpointInfo::default();
+    if n_get_endpoint_info(at, at_no, &mut eif) == 0 {
+        return -1;
+    }
+    let mut num_centerpoints = 0;
+    for j in 0..a.valence as usize {
+        let bond_type = i32::from(a.bond_type[j]) & BOND_TYPE_MASK;
+        let cp = a.neighbor[j] as usize;
+        let c = &at[cp];
+        let alt = bond_type == BOND_ALTERN || bond_type == BOND_ALT12NS || bond_type == BOND_TAUTOM;
+        if ((eif.c_acceptor != 0 && (bond_type == BOND_TYPE_DOUBLE || alt))
+            || (eif.c_donor != 0 && (bond_type == BOND_TYPE_SINGLE || alt)))
+            && (c.chem_bonds_valence > c.valence
+                || (c.chem_bonds_valence == c.valence && (c.endpoint != 0 || c.c_point != 0)))
+            && is_centerpoint_elem(c.el_number)
+        {
+            num_centerpoints += 1;
+            break;
+        }
+    }
+    if num_centerpoints == 0 {
+        return -1;
+    }
+    let tg = a.endpoint;
+    if tg != 0
+        && let Some(info) = t_group_info
+        && let Some(groups) = &info.t_group
+    {
+        for g in groups.iter().take(info.num_t_groups) {
+            if tg == g.n_group_number {
+                if g.num[0] > g.num[1] {
+                    *s_subtype |= SALT_DONOR_H;
+                }
+                if g.num[1] != 0 {
+                    *s_subtype |= SALT_DONOR_NEG;
+                }
+                *s_subtype |= SALT_ACCEPTOR;
+                return 1;
+            }
+        }
+        return -1;
+    }
+    if eif.c_acceptor != 0 {
+        *s_subtype |= SALT_ACCEPTOR;
+    }
+    if eif.c_donor != 0 {
+        if a.charge == -1 {
+            *s_subtype |= SALT_DONOR_NEG;
+        }
+        if a.num_h != 0 {
+            *s_subtype |= SALT_DONOR_H;
+        }
+    }
+    1
+}
+
+/// `GetOtherSaltType`: type 2 for a terminal C-SH or C-S(-)
+pub fn get_other_salt_type(at: &[InpAtom], at_no: usize, s_subtype: &mut i32) -> i32 {
+    let a = &at[at_no];
+    if a.valence != 1
+        || a.chem_bonds_valence != 1
+        || 1 != i32::from(a.num_h == 1) + i32::from(a.charge == -1)
+    {
+        return -1;
+    }
+    *s_subtype = 0;
+    if !(a.el_number == EL_NUMBER_S || a.el_number == EL_NUMBER_SE || a.el_number == EL_NUMBER_TE) {
+        return -1;
+    }
+    let mut eif = EndpointInfo::default();
+    if n_get_endpoint_info(at, at_no, &mut eif) == 0
+        || (eif.c_moveable_charge != 0 && a.c_point == 0)
+        || eif.c_donor == 0
+        || eif.c_acceptor != 0
+    {
+        return -1;
+    }
+    let cp = a.neighbor[0] as usize;
+    let c = &at[cp];
+    if c.el_number != EL_NUMBER_C
+        || c.charge != 0
+        || (c.radical != 0 && i32::from(c.radical) != RADICAL_SINGLET)
+        || c.valence != c.chem_bonds_valence
+    {
+        return -1;
+    }
+    if a.num_h == 1 {
+        *s_subtype |= SALT_P_DONOR;
+    } else if a.charge == -1 {
+        *s_subtype |= SALT_P_ACCEPTOR;
+    } else {
+        return -1;
+    }
+    2
+}
+
+/// `comp_candidates`
+pub fn comp_candidates(s1: &SCandidate, s2: &SCandidate) -> i32 {
+    if s1.type_ >= 0 && s2.type_ < 0 {
+        return -1;
+    }
+    if s1.type_ < 0 && s2.type_ >= 0 {
+        return 1;
+    }
+    if s1.endpoint != 0 && s2.endpoint == 0 {
+        return -1;
+    }
+    if s1.endpoint == 0 && s2.endpoint != 0 {
+        return 1;
+    }
+    if s1.endpoint != 0 && s2.endpoint != 0 {
+        let ret = i32::from(s1.endpoint) - i32::from(s2.endpoint);
+        if ret != 0 {
+            return ret;
+        }
+    }
+    i32::from(s1.atnumber) - i32::from(s2.atnumber)
+}
