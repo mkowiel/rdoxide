@@ -2405,3 +2405,117 @@ fn balanced_network_search_matches_the_c_code() {
         assert_eq!(got, want, "{inp}");
     }
 }
+
+#[test]
+fn balanced_network_growth_matches_the_c_code() {
+    use rdoxide::external::inchi::ichi_bns::*;
+    use rdoxide::external::inchi::inpdef::InpAtom;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_bnvertex.json")).unwrap();
+    for c in data.as_array().unwrap() {
+        let inp = &c["in"];
+        let mut at: Vec<InpAtom> = Vec::new();
+        for a in inp["atoms"].as_array().unwrap() {
+            let mut x = InpAtom {
+                valence: a["v"].as_i64().unwrap() as i8,
+                chem_bonds_valence: a["cbv"].as_i64().unwrap() as i8,
+                el_number: a["el"].as_u64().unwrap() as u8,
+                radical: a["rad"].as_i64().unwrap() as i8,
+                c_point: a["vt"].as_u64().unwrap() as u16,
+                ..Default::default()
+            };
+            for (j, e) in a["nb"].as_array().unwrap().iter().enumerate() {
+                x.neighbor[j] = e[0].as_u64().unwrap() as u16;
+                x.bond_type[j] = e[1].as_u64().unwrap() as u8;
+            }
+            at.push(x);
+        }
+        let n = at.len();
+        let (mut p, _) = allocate_and_init_bn_struct(
+            &mut at,
+            n,
+            inp["ma"].as_i64().unwrap() as i32,
+            inp["me"].as_i64().unwrap() as i32,
+            inp["mp"].as_i64().unwrap() as i32,
+        );
+        for i in 0..n {
+            let vt = u32::from(at[i].c_point);
+            p.vert[i].type_ |= (((vt & 0x1c) << 1) | ((vt & 3) << 9)) as u16;
+        }
+        let mut got: Vec<String> = Vec::new();
+        for o in inp["ops"].as_array().unwrap() {
+            let o: Vec<i32> = o
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|v| v.as_i64().unwrap() as i32)
+                .collect();
+            let (op, a, b, x, y, z) = (o[0], o[1], o[2], o[3], o[4], o[5]);
+            let mut dots = 5;
+            if (op == 0 && a >= p.num_vertices)
+                || ((op == 1 || op == 4) && (a >= p.num_vertices || b >= p.num_vertices))
+            {
+                got.push("skip".into());
+                continue;
+            }
+            match op {
+                0 => {
+                    let r = add_new_vertex(&mut p, a, x, y, z, &mut dots);
+                    got.push(format!("o0 {r} {dots}"));
+                }
+                1 => got.push(format!("o1 {}", add_new_edge(&mut p, a, b, x, y))),
+                2 => got.push(format!("o2 {}", get_edge_to_group_vertex(&p, a, x as u16))),
+                3 => got.push(format!("o3 {}", get_group_vertex(&p, a, x as u16))),
+                _ => {
+                    let mut buf = [0i32; 64];
+                    let r = add_st_cap_to_a_vertex(&mut p, a, b, &mut buf, &mut dots, x != 0);
+                    let mut s = format!("o4 {r} {dots}:");
+                    for v in &buf[..r as usize] {
+                        s += &format!(" {v}");
+                    }
+                    got.push(s);
+                }
+            }
+            got.push(format!("C {} {}", p.num_vertices, p.num_edges));
+            for v in p.vert.iter().take(p.num_vertices as usize) {
+                let e = &v.st_edge;
+                let mut s = format!(
+                    "V {} {} {} {} {} {} {} {} |",
+                    v.type_,
+                    e.cap,
+                    e.cap0,
+                    e.flow,
+                    e.flow0,
+                    e.pass,
+                    v.num_adj_edges,
+                    v.max_adj_edges
+                );
+                for k in 0..v.num_adj_edges as usize {
+                    s += &format!(" {}", p.iedge[v.iedge + k]);
+                }
+                got.push(s);
+            }
+            for e in p.edge.iter().take(p.num_edges as usize) {
+                got.push(format!(
+                    "E {} {} {} {} {} {} {} {} {}",
+                    e.cap,
+                    e.cap0,
+                    e.flow,
+                    e.flow0,
+                    e.pass,
+                    e.neighbor1,
+                    e.neighbor12,
+                    e.neigh_ord[0],
+                    e.neigh_ord[1]
+                ));
+            }
+        }
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        assert_eq!(got, want, "{inp}");
+    }
+}

@@ -1436,3 +1436,201 @@ pub fn is_bns_endpoint(p: &BnStruct, v: i32) -> bool {
     }
     false
 }
+
+pub const BNS_VERT_TYPE_ANY_GROUP: u16 =
+    BNS_VERT_TYPE_TGROUP | BNS_VERT_TYPE_C_GROUP | BNS_VERT_TYPE_SUPER_TGROUP;
+
+/// `bAddNewVertex`: adds a temporary vertex joined to `v2` by a new edge;
+/// returns the new vertex or an error code
+pub fn add_new_vertex(
+    p: &mut BnStruct,
+    v2: Vertex,
+    cap: i32,
+    flow: i32,
+    max_adj_edges: i32,
+    n_dots: &mut i32,
+) -> i32 {
+    let vlast = (p.num_vertices - 1) as usize;
+    let vnew = p.num_vertices;
+    let iedge = p.num_edges;
+    if iedge >= p.max_edges || vnew >= p.max_vertices {
+        return BNS_VERT_EDGE_OVFL;
+    }
+    if p.vert[vlast].iedge as i32 + i32::from(p.vert[vlast].max_adj_edges) + max_adj_edges
+        >= p.max_iedges
+    {
+        return BNS_VERT_EDGE_OVFL;
+    }
+    let old = p.vert[v2 as usize];
+    if old.num_adj_edges >= old.max_adj_edges || max_adj_edges <= 0 {
+        return BNS_VERT_EDGE_OVFL;
+    }
+    let new_iedge = p.vert[vlast].iedge + usize::from(p.vert[vlast].max_adj_edges);
+    let mut e = BnsEdge {
+        cap,
+        cap0: cap,
+        flow,
+        flow0: flow,
+        pass: 0,
+        neighbor1: v2 as u16,
+        neighbor12: (v2 ^ vnew) as u16,
+        forbidden: 0,
+        ..Default::default()
+    };
+    e.neigh_ord[usize::from(v2 > vnew)] = old.num_adj_edges;
+    e.neigh_ord[usize::from(v2 < vnew)] = 0;
+    p.edge[iedge as usize] = e;
+    p.vert[vnew as usize] = BnsVertex {
+        max_adj_edges: max_adj_edges as u16,
+        num_adj_edges: 1,
+        st_edge: BnsStEdge {
+            cap,
+            cap0: cap,
+            flow,
+            flow0: flow,
+            pass: 0,
+        },
+        iedge: new_iedge,
+        type_: BNS_VERT_TYPE_TEMP,
+    };
+    p.iedge[new_iedge] = iedge;
+    *n_dots += cap - flow;
+    let o = p.vert[v2 as usize].iedge + usize::from(old.num_adj_edges);
+    p.iedge[o] = iedge;
+    let pv = &mut p.vert[v2 as usize];
+    pv.num_adj_edges += 1;
+    *n_dots -= pv.st_edge.cap - pv.st_edge.flow;
+    pv.st_edge.flow += flow;
+    if pv.st_edge.cap < pv.st_edge.flow {
+        pv.st_edge.cap = pv.st_edge.flow;
+    }
+    *n_dots += pv.st_edge.cap - pv.st_edge.flow;
+    p.num_edges += 1;
+    p.num_vertices += 1;
+    vnew
+}
+
+/// `AddNewEdge`: connects the vertices `ip1` and `ip2`; returns the edge index
+/// or an error code
+pub fn add_new_edge(p: &mut BnStruct, ip1: i32, ip2: i32, cap: i32, flow: i32) -> i32 {
+    let ie = p.num_edges;
+    if ip1 >= p.max_vertices || ip1 < 0 || ip2 >= p.max_vertices || ip2 < 0 || ie >= p.max_edges {
+        return BNS_VERT_EDGE_OVFL;
+    }
+    let (a, b) = (p.vert[ip1 as usize], p.vert[ip2 as usize]);
+    if a.iedge as i32 + i32::from(a.max_adj_edges) > p.max_iedges
+        || b.iedge as i32 + i32::from(b.max_adj_edges) > p.max_iedges
+        || a.num_adj_edges >= a.max_adj_edges
+        || b.num_adj_edges >= b.max_adj_edges
+    {
+        return BNS_VERT_EDGE_OVFL;
+    }
+    let mut e = BnsEdge {
+        neighbor1: ip1.min(ip2) as u16,
+        neighbor12: (ip1 ^ ip2) as u16,
+        cap,
+        cap0: cap,
+        flow,
+        flow0: flow,
+        ..Default::default()
+    };
+    p.iedge[a.iedge + usize::from(a.num_adj_edges)] = ie;
+    p.iedge[b.iedge + usize::from(b.num_adj_edges)] = ie;
+    e.neigh_ord[usize::from(ip1 > ip2)] = a.num_adj_edges;
+    e.neigh_ord[usize::from(ip1 < ip2)] = b.num_adj_edges;
+    p.edge[ie as usize] = e;
+    for i in [ip1, ip2] {
+        let v = &mut p.vert[i as usize];
+        v.num_adj_edges += 1;
+        v.st_edge.flow += flow;
+        if v.st_edge.cap < v.st_edge.flow {
+            v.st_edge.cap = v.st_edge.flow;
+        }
+    }
+    p.num_edges += 1;
+    ie
+}
+
+/// `GetEdgeToGroupVertex`
+pub fn get_edge_to_group_vertex(p: &BnStruct, v1: Vertex, type_: u16) -> i32 {
+    if v1 < p.num_atoms {
+        let pv = &p.vert[v1 as usize];
+        for i in (0..pv.num_adj_edges as usize).rev() {
+            let ie = p.iedge[pv.iedge + i];
+            let e = &p.edge[ie as usize];
+            let v2 = i32::from(e.neighbor12) ^ v1;
+            if p.vert[v2 as usize].type_ == type_ {
+                return if e.forbidden != 0 { NO_VERTEX } else { ie };
+            }
+        }
+        return NO_VERTEX;
+    }
+    if v1 < p.num_vertices {
+        return NO_VERTEX;
+    }
+    BNS_VERT_EDGE_OVFL
+}
+
+/// `GetGroupVertex`
+pub fn get_group_vertex(p: &BnStruct, v1: Vertex, type_: u16) -> Vertex {
+    if v1 < p.num_atoms {
+        let pv = &p.vert[v1 as usize];
+        let type2 = if type_ == BNS_VERT_TYPE_ENDPOINT {
+            BNS_VERT_TYPE_TGROUP
+        } else if type_ == BNS_VERT_TYPE_C_POINT {
+            BNS_VERT_TYPE_C_GROUP
+        } else {
+            0
+        };
+        if pv.type_ & type_ == type_ {
+            for i in (0..pv.num_adj_edges as usize).rev() {
+                let e = &p.edge[p.iedge[pv.iedge + i] as usize];
+                let v2 = i32::from(e.neighbor12) ^ v1;
+                if p.vert[v2 as usize].type_ == type2 {
+                    return if e.forbidden != 0 { NO_VERTEX } else { v2 };
+                }
+            }
+        }
+        return super::ichierr::BNS_BOND_ERR;
+    }
+    if v1 < p.num_vertices {
+        return NO_VERTEX;
+    }
+    BNS_VERT_EDGE_OVFL
+}
+
+/// `bAddStCapToAVertex`: increments the st-cap of `v1`, saving the old caps in
+/// `old_caps`; returns the number of saved values
+pub fn add_st_cap_to_a_vertex(
+    p: &mut BnStruct,
+    v1: Vertex,
+    v2: Vertex,
+    old_caps: &mut [i32],
+    n_dots: &mut i32,
+    b_adjacent_donors: bool,
+) -> i32 {
+    let mut n = 0usize;
+    old_caps[n] = p.vert[v1 as usize].st_edge.cap;
+    n += 1;
+    p.vert[v1 as usize].st_edge.cap += 1;
+    *n_dots += 1;
+    let v1v = p.vert[v1 as usize];
+    if v1v.type_ & BNS_VERT_TYPE_ANY_GROUP == 0 {
+        for i in 0..v1v.num_adj_edges as usize {
+            let ie = p.iedge[v1v.iedge + i] as usize;
+            old_caps[n] = p.edge[ie].cap;
+            n += 1;
+            let v = i32::from(p.edge[ie].neighbor12) ^ v1;
+            if v == v2 && !b_adjacent_donors {
+                continue;
+            }
+            let pv = p.vert[v as usize];
+            if pv.type_ & BNS_VERT_TYPE_ANY_GROUP != 0 {
+                continue;
+            }
+            let new_cap = pv.st_edge.cap.min(v1v.st_edge.cap).min(MAX_BOND_EDGE_CAP);
+            p.edge[ie].cap = new_cap;
+        }
+    }
+    n as i32
+}
