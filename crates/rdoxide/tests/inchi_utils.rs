@@ -7152,3 +7152,80 @@ fn stereo_candidate_checks_match_the_c_code() {
         assert_eq!(got, want, "case {n}: {inp}");
     }
 }
+
+#[test]
+fn half_stereo_bond_parity_matches_the_c_code() {
+    use rdoxide::external::inchi::ichister::half_stereo_bond_parity;
+    use rdoxide::external::inchi::inpdef::InpAtom;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_halfsb.json")).unwrap();
+    for (n, c) in data.as_array().unwrap().iter().enumerate() {
+        let inp = &c["in"];
+        let ints = |v: &serde_json::Value| -> Vec<i64> {
+            v.as_array()
+                .unwrap()
+                .iter()
+                .map(|x| x.as_i64().unwrap())
+                .collect()
+        };
+        let mut at: Vec<InpAtom> = Vec::new();
+        for a in inp["atoms"].as_array().unwrap() {
+            let mut x = InpAtom::default();
+            x.set_elname(a["el"].as_str().unwrap());
+            x.charge = a["ch"].as_i64().unwrap() as i8;
+            x.radical = a["rad"].as_i64().unwrap() as i8;
+            x.num_h = a["nh"].as_i64().unwrap() as i8;
+            x.c_flags = a["cf"].as_i64().unwrap() as i8;
+            x.orig_at_number = a["orig"].as_u64().unwrap() as u16;
+            x.iso_atw_diff = a["adiff"].as_i64().unwrap() as i8;
+            x.b_used_0d_parity = a["u0"].as_i64().unwrap() as i8;
+            let xyz = a["xyz"].as_array().unwrap();
+            x.x = f64::from_bits(xyz[0].as_u64().unwrap());
+            x.y = f64::from_bits(xyz[1].as_u64().unwrap());
+            x.z = f64::from_bits(xyz[2].as_u64().unwrap());
+            for (j, v) in ints(&a["iso"]).iter().enumerate() {
+                x.num_iso_h[j] = *v as i8;
+            }
+            for (j, v) in ints(&a["sbp"]).iter().enumerate() {
+                x.sb_parity[j] = *v as i8;
+            }
+            for (j, v) in ints(&a["sbo"]).iter().enumerate() {
+                x.sb_ord[j] = *v as i8;
+            }
+            for (j, v) in ints(&a["sno"]).iter().enumerate() {
+                x.sn_orig_at_num[j] = *v as u16;
+            }
+            let nb = a["nb"].as_array().unwrap();
+            x.valence = nb.len() as i8;
+            for (j, q) in nb.iter().enumerate() {
+                x.neighbor[j] = q[0].as_u64().unwrap() as u16;
+                x.bond_stereo[j] = q[1].as_i64().unwrap() as i8;
+            }
+            at.push(x);
+        }
+        let nmain = inp["n"].as_u64().unwrap() as usize;
+        let nr = inp["nr"].as_u64().unwrap() as usize;
+        let z = ints(&inp["z"]);
+        let mut zd = [z[0] as i8, z[1] as i8, z[2] as i8];
+        let usez = inp["usez"].as_i64().unwrap() != 0;
+        let r = half_stereo_bond_parity(
+            &mut at,
+            0,
+            nmain,
+            nr,
+            if usez { Some(&mut zd) } else { None },
+            inp["pe"].as_i64().unwrap() as i32,
+            inp["vab"].as_i64().unwrap() as i32,
+        );
+        let got = format!(
+            "{} {} {} {} {} {} 0",
+            r,
+            if usez { zd[0] } else { 0 },
+            if usez { zd[1] } else { 0 },
+            if usez { zd[2] } else { 0 },
+            at[0].b_ambiguous_stereo,
+            at[0].b_used_0d_parity
+        );
+        assert_eq!(got, c["out"].as_str().unwrap(), "case {n}");
+    }
+}
