@@ -104,9 +104,9 @@ pub fn equ_string(equ_val: i32) -> &'static str {
 // (`INCHI_BASE/src/ichiprt1.c`)
 
 use super::ichi::{
-    DIFL_F, DIFS_B_SBONDS, DIFS_H_H_ATOMS, DIFS_I_IATOMS, DIFS_M_SP3INV, DIFS_O_TRANSP,
-    DIFS_P_PROTONS, DIFS_Q_CHARGE, DIFS_S_STYPE, DIFS_T_SATOMS, DifSegs, INCHI_SEGM_FILL,
-    InChISort, inchi_segment_action,
+    DIFL_F, DIFS_B_SBONDS, DIFS_F_FORMULA, DIFS_H_H_ATOMS, DIFS_I_IATOMS, DIFS_M_SP3INV,
+    DIFS_O_TRANSP, DIFS_P_PROTONS, DIFS_Q_CHARGE, DIFS_S_STYPE, DIFS_T_SATOMS, DifSegs,
+    INCHI_SEGM_FILL, InChISort, inchi_segment_action,
 };
 use super::ichi_io::{
     InchiIosString, InchiIostream, inchi_ios_print_nodisplay, inchi_strbuf_printf,
@@ -116,8 +116,8 @@ use super::ichican2::TAUT_YES;
 use super::ichiprt2::{make_delim, make_iso_h_string};
 use super::ichiprt3::{
     OUT_NN, OUT_TN, bin_aux_taut_trans, str_aux_taut_trans, str_charge2, str_connections,
-    str_h_atoms, str_hill_formula, str_iso_atoms, str_iso_sp2, str_iso_sp3, str_iso_stereo_abs_inv,
-    str_sp2, str_sp3, str_stereo_abs_inv,
+    str_fixed_h_atoms, str_h_atoms, str_hill_formula, str_hill_formula2, str_iso_atoms,
+    str_iso_sp2, str_iso_sp3, str_iso_stereo_abs_inv, str_sp2, str_sp3, str_stereo_abs_inv,
 };
 
 pub const INCHI_BAS: i32 = 0;
@@ -376,6 +376,8 @@ pub struct InchiOutCtl {
     pub n_zy: i32,
     pub p_inchi_sort: Vec<InChISort>,
     pub p_inchi_sort2: Vec<InChISort>,
+    /// `pINChISortTautAndNonTaut[TAUT_NUM]`
+    pub p_inchi_sort_taut_and_non_taut: [Vec<InChISort>; 2],
 }
 
 /// `OutputINCHI_VersionAndKind`
@@ -641,8 +643,13 @@ pub fn output_inchi_charge_and_removed_added_protons_layers(
 
 pub const FLAG_SORT_PRINT_TRANSPOS_BAS: i32 = 1;
 pub const FLAG_SORT_PRINT_TRANSPOS_REC: i32 = 2;
+pub const FLAG_SORT_PRINT_NO_NFIX_H_BAS: i32 = 4;
+pub const FLAG_SORT_PRINT_NO_NFIX_H_REC: i32 = 8;
+pub const FLAG_SORT_PRINT_NO_IFIX_H_BAS: i32 = 16;
+pub const FLAG_SORT_PRINT_NO_IFIX_H_REC: i32 = 32;
 const X_REL: &str = "2";
 const X_RAC: &str = "3";
+const TAUT_NON: usize = 0;
 const X_ABS: &str = "1";
 
 fn seg_action(io: &InchiOutCtl, seg: usize) -> i32 {
@@ -1092,6 +1099,142 @@ pub fn output_inchi_isotopic_layer(
         } else {
             slash(out_file, io, "/");
         }
+    }
+    0
+}
+
+/// `OutputINCHI_FixedHLayerWithSublayers`; `then_goto_repeat` is set when
+/// the caller has to run the layers again for the non-tautomeric pass
+pub fn output_inchi_fixed_h_layer_with_sublayers(
+    out_file: &mut InchiIostream,
+    strbuf: &mut InchiIosString,
+    basic_or_reconnected: i32,
+    io: &mut InchiOutCtl,
+    lf: &str,
+    then_goto_repeat: &mut i32,
+) -> i32 {
+    let bas = basic_or_reconnected == INCHI_BAS;
+    *then_goto_repeat = 0;
+    if io.b_out_type == OUT_TN
+        && io.b_second_non_taut_pass == 0
+        && io.b_non_taut_is_identical_to_taut != 0
+        && io.b_tautomeric != 0
+        && io.b_non_tautomeric != 0
+    {
+        io.sort_print_inchi_flags |= if bas {
+            FLAG_SORT_PRINT_NO_NFIX_H_BAS
+        } else {
+            FLAG_SORT_PRINT_NO_NFIX_H_REC
+        };
+        io.sort_print_inchi_flags |= if bas {
+            FLAG_SORT_PRINT_NO_IFIX_H_BAS
+        } else {
+            FLAG_SORT_PRINT_NO_IFIX_H_REC
+        };
+    }
+
+    if io.b_out_type == OUT_TN
+        && io.b_non_taut_is_identical_to_taut == 0
+        && inchi_segment_action(io.s_dif_segs[DIFL_F][DIFS_F_FORMULA]) != 0
+    {
+        io.b_out_type = OUT_NN;
+        io.i_cur_taut_mode = TAUT_NON;
+        io.p_inchi_sort = io.p_inchi_sort_taut_and_non_taut[TAUT_NON].clone();
+        io.b_second_non_taut_pass = 1;
+        io.n_cur_inchi_segment = DIFL_F;
+        io.num_components = io.num_comp[io.i_cur_taut_mode] as usize;
+        io.b_fh_tag = IL_FIXH;
+        io.b_tag1 = io.b_fh_tag;
+        io.sz_tag1 = sz_get_tag(&IDENT_LBL, io.n_tag, io.b_tag1, &mut io.b_always);
+        io.b_tag1 = IL_FMLF | io.b_fh_tag;
+        io.sz_tag1 = sz_get_tag(&IDENT_LBL, io.n_tag, io.b_tag1, &mut io.b_always);
+        inchi_strbuf_reset(strbuf);
+        io.tot_len = 0;
+        io.n_segm_action = seg_action(io, DIFS_F_FORMULA);
+        if io.n_segm_action == INCHI_SEGM_FILL {
+            io.tot_len2 = str_hill_formula2(
+                &io.p_inchi_sort,
+                &io.p_inchi_sort2,
+                strbuf,
+                &mut io.b_overflow,
+                io.b_out_type,
+                io.num_components,
+                io.b_use_multipliers != 0,
+            );
+            if io.n_pzz > 0 && io.n_zy > 0 {
+                merge_zz_in_hill_formula(strbuf);
+            }
+            io.b_non_taut_non_iso_identifier_not_empty += io.b_second_non_taut_pass;
+        } else {
+            io.tot_len2 = io.tot_len;
+        }
+        io.tot_len = io.tot_len2;
+        if str_line_end(
+            &io.sz_tag1,
+            &mut io.b_overflow,
+            strbuf,
+            -io.n_segm_action,
+            io.b_plain_text_tags,
+        ) != 0
+        {
+            return 1;
+        }
+        print_layer(out_file, strbuf, lf);
+
+        io.n_segm_action = seg_action(io, DIFS_H_H_ATOMS);
+        if io.n_segm_action == INCHI_SEGM_FILL {
+            io.b_tag1 = IL_HFIX | io.b_fh_tag;
+            io.sz_tag1 = sz_get_tag(&IDENT_LBL, io.n_tag, io.b_tag1, &mut io.b_always);
+            inchi_strbuf_reset(strbuf);
+            io.tot_len = 0;
+            io.tot_len2 = str_fixed_h_atoms(
+                &io.p_inchi_sort,
+                strbuf,
+                &mut io.b_overflow,
+                io.b_out_type,
+                io.atom_mode,
+                io.num_components,
+                io.b_use_multipliers != 0,
+            );
+            io.tot_len = io.tot_len2;
+            if str_line_end(
+                &io.sz_tag1,
+                &mut io.b_overflow,
+                strbuf,
+                -io.n_segm_action,
+                io.b_plain_text_tags,
+            ) != 0
+            {
+                return 2;
+            }
+            print_layer(out_file, strbuf, lf);
+            io.b_non_taut_non_iso_identifier_not_empty += io.b_second_non_taut_pass;
+        }
+        *then_goto_repeat = 1;
+        return 0;
+    }
+
+    if io.b_out_type == OUT_NN && io.b_output_type == OUT_TN && io.b_second_non_taut_pass != 0 {
+        io.b_out_type = OUT_TN;
+        io.i_cur_taut_mode = TAUT_YES;
+        io.p_inchi_sort = io.p_inchi_sort_taut_and_non_taut[TAUT_YES].clone();
+        io.b_second_non_taut_pass = 0;
+        io.num_components = io.num_comp[io.i_cur_taut_mode] as usize;
+        if io.b_non_taut_non_iso_identifier_not_empty == 0 {
+            io.sort_print_inchi_flags |= if bas {
+                FLAG_SORT_PRINT_NO_NFIX_H_BAS
+            } else {
+                FLAG_SORT_PRINT_NO_NFIX_H_REC
+            };
+        }
+        if io.b_non_taut_iso_identifier_not_empty == 0 {
+            io.sort_print_inchi_flags |= if bas {
+                FLAG_SORT_PRINT_NO_IFIX_H_BAS
+            } else {
+                FLAG_SORT_PRINT_NO_IFIX_H_REC
+            };
+        }
+        io.b_fh_tag = 0;
     }
     0
 }
