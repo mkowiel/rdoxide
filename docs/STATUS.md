@@ -282,6 +282,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 166 | done |
 | 167 | done |
 | 168 | done |
+| 169 | done |
 
 ## Python package files
 
@@ -620,3 +621,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-21 — Stage 166: I4u: MarkChargeGroups
 * 2026-10-21 — Stage 167: I4v: RegisterEndPoints, SetTautomericBonds
 * 2026-10-21 — Stage 168: I4w: FindAccessibleEndPoints, GetNeutralRepsIfNeeded
+* 2026-10-21 — Stage 169: I4x: MarkSaltChargeGroups2
