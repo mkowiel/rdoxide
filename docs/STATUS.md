@@ -286,6 +286,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 170 | done |
 | 171 | done |
 | 172 | done |
+| 173 | done |
 
 ## Python package files
 
@@ -628,3 +629,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-21 — Stage 170: I4y: MarkSaltChargeGroups
 * 2026-10-21 — Stage 171: I4z: MergeSaltTautGroups
 * 2026-10-21 — Stage 172: I5a: MakeIsotopicHGroup
+* 2026-10-21 — Stage 173: I5b: MarkTautomerGroups (1,3 rules + PT variants)

@@ -2526,3 +2526,342 @@ pub fn make_isotopic_h_group(
     }
     n_cand
 }
+
+/// The 1,3 tautomerism rules scanned by `MarkTautomerGroups`: the generic
+/// one and the `PT_*` variants (each one a copy of the generic loop in C
+/// with its own centerpoint test, endpoint test and group statistics)
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum TautRule {
+    Generic,
+    Pt22,
+    Pt16,
+    Pt06,
+    Pt39,
+    Pt13,
+    Pt18,
+}
+
+impl TautRule {
+    fn mode(self) -> i32 {
+        use super::ichi_bns::*;
+        match self {
+            TautRule::Generic => ALT_PATH_MODE_TAUTOM,
+            TautRule::Pt22 => ALT_PATH_MODE_TAUTOM_PT_22_00,
+            TautRule::Pt16 => ALT_PATH_MODE_TAUTOM_PT_16_00,
+            TautRule::Pt06 => ALT_PATH_MODE_TAUTOM_PT_06_00,
+            TautRule::Pt39 => ALT_PATH_MODE_TAUTOM_PT_39_00,
+            TautRule::Pt13 => ALT_PATH_MODE_TAUTOM_PT_13_00,
+            TautRule::Pt18 => ALT_PATH_MODE_TAUTOM_PT_18_00,
+        }
+    }
+
+    fn info(self, at: &[InpAtom], iat: usize, eif: &mut EndpointInfo) -> i32 {
+        match self {
+            TautRule::Generic => n_get_endpoint_info(at, iat, eif),
+            TautRule::Pt22 => n_get_endpoint_info_pt_22_00(at, iat, eif),
+            TautRule::Pt16 => n_get_endpoint_info_pt_16_00(at, iat, eif),
+            TautRule::Pt06 => n_get_endpoint_info_pt_06_00(at, iat, eif),
+            TautRule::Pt39 => n_get_endpoint_info_pt_39_00(at, iat, eif),
+            TautRule::Pt13 => n_get_endpoint_info_pt_13_00(at, iat, eif),
+            TautRule::Pt18 => n_get_endpoint_info_pt_18_00(at, iat, eif),
+        }
+    }
+
+    fn flag(self) -> u64 {
+        use super::ichiparm::*;
+        match self {
+            TautRule::Generic => 0,
+            TautRule::Pt22 => TG_FLAG_PT_22_00,
+            TautRule::Pt16 => TG_FLAG_PT_16_00,
+            TautRule::Pt06 => TG_FLAG_PT_06_00,
+            TautRule::Pt39 => TG_FLAG_PT_39_00,
+            TautRule::Pt13 => TG_FLAG_PT_13_00,
+            TautRule::Pt18 => TG_FLAG_PT_18_00,
+        }
+    }
+
+    /// the PT_13_00 and PT_18_00 loops accept single, triple and 1,3 bonds
+    fn wide_bonds(self) -> bool {
+        matches!(self, TautRule::Pt13 | TautRule::Pt18)
+    }
+}
+
+/// `ALLOWED_EDGE`
+fn allowed_edge(p: &super::ichi_bns::BnStruct, iat: usize, ibond: usize) -> bool {
+    p.edge.is_empty()
+        || p.vert.is_empty()
+        || p.edge[p.iedge[p.vert[iat].iedge + ibond] as usize].forbidden == 0
+}
+
+/// `MarkTautomerGroups` for the 1,3 tautomerism loops (the generic one and
+/// `PT_22_00`, `PT_16_00`, `PT_06_00`, `PT_39_00`, `PT_13_00`, `PT_18_00`).
+/// Returns the number of changes or an error. The keto-enol, 1,5 and ring
+/// rules that follow in C are not ported yet.
+pub fn mark_tautomer_groups(
+    at: &mut [InpAtom],
+    num_atoms: i32,
+    tgi: &mut TGroupInfo,
+    mut cgi: Option<&mut CGroupInfo>,
+    p: &mut super::ichi_bns::BnStruct,
+    bd: &mut super::ichi_bns::BnData,
+) -> i32 {
+    use super::ichierr::{CT_TAUCOUNT_ERR, is_bns_error};
+    use super::ichiparm::TG_FLAG_TEST_TAUT__ATOMS;
+    use super::inpdef::MAXVAL;
+    const BOND_SINGLE: i32 = BOND_TYPE_SINGLE;
+    const BOND_DOUBLE: i32 = BOND_TYPE_DOUBLE;
+    const BOND_TRIPLE: i32 = super::incomdef::BOND_TYPE_TRIPLE;
+    const BOND_ALT_13: i32 = super::ichi_bns::BOND_ALT_13;
+
+    if tgi.b_taut_flags & TG_FLAG_TEST_TAUT__ATOMS == 0 {
+        return 0;
+    }
+    if tgi.t_group.is_none() && tgi.max_num_t_groups == 0 {
+        let keep = TGroupInfo {
+            b_taut_flags: tgi.b_taut_flags,
+            b_taut_flags_done: tgi.b_taut_flags_done,
+            tni: tgi.tni,
+            t_group_number: std::mem::take(&mut tgi.t_group_number),
+            ..Default::default()
+        };
+        *tgi = keep;
+        tgi.max_num_t_groups = num_atoms as usize / 2 + 1;
+        tgi.t_group = Some(vec![TGroup::default(); tgi.max_num_t_groups + 1]);
+    }
+    if tgi.t_group.is_none() || tgi.max_num_t_groups == 0 {
+        return 0;
+    }
+
+    let mut tot_changes = 0;
+    let mut end_point = [TEndpoint::default(); MAXVAL];
+    let mut bond_pos = [TBondPos::default(); MAXVAL];
+    let mut eif1 = EndpointInfo::default();
+    for rule in [
+        TautRule::Generic,
+        TautRule::Pt22,
+        TautRule::Pt16,
+        TautRule::Pt06,
+        TautRule::Pt39,
+        TautRule::Pt13,
+        TautRule::Pt18,
+    ] {
+        if rule != TautRule::Generic && tgi.b_taut_flags & rule.flag() == 0 {
+            continue;
+        }
+        let wide = rule.wide_bonds();
+        for i in 0..num_atoms as usize {
+            if rule.info(at, i, &mut eif1) == 0 {
+                continue;
+            }
+            for j in 0..at[i].valence as usize {
+                let bond_type = i32::from(at[i].bond_type[j]) & !BOND_MARK_ALL;
+                let centerpoint = at[i].neighbor[j] as usize;
+                let cp = &at[centerpoint];
+                let bond_ok = bond_type == BOND_DOUBLE
+                    || bond_type == BOND_ALTERN
+                    || bond_type == BOND_ALT12NS
+                    || bond_type == BOND_TAUTOM
+                    || (wide && (bond_type == BOND_SINGLE || bond_type == BOND_ALT_13));
+                let elem_ok = match rule {
+                    TautRule::Generic => is_centerpoint_elem(cp.el_number),
+                    TautRule::Pt22 => cp.el_number == EL_NUMBER_N,
+                    TautRule::Pt16 => {
+                        cp.el_number == EL_NUMBER_N && cp.valence == 2 && cp.charge == 0
+                    }
+                    TautRule::Pt06 => {
+                        cp.el_number == EL_NUMBER_N
+                            || cp.el_number == EL_NUMBER_C
+                            || cp.el_number == EL_NUMBER_P
+                    }
+                    TautRule::Pt39 => cp.el_number == EL_NUMBER_N && cp.valence == 3,
+                    TautRule::Pt13 | TautRule::Pt18 => {
+                        cp.el_number == EL_NUMBER_C && cp.valence == 2
+                    }
+                };
+                if !(bond_ok && elem_ok && allowed_edge(p, i, j)) {
+                    continue;
+                }
+                let mut num_o = 0;
+                let mut num_x = 0; // N for PT_39/PT_18, C for PT_13
+                let mut n_possible_mobile = 0;
+                let mut group_number = i32::from(num_atoms as u16);
+                let mut b_diff_groups: i32 = -1;
+                let (mut n_donor, mut n_acceptor) = (0, 0);
+                let (mut n_end, mut n_bpos) = (0usize, 0usize);
+                for k in 0..at[centerpoint].valence as usize {
+                    let endpoint = at[centerpoint].neighbor[k] as usize;
+                    if rule == TautRule::Pt39 {
+                        num_o += i32::from(at[endpoint].el_number == EL_NUMBER_O);
+                        num_x += i32::from(at[endpoint].el_number == EL_NUMBER_N);
+                    }
+                    let bond_type = i32::from(at[centerpoint].bond_type[k]) & !BOND_MARK_ALL;
+                    let mut b_non_taut = false;
+                    if !allowed_edge(p, centerpoint, k) {
+                        continue;
+                    }
+                    if bond_type == BOND_ALTERN
+                        || bond_type == BOND_ALT12NS
+                        || bond_type == BOND_TAUTOM
+                        || (wide && bond_type == BOND_ALT_13)
+                    {
+                    } else if bond_type == BOND_SINGLE
+                        || bond_type == BOND_DOUBLE
+                        || (wide && bond_type == BOND_TRIPLE)
+                    {
+                        b_non_taut = true;
+                    } else {
+                        continue;
+                    }
+                    let endpoint_valence = rule.info(at, endpoint, &mut eif1);
+                    if endpoint_valence == 0 {
+                        continue;
+                    }
+                    match rule {
+                        TautRule::Pt16 => {
+                            if at[endpoint].el_number == EL_NUMBER_O
+                                && at[endpoint].n_num_at_in_ring_system != 1
+                            {
+                                continue;
+                            }
+                            if endpoint != i && at[endpoint].el_number == at[i].el_number {
+                                continue;
+                            }
+                        }
+                        TautRule::Pt06
+                            if i != endpoint
+                                && at[endpoint].el_number == EL_NUMBER_C
+                                && at[i].el_number == EL_NUMBER_C =>
+                        {
+                            continue;
+                        }
+                        _ => {}
+                    }
+                    let mut n_mobile = add_atom2num(&mut end_point[n_end].num, &at[endpoint], 2);
+                    add_atom2da(&mut end_point[n_end].num_da, &at[endpoint], 2);
+                    if rule == TautRule::Pt18 {
+                        n_mobile = i32::from(eif1.c_mobile);
+                        if bond_type == BOND_DOUBLE && endpoint_valence == 3 && n_mobile == 0 {
+                            continue;
+                        }
+                    }
+                    let ep = i32::from(at[endpoint].endpoint);
+                    let mut possibly = 0;
+                    let (d, a);
+                    if wide {
+                        if b_non_taut {
+                            d = i32::from(n_mobile != 0 || ep != 0);
+                            a = i32::from(n_mobile == 0);
+                        } else {
+                            d = i32::from(eif1.c_donor != 0);
+                            a = if rule == TautRule::Pt18 {
+                                i32::from(eif1.c_acceptor != 0)
+                            } else {
+                                i32::from(
+                                    i32::from(eif1.c_neutral_bonds_valence)
+                                        > i32::from(at[endpoint].valence),
+                                )
+                            };
+                        }
+                    } else if b_non_taut {
+                        d = i32::from(bond_type == BOND_SINGLE && (n_mobile != 0 || ep != 0));
+                        a = i32::from(bond_type == BOND_DOUBLE);
+                    } else {
+                        d = i32::from(ep != 0 || eif1.c_donor != 0);
+                        a = i32::from(
+                            ep != 0
+                                || i32::from(eif1.c_neutral_bonds_valence)
+                                    > i32::from(at[endpoint].valence),
+                        );
+                    }
+                    n_donor += d;
+                    possibly += d;
+                    n_acceptor += a;
+                    possibly += a;
+                    if possibly == 0 {
+                        continue;
+                    }
+                    if wide {
+                        num_o += i32::from(endpoint_valence == 2);
+                        num_x += if rule == TautRule::Pt13 {
+                            i32::from(endpoint_valence == 4)
+                        } else {
+                            i32::from(endpoint_valence == 3)
+                        };
+                    }
+                    end_point[n_end].n_group_number = at[endpoint].endpoint;
+                    end_point[n_end].n_equ_number = 0;
+                    end_point[n_end].n_atom_number = endpoint as u16;
+                    if group_number != ep {
+                        b_diff_groups += 1;
+                        group_number = ep;
+                    }
+                    bond_pos[n_bpos].n_atom_number = centerpoint as u16;
+                    bond_pos[n_bpos].neighbor_index = k as u16;
+                    n_bpos += 1;
+                    n_possible_mobile += i32::from(if wide {
+                        n_mobile > 0
+                    } else {
+                        n_mobile > 0 || ep != 0
+                    });
+                    n_end += 1;
+                }
+                let extra = match rule {
+                    TautRule::Pt39 => num_o == 1 && num_x < 2,
+                    TautRule::Pt13 | TautRule::Pt18 => num_o == 1 && num_x == 1,
+                    _ => true,
+                };
+                if !(n_end > 1
+                    && n_possible_mobile != 0
+                    && n_donor != 0
+                    && n_acceptor != 0
+                    && extra)
+                {
+                    continue;
+                }
+                let n_err = find_accessible_end_points(
+                    &mut end_point,
+                    &mut n_end,
+                    &mut bond_pos,
+                    &mut n_bpos,
+                    p,
+                    bd,
+                    at,
+                    num_atoms,
+                    cgi.as_deref(),
+                    rule.mode(),
+                );
+                if is_bns_error(n_err) {
+                    return n_err;
+                }
+                if n_end > 0 {
+                    if group_number == 0 || b_diff_groups > 0 {
+                        let num_changes = register_end_points(
+                            tgi,
+                            &mut end_point[..n_end],
+                            at,
+                            num_atoms,
+                            cgi.as_deref_mut(),
+                            Some(p),
+                        );
+                        let mut n_err = 0;
+                        if num_changes == -1 {
+                            n_err = CT_TAUCOUNT_ERR;
+                        }
+                        if num_changes < 0 {
+                            n_err = num_changes;
+                        }
+                        if n_err != 0 {
+                            return n_err;
+                        }
+                        tot_changes += i32::from(num_changes > 0);
+                    }
+                    if n_bpos > 0 {
+                        let num_changes = set_tautomeric_bonds(at, &bond_pos[..n_bpos]);
+                        tot_changes += i32::from(num_changes > 0);
+                    }
+                }
+            }
+        }
+    }
+    tot_changes
+}
