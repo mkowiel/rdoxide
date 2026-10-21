@@ -6668,3 +6668,354 @@ pub fn mark_non_stereo_alt_bns(
     }
     ret
 }
+
+// ---- adding and removing protons when reconstructing a structure ----
+
+/// `RI_ERR_PROGR`
+pub const RI_ERR_PROGR: i32 = -3;
+
+/// `bHasChargedNeighbor`
+pub fn b_has_charged_neighbor(at: &[InpAtom], iat: usize) -> bool {
+    (0..at[iat].valence as usize).any(|i| at[at[iat].neighbor[i] as usize].charge != 0)
+}
+
+/// the test "the atom would get the proton back" shared by the two
+/// directions of `AddRemoveProtonsRestr`
+fn type_matches_classes(type_: i32, mask: Option<i32>, classes: &[(i32, i32)]) -> bool {
+    type_ != 0
+        && classes
+            .iter()
+            .any(|c| type_ & c.0 != 0 && mask.unwrap_or(0) != 0)
+}
+
+/// `AddRemoveProtonsRestr`: adds (`*num_protons_to_add` > 0) or removes
+/// (< 0) protons so that the normalization of the reconstructed structure
+/// gives the original one; returns the number of changed atoms or an error
+#[allow(clippy::too_many_arguments)]
+pub fn add_remove_protons_restr(
+    at: &mut [InpAtom],
+    num_atoms: i32,
+    num_protons_to_add: &mut i32,
+    n_num_prot_added_by_restr: i32,
+    b_normalization_flags: u64,
+    num_tg: i32,
+    _n_charge_revrs: i32,
+    _n_charge_in_chi: i32,
+) -> i32 {
+    use super::util::get_endpoint_valence;
+    let na = num_atoms as usize;
+    let mut totals = vec![0i32; attot::ARRAY_LEN];
+    let mut num_prot = *num_protons_to_add;
+    let mut n_success = 0;
+    mark_at_type(at, num_atoms, Some(&mut totals));
+    let acid_ok = |t: &[i32]| t[attot::TOT_CHARGE] - n_num_prot_added_by_restr;
+
+    if num_prot < 0 && acid_ok(&totals) <= 0 {
+        // remove protons from atoms that the normalization would protonate back
+        let mut i = 0;
+        while i < na && num_prot != 0 {
+            let a = &at[i];
+            if a.sb_parity[0] != 0
+                || a.p_parity != 0
+                || a.charge != 0
+                || a.num_h == 0
+                || a.radical != 0
+                || b_has_charged_neighbor(at, i)
+            {
+                i += 1;
+                continue;
+            }
+            at[i].charge -= 1;
+            at[i].num_h -= 1;
+            let (type_, mask) = get_atom_charge_type(at, i, None, 0);
+            at[i].charge += 1;
+            at[i].num_h += 1;
+            if type_matches_classes(type_, mask, &AA_TYP_MASK) {
+                get_atom_charge_type(at, i, Some(&mut totals), 1);
+                at[i].charge -= 1;
+                at[i].num_h -= 1;
+                get_atom_charge_type(at, i, Some(&mut totals), 0);
+                num_prot += 1;
+                n_success += 1;
+            }
+            i += 1;
+        }
+    }
+
+    if num_prot < 0 && num_tg != 0 && acid_ok(&totals) <= 0 {
+        // O=C-NH => (-)O-C=N, O and N are tautomeric endpoints
+        for i in 0..na {
+            let a = &at[i];
+            if a.endpoint == 0
+                || a.sb_parity[0] != 0
+                || a.p_parity != 0
+                || a.radical != 0
+                || a.charge != 0
+                || b_has_charged_neighbor(at, i)
+            {
+                continue;
+            }
+            if a.valence != 1
+                || i32::from(a.bond_type[0]) != BOND_TYPE_DOUBLE
+                || a.num_h != 0
+                || get_endpoint_valence(a.el_number) != 2
+            {
+                continue;
+            }
+            let centp = a.neighbor[0] as usize;
+            if at[centp].sb_parity[0] != 0
+                || at[centp].p_parity != 0
+                || !is_centerpoint_elem(at[centp].el_number)
+            {
+                continue;
+            }
+            for k in 0..at[centp].valence as usize {
+                if i32::from(at[centp].bond_type[k]) != BOND_TYPE_SINGLE {
+                    continue;
+                }
+                let endp2 = at[centp].neighbor[k] as usize;
+                let e2 = &at[endp2];
+                if e2.endpoint != at[i].endpoint
+                    || e2.num_h == 0
+                    || e2.charge != 0
+                    || e2.sb_parity[0] != 0
+                    || e2.p_parity != 0
+                    || e2.valence != e2.chem_bonds_valence
+                    || 3 != i32::from(e2.chem_bonds_valence) + i32::from(e2.num_h)
+                    || get_endpoint_valence(e2.el_number) != 3
+                {
+                    continue;
+                }
+                let i0 = (0..at[centp].valence as usize)
+                    .find(|&q| at[centp].neighbor[q] as usize == i)
+                    .unwrap_or(at[centp].valence as usize);
+                let k0 = (0..at[endp2].valence as usize)
+                    .find(|&q| at[endp2].neighbor[q] as usize == centp)
+                    .unwrap_or(at[endp2].valence as usize);
+                if i0 == at[centp].valence as usize || k0 == at[endp2].valence as usize {
+                    return RI_ERR_PROGR;
+                }
+                get_atom_charge_type(at, i, Some(&mut totals), 1);
+                get_atom_charge_type(at, endp2, Some(&mut totals), 1);
+                at[i].bond_type[0] = at[i].bond_type[0].wrapping_sub(1);
+                at[centp].bond_type[i0] = at[centp].bond_type[i0].wrapping_sub(1);
+                at[i].chem_bonds_valence -= 1;
+                at[i].charge -= 1;
+                at[endp2].bond_type[k0] = at[endp2].bond_type[k0].wrapping_add(1);
+                at[centp].bond_type[k] = at[centp].bond_type[k].wrapping_add(1);
+                at[endp2].chem_bonds_valence += 1;
+                at[endp2].num_h -= 1;
+                num_prot += 1;
+                n_success += 1;
+                get_atom_charge_type(at, i, Some(&mut totals), 0);
+                get_atom_charge_type(at, endp2, Some(&mut totals), 0);
+            }
+        }
+    }
+
+    if num_prot > 0 {
+        // 1. the test of SimpleRemoveAcidicProtons: H(+) to =C-O(-), etc.
+        let mut i = 0;
+        while i < na && num_prot != 0 && acid_ok(&totals) >= 0 {
+            let a = &at[i];
+            if a.sb_parity[0] != 0
+                || a.p_parity != 0
+                || a.num_h != 0
+                || a.charge != -1
+                || a.radical != 0
+                || b_has_charged_neighbor(at, i)
+            {
+                i += 1;
+                continue;
+            }
+            at[i].charge += 1;
+            at[i].num_h += 1;
+            let (type_, mask) = get_atom_charge_type(at, i, None, 0);
+            at[i].charge -= 1;
+            at[i].num_h -= 1;
+            if type_matches_classes(type_, mask, &AR_TYP_MASK) {
+                get_atom_charge_type(at, i, Some(&mut totals), 1);
+                at[i].charge += 1;
+                at[i].num_h += 1;
+                get_atom_charge_type(at, i, Some(&mut totals), 0);
+                num_prot -= 1;
+                n_success += 1;
+            }
+            i += 1;
+        }
+        // 2. the test of SimpleRemoveHplusNPO
+        let mut i = 0;
+        while i < na && num_prot != 0 {
+            let a = &at[i];
+            if a.sb_parity[0] != 0
+                || a.p_parity != 0
+                || a.charge != 0
+                || a.radical != 0
+                || b_has_charged_neighbor(at, i)
+            {
+                i += 1;
+                continue;
+            }
+            at[i].num_h += 1;
+            at[i].charge += 1;
+            let (type_, mask) = get_atom_charge_type(at, i, None, 0);
+            let success = PR_SIMPLE_TYP & type_ != 0 && PR_SIMPLE_MSK & mask.unwrap_or(0) != 0;
+            at[i].num_h -= 1;
+            at[i].charge -= 1;
+            if success {
+                get_atom_charge_type(at, i, Some(&mut totals), 1);
+                at[i].num_h += 1;
+                at[i].charge += 1;
+                get_atom_charge_type(at, i, Some(&mut totals), 0);
+                num_prot -= 1;
+                n_success += 1;
+            }
+            i += 1;
+        }
+    }
+
+    if num_prot < 0
+        && b_normalization_flags & FLAG_PROTON_AC_HARD_ADDED != 0
+        && num_tg == 1
+        && acid_ok(&totals) <= 0
+    {
+        // remove protons from tautomeric N (a specific ADP must be present)
+        let (mut n_acceptors, mut n_donors) = (0, 0);
+        let aa_co_typ = (ATT_ACIDIC_CO | ATT_NO) as i32;
+        let aa_co_msk = atbit::CO | atbit::NO;
+        let nh_donor = |at: &[InpAtom], i: usize, t: i32, m: Option<i32>| {
+            t == i32::from(ATT_ATOM_N)
+                && m == Some(atbit::NP_H)
+                && at[i].charge == 0
+                && at[i].valence == at[i].chem_bonds_valence
+        };
+        for i in 0..na {
+            let a = &at[i];
+            if a.endpoint == 0
+                || a.radical != 0
+                || a.sb_parity[0] != 0
+                || a.p_parity != 0
+                || b_has_charged_neighbor(at, i)
+            {
+                continue;
+            }
+            let (t, m) = get_atom_charge_type(at, i, None, 0);
+            if t & aa_co_typ != 0 && m.unwrap_or(0) & aa_co_msk != 0 {
+                n_acceptors += 1;
+            } else if nh_donor(at, i, t, m) {
+                n_donors += 1;
+            }
+        }
+        let num_max = n_acceptors.min(n_donors);
+        let mut num_success = 0;
+        let mut i = 0;
+        while i < na && num_success < num_max && num_prot < 0 {
+            let a = &at[i];
+            if a.endpoint == 0
+                || a.radical != 0
+                || a.sb_parity[0] != 0
+                || a.p_parity != 0
+                || b_has_charged_neighbor(at, i)
+            {
+                i += 1;
+                continue;
+            }
+            let (t, m) = get_atom_charge_type(at, i, None, 0);
+            if nh_donor(at, i, t, m) {
+                get_atom_charge_type(at, i, Some(&mut totals), 1);
+                at[i].num_h -= 1;
+                at[i].charge -= 1;
+                get_atom_charge_type(at, i, Some(&mut totals), 0);
+                num_prot += 1;
+                num_success += 1;
+                n_success += 1;
+            }
+            i += 1;
+        }
+    }
+    *num_protons_to_add = num_prot;
+    n_success
+}
+
+/// `AddRemoveIsoProtonsRestr`: distributes isotopic protons over the atoms;
+/// returns the number of placed isotopes or an error
+pub fn add_remove_iso_protons_restr(
+    at: &mut [InpAtom],
+    num_atoms: i32,
+    num_protons_to_add: &mut [i16; 3],
+    num_tg: i32,
+) -> i32 {
+    use super::strutil::hetero_atom_may_have_xchg_iso_h;
+    let na = num_atoms as usize;
+    let mut n_success = 0;
+    let mode2 = if num_tg != 0 { 1 } else { 0 };
+    for mode in 0..=mode2 {
+        for iso in (0..=2usize).rev() {
+            if num_protons_to_add[iso] == 0 {
+                continue;
+            }
+            if num_protons_to_add[iso] < 0 {
+                return RI_ERR_PROGR;
+            }
+            let mut i = 0;
+            while i < na && num_protons_to_add[iso] > 0 {
+                let j;
+                if mode != 0 {
+                    if at[i].endpoint != 0 {
+                        j = i;
+                    } else {
+                        i += 1;
+                        continue;
+                    }
+                } else if at[i].endpoint == 0 && hetero_atom_may_have_xchg_iso_h(at, i) == 1 {
+                    j = i;
+                } else if at[i].el_number == super::util::EL_NUMBER_H
+                    && at[i].charge == 1
+                    && at[i].valence == 0
+                    && at[i].radical == 0
+                    && at[i].iso_atw_diff == 0
+                {
+                    at[i].iso_atw_diff = 1 + iso as i8;
+                    num_protons_to_add[iso] -= 1;
+                    n_success += 1;
+                    i += 1;
+                    continue;
+                } else {
+                    i += 1;
+                    continue;
+                }
+                let mut num_h = i32::from(at[j].num_h);
+                while num_h > 0 && num_protons_to_add[iso] > 0 {
+                    at[j].num_iso_h[iso] += 1;
+                    at[j].num_h -= 1;
+                    num_protons_to_add[iso] -= 1;
+                    num_h -= 1;
+                    n_success += 1;
+                }
+                let (mut num_expl_h, mut num_expl_iso_h) = (0usize, 0usize);
+                let mut k = 0;
+                while k < at[j].valence as usize && na <= at[j].neighbor[k] as usize {
+                    let n = at[j].neighbor[k] as usize;
+                    num_expl_h += usize::from(at[n].iso_atw_diff == 0);
+                    num_expl_iso_h += usize::from(at[n].iso_atw_diff != 0);
+                    k += 1;
+                }
+                while num_expl_h > 0 && num_protons_to_add[iso] > 0 {
+                    // the index is that of the C code
+                    let n = at[j].neighbor[num_expl_h] as usize;
+                    if at[n].iso_atw_diff != 0 {
+                        return RI_ERR_PROGR;
+                    }
+                    at[n].iso_atw_diff = 1 + iso as i8;
+                    num_expl_h -= 1;
+                    num_expl_iso_h += 1;
+                    num_protons_to_add[iso] -= 1;
+                    n_success += 1;
+                }
+                let _ = num_expl_iso_h;
+                i += 1;
+            }
+        }
+    }
+    n_success
+}

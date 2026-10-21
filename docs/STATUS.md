@@ -278,6 +278,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 162 | done |
 | 163 | done |
 | 164 | done |
+| 165 | done |
 
 ## Python package files
 
@@ -612,3 +613,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-21 — Stage 162: I4q: BnsAdjustFlowBondsRad, BnsTestAndMarkAltBonds and the flow-range helpers
 * 2026-10-21 — Stage 163: I4r: SetForbiddenEdges, fix_special_bonds
 * 2026-10-21 — Stage 164: I4s: ReInitBnStructForAltBns, MarkRingSystemsAltBns, MarkNonStereoAltBns
+* 2026-10-21 — Stage 165: I4t: AddRemoveProtonsRestr, AddRemoveIsoProtonsRestr, bHasChargedNeighbor
