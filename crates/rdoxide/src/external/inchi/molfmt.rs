@@ -12,6 +12,10 @@
 use super::ichi_io::{InchiIostream, inchi_fgets_lf};
 use super::ichierr::add_error_message;
 use super::ichiprt1::MolCoord;
+use super::molfmt3::{
+    molfile_v3000_init, molfile_v3000_read_atoms_block, molfile_v3000_read_bonds_block,
+    molfile_v3000_read_ctab_begin_and_counts_line, molfile_v3000_read_tail_of_ctab,
+};
 use super::util::{
     dotify_non_printable_chars, extract_charges_and_radicals, get_atomic_mass, inchi_memicmp,
     lrtrim, mystrncpy, normalize_string, remove_one_lf,
@@ -631,7 +635,7 @@ pub fn molfile_get_xyz_dim_and_norm_factors(
 }
 
 /// `TREAT_ERR`
-fn treat_err(err: &mut i32, new_err: i32, p_str_err: &mut String, msg: &str) {
+pub(crate) fn treat_err(err: &mut i32, new_err: i32, p_str_err: &mut String, msg: &str) {
     if *err == 0 && new_err != 0 {
         *err = new_err;
     }
@@ -1643,7 +1647,7 @@ pub fn molfile_read_prop_block(
 
 /// `MolfileReadDataLines` for V2000 input. `only` is the
 /// `OnlyHeaderBlock`/`OnlyCTab` mode (nothing is allocated for atoms and bonds);
-/// otherwise the data are returned. The V3000 reader is not ported yet.
+/// otherwise the data are returned.
 /// Returns the data (read-all mode, no error) and the error code (negative
 /// when the end of the data was met).
 pub fn molfile_read_data_lines(
@@ -1677,7 +1681,18 @@ pub fn molfile_read_data_lines(
             retcode += 20;
             break 'fin;
         }
-        assert!(m.ctab.v3000.is_none(), "V3000 molfiles are not ported yet");
+        if m.ctab.v3000.is_some() {
+            retcode = molfile_v3000_read_ctab_begin_and_counts_line(&mut m.ctab, inp, p_str_err);
+            if retcode != 0 {
+                retcode += 70;
+                break 'fin;
+            }
+            retcode = molfile_v3000_init(&mut m.ctab);
+            if retcode != 0 {
+                retcode += 70;
+                break 'fin;
+            }
+        }
         if should_read_all {
             let n_alloc = m.ctab.n_atoms.max(1) as usize;
             m.ctab.atoms = Some(vec![MolFmtAtom::default(); n_alloc]);
@@ -1685,7 +1700,11 @@ pub fn molfile_read_data_lines(
                 m.ctab.coords = Some(vec![[0u8; super::ichiprt1::MOL_COORD_LEN]; n_alloc]);
             }
         }
-        retcode = molfile_read_atoms_block(&mut m.ctab, inp, retcode, p_str_err);
+        retcode = if m.ctab.v3000.is_none() {
+            molfile_read_atoms_block(&mut m.ctab, inp, retcode, p_str_err)
+        } else {
+            molfile_v3000_read_atoms_block(&mut m.ctab, inp, retcode, p_str_err)
+        };
         if retcode != 0 {
             if retcode < 0 {
                 retcode = -retcode;
@@ -1698,7 +1717,11 @@ pub fn molfile_read_data_lines(
         }
         prevcode = retcode;
         if !data_ended {
-            retcode = molfile_read_bonds_block(&mut m.ctab, inp, retcode, p_str_err);
+            retcode = if m.ctab.v3000.is_none() {
+                molfile_read_bonds_block(&mut m.ctab, inp, retcode, p_str_err)
+            } else {
+                molfile_v3000_read_bonds_block(&mut m.ctab, inp, retcode, p_str_err)
+            };
             if retcode != 0 {
                 if retcode < 0 {
                     retcode = -retcode;
@@ -1709,6 +1732,20 @@ pub fn molfile_read_data_lines(
                 } else {
                     retcode + 40
                 };
+            }
+            if m.ctab.v3000.is_some() {
+                retcode = molfile_v3000_read_tail_of_ctab(&mut m.ctab, inp, retcode, p_str_err);
+                if retcode != 0 {
+                    if retcode < 0 {
+                        retcode = -retcode;
+                        data_ended = true;
+                    }
+                    retcode = if prevcode != 0 {
+                        prevcode
+                    } else {
+                        retcode + 70
+                    };
+                }
             }
         }
         prevcode = retcode;

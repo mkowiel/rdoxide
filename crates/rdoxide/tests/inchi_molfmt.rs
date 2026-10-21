@@ -386,3 +386,83 @@ fn molfile_data_lines_match_c() {
         assert_eq!(out, want, "case {ci}: {inp}");
     }
 }
+
+fn dump_v3(c: &MolFmtCtab, out: &mut Vec<String>) {
+    let Some(v) = c.v3000.as_ref() else {
+        return;
+    };
+    let mut l = format!(
+        "V {} {} {} {} {} {} {} {} {} {} {}",
+        v.n_non_star_atoms,
+        v.n_star_atoms,
+        v.n_sgroups,
+        v.n_3d_constraints,
+        v.n_collections,
+        v.n_non_haptic_bonds,
+        v.n_haptic_bonds,
+        v.n_steabs,
+        v.n_sterel,
+        v.n_sterac,
+        i32::from(!v.atom_index_orig.is_empty())
+    );
+    if !v.atom_index_orig.is_empty() {
+        for i in 0..(v.n_non_star_atoms + v.n_star_atoms) as usize {
+            l += &format!(" {}:{}", v.atom_index_orig[i], v.atom_index_fin[i]);
+        }
+    }
+    out.push(l);
+    fn lists(ls: &[Vec<i32>], haptic: bool) -> String {
+        let mut s = format!(" {}", ls.len());
+        for x in ls {
+            let n = if haptic { x[2] } else { x[1] };
+            let cnt = (n + if haptic { 3 } else { 2 }).max(0) as usize;
+            s += " [";
+            for k in 0..cnt.min(40) {
+                s += &format!("{},", x[k]);
+            }
+            s += "]";
+        }
+        s
+    }
+    out.push(format!("W{}", lists(&v.haptic_bonds, true)));
+    out.push(format!(
+        "S{}{}{}",
+        lists(&v.steabs, false),
+        lists(&v.sterel, false),
+        lists(&v.sterac, false)
+    ));
+}
+
+#[test]
+fn molfile_v3000_matches_c() {
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_molfmt3.json")).unwrap();
+    for (ci, c) in data.as_array().unwrap().iter().enumerate() {
+        let inp = c["in"].as_str().unwrap();
+        let t: Vec<&str> = inp.split(' ').collect();
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        let (bcoord, polymers, nowarn, pseudo) =
+            (t[1] == "1", t[2] == "1", t[3] == "1", t[4] == "1");
+        let mut ios = stream(&unhex(t[5]));
+        let mut perr = String::new();
+        let mut out = Vec::new();
+        let (m, err) = molfile_read_data_lines(&mut ios, None, bcoord, polymers, &mut perr, nowarn);
+        if let Some(mut m) = m {
+            dump_hdr(&m.hdr, &mut out);
+            dump_ctab(&m.ctab, &mut out);
+            let mut e2 = 0;
+            let mut s2 = String::new();
+            let nzz = molfile_treat_pseudo_element_atoms(&mut m.ctab, pseudo, &mut e2, &mut s2);
+            dump_v3(&m.ctab, &mut out);
+            dump_all(&m.ctab, &mut out);
+            out.push(format!("Z {nzz} {e2} {}", hex(s2.as_bytes())));
+        }
+        out.push(format!("R {err} {}", hex(perr.as_bytes())));
+        assert_eq!(out, want, "case {ci}: {inp}");
+    }
+}
