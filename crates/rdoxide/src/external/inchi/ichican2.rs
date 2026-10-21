@@ -2305,3 +2305,89 @@ pub fn canon_graph(
     }
     ret
 }
+
+// ---------------------------------------------------------------------------
+// helpers of the base canonical numbering (`GetBaseCanonRanking`)
+// ---------------------------------------------------------------------------
+
+use super::ichimap::{comp_ranks_ord, sorted_equ_info_to_ranks, sorted_ranks_to_equ_info};
+
+/// `iOther`: second canonicalization of the no H structure
+pub const CANON_FLAG_NO_H_RECANON: i32 = 0x0001;
+/// `iOther`: NoTautH equivalence partition differs from NoH
+pub const CANON_FLAG_NO_TAUT_H_DIFF: i32 = 0x0002;
+/// `iOther`: equivalence partition in isotopic only non-taut differs from non-isotopic
+pub const CANON_FLAG_ISO_ONLY_NON_TAUT_DIFF: i32 = 0x0004;
+/// `iBase`: isotopic equivalence partition in isotopic taut differs from non-isotopic taut
+pub const CANON_FLAG_ISO_TAUT_DIFF: i32 = 0x0008;
+/// `iOther`: isotopic equivalence partition in fixed H non-taut differs from non-isotopic fixed H
+pub const CANON_FLAG_ISO_FIXED_H_DIFF: i32 = 0x0010;
+
+/// `AT_ISO_SORT_KEY_MULT`: up to 32 identical hydrogen isotopes
+pub const AT_ISO_SORT_KEY_MULT: i64 = 32;
+
+/// `ATOM_SIZES`
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct AtomSizes {
+    pub n_max_num_stereo_atoms: i32,
+    pub n_max_num_stereo_bonds: i32,
+    pub num_isotopic_atoms: i32,
+    pub n_len_ct: i32,
+    pub n_len_bonds: i32,
+    pub n_len_isotopic: i32,
+    pub n_len_ct_at_only: i32,
+    pub n_len_linear_ct_stereo_dble: i32,
+    pub n_len_linear_ct_stereo_carb: i32,
+    pub b_may_have_stereo: i32,
+    pub b_ignore_isotopic: i32,
+    pub n_len_linear_ct_tautomer: i32,
+    pub n_len_linear_ct_isotopic_tautomer: i32,
+    pub b_has_isotopic_taut_groups: i32,
+    pub n_len_isotopic_endpoints: i32,
+}
+
+/// `make_iso_sort_key`
+pub fn make_iso_sort_key(iso_atw_diff: i32, num_1h: i32, num_2h: i32, num_3h: i32) -> i64 {
+    let mut key = 0i64;
+    let mut mult = 1i64;
+    key += mult * i64::from(num_1h);
+    mult *= AT_ISO_SORT_KEY_MULT;
+    key += mult * i64::from(num_2h);
+    mult *= AT_ISO_SORT_KEY_MULT;
+    key += mult * i64::from(num_3h);
+    mult *= AT_ISO_SORT_KEY_MULT;
+    key += mult * i64::from(iso_atw_diff);
+    key
+}
+
+/// `FixCanonEquivalenceInfo`: makes the current ranks agree with the
+/// equivalence information; returns the number of different ranks and
+/// `bChanged` (bit 0: symmetry ranks changed, bit 1: current ranks changed).
+/// `n_temp_rank` is always the same as `n_curr_rank` on exit.
+pub fn fix_canon_equivalence_info(
+    num_at_tg: usize,
+    n_symm_rank: &mut [u16],
+    n_curr_rank: &mut [u16],
+    n_temp_rank: &mut [u16],
+    n_atom_number: &mut [u16],
+) -> (i32, i32) {
+    {
+        let sr: &[u16] = n_symm_rank;
+        inchi_qsort(&mut n_atom_number[..num_at_tg], |a, b| {
+            comp_ranks_ord(sr, *a, *b)
+        });
+    }
+    let (n_num_diff_ranks, b_change_symm_rank) =
+        sorted_equ_info_to_ranks(n_symm_rank, n_temp_rank, n_atom_number, num_at_tg);
+    let b_change_curr_rank = n_curr_rank[..num_at_tg] != n_temp_rank[..num_at_tg];
+    if b_change_curr_rank {
+        n_curr_rank[..num_at_tg].copy_from_slice(&n_temp_rank[..num_at_tg]);
+    }
+    if b_change_symm_rank {
+        sorted_ranks_to_equ_info(n_symm_rank, n_temp_rank, n_atom_number, num_at_tg);
+    }
+    (
+        n_num_diff_ranks,
+        i32::from(b_change_symm_rank) | (2 * i32::from(b_change_curr_rank)),
+    )
+}

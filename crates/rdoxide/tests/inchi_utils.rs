@@ -10271,3 +10271,52 @@ fn canonical_graph_search_matches_the_c_code() {
         assert_eq!(got, want, "case {case}");
     }
 }
+
+#[test]
+fn base_canonical_numbering_helpers_match_the_c_code() {
+    use rdoxide::external::inchi::ichican2::{fix_canon_equivalence_info, make_iso_sort_key};
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_can2e.json")).unwrap();
+    fn u16s(v: &serde_json::Value) -> Vec<u16> {
+        v.as_array()
+            .unwrap()
+            .iter()
+            .map(|x| x.as_u64().unwrap() as u16)
+            .collect()
+    }
+    fn join(v: &[u16]) -> String {
+        v.iter().map(|x| format!(" {x}")).collect()
+    }
+    for (case, c) in data.as_array().unwrap().iter().enumerate() {
+        let inp = &c["in"];
+        let n = inp["n"].as_u64().unwrap() as usize;
+        let mut sym = u16s(&inp["sym"]);
+        let mut cur = u16s(&inp["cur"]);
+        let mut an = u16s(&inp["an"]);
+        let mut tmp = vec![0u16; 64];
+        let (r, bch) = fix_canon_equivalence_info(n, &mut sym, &mut cur, &mut tmp, &mut an);
+        let d: Vec<i32> = inp["d"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|x| x.as_i64().unwrap() as i32)
+            .collect();
+        let got = vec![
+            format!(
+                "F {r} {bch} |{} |{} |{} |{}",
+                join(&sym),
+                join(&cur),
+                join(&tmp[..n]),
+                join(&an)
+            ),
+            format!("K {}", make_iso_sort_key(d[0], d[1], d[2], d[3])),
+        ];
+        let want: Vec<String> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| s.as_str().unwrap().to_string())
+            .collect();
+        assert_eq!(got, want, "case {case}");
+    }
+}
