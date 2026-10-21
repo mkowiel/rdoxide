@@ -1529,3 +1529,528 @@ impl CurTree {
         -1
     }
 }
+
+// ---------------------------------------------------------------------------
+// ichimap2.c: ties, parities of mapped atoms and bonds, mapping of one atom
+// ---------------------------------------------------------------------------
+
+use super::ichierr::{CT_ERR_MAX, CT_ERR_MIN, CT_MAPCOUNT_ERR};
+use super::ichister::{
+    KNOWN_PARITIES_EQL, MAX_NUM_STEREO_BOND_NEIGH, MIN_NUM_STEREO_BOND_NEIGH, atom_parity_well_def,
+    parity_well_def,
+};
+use super::inpdef::MAX_NUM_STEREO_ATOM_NEIGH;
+
+/// `EQ_NEIGH`: neighbors of a stereo center with equal mapping ranks
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct EqNeigh {
+    pub num_to: i32,
+    pub to_at: [u16; 4],
+    pub from_at: u16,
+    pub rank: u16,
+    pub canon_rank: u16,
+}
+
+/// `RETURNED_ERROR`
+fn returned_error(v: i32) -> bool {
+    (CT_ERR_MIN..=CT_ERR_MAX).contains(&v)
+}
+
+/// `NumberOfTies`: the number of tied atoms with the rank of `at_no1`; when
+/// larger than one, the two array pairs for breaking the tie are made sure to
+/// exist (`rank_stack1[2..4]` and `rank_stack2[2..4]`, `length` entries each)
+#[allow(clippy::too_many_arguments)]
+pub fn number_of_ties(
+    rank_stack1: &mut Vec<Vec<u16>>,
+    rank_stack2: &mut Vec<Vec<u16>>,
+    length: usize,
+    at_no1: usize,
+    at_no2: usize,
+    n_new_rank: &mut u16,
+    b_add_stack: &mut i32,
+    b_mapped1: &mut i32,
+) -> i32 {
+    *b_add_stack = 0;
+    *b_mapped1 = 0;
+    *n_new_rank = 0;
+    let r = rank_stack1[0][at_no1];
+    if r != rank_stack2[0][at_no2] {
+        return CT_MAPCOUNT_ERR;
+    }
+    let i_max = r as usize - 1;
+    let mut i1 = 1usize;
+    while i1 <= i_max && r == rank_stack1[0][rank_stack1[1][i_max - i1] as usize] {
+        i1 += 1;
+    }
+    let mut i2 = 1usize;
+    while i2 <= i_max && r == rank_stack2[0][rank_stack2[1][i_max - i2] as usize] {
+        i2 += 1;
+    }
+    if i2 != i1 {
+        return CT_MAPCOUNT_ERR;
+    }
+    if i1 > 1 {
+        *n_new_rank = (r as usize - i1 + 1) as u16;
+        for i in 0..4 {
+            if i < 2 {
+                let idx = 2 + i;
+                if let Some(v) = rank_stack1.get(idx)
+                    && v.first().is_some_and(|x| *x != 0)
+                {
+                    *b_mapped1 += 1;
+                }
+                while rank_stack1.len() <= idx {
+                    rank_stack1.push(Vec::new());
+                }
+                if rank_stack1[idx].is_empty() {
+                    rank_stack1[idx] = vec![0; length];
+                }
+            } else {
+                let idx = i;
+                while rank_stack2.len() <= idx {
+                    rank_stack2.push(Vec::new());
+                }
+                if rank_stack2[idx].is_empty() {
+                    rank_stack2[idx] = vec![0; length];
+                }
+                let src = if i == 2 {
+                    rank_stack2[0][..length].to_vec()
+                } else {
+                    rank_stack2[1][..length].to_vec()
+                };
+                rank_stack2[idx][..length].copy_from_slice(&src);
+            }
+        }
+        *b_add_stack = 2;
+    }
+    i1 as i32
+}
+
+/// `parity_of_mapped_half_bond`
+#[allow(clippy::too_many_arguments)]
+pub fn parity_of_mapped_half_bond(
+    from_at: usize,
+    to_at: usize,
+    from_neigh: usize,
+    to_neigh: usize,
+    at: &[SpAtom],
+    mut p_en: Option<&mut EqNeigh>,
+    n_canon_rank_from: &[u16],
+    n_rank_from: &[u16],
+    n_rank_to: &[u16],
+) -> i32 {
+    let mut r_to = [0u16; MAX_NUM_STEREO_BOND_NEIGH as usize];
+    let mut at_no_to = [0u16; MAX_NUM_STEREO_BOND_NEIGH as usize];
+    let mut r_canon_from = [0u16; MAX_NUM_STEREO_BOND_NEIGH as usize];
+    let mut at_no_from = [0u16; MAX_NUM_STEREO_BOND_NEIGH as usize];
+    if let Some(en) = p_en.as_deref_mut() {
+        *en = EqNeigh::default();
+    }
+    if n_rank_from[from_at] != n_rank_to[to_at]
+        || n_rank_from[from_neigh] != n_rank_to[to_neigh]
+        || at[to_at].valence != at[from_at].valence
+    {
+        return 0;
+    }
+    let parity = parity_val(i32::from(at[to_at].parity));
+    let num_neigh = i32::from(at[to_at].valence);
+    if !(MIN_NUM_STEREO_BOND_NEIGH..=MAX_NUM_STEREO_BOND_NEIGH).contains(&num_neigh) {
+        if num_neigh == 1 && at[to_at].stereo_bond_neighbor[0] != 0 {
+            if parity_well_def(parity) {
+                return 2 - parity % 2;
+            }
+            return if parity != 0 { parity } else { AB_PARITY_UNDF };
+        }
+        return 0;
+    }
+    let num_neigh = num_neigh as usize;
+    if parity_known(parity) {
+        if !atom_parity_well_def(parity) {
+            return parity;
+        }
+    } else {
+        return 0;
+    }
+    let mut to_sb_neigh_ord: i32 = -1;
+    for i in 0..MAX_NUM_STEREO_BONDS {
+        let k = at[to_at].stereo_bond_neighbor[i] as usize;
+        if k == 0 {
+            break;
+        }
+        if k == to_neigh + 1 {
+            to_sb_neigh_ord = i as i32;
+            break;
+        }
+    }
+    if to_sb_neigh_ord < 0 {
+        return 0;
+    }
+    let to_sb_neigh_ord = i32::from(at[to_at].stereo_bond_ord[to_sb_neigh_ord as usize]);
+    let r_sb_neigh = n_rank_to[at[to_at].neighbor[to_sb_neigh_ord as usize] as usize];
+    let mut j = 0usize;
+    for i in 0..num_neigh {
+        if i as i32 != to_sb_neigh_ord {
+            at_no_to[j] = at[to_at].neighbor[i];
+            r_to[j] = n_rank_to[at_no_to[j] as usize];
+            if r_sb_neigh == r_to[j] {
+                return 0;
+            }
+            j += 1;
+        }
+    }
+    if j + 1 != num_neigh {
+        return 0;
+    }
+    if j == 1 {
+        return 2 - (parity + 1 + to_sb_neigh_ord) % 2;
+    }
+    if j != 2 {
+        return 0;
+    }
+    if r_to[0] == r_to[1] {
+        let mut j = 0usize;
+        let mut from_sb_neigh_ord = -1i32;
+        for i in 0..num_neigh {
+            let k = at[from_at].neighbor[i] as usize;
+            let r = n_rank_from[k];
+            if r == r_sb_neigh {
+                from_sb_neigh_ord = i as i32;
+            } else if r == r_to[0] {
+                if j < 2 {
+                    r_canon_from[j] = n_canon_rank_from[k];
+                    at_no_from[j] = k as u16;
+                }
+                j += 1;
+            } else {
+                return 0;
+            }
+        }
+        if from_sb_neigh_ord < 0 || j != 2 {
+            return 0;
+        }
+        if let Some(en) = p_en {
+            en.to_at[0] = at_no_to[0];
+            en.to_at[1] = at_no_to[1];
+            en.num_to = 2;
+            en.rank = r_to[0];
+            let i = usize::from(r_canon_from[1] < r_canon_from[0]);
+            en.from_at = at_no_from[i];
+            en.canon_rank = r_canon_from[i];
+        }
+        return -i32::from(r_to[0]);
+    }
+    let mut from_sb_neigh_ord = -1i32;
+    for i in 0..num_neigh {
+        let k = at[from_at].neighbor[i] as usize;
+        let r = n_rank_from[k];
+        if r == r_sb_neigh {
+            from_sb_neigh_ord = i as i32;
+        } else if r == r_to[0] {
+            r_canon_from[0] = n_canon_rank_from[k];
+        } else if r == r_to[1] {
+            r_canon_from[1] = n_canon_rank_from[k];
+        } else {
+            return 0;
+        }
+    }
+    if r_canon_from[0] == 0 || r_canon_from[1] == 0 || from_sb_neigh_ord < 0 {
+        return 0;
+    }
+    2 - (parity + to_sb_neigh_ord + i32::from(r_canon_from[1] < r_canon_from[0])) % 2
+}
+
+/// `parity_of_mapped_atom2`
+pub fn parity_of_mapped_atom2(
+    from_at: usize,
+    to_at: usize,
+    at: &[SpAtom],
+    mut p_en: Option<&mut EqNeigh>,
+    n_canon_rank_from: &[u16],
+    n_rank_from: &[u16],
+    n_rank_to: &[u16],
+) -> i32 {
+    let num_neigh = at[to_at].valence as i32;
+    if let Some(en) = p_en.as_deref_mut() {
+        *en = EqNeigh::default();
+    }
+    if n_rank_from[from_at] != n_rank_to[to_at] {
+        return 0;
+    }
+    if num_neigh > MAX_NUM_STEREO_ATOM_NEIGH as i32 || num_neigh < 2 {
+        if num_neigh == 1 {
+            return if at[to_at].parity != 0 {
+                i32::from(at[to_at].parity)
+            } else {
+                AB_PARITY_UNDF
+            };
+        }
+        return 0;
+    }
+    let num_neigh = num_neigh as usize;
+    let mut neigh_rank_from = [0u16; 4];
+    let mut neigh_number_from = [0u16; 4];
+    let mut neigh_rank_to = [0u16; 4];
+    let mut neigh_number_to = [0u16; 4];
+    let mut neigh_rank_from_canon = [0u16; 4];
+    let mut neigh_rank_to_canon = [0u16; 4];
+    for i in 0..num_neigh {
+        neigh_number_to[i] = i as u16;
+        neigh_number_from[i] = i as u16;
+        neigh_rank_to[i] = n_rank_to[at[to_at].neighbor[i] as usize];
+        let j = at[from_at].neighbor[i] as usize;
+        neigh_rank_from[i] = n_rank_from[j];
+        neigh_rank_from_canon[i] = n_canon_rank_from[j];
+    }
+    let mut count_eql = 0i32;
+    {
+        let rf = neigh_rank_from;
+        insertions_sort(&mut neigh_number_from[..num_neigh], |a, b| {
+            comp_neighbors_ranks_count_eql(&rf, &mut count_eql, *a, *b)
+        });
+    }
+    if count_eql != 0 {
+        let mut r_canon_from_min = MAX_ATOMS_PLUS_1;
+        let mut neigh_canon_from_min = 0usize;
+        let mut r = 0i32;
+        let mut neigh1 = neigh_number_from[0] as usize;
+        let mut r1 = i32::from(neigh_rank_from[neigh1]);
+        for i in 1..num_neigh {
+            let neigh2 = neigh_number_from[i] as usize;
+            let r2 = i32::from(neigh_rank_from[neigh2]);
+            if r2 == r1 {
+                if r != r2 {
+                    r = r2;
+                    let rc = i32::from(neigh_rank_from_canon[neigh1]);
+                    if rc < r_canon_from_min {
+                        r_canon_from_min = rc;
+                        neigh_canon_from_min = neigh1;
+                    }
+                }
+                let rc = i32::from(neigh_rank_from_canon[neigh2]);
+                if rc < r_canon_from_min {
+                    r_canon_from_min = rc;
+                    neigh_canon_from_min = neigh2;
+                }
+            }
+            r1 = r2;
+            neigh1 = neigh2;
+        }
+        if r != 0 {
+            let r1 = i32::from(neigh_rank_from[neigh_canon_from_min]);
+            let mut j = 0usize;
+            if let Some(en) = p_en {
+                for i in 0..num_neigh {
+                    if r1 == i32::from(neigh_rank_to[i]) {
+                        en.to_at[j] = at[to_at].neighbor[i];
+                        j += 1;
+                    }
+                }
+                insertions_sort(&mut en.to_at[..j], |a, b| comp_ranks_inv_ord(*a, *b));
+                en.num_to = j as i32;
+                en.from_at = at[from_at].neighbor[neigh_canon_from_min];
+                en.rank = r1 as u16;
+                en.canon_rank = r_canon_from_min as u16;
+            } else {
+                for i in 0..num_neigh {
+                    if r1 == i32::from(neigh_rank_to[i]) {
+                        j += 1;
+                    }
+                }
+            }
+            if j <= 1 || r1 == 0 || r_canon_from_min > MAX_ATOMS_I32 {
+                return 0;
+            }
+            return -r;
+        }
+        return 0;
+    }
+    if !atom_parity_well_def(i32::from(at[to_at].parity)) {
+        return i32::from(at[to_at].parity);
+    }
+    let mut dummy = 0i32;
+    let mut num_trans_to = {
+        let rt = neigh_rank_to;
+        insertions_sort(&mut neigh_number_to[..num_neigh], |a, b| {
+            comp_neighbors_ranks_count_eql(&rt, &mut dummy, *a, *b)
+        })
+    };
+    for i in 0..num_neigh {
+        let j = neigh_number_to[i] as usize;
+        let k = neigh_number_from[i] as usize;
+        if neigh_rank_to[j] != neigh_rank_from[k] {
+            return 0;
+        }
+        neigh_rank_to_canon[j] = neigh_rank_from_canon[k];
+    }
+    num_trans_to += {
+        let rc = neigh_rank_to_canon;
+        insertions_sort(&mut neigh_number_to[..num_neigh], |a, b| {
+            comp_neighbors_ranks_count_eql(&rc, &mut dummy, *a, *b)
+        })
+    };
+    2 - (num_trans_to + i32::from(at[to_at].parity)) % 2
+}
+
+const MAX_ATOMS_I32: i32 = 32766;
+const MAX_ATOMS_PLUS_1: i32 = MAX_ATOMS_I32 + 1;
+
+/// `ClearPreviousMappings`: zeroes the first entry of every array; returns their number
+pub fn clear_previous_mappings(rank_stack: &mut [Vec<u16>]) -> i32 {
+    for v in rank_stack.iter_mut() {
+        if let Some(x) = v.first_mut() {
+            *x = 0;
+        }
+    }
+    rank_stack.len() as i32
+}
+
+/// `map_an_atom2`: maps atom `at_no1` ("from") onto `at_no2` ("to"), untying
+/// their mapping ranks if they are tied; returns the mapping rank value
+#[allow(clippy::too_many_arguments)]
+pub fn map_an_atom2(
+    num_atoms: usize,
+    num_max: usize,
+    at_no1: usize,
+    at_no2: usize,
+    n_temp_rank: &mut [u16],
+    n_num_mapped_ranks: i32,
+    pn_new_num_mapped_ranks: &mut i32,
+    cs: &mut CanonCounters,
+    neigh_list: &mut NeighList,
+    rank_stack1: &mut Vec<Vec<u16>>,
+    rank_stack2: &mut Vec<Vec<u16>>,
+    b_add_stack: &mut i32,
+) -> i32 {
+    let length = num_max;
+    let mut n_new_rank = 0u16;
+    let mut b_mapped = 0i32;
+    let n_num_ties = number_of_ties(
+        rank_stack1,
+        rank_stack2,
+        length,
+        at_no1,
+        at_no2,
+        &mut n_new_rank,
+        b_add_stack,
+        &mut b_mapped,
+    );
+    if returned_error(n_num_ties) {
+        return n_num_ties;
+    }
+    if n_num_ties <= 1 {
+        *pn_new_num_mapped_ranks = n_num_mapped_ranks;
+        return i32::from(rank_stack1[0][at_no1]);
+    }
+    let mut new_rank1 = std::mem::take(&mut rank_stack1[2]);
+    let mut new_atom_number1 = std::mem::take(&mut rank_stack1[3]);
+    let mut new_rank2 = std::mem::take(&mut rank_stack2[2]);
+    let mut new_atom_number2 = std::mem::take(&mut rank_stack2[3]);
+    new_rank2[..length].copy_from_slice(&rank_stack2[0][..length]);
+    new_atom_number2[..length].copy_from_slice(&rank_stack2[1][..length]);
+    new_rank2[at_no2] = n_new_rank;
+    let n_new_num_ranks2 = differentiate_ranks2(
+        num_atoms,
+        neigh_list,
+        n_num_mapped_ranks,
+        &mut new_rank2,
+        n_temp_rank,
+        &mut new_atom_number2,
+        &mut cs.l_num_neigh_list_iter,
+        1,
+    );
+    cs.l_num_break_ties += 1;
+    let mut already = b_mapped;
+    if already == 2 && n_new_rank == new_rank1[at_no1] {
+        for i in 0..num_atoms {
+            if new_rank1[new_atom_number1[i] as usize] != new_rank2[new_atom_number2[i] as usize] {
+                already = 0;
+                break;
+            }
+        }
+    } else {
+        already = 0;
+    }
+    let n_new_num_ranks1;
+    if already != 2 {
+        clear_previous_mappings(&mut rank_stack1[4..]);
+        new_rank1[..length].copy_from_slice(&rank_stack1[0][..length]);
+        new_atom_number1[..length].copy_from_slice(&rank_stack1[1][..length]);
+        new_rank1[at_no1] = n_new_rank;
+        n_new_num_ranks1 = differentiate_ranks2(
+            num_atoms,
+            neigh_list,
+            n_num_mapped_ranks,
+            &mut new_rank1,
+            n_temp_rank,
+            &mut new_atom_number1,
+            &mut cs.l_num_neigh_list_iter,
+            1,
+        );
+        cs.l_num_break_ties += 1;
+    } else {
+        n_new_num_ranks1 = n_new_num_ranks2;
+    }
+    let mut ret = new_rank1[at_no1] as i32;
+    if n_new_num_ranks1 != n_new_num_ranks2 {
+        ret = CT_MAPCOUNT_ERR;
+    } else {
+        *pn_new_num_mapped_ranks = n_new_num_ranks2;
+        for i in 0..num_atoms {
+            if new_rank1[new_atom_number1[i] as usize] != new_rank2[new_atom_number2[i] as usize] {
+                ret = CT_MAPCOUNT_ERR;
+                break;
+            }
+        }
+    }
+    rank_stack1[2] = new_rank1;
+    rank_stack1[3] = new_atom_number1;
+    rank_stack2[2] = new_rank2;
+    rank_stack2[3] = new_atom_number2;
+    ret
+}
+
+/// `might_change_other_atom_parity`
+pub fn might_change_other_atom_parity(
+    at: &[SpAtom],
+    num_atoms: usize,
+    at_no: usize,
+    n_rank2: &[u16],
+    n_rank1: &[u16],
+) -> i32 {
+    for i in 0..num_atoms {
+        if n_rank2[i] != n_rank1[i] {
+            if i != at_no
+                && at[i].b_has_stereo_or_equ_to_stereo != 0
+                && i32::from(at[i].stereo_atom_parity) & KNOWN_PARITIES_EQL == 0
+                && at[i].stereo_bond_neighbor[0] == 0
+            {
+                return 1;
+            }
+            for j in 0..at[i].valence as usize {
+                let nb = at[i].neighbor[j] as usize;
+                if nb != at_no
+                    && at[nb].b_has_stereo_or_equ_to_stereo != 0
+                    && i32::from(at[nb].stereo_atom_parity) & KNOWN_PARITIES_EQL == 0
+                    && at[nb].stereo_bond_neighbor[0] == 0
+                {
+                    return 1;
+                }
+            }
+        }
+    }
+    0
+}
+
+/// `GetMinNewRank`
+pub fn get_min_new_rank(n_atom_rank: &[u16], n_atom_numb: &[u16], n_rank1: u16) -> u16 {
+    let mut i = n_rank1 as i32 - 1;
+    let mut n_rank2 = 0u16;
+    while i >= 0 {
+        n_rank2 = n_atom_rank[n_atom_numb[i as usize] as usize];
+        if n_rank1 != n_rank2 {
+            break;
+        }
+        i -= 1;
+    }
+    if i >= 0 { n_rank2 + 1 } else { 1 }
+}
