@@ -311,6 +311,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 195 | InChI port I6l: ichimap2 RemoveCalculatedNonStereo (bond and center parts) with differential test against the C code; ichimap2 complete |
 | 196 | InChI port I6m: ichimap4 map_stereo_bonds4 and map_stereo_atoms4 with differential test against the C code; ichimap complete |
 | 197 | InChI port I6n: first part of ichican2 (partitions, cells, node sets, PartitionColorVertex) with differential test against the C code |
+| 198 | InChI port I6o: ichican2 connection table fill, compare and copy with differential test against the C code |
 
 ## Python package files
 
@@ -678,3 +679,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-21 — Stage 195: ported RemoveCalculatedNonStereo* and tested them against the real InChI C on 8000 random cases.
 * 2026-10-21 — Stage 196: ported ichimap4.c and tested it against the real InChI C on 4000 random cases.
 * 2026-10-21 — Stage 197: ported the first part of ichican2.c and tested it against the upstream C compiled from source on 3000 random cases.
+* 2026-10-21 — Stage 198: ported CtPartFill, CtPartCompare, CtFullCompare, CtPartCopy and the layer helpers of ichican2.c and tested them against the upstream C on 4000 random cases.
