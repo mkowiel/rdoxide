@@ -887,3 +887,419 @@ pub fn triple_prod_char(
         -((0.5 - len).floor() as i32)
     }
 }
+
+// ---------------------------------------------------------------------------
+// stereo center / stereo bond candidate checks
+// ---------------------------------------------------------------------------
+
+pub const PES_BIT_POINT_EDGE_STEREO: i32 = 1;
+pub const PES_BIT_PHOSPHINE_STEREO: i32 = 2;
+pub const PES_BIT_ARSINE_STEREO: i32 = 4;
+pub const PES_BIT_FIX_SP3_BUG: i32 = 8;
+pub const MAX_NUM_STEREO_BOND_NEIGH: i32 = 3;
+pub const MIN_NUM_STEREO_BOND_NEIGH: i32 = 2;
+pub const CMODE_NO_ALT_SBONDS: u64 = 0x000100;
+
+use super::ichiring::is_atom_in_3memb_ring;
+use super::ichitaut::{BOND_ALT12NS, BOND_ALTERN, BOND_MARK_ALL, BOND_TAUTOM};
+use super::incomdef::{BOND_TYPE_SINGLE, RADICAL_SINGLET};
+use super::util::get_endpoint_valence;
+
+const BOND_SINGLE: i32 = BOND_TYPE_SINGLE;
+const BOND_DOUBLE: i32 = BOND_TYPE_DOUBLE;
+
+fn radical_ok(radical: i8) -> bool {
+    radical == 0 || i32::from(radical) == RADICAL_SINGLET
+}
+
+fn elem_table_check(table: &[(&str, i8)], elname: &str, charge: i8, radical: i8) -> bool {
+    table
+        .iter()
+        .find(|(e, c)| *e == elname && *c == charge)
+        .is_some_and(|_| radical_ok(radical))
+}
+
+/// `bCanAtomHaveAStereoBond`
+pub fn b_can_atom_have_a_stereo_bond(elname: &str, charge: i8, radical: i8) -> bool {
+    const T: [(&str, i8); 5] = [("C", 0), ("Si", 0), ("Ge", 0), ("N", 0), ("N", 1)];
+    elem_table_check(&T, elname, charge, radical)
+}
+
+/// `bCanAtomBeMiddleAllene`
+pub fn b_can_atom_be_middle_allene(elname: &str, charge: i8, radical: i8) -> bool {
+    const T: [(&str, i8); 3] = [("C", 0), ("Si", 0), ("Ge", 0)];
+    elem_table_check(&T, elname, charge, radical)
+}
+
+/// `bCanAtomBeTerminalAllene`
+pub fn b_can_atom_be_terminal_allene(elname: &str, charge: i8, radical: i8) -> bool {
+    b_can_atom_be_middle_allene(elname, charge, radical)
+}
+
+/// `bInpAtomHasRequirdNeigh`
+pub fn b_inp_atom_has_requird_neigh(
+    at: &[InpAtom],
+    cur_at: usize,
+    requird_neigh_type: i32,
+    num_dble_bonds: i32,
+    b_stereo_at_zz: i32,
+) -> bool {
+    let a = &at[cur_at];
+    if a.endpoint != 0 {
+        return false;
+    }
+    if requird_neigh_type & 1 != 0 && a.num_h != 0 {
+        return false;
+    }
+    let val = a.valence as usize;
+    if requird_neigh_type & 2 != 0 {
+        for i in 0..val {
+            let ni = &at[a.neighbor[i] as usize];
+            if ni.valence != 1 || get_endpoint_valence(ni.el_number) == 0 {
+                continue;
+            }
+            for j in i + 1..val {
+                let nj = &at[a.neighbor[j] as usize];
+                if nj.valence != 1
+                    || ni.el_number != nj.el_number
+                    || get_endpoint_valence(nj.el_number) == 0
+                {
+                    continue;
+                }
+                if ni.num_h != nj.num_h && ni.elname_str() != "C" {
+                    return false;
+                }
+            }
+        }
+    }
+    if b_stereo_at_zz == 0 {
+        for i in 0..val {
+            let n = at[a.neighbor[i] as usize].elname_str();
+            if n == "Zz" || n == "Zy" {
+                return false;
+            }
+        }
+    }
+    let (mut num_1s, mut num_mult, mut num_other) = (0, 0, 0);
+    for i in 0..val {
+        match i32::from(a.bond_type[i]) & !BOND_MARK_ALL {
+            BOND_SINGLE => num_1s += 1,
+            BOND_DOUBLE | BOND_ALTERN | BOND_TAUTOM | BOND_ALT12NS => num_mult += 1,
+            _ => num_other += 1,
+        }
+    }
+    if num_other != 0 {
+        return false;
+    }
+    if (num_dble_bonds != 0 && num_dble_bonds > num_mult)
+        || (num_dble_bonds == 0 && i32::from(a.valence) != num_1s)
+    {
+        return false;
+    }
+    true
+}
+
+/// `bCanInpAtomBeAStereoCenter`: the number of bonds and implicit H (3 or 4)
+/// of a possible stereocenter, otherwise 0
+pub fn b_can_inp_atom_be_a_stereo_center(
+    at: &[InpAtom],
+    cur_at: usize,
+    b_pointed_edge_stereo: i32,
+    b_stereo_at_zz: i32,
+) -> i32 {
+    // (element, charge, bonds+H, chemical valence+H, has 3-membered ring, required neighbors)
+    const T: [(&str, i8, i32, i32, bool, i32); 21] = [
+        ("C", 0, 4, 4, false, 0),
+        ("Si", 0, 4, 4, false, 0),
+        ("Ge", 0, 4, 4, false, 0),
+        ("Sn", 0, 4, 4, false, 0),
+        ("As", 1, 4, 4, false, 3),
+        ("B", -1, 4, 4, false, 0),
+        ("S", 0, 3, 4, false, 3),
+        ("S", 0, 4, 6, false, 3),
+        ("S", 1, 3, 3, false, 3),
+        ("S", 1, 4, 5, false, 3),
+        ("Se", 0, 3, 4, false, 3),
+        ("Se", 0, 4, 6, false, 3),
+        ("Se", 1, 3, 3, false, 3),
+        ("Se", 1, 4, 5, false, 3),
+        ("N", 0, 4, 5, false, 3),
+        ("N", 1, 4, 4, false, 3),
+        ("N", 0, 3, 3, true, 1),
+        ("P", 1, 4, 4, false, 3),
+        ("P", 0, 4, 5, false, 3),
+        ("P", 0, 3, 3, false, 2),
+        ("As", 0, 3, 3, false, 2),
+    ];
+    const PHOSPHINE_STEREO: usize = 19;
+    const ARSINE_STEREO: usize = 20;
+    let a = &at[cur_at];
+    let mut ret = 0;
+    let mut found = T.len();
+    for (i, &(el, charge, nb, cv, ring3, req)) in T.iter().enumerate() {
+        // (ALLOW_NO_CHARGE_ON_STEREO_CENTERS is disabled upstream)
+        if a.elname_str() == el
+            && a.charge == charge
+            && (a.radical == 0 || a.radical == 1)
+            && i32::from(a.valence) + i32::from(a.num_h) == nb
+            && i32::from(a.chem_bonds_valence) + i32::from(a.num_h) == cv
+            && (!ring3 || is_atom_in_3memb_ring(at, cur_at))
+            && b_inp_atom_has_requird_neigh(at, cur_at, req, cv - nb, b_stereo_at_zz)
+        {
+            ret = nb;
+            found = i;
+            break;
+        }
+    }
+    if found == PHOSPHINE_STEREO && b_pointed_edge_stereo & PES_BIT_PHOSPHINE_STEREO == 0 {
+        ret = 0;
+    }
+    if found == ARSINE_STEREO && b_pointed_edge_stereo & PES_BIT_ARSINE_STEREO == 0 {
+        ret = 0;
+    }
+    ret
+}
+
+/// `bIsSuitableHeteroInpAtom`: 1 for `=N-`/`=NH`, 0 for `=O`, -1 otherwise
+pub fn b_is_suitable_hetero_inp_atom(a: &InpAtom) -> i32 {
+    if a.charge == 0 && radical_ok(a.radical) {
+        let val = get_endpoint_valence(a.el_number);
+        if val > 0 {
+            let num_h = i32::from(a.num_h);
+            if val == i32::from(a.chem_bonds_valence) + num_h {
+                match val {
+                    2 if num_h == 0 && a.valence == 1 => return 0,
+                    3 if (a.valence == 1 && num_h == 1) || (a.valence == 2 && num_h == 0) => {
+                        return 1;
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+    -1
+}
+
+/// `bIsOxide`; like the C code it clears the mark bits of the bond types of `cur_at`
+pub fn b_is_oxide(at: &mut [InpAtom], cur_at: usize) -> bool {
+    for i in 0..at[cur_at].valence as usize {
+        at[cur_at].bond_type[i] &= !(BOND_MARK_ALL as u8);
+        let bond_type = i32::from(at[cur_at].bond_type[i]);
+        let an = &at[at[cur_at].neighbor[i] as usize];
+        if bond_type == BOND_DOUBLE {
+            if an.valence == 1
+                && an.charge == 0
+                && an.num_h == 0
+                && an.radical == 0
+                && get_endpoint_valence(an.el_number) == 2
+            {
+                return true;
+            }
+        } else if (bond_type == BOND_TAUTOM || bond_type == BOND_ALT12NS)
+            && an.valence == 1
+            && get_endpoint_valence(an.el_number) == 2
+        {
+            return true;
+        }
+    }
+    false
+}
+
+/// `get_allowed_stereo_bond_type`
+pub fn get_allowed_stereo_bond_type(bond_type: i32) -> i32 {
+    let bt = bond_type & !BOND_MARK_ALL;
+    match bt {
+        BOND_ALTERN | BOND_DOUBLE | BOND_SINGLE | BOND_TAUTOM => bt,
+        _ => 0,
+    }
+}
+
+/// `half_stereo_bond_action`
+pub fn half_stereo_bond_action(
+    n_parity: i32,
+    b_unknown: bool,
+    b_isotopic: bool,
+    v_ab_parity_unknown: i32,
+) -> i32 {
+    const AB_NEGATIVE: i32 = 0x10;
+    const AB_UNKNOWN: i32 = 0x20;
+    let mut p = n_parity;
+    if p == AB_PARITY_NONE {
+        return AB_PARITY_NONE;
+    }
+    if p == v_ab_parity_unknown {
+        p = AB_PARITY_ODD | AB_UNKNOWN;
+    }
+    if p == -v_ab_parity_unknown {
+        p = AB_PARITY_ODD | AB_UNKNOWN | AB_NEGATIVE;
+    }
+    if p < 0 {
+        p = (if p == -AB_PARITY_EVEN {
+            AB_PARITY_ODD
+        } else {
+            -p
+        }) | AB_NEGATIVE;
+    } else if p == AB_PARITY_EVEN {
+        p = AB_PARITY_ODD;
+    }
+    if b_unknown {
+        p |= AB_UNKNOWN;
+    }
+    const ODD: i32 = AB_PARITY_ODD;
+    const UNDF: i32 = AB_PARITY_UNDF;
+    const IISO: i32 = AB_PARITY_IISO;
+    if b_isotopic {
+        match p {
+            ODD | 0x11 => AB_PARITY_CALC,
+            0x21 | 0x24 | 0x31 | 0x34 => v_ab_parity_unknown,
+            IISO | 0x25 => AB_PARITY_NONE,
+            UNDF | 0x14 => AB_PARITY_UNDF,
+            _ => -1,
+        }
+    } else {
+        match p {
+            ODD => AB_PARITY_CALC,
+            0x21 | 0x24 => v_ab_parity_unknown,
+            UNDF => AB_PARITY_UNDF,
+            0x31 | 0x11 | IISO | 0x25 | 0x14 | 0x34 => AB_PARITY_NONE,
+            _ => -1,
+        }
+    }
+}
+
+/// `can_be_a_stereo_bond_with_isotopic_H`: the number of possible stereo
+/// bonds of `cur_at` (to atoms with smaller numbers)
+pub fn can_be_a_stereo_bond_with_isotopic_h(at: &mut [InpAtom], cur_at: usize, n_mode: u64) -> i32 {
+    fn type_n(a: &InpAtom) -> i32 {
+        if a.num_h == 0 && a.charge == 0 && a.radical == 0 && get_endpoint_valence(a.el_number) == 3
+        {
+            if a.valence == 2 && a.chem_bonds_valence == 3 {
+                return 1;
+            } else if a.valence == 3 && a.chem_bonds_valence == 5 {
+                return 2;
+            }
+        }
+        0
+    }
+    let nbh = |a: &InpAtom| i32::from(a.valence) + i32::from(a.num_h);
+    if nbh(&at[cur_at]) > MAX_NUM_STEREO_BOND_NEIGH || nbh(&at[cur_at]) < MIN_NUM_STEREO_BOND_NEIGH
+    {
+        return 0;
+    }
+    if !b_can_atom_have_a_stereo_bond(
+        at[cur_at].elname_str(),
+        at[cur_at].charge,
+        at[cur_at].radical,
+    ) {
+        return 0;
+    }
+    let (mut num_2s, mut num_alt, mut num_wrong_bonds_1) = (0, 0, 0);
+    let mut num_2s_hetero = [0i32; 2];
+    let type_n_cur = type_n(&at[cur_at]);
+    let mut num_stereo_bonds = 0;
+    for i in 0..at[cur_at].valence as usize {
+        let mut b_found = false;
+        let next_at = at[cur_at].neighbor[i] as usize;
+        let bond_type = get_allowed_stereo_bond_type(i32::from(at[cur_at].bond_type[i]));
+        if bond_type == BOND_ALTERN {
+            num_alt += 1;
+            if cur_at > next_at && n_mode & CMODE_NO_ALT_SBONDS == 0 {
+                b_found = true;
+            }
+        } else if bond_type == BOND_DOUBLE {
+            num_2s += 1;
+            let n2sh = b_is_suitable_hetero_inp_atom(&at[next_at]);
+            if n2sh >= 0 {
+                num_2s_hetero[n2sh as usize] += 1;
+            }
+            if cur_at > next_at {
+                b_found = true;
+            }
+        } else if bond_type != BOND_SINGLE && bond_type != BOND_TAUTOM {
+            num_wrong_bonds_1 += 1;
+            if num_wrong_bonds_1 > 1 || (num_wrong_bonds_1 != 0 && at[cur_at].valence <= 2) {
+                return 0;
+            }
+            continue;
+        }
+        if b_found {
+            if nbh(&at[next_at]) > MAX_NUM_STEREO_BOND_NEIGH
+                || nbh(&at[next_at]) < MIN_NUM_STEREO_BOND_NEIGH
+            {
+                continue;
+            }
+            if !b_can_atom_have_a_stereo_bond(
+                at[next_at].elname_str(),
+                at[next_at].charge,
+                at[next_at].radical,
+            ) {
+                continue;
+            }
+            let (mut num_2s_next, mut num_alt_next) = (0, 0);
+            let mut num_2s_hetero_next = [0i32; 2];
+            let type_n_next = type_n(&at[next_at]);
+            let nv = at[next_at].valence as usize;
+            let mut j = 0;
+            while j < nv {
+                let bond_type = get_allowed_stereo_bond_type(i32::from(at[next_at].bond_type[j]));
+                if bond_type == BOND_ALTERN {
+                    num_alt_next += 1;
+                } else if bond_type == BOND_DOUBLE {
+                    num_2s_next += 1;
+                    let n2sh = b_is_suitable_hetero_inp_atom(&at[at[next_at].neighbor[j] as usize]);
+                    if n2sh >= 0 {
+                        num_2s_hetero_next[n2sh as usize] += 1;
+                    }
+                } else if bond_type != BOND_SINGLE && bond_type != BOND_TAUTOM {
+                    // (sic) the C code tests the counter of the first atom here
+                    if num_wrong_bonds_1 > 1 || (num_wrong_bonds_1 != 0 && at[cur_at].valence <= 2)
+                    {
+                        break;
+                    }
+                }
+                j += 1;
+            }
+            if 3 == (type_n_cur | type_n_next)
+                && ((type_n_cur == 2 && !b_is_oxide(at, cur_at))
+                    || (type_n_next == 2 && !b_is_oxide(at, next_at)))
+            {
+                b_found = false;
+            } else if j < nv
+                || i32::from(num_alt_next > 0) + i32::from(num_2s_next > 0) != 1
+                || num_2s_next > 2
+            {
+                b_found = false;
+            } else if num_2s_next == 2 && at[next_at].valence != 2 {
+                let n = &at[next_at];
+                if 1 == (num_2s_hetero_next[0] | num_2s_hetero_next[1])
+                    && nbh(n) == 3
+                    && i32::from(n.chem_bonds_valence) + i32::from(n.num_h) == 5
+                    && get_endpoint_valence(n.el_number) == 3
+                    && (type_n_cur == 0 || b_is_oxide(at, next_at))
+                {
+                } else {
+                    b_found = false;
+                }
+            }
+        }
+        if b_found {
+            num_stereo_bonds += 1;
+        }
+    }
+    if i32::from(num_alt > 0) + i32::from(num_2s > 0) != 1 || num_stereo_bonds == 0 {
+        return 0;
+    }
+    if num_2s > 1 {
+        let a = &at[cur_at];
+        if num_2s == 2
+            && 1 == (num_2s_hetero[0] | num_2s_hetero[1])
+            && nbh(a) == 3
+            && i32::from(a.chem_bonds_valence) + i32::from(a.num_h) == 5
+            && get_endpoint_valence(a.el_number) == 3
+        {
+        } else {
+            return 0;
+        }
+    }
+    num_stereo_bonds
+}
