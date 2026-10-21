@@ -3474,3 +3474,183 @@ fn alternating_path_existence_matches_the_c_code() {
     }
     assert!(seen.keys().any(|&k| k > 0) && seen.len() > 3, "{seen:?}");
 }
+
+#[test]
+fn group_vertices_match_the_c_code() {
+    use rdoxide::external::inchi::ichi_bns::*;
+    use rdoxide::external::inchi::ichitaut::{CGroup, CGroupInfo, TGroup, TGroupInfo};
+    use rdoxide::external::inchi::inpdef::InpAtom;
+    fn ints(v: &serde_json::Value) -> Vec<i32> {
+        v.as_array()
+            .unwrap()
+            .iter()
+            .map(|x| x.as_i64().unwrap() as i32)
+            .collect()
+    }
+    fn dump_state(
+        p: &BnStruct,
+        at: &[InpAtom],
+        t: &TGroupInfo,
+        cg: &CGroupInfo,
+        got: &mut Vec<String>,
+    ) {
+        got.push(format!(
+            "C {} {} {} {} {} {}",
+            p.num_vertices,
+            p.num_edges,
+            p.num_t_groups,
+            p.num_c_groups,
+            p.num_added_atoms,
+            p.num_added_edges
+        ));
+        let mut s = String::from("V");
+        for v in p.vert.iter().take(p.num_vertices as usize) {
+            let e = &v.st_edge;
+            s += &format!(
+                " {}:{}:{}:{}:{}:{}:{}:{}|",
+                v.type_, e.cap, e.cap0, e.flow, e.flow0, v.num_adj_edges, v.max_adj_edges, v.iedge
+            );
+            for k in 0..v.num_adj_edges as usize {
+                s += &format!("{}.", p.iedge[v.iedge + k]);
+            }
+        }
+        got.push(s);
+        let mut s = String::from("E");
+        for e in p.edge.iter().take(p.num_edges as usize) {
+            s += &format!(
+                " {}:{}:{}:{}:{}:{}:{}:{}:{}:{}",
+                e.cap,
+                e.cap0,
+                e.flow,
+                e.flow0,
+                e.pass,
+                e.forbidden,
+                e.neighbor1,
+                e.neighbor12,
+                e.neigh_ord[0],
+                e.neigh_ord[1]
+            );
+        }
+        got.push(s);
+        let mut s = String::from("G");
+        for g in t.t_group.iter().flatten().take(t.num_t_groups) {
+            s += &format!(" {}", g.n_group_number);
+        }
+        s += " |";
+        for g in cg.c_group.iter().flatten().take(cg.num_c_groups) {
+            s += &format!(" {}", g.n_group_number);
+        }
+        got.push(s);
+        let mut s = String::from("A");
+        for a in at {
+            s += &format!(" {},{}", a.endpoint, a.c_point);
+        }
+        got.push(s);
+    }
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_bngroups.json")).unwrap();
+    let mut codes = std::collections::HashSet::new();
+    for c in data.as_array().unwrap() {
+        let inp = &c["in"];
+        let mut at: Vec<InpAtom> = Vec::new();
+        for a in inp["atoms"].as_array().unwrap() {
+            let mut x = InpAtom {
+                valence: a["v"].as_i64().unwrap() as i8,
+                chem_bonds_valence: a["cbv"].as_i64().unwrap() as i8,
+                el_number: a["el"].as_u64().unwrap() as u8,
+                radical: a["rad"].as_i64().unwrap() as i8,
+                charge: a["chg"].as_i64().unwrap() as i8,
+                num_h: a["nh"].as_i64().unwrap() as i8,
+                endpoint: a["ep"].as_u64().unwrap() as u16,
+                c_point: a["cp"].as_u64().unwrap() as u16,
+                ..Default::default()
+            };
+            for (j, e) in a["nb"].as_array().unwrap().iter().enumerate() {
+                x.neighbor[j] = e[0].as_u64().unwrap() as u16;
+                x.bond_type[j] = e[1].as_u64().unwrap() as u8;
+            }
+            at.push(x);
+        }
+        let n = at.len();
+        let (mut p, _) = allocate_and_init_bn_struct(
+            &mut at,
+            n,
+            inp["ma"].as_i64().unwrap() as i32,
+            inp["me"].as_i64().unwrap() as i32,
+            inp["mp"].as_i64().unwrap() as i32,
+        );
+        p.pb_taut_flags = inp["tfl"].as_u64().unwrap() as u32;
+        let mut tgi = TGroupInfo {
+            t_group: Some(
+                inp["tg"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|g| {
+                        let g = ints(g);
+                        TGroup {
+                            n_group_number: g[0] as u16,
+                            n_num_endpoints: g[1] as u16,
+                            ..Default::default()
+                        }
+                    })
+                    .collect(),
+            ),
+            num_t_groups: inp["tg"].as_array().unwrap().len(),
+            b_taut_flags: inp["tf"].as_u64().unwrap(),
+            ..Default::default()
+        };
+        let mut cgi = CGroupInfo {
+            c_group: Some(
+                inp["cg"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|g| {
+                        let g = ints(g);
+                        CGroup {
+                            n_group_number: g[0] as u16,
+                            num_c_points: g[1] as u16,
+                            ..Default::default()
+                        }
+                    })
+                    .collect(),
+            ),
+            num_c_groups: inp["cg"].as_array().unwrap().len(),
+        };
+        let mode = inp["mode"].as_i64().unwrap();
+        let mut got: Vec<String> = Vec::new();
+        for _ in 0..2 {
+            let ret = if mode == 0 {
+                let has_t = tgi.num_t_groups > 0;
+                let has_c = cgi.num_c_groups > 0;
+                re_init_bn_struct_add_groups(
+                    &mut p,
+                    &mut at,
+                    n,
+                    if has_t { Some(&mut tgi) } else { None },
+                    if has_c { Some(&mut cgi) } else { None },
+                )
+            } else {
+                let r0 = re_init_bn_struct(&mut p, &mut at, n, false);
+                let r = if mode == 1 {
+                    add_t_groups_to_bn_struct(&mut p, &at, n as i32, Some(&mut tgi))
+                } else {
+                    add_c_groups_to_bn_struct(&mut p, &at, n as i32, Some(&mut cgi))
+                };
+                r + 100000 * r0
+            };
+            codes.insert(ret);
+            got.push(format!("R {ret}"));
+            dump_state(&p, &at, &tgi, &cgi, &mut got);
+        }
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        assert_eq!(got, want, "{inp}");
+    }
+    assert!(codes.len() >= 3, "{codes:?}");
+}

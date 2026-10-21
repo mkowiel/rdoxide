@@ -4317,3 +4317,271 @@ pub fn exists_any_alt_path(
     }
     0
 }
+
+// ---- adding t-groups and c-groups to the network ----
+
+use super::ichiparm::{
+    TG_FLAG_KETO_ENOL_TAUT, TG_FLAG_MOVE_POS_CHARGES, TG_FLAG_PT_06_00, TG_FLAG_PT_13_00,
+    TG_FLAG_PT_16_00, TG_FLAG_PT_18_00, TG_FLAG_PT_22_00, TG_FLAG_PT_39_00,
+};
+use super::ichitaut::CGroupInfo;
+
+pub const BNS_ADD_SUPER_TGROUP: i32 = 1;
+
+/// `AddTGroups2BnStruct`: adds a fictitious vertex for each t-group and joins
+/// the endpoints to it
+pub fn add_t_groups_to_bn_struct(
+    p: &mut BnStruct,
+    at: &[InpAtom],
+    num_atoms: i32,
+    tgi: Option<&mut TGroupInfo>,
+) -> i32 {
+    use super::ichitaut::{BOND_ALT12NS, BOND_ALTERN, BOND_TAUTOM};
+    let mut ret = 0;
+    let Some(tgi) = tgi else { return 0 };
+    if tgi.num_t_groups == 0 || tgi.t_group.is_none() {
+        return 0;
+    }
+    let num_tg = tgi.num_t_groups;
+    let mut num_edges = p.num_edges;
+    let num_vertices = p.num_vertices;
+    if num_vertices + num_tg as i32 >= p.max_vertices {
+        return BNS_VERT_EDGE_OVFL;
+    }
+    let flags = tgi.b_taut_flags;
+    let tg = tgi.t_group.as_mut().expect("t_group");
+    let n_max = tg[..num_tg]
+        .iter()
+        .map(|t| i32::from(t.n_group_number))
+        .fold(0, i32::max);
+    for v in &mut p.vert[num_vertices as usize..(num_vertices + n_max) as usize] {
+        *v = BnsVertex::default();
+    }
+    if n_max != i32::from(tg[num_tg - 1].n_group_number) {
+        tg[..num_tg].sort_by_key(|t| t.n_group_number);
+    }
+    let mut prev = (num_vertices - 1) as usize;
+    for t in tg.iter().take(num_tg) {
+        let cur = (num_vertices + i32::from(t.n_group_number) - 1) as usize;
+        let iedge = p.vert[prev].iedge + usize::from(p.vert[prev].max_adj_edges);
+        let v = &mut p.vert[cur];
+        v.iedge = iedge;
+        v.max_adj_edges =
+            (i32::from(t.n_num_endpoints) + BNS_ADD_EDGES + BNS_ADD_SUPER_TGROUP) as u16;
+        v.num_adj_edges = 0;
+        v.st_edge.flow = 0;
+        v.st_edge.flow0 = 0;
+        v.st_edge.cap = 0;
+        v.st_edge.cap0 = 0;
+        v.type_ = BNS_VERT_TYPE_TGROUP;
+        prev = cur;
+    }
+    for endpoint in 0..num_atoms {
+        let ep = endpoint as usize;
+        if at[ep].endpoint == 0 {
+            continue;
+        }
+        let fictpoint = i32::from(at[ep].endpoint) + num_vertices - 1;
+        let fp = fictpoint as usize;
+        if fictpoint >= p.max_vertices
+            || num_edges >= p.max_edges
+            || p.vert[fp].num_adj_edges >= p.vert[fp].max_adj_edges
+            || p.vert[ep].num_adj_edges >= p.vert[ep].max_adj_edges
+        {
+            ret = BNS_VERT_EDGE_OVFL;
+            break;
+        }
+        let mut eif = EndpointInfo::default();
+        let pt = |f: u64, g: EndpointInfoFn, eif: &mut EndpointInfo| {
+            flags & f != 0 && g(at, ep, eif) != 0
+        };
+        if n_get_endpoint_info(at, ep, &mut eif) == 0
+            && !pt(TG_FLAG_PT_22_00, n_get_endpoint_info_pt_22_00, &mut eif)
+            && !pt(TG_FLAG_PT_16_00, n_get_endpoint_info_pt_16_00, &mut eif)
+            && !pt(TG_FLAG_PT_06_00, n_get_endpoint_info_pt_06_00, &mut eif)
+            && !pt(TG_FLAG_PT_39_00, n_get_endpoint_info_pt_39_00, &mut eif)
+            && !pt(TG_FLAG_PT_13_00, n_get_endpoint_info_pt_13_00, &mut eif)
+            && !pt(TG_FLAG_PT_18_00, n_get_endpoint_info_pt_18_00, &mut eif)
+            && !pt(TG_FLAG_KETO_ENOL_TAUT, n_get_endpoint_info_ket, &mut eif)
+        {
+            ret = BNS_BOND_ERR;
+            break;
+        }
+        p.vert[ep].type_ |= BNS_VERT_TYPE_ENDPOINT;
+        for k in 0..p.vert[ep].num_adj_edges as usize {
+            let iedge = p.iedge[p.vert[ep].iedge + k] as usize;
+            if p.edge[iedge].cap == 0 {
+                let centerpoint = i32::from(p.edge[iedge].neighbor12) ^ endpoint;
+                if centerpoint < p.num_atoms && p.vert[centerpoint as usize].st_edge.cap >= 1 {
+                    let bond_type = i32::from(at[ep].bond_type[k]) & BOND_TYPE_MASK;
+                    if bond_type == BOND_TAUTOM
+                        || bond_type == BOND_ALTERN
+                        || bond_type == BOND_ALT12NS
+                        || bond_type == BOND_TYPE_SINGLE
+                    {
+                        p.edge[iedge].cap = 1;
+                    }
+                }
+            }
+        }
+        let ne = num_edges as usize;
+        p.edge[ne].cap = 1;
+        p.edge[ne].flow = 0;
+        p.edge[ne].pass = 0;
+        p.edge[ne].forbidden &= p.edge_forbidden_mask;
+        if eif.c_donor != 0 {
+            p.edge[ne].flow += 1;
+            p.vert[fp].st_edge.flow += 1;
+            p.vert[fp].st_edge.cap += 1;
+            p.vert[ep].st_edge.flow += 1;
+            p.vert[ep].st_edge.cap += 1;
+        }
+        p.edge[ne].neighbor1 = endpoint as u16;
+        p.edge[ne].neighbor12 = (endpoint ^ fictpoint) as u16;
+        let o1 = p.vert[ep].num_adj_edges;
+        let o2 = p.vert[fp].num_adj_edges;
+        let (i1, i2) = (p.vert[ep].iedge, p.vert[fp].iedge);
+        p.iedge[i1 + usize::from(o1)] = num_edges;
+        p.iedge[i2 + usize::from(o2)] = num_edges;
+        num_edges += 1;
+        p.edge[ne].neigh_ord[0] = o1;
+        p.edge[ne].neigh_ord[1] = o2;
+        p.vert[ep].num_adj_edges += 1;
+        p.vert[fp].num_adj_edges += 1;
+        p.edge[ne].cap0 = p.edge[ne].cap;
+        p.edge[ne].flow0 = p.edge[ne].flow;
+    }
+    p.num_edges = num_edges;
+    p.num_vertices += n_max;
+    p.num_t_groups = num_tg as i32;
+    ret
+}
+
+/// `AddCGroups2BnStruct`: adds a fictitious vertex for each charge group and
+/// joins the c-points to it
+pub fn add_c_groups_to_bn_struct(
+    p: &mut BnStruct,
+    at: &[InpAtom],
+    num_atoms: i32,
+    cgi: Option<&mut CGroupInfo>,
+) -> i32 {
+    let mut ret = 0;
+    let Some(cgi) = cgi else { return 0 };
+    if cgi.num_c_groups == 0 || cgi.c_group.is_none() {
+        return 0;
+    }
+    let num_cg = cgi.num_c_groups;
+    let mut num_edges = p.num_edges;
+    let num_vertices = p.num_vertices;
+    if num_vertices + num_cg as i32 >= p.max_vertices {
+        return BNS_VERT_EDGE_OVFL;
+    }
+    let cg = cgi.c_group.as_mut().expect("c_group");
+    let n_max = cg[..num_cg]
+        .iter()
+        .map(|c| i32::from(c.n_group_number))
+        .fold(0, i32::max);
+    for v in &mut p.vert[num_vertices as usize..(num_vertices + n_max) as usize] {
+        *v = BnsVertex::default();
+    }
+    if n_max != i32::from(cg[num_cg - 1].n_group_number) {
+        cg[..num_cg].sort_by_key(|c| c.n_group_number);
+    }
+    let mut prev = (num_vertices - 1) as usize;
+    for c in cg.iter().take(num_cg) {
+        let cur = (num_vertices + i32::from(c.n_group_number) - 1) as usize;
+        let iedge = p.vert[prev].iedge + usize::from(p.vert[prev].max_adj_edges);
+        let v = &mut p.vert[cur];
+        v.iedge = iedge;
+        v.max_adj_edges = (i32::from(c.num_c_points) + BNS_ADD_EDGES) as u16;
+        v.num_adj_edges = 0;
+        v.st_edge.flow = 0;
+        v.st_edge.flow0 = 0;
+        v.st_edge.cap = 0;
+        v.st_edge.cap0 = 0;
+        v.type_ = BNS_VERT_TYPE_C_GROUP;
+        prev = cur;
+    }
+    for c_point in 0..num_atoms {
+        let cp = c_point as usize;
+        if at[cp].c_point == 0 {
+            continue;
+        }
+        let fictpoint = i32::from(at[cp].c_point) + num_vertices - 1;
+        let fp = fictpoint as usize;
+        if fictpoint >= p.max_vertices
+            || num_edges >= p.max_edges
+            || p.vert[fp].num_adj_edges >= p.vert[fp].max_adj_edges
+            || p.vert[cp].num_adj_edges >= p.vert[cp].max_adj_edges
+        {
+            ret = BNS_VERT_EDGE_OVFL;
+            break;
+        }
+        p.vert[cp].type_ |= BNS_VERT_TYPE_C_POINT;
+        let ne = num_edges as usize;
+        p.edge[ne].cap = 1;
+        p.edge[ne].flow = 0;
+        p.edge[ne].pass = 0;
+        p.edge[ne].forbidden &= p.edge_forbidden_mask;
+        if at[cp].charge != 1 {
+            p.edge[ne].flow += 1;
+            p.vert[fp].st_edge.flow += 1;
+            p.vert[fp].st_edge.cap += 1;
+            p.vert[cp].st_edge.flow += 1;
+            p.vert[cp].st_edge.cap += 1;
+        }
+        for k in 0..p.vert[cp].num_adj_edges as usize {
+            let iedge = p.iedge[p.vert[cp].iedge + k] as usize;
+            let mut new_cap = p.vert[cp].st_edge.cap;
+            let centerpoint = i32::from(p.edge[iedge].neighbor12) ^ c_point;
+            if p.edge[iedge].cap == 0
+                && centerpoint < p.num_atoms
+                && p.vert[centerpoint as usize].st_edge.cap >= 1
+            {
+                new_cap = new_cap
+                    .min(p.vert[centerpoint as usize].st_edge.cap)
+                    .min(MAX_BOND_EDGE_CAP);
+                p.edge[iedge].cap = new_cap;
+            }
+        }
+        p.edge[ne].neighbor1 = c_point as u16;
+        p.edge[ne].neighbor12 = (c_point ^ fictpoint) as u16;
+        let o1 = p.vert[cp].num_adj_edges;
+        let o2 = p.vert[fp].num_adj_edges;
+        let (i1, i2) = (p.vert[cp].iedge, p.vert[fp].iedge);
+        p.iedge[i1 + usize::from(o1)] = num_edges;
+        p.iedge[i2 + usize::from(o2)] = num_edges;
+        num_edges += 1;
+        p.edge[ne].neigh_ord[0] = o1;
+        p.edge[ne].neigh_ord[1] = o2;
+        p.vert[cp].num_adj_edges += 1;
+        p.vert[fp].num_adj_edges += 1;
+        p.edge[ne].cap0 = p.edge[ne].cap;
+        p.edge[ne].flow0 = p.edge[ne].flow;
+    }
+    p.num_edges = num_edges;
+    p.num_vertices += n_max;
+    p.num_c_groups = num_cg as i32;
+    ret
+}
+
+/// `ReInitBnStructAddGroups`: strips the groups and adds the given ones
+pub fn re_init_bn_struct_add_groups(
+    p: &mut BnStruct,
+    at: &mut [InpAtom],
+    num_atoms: usize,
+    tgi: Option<&mut TGroupInfo>,
+    cgi: Option<&mut CGroupInfo>,
+) -> i32 {
+    let ret = re_init_bn_struct(p, at, num_atoms, false);
+    if ret != 0 {
+        return super::ichierr::BNS_REINIT_ERR;
+    }
+    if u64::from(p.pb_taut_flags) & TG_FLAG_MOVE_POS_CHARGES != 0 {
+        let r = add_c_groups_to_bn_struct(p, at, num_atoms as i32, cgi);
+        if is_bns_error(r) {
+            return r;
+        }
+    }
+    add_t_groups_to_bn_struct(p, at, num_atoms as i32, tgi)
+}

@@ -681,6 +681,14 @@ pub struct TGroupInfo {
     pub t_group: Option<Vec<TGroup>>,
     pub num_t_groups: usize,
     pub tni: Tni,
+    pub b_taut_flags: u64,
+}
+
+/// `C_GROUP_INFO` (the c-group list)
+#[derive(Debug, Clone, Default)]
+pub struct CGroupInfo {
+    pub c_group: Option<Vec<CGroup>>,
+    pub num_c_groups: usize,
 }
 
 /// `C_CANDIDATE`
