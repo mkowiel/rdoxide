@@ -2495,3 +2495,306 @@ pub fn output_auxinfo_reversibility_info(
     }
     0
 }
+
+// ---------------------------------------------------------------------------
+// Helpers of the polymer output
+
+pub const IS_WARNING: i32 = 1;
+pub const IS_ERROR: i32 = 2;
+pub const IS_FATAL: i32 = 3;
+
+/// `OutputINChIPlainError`
+pub fn output_inchi_plain_error(out_file: &mut InchiIostream, error_text: &str, error: i32) -> i32 {
+    let err = match error {
+        IS_WARNING => "warning",
+        IS_ERROR => "error (no InChI)",
+        _ => "fatal (aborted)",
+    };
+    inchi_ios_print(
+        Some(out_file),
+        &format!("message: type=\"{err}\" value=\"{error_text}\""),
+    );
+    1
+}
+
+/// `IsBondAtomNumsLesser`
+pub fn is_bond_atom_nums_lesser(bond1: &[i32; 2], bond2: &[i32; 2]) -> i32 {
+    let (min1, max1) = (bond1[0].min(bond1[1]), bond1[0].max(bond1[1]));
+    let (min2, max2) = (bond2[0].min(bond2[1]), bond2[0].max(bond2[1]));
+    if min1 != min2 {
+        return if min1 < min2 { -1 } else { 1 };
+    }
+    match max1.cmp(&max2) {
+        std::cmp::Ordering::Less => -1,
+        std::cmp::Ordering::Greater => 1,
+        std::cmp::Ordering::Equal => 0,
+    }
+}
+
+/// `inchi_sort_int_pair_ascending`
+pub fn inchi_sort_int_pair_ascending(a: &mut i32, b: &mut i32) {
+    if *a > *b {
+        std::mem::swap(a, b);
+    }
+}
+
+/// `CountPseudoElementInFormula`
+pub fn count_pseudo_element_in_formula(pseudo: &str, s: &[u8]) -> i32 {
+    use super::util::strtol10 as strtol;
+    let ps = pseudo.as_bytes();
+    let at = |i: usize| s.get(i).copied().unwrap_or(0);
+    let (mut npseudo, mut mult) = (0i32, 1i32);
+    let mut new_component = true;
+    let mut prev = b'/';
+    let mut p = 0usize;
+    while at(p) != 0 {
+        if at(p) == b'/' {
+            break;
+        } else if at(p) == b'.' {
+            new_component = true;
+            prev = at(p);
+            p += 1;
+            continue;
+        }
+        if new_component {
+            new_component = false;
+            if at(p).is_ascii_digit() {
+                let (v, n) = strtol(&s[p..]);
+                mult = v as i32;
+                p += n;
+                prev = at(p);
+                continue;
+            }
+            mult = 1;
+            if mult == 0 {
+                break;
+            }
+        } else if at(p) == ps[1] && prev == ps[0] {
+            // (as in the C code `q` points at the pseudo element letter, so the
+            // index digits are never read)
+            let q = p;
+            let index = if at(q) != 0 && at(q).is_ascii_digit() {
+                let (v, n) = strtol(&s[q..]);
+                p = q + n;
+                v as i32
+            } else {
+                p = q;
+                1
+            };
+            npseudo = npseudo.wrapping_add(mult.wrapping_mul(index));
+        }
+        prev = at(p);
+        p += 1;
+    }
+    npseudo
+}
+
+/// `InternallyGetCanoNumsAndComponentNums`: `cano_nums[orig_num]` (orig
+/// numbers 1-based, canonical numbers 0-based) and `compnt_nums[cano_num]`
+/// (components 1-based); both have `nat + 1` elements
+pub fn internally_get_cano_nums_and_component_nums(
+    strbuf: &mut InchiIosString,
+    io: &mut InchiOutCtl,
+    nat: usize,
+    cano_nums: &mut [i32],
+    compnt_nums: &mut [i32],
+) -> i32 {
+    if strbuf.p_str.is_none() {
+        return 1;
+    }
+    inchi_strbuf_reset(strbuf);
+    io.tot_len = p3::str_aux_numb(
+        &io.p_inchi_sort,
+        strbuf,
+        &mut io.b_overflow,
+        io.b_out_type,
+        io.taut_mode,
+        io.num_components,
+        io.b_second_non_taut_pass != 0,
+        io.b_omit_repetitions != 0,
+    );
+    for i in 0..nat {
+        compnt_nums[i] = -1;
+        cano_nums[i + 1] = -1;
+    }
+    let mut err = 0;
+    let (mut icompnt, mut cano_num) = (1, 0usize);
+    let mut cnum = String::new();
+    for k in 0..=strbuf.n_used_length.max(0) as usize {
+        let c = strbuf
+            .p_str
+            .as_ref()
+            .and_then(|p| p.get(k))
+            .copied()
+            .unwrap_or(0);
+        if c == b',' || c == b';' || c == 0 {
+            let orig_num: usize = cnum.parse().unwrap_or(0);
+            if let Some(x) = cano_nums.get_mut(orig_num) {
+                *x = cano_num as i32;
+            }
+            if let Some(x) = compnt_nums.get_mut(cano_num) {
+                *x = icompnt;
+            }
+            cnum.clear();
+            cano_num += 1;
+            if c == b';' {
+                icompnt += 1;
+            }
+            if c == 0 {
+                break;
+            }
+        } else if c.is_ascii_digit() {
+            cnum.push(c as char);
+        } else {
+            err = 2;
+            break;
+        }
+    }
+    inchi_strbuf_reset(strbuf);
+    err
+}
+
+/// `EditINCHI_HidePolymerZz`: removes the polymer-related `Zz` pseudo atoms
+/// from the InChI text in the stream
+pub fn edit_inchi_hide_polymer_zz(out: &mut InchiIostream, n_pzz: i32, n_zy: i32) {
+    if n_zy > 0 && (n_pzz == 0 || n_pzz < 2) {
+        return;
+    }
+    let mut used = i64::from(out.s.n_used_length);
+    let Some(pstr) = out.s.p_str.as_ref() else {
+        return;
+    };
+    let mut s: Vec<u8> = pstr.clone();
+    let cstr_len = s.iter().position(|&c| c == 0).unwrap_or(s.len());
+    let find =
+        |pat: &[u8]| -> Option<usize> { s[..cstr_len].windows(pat.len()).position(|w| w == pat) };
+    if find(b"/z").is_none() {
+        return;
+    }
+    let Some(start) = find(b"InChI=1B/") else {
+        return;
+    };
+    let nzz = i64::from(n_pzz);
+    let mut buf = vec![0u8; used.max(0) as usize + 2];
+    let mut eol_was_consumed = false;
+    if used > 0 && s[(used - 1) as usize] == b'\n' {
+        s[(used - 1) as usize] = 0;
+        used -= 1;
+        eol_was_consumed = true;
+    }
+    let at = |s: &[u8], i: i64| -> u8 {
+        if i < 0 {
+            0
+        } else {
+            s.get(i as usize).copied().unwrap_or(0)
+        }
+    };
+    let set = |buf: &mut Vec<u8>, i: i64, v: u8| {
+        if i >= 0 && (i as usize) < buf.len() {
+            buf[i as usize] = v;
+        }
+    };
+    let (mut ncopied, mut nslash) = (0i64, 0);
+    let (mut skip, mut is_in_z_layer) = (false, false);
+    let (mut nonprt_prev, mut prev_layer_symbol) = (false, b'0');
+    let mut i = start as i64;
+    while i < used {
+        let pre_eol = i == used - 1;
+        let si = at(&s, i);
+        let nonprt_sym = si == b'\n' || si == b'\r' || si == b'\t';
+        if !skip {
+            set(&mut buf, ncopied, si);
+            ncopied += 1;
+            if nonprt_sym && nonprt_prev {
+                i += 1;
+                continue;
+            }
+        }
+        nonprt_prev = nonprt_sym;
+        if is_in_z_layer && !skip {
+            if si == b'(' {
+                let p = (i + 1) as usize;
+                let (_, n) = super::util::strtol10(s.get(p..).unwrap_or(&[]));
+                if at(&s, (p + n) as i64) != b'-' {
+                    skip = true;
+                }
+            }
+        } else if is_in_z_layer && skip && si == b'-' {
+            skip = false;
+        }
+        if si == b'/' || pre_eol || nonprt_sym {
+            if is_in_z_layer {
+                is_in_z_layer = false;
+            }
+            if si == b'/' {
+                nslash += 1;
+            }
+            if nslash == 2 || (nslash == 1 && pre_eol) || prev_layer_symbol == b'f' {
+                if nzz != 0 {
+                    let ii = if pre_eol { i + 1 } else { i };
+                    if at(&s, ii - 1) == b'z' && at(&s, ii - 2) == b'Z' {
+                        ncopied -= 2;
+                        let mut j = ii - 3;
+                        while j >= 0 {
+                            if at(&s, j) == b'.' {
+                                break;
+                            }
+                            ncopied -= 1;
+                            j -= 1;
+                        }
+                        ncopied -= 1;
+                        set(&mut buf, ncopied - 1, if pre_eol { 0 } else { b'/' });
+                    }
+                }
+            } else if (nslash > 2 || pre_eol || si == b'\n')
+                && nzz != 0
+                && !matches!(prev_layer_symbol, b'p' | b's' | b'f' | b'z')
+            {
+                let mut n_eaten = 0;
+                let eatable = if prev_layer_symbol == b'm' {
+                    b'.'
+                } else {
+                    b';'
+                };
+                let ii = if pre_eol { i + 1 } else { i };
+                let mut j = ii - 1;
+                while j >= 0 {
+                    if at(&s, j) == eatable && n_eaten < nzz {
+                        ncopied -= 1;
+                        n_eaten += 1;
+                    } else {
+                        break;
+                    }
+                    j -= 1;
+                }
+                if !pre_eol {
+                    set(
+                        &mut buf,
+                        ncopied - 1,
+                        if si == b'\n' { b'\n' } else { b'/' },
+                    );
+                } else {
+                    set(&mut buf, ncopied, 0);
+                    break;
+                }
+            }
+            prev_layer_symbol = at(&s, i + 1);
+            if at(&s, i + 1) == b'r' {
+                if !(i + 3 < used && at(&s, i + 3) == b':') {
+                    nslash = 1;
+                }
+            } else if at(&s, i + 1) == b'z' {
+                is_in_z_layer = true;
+            }
+        }
+        i += 1;
+    }
+    out.s.n_used_length = 0;
+    let end = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());
+    let text = format!(
+        "{}{}",
+        String::from_utf8_lossy(&buf[..end]),
+        if eol_was_consumed { "\n" } else { "" }
+    );
+    inchi_ios_print_nodisplay(Some(out), &text);
+}
