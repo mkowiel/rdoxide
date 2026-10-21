@@ -1710,6 +1710,10 @@ pub struct SpAtom {
     pub valence: i8,
     pub b_has_stereo_or_equ_to_stereo: i8,
     pub b_has_stereo_or_equ_to_stereo2: i8,
+    pub endpoint: u16,
+    pub num_h: i8,
+    pub num_iso_h: [i8; 3],
+    pub n_ring_system: u16,
     pub stereo_bond_neighbor: [u16; MAX_NUM_STEREO_BONDS],
     pub stereo_bond_neighbor2: [u16; MAX_NUM_STEREO_BONDS],
     pub stereo_bond_ord: [i8; MAX_NUM_STEREO_BONDS],
@@ -3263,4 +3267,490 @@ pub fn get_stereo_center_parity(at: &[SpAtom], i: usize, n_rank: &[u16]) -> i32 
     } else {
         i32::from(at[i].parity)
     }
+}
+
+// ---------------------------------------------------------------------------
+// ichicans.c: stereo descriptors of the canonical connection table
+// ---------------------------------------------------------------------------
+
+/// `AT_STEREO_CARB`
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct AtStereoCarb {
+    pub at_num: u16,
+    pub parity: u8,
+}
+
+/// `AT_STEREO_DBLE`
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct AtStereoDble {
+    pub at_num1: u16,
+    pub at_num2: u16,
+    pub parity: u8,
+}
+
+/// The stereo part of `CANON_STAT`: the (maybe absent) linear stereo CTs
+/// and their lengths and capacities
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct CanonStatStereo {
+    pub carb: Option<Vec<AtStereoCarb>>,
+    pub n_len_carb: i32,
+    pub n_max_len_carb: i32,
+    pub dble: Option<Vec<AtStereoDble>>,
+    pub n_len_dble: i32,
+    pub n_max_len_dble: i32,
+}
+
+pub fn is_allene_chain(x: i32) -> bool {
+    ((x & MASK_CUMULENE_LEN) / MULT_STEREOBOND) % 2 != 0
+}
+pub fn bond_chain_len(x: i32) -> i32 {
+    (x & MASK_CUMULENE_LEN) / MULT_STEREOBOND
+}
+
+/// `UnmarkNonStereo`: removes the parities of centers and bonds whose
+/// constitutionally equivalent neighbors cannot make them stereogenic;
+/// returns the number of removed parities
+pub fn unmark_non_stereo(
+    at: &mut [SpAtom],
+    num_atoms: usize,
+    n_rank: &[u16],
+    n_atom_number: &[u16],
+    b_isotopic: bool,
+) -> i32 {
+    use super::incomdef::NUM_H_ISOTOPES;
+    let mut visited = vec![0i8; num_atoms];
+    let mut num_removed_parities = 0i32;
+    let mut num_no_parity_atoms = 0i32;
+    // (declared once in the C code: the values persist between the loops)
+    let mut num_in_same_ring_system = 1i32;
+    let mut num_with_eq_neigh_in_same_ring_system = 0i32;
+    let mut n_neighbor_number = [0u16; MAX_NUM_STEREO_ATOM_NEIGH];
+    let mut j = 0usize;
+    loop {
+        let num_removed_parities0 = num_removed_parities;
+        let mut i1 = 0usize;
+        let mut n_prev_atom_rank = 0u16;
+        let mut i = 0usize;
+        while i <= num_atoms {
+            if i == num_atoms || {
+                j = n_atom_number[i] as usize;
+                n_prev_atom_rank != n_rank[j]
+            } {
+                let i2 = i;
+                if (i2 - i1) as i32 > num_no_parity_atoms {
+                    let mut jc = n_atom_number[i1] as usize;
+                    num_no_parity_atoms = 0;
+                    let val = at[jc].valence as usize;
+                    let num_implicit_h = if at[jc].endpoint != 0 {
+                        0
+                    } else {
+                        i32::from(at[jc].num_h)
+                    };
+                    if val as i32 + num_implicit_h > MAX_NUM_STEREO_ATOM_NEIGH as i32 {
+                        i += 1;
+                        continue;
+                    }
+                    for k in 0..val {
+                        n_neighbor_number[k] = k as u16;
+                    }
+                    for ic in i1..i2 {
+                        jc = n_atom_number[ic] as usize;
+                        let nbrs = at[jc].neighbor;
+                        insertions_sort(&mut n_neighbor_number[..val], |a, b| {
+                            i32::from(n_rank[nbrs[*a as usize] as usize])
+                                - i32::from(n_rank[nbrs[*b as usize] as usize])
+                        });
+                        let mut num_neighbors_with_parity = -1i32;
+                        let mut k1 = 0usize;
+                        let mut n_prev_neigh_rank = 0u16;
+                        let mut k = 0usize;
+                        while k <= val {
+                            if k == val
+                                || n_prev_neigh_rank
+                                    != n_rank[nbrs[n_neighbor_number[k] as usize] as usize]
+                            {
+                                let k2 = k;
+                                if k2 - k1 > 1 {
+                                    num_in_same_ring_system = 0;
+                                    let mut n_ring_system = 0u16;
+                                    for kn in k1..k2 {
+                                        let cur = at[nbrs[n_neighbor_number[kn] as usize] as usize]
+                                            .n_ring_system;
+                                        if n_ring_system == 0 {
+                                            n_ring_system = cur;
+                                        } else {
+                                            num_in_same_ring_system +=
+                                                i32::from(n_ring_system == cur);
+                                        }
+                                    }
+                                    num_neighbors_with_parity = 0;
+                                    for kn in k1..k2 {
+                                        visited.iter_mut().for_each(|v| *v = 0);
+                                        visited[jc] = 1;
+                                        num_neighbors_with_parity +=
+                                            i32::from(find_atoms_with_parity(
+                                                at,
+                                                &mut visited,
+                                                jc as i32,
+                                                nbrs[n_neighbor_number[kn] as usize] as usize,
+                                            ));
+                                    }
+                                }
+                                if num_neighbors_with_parity == 0 && num_in_same_ring_system == 0 {
+                                    break;
+                                }
+                                if k + 1 < val {
+                                    k1 = k;
+                                    n_prev_neigh_rank =
+                                        n_rank[nbrs[n_neighbor_number[k] as usize] as usize];
+                                } else {
+                                    break;
+                                }
+                            }
+                            k += 1;
+                        }
+                        if num_implicit_h > 1 {
+                            let a = &at[jc];
+                            if (b_isotopic
+                                && (a.num_iso_h[0] > 1 || a.num_iso_h[1] > 1 || a.num_iso_h[2] > 1))
+                                || num_implicit_h > NUM_H_ISOTOPES as i32
+                                || !b_isotopic
+                            {
+                                num_neighbors_with_parity = 0;
+                            }
+                        }
+                        num_no_parity_atoms += i32::from(num_neighbors_with_parity == 0);
+                        num_with_eq_neigh_in_same_ring_system +=
+                            i32::from(num_in_same_ring_system != 0);
+                    }
+                    let cnt = (i2 - i1) as i32;
+                    if num_no_parity_atoms == cnt && num_with_eq_neigh_in_same_ring_system != cnt {
+                        for ic in i1..i2 {
+                            jc = n_atom_number[ic] as usize;
+                            at[jc].parity = 0;
+                            at[jc].stereo_atom_parity = 0;
+                            at[jc].final_parity = 0;
+                            at[jc].b_has_stereo_or_equ_to_stereo = 0;
+                            let mut k = 0;
+                            while k < MAX_NUM_STEREO_BOND_NEIGH as usize
+                                && at[jc].stereo_bond_neighbor[k] != 0
+                            {
+                                let jn = at[jc].stereo_bond_neighbor[k] as usize - 1;
+                                let mut k1 = 0;
+                                while k1 < MAX_NUM_STEREO_BOND_NEIGH as usize
+                                    && at[jn].stereo_bond_neighbor[k1] != 0
+                                {
+                                    if at[jn].stereo_bond_neighbor[k1] as usize - 1 == jc {
+                                        remove_half_stereo_bond(at, jn, k1);
+                                        break;
+                                    }
+                                    k1 += 1;
+                                }
+                                at[jc].stereo_bond_neighbor[k] = 0;
+                                at[jc].stereo_bond_ord[k] = 0;
+                                at[jc].stereo_bond_z_prod[k] = 0;
+                                at[jc].stereo_bond_parity[k] = 0;
+                                k += 1;
+                            }
+                        }
+                        num_removed_parities += num_no_parity_atoms;
+                    }
+                }
+                if i < num_atoms {
+                    n_prev_atom_rank = n_rank[j];
+                    i1 = i;
+                }
+                num_no_parity_atoms = 0;
+            }
+            num_no_parity_atoms += i32::from(i < num_atoms && at[j].parity == 0);
+            i += 1;
+        }
+        if num_removed_parities == num_removed_parities0 {
+            break;
+        }
+    }
+    num_removed_parities
+}
+
+/// `FillSingleStereoDescriptors`: adds the stereo descriptors of atom `i` to the linear CTs
+#[allow(clippy::too_many_arguments)]
+pub fn fill_single_stereo_descriptors(
+    at: &[SpAtom],
+    i: usize,
+    mut num_trans: i32,
+    n_rank: &[u16],
+    carb: Option<&mut [AtStereoCarb]>,
+    n_stereo_carb_len: &mut i32,
+    n_max_stereo_carb_len: i32,
+    dble: Option<&mut [AtStereoDble]>,
+    n_stereo_dble_len: &mut i32,
+    n_max_stereo_dble_len: i32,
+    b_allene: i32,
+) -> i32 {
+    use super::ichierr::{CT_OVERFLOW, CT_STEREOBOND_ERROR};
+    if dble.is_none() && carb.is_none() {
+        return 0;
+    }
+    if at[i].parity != 0 || at[i].stereo_bond_neighbor[0] != 0 {
+        let rank = n_rank[i];
+        let mut num_allene = 0;
+        if atom_parity_well_def(i32::from(at[i].parity)) && num_trans < 0 {
+            let num_neigh = at[i].valence as usize;
+            let mut order = [0u16; super::inpdef::MAXVAL];
+            for k in 0..num_neigh {
+                order[k] = k as u16;
+            }
+            num_trans = insertions_sort(&mut order[..num_neigh], |a, b| {
+                i32::from(n_rank[at[i].neighbor[*a as usize] as usize])
+                    - i32::from(n_rank[at[i].neighbor[*b as usize] as usize])
+            });
+        }
+        if let (Some(dble), true) = (dble, at[i].stereo_bond_neighbor[0] != 0) {
+            let mut n_stereo_neigh_number = [0u16; MAX_NUM_STEREO_BONDS];
+            let mut n_stereo_neigh = [0u16; MAX_NUM_STEREO_BONDS];
+            let mut num_stereo = 0usize;
+            while num_stereo < MAX_NUM_STEREO_BONDS && at[i].stereo_bond_neighbor[num_stereo] != 0 {
+                n_stereo_neigh_number[num_stereo] = num_stereo as u16;
+                n_stereo_neigh[num_stereo] = at[i].stereo_bond_neighbor[num_stereo] - 1;
+                num_allene += i32::from(is_allene_chain(i32::from(
+                    at[i].stereo_bond_parity[num_stereo],
+                )));
+                num_stereo += 1;
+            }
+            if (b_allene > 0 && num_allene == 0) || (b_allene == 0 && num_allene != 0) {
+                return 0;
+            }
+            insertions_sort(&mut n_stereo_neigh_number[..num_stereo], |a, b| {
+                i32::from(n_rank[n_stereo_neigh[*a as usize] as usize])
+                    - i32::from(n_rank[n_stereo_neigh[*b as usize] as usize])
+            });
+            for k in 0..num_stereo {
+                let stereo_neigh_ord = n_stereo_neigh_number[k] as usize;
+                let stereo_neigh = n_stereo_neigh[stereo_neigh_ord] as usize;
+                let r_neigh = n_rank[stereo_neigh];
+                if r_neigh < rank {
+                    let stereo_bond_parity =
+                        parity_val(i32::from(at[i].stereo_bond_parity[stereo_neigh_ord]));
+                    if stereo_bond_parity == AB_PARITY_NONE {
+                        continue;
+                    }
+                    let mut parity;
+                    if (AB_MIN_KNOWN_PARITY..=AB_MAX_KNOWN_PARITY).contains(&stereo_bond_parity) {
+                        parity = stereo_bond_parity;
+                    } else if atom_parity_well_def(i32::from(at[i].parity))
+                        && atom_parity_well_def(i32::from(at[stereo_neigh].parity))
+                        && MIN_DOT_PROD
+                            <= i32::from(at[i].stereo_bond_z_prod[stereo_neigh_ord]).abs()
+                    {
+                        let mut stereo_neigh_ord2: i32 = -1;
+                        for j in 0..MAX_NUM_STEREO_BONDS {
+                            let nn = at[stereo_neigh].stereo_bond_neighbor[j] as usize;
+                            if nn == 0 {
+                                break;
+                            }
+                            if i + 1 == nn {
+                                stereo_neigh_ord2 = j as i32;
+                                break;
+                            }
+                        }
+                        if stereo_neigh_ord2 >= 0 {
+                            let hp1 = half_stereo_bond_parity_ranks(
+                                at,
+                                i,
+                                stereo_neigh_ord as i32,
+                                n_rank,
+                            );
+                            let hp2 = half_stereo_bond_parity_ranks(
+                                at,
+                                stereo_neigh,
+                                stereo_neigh_ord2,
+                                n_rank,
+                            );
+                            if atom_parity_well_def(hp1) && atom_parity_well_def(hp2) {
+                                parity = 2
+                                    - (hp1
+                                        + hp2
+                                        + i32::from(
+                                            at[i].stereo_bond_z_prod[stereo_neigh_ord] < 0,
+                                        ))
+                                        % 2;
+                            } else {
+                                return CT_STEREOBOND_ERROR;
+                            }
+                        } else {
+                            return CT_STEREOBOND_ERROR;
+                        }
+                    } else {
+                        parity = i32::from(at[i].parity).max(i32::from(at[stereo_neigh].parity));
+                        if parity == AB_PARITY_NONE {
+                            continue;
+                        }
+                        if atom_parity_well_def(parity) {
+                            parity = AB_PARITY_UNDF;
+                        }
+                    }
+                    if *n_stereo_dble_len >= n_max_stereo_dble_len {
+                        return CT_OVERFLOW;
+                    }
+                    dble[*n_stereo_dble_len as usize] = AtStereoDble {
+                        at_num1: rank,
+                        at_num2: r_neigh,
+                        parity: parity as u8,
+                    };
+                    *n_stereo_dble_len += 1;
+                }
+            }
+        }
+        if b_allene > 0 {
+            return 0;
+        }
+        if let (Some(carb), true) = (carb, at[i].stereo_bond_neighbor[0] == 0) {
+            if *n_stereo_carb_len >= n_max_stereo_carb_len {
+                return CT_OVERFLOW;
+            }
+            let parity = if atom_parity_well_def(i32::from(at[i].parity)) {
+                2 - (i32::from(at[i].parity) + num_trans) % 2
+            } else {
+                i32::from(at[i].parity)
+            };
+            carb[*n_stereo_carb_len as usize] = AtStereoCarb {
+                at_num: rank,
+                parity: parity as u8,
+            };
+            *n_stereo_carb_len += 1;
+        }
+    }
+    0
+}
+
+/// `SwitchAtomStereoAndIsotopicStereo`
+pub fn switch_atom_stereo_and_isotopic_stereo(
+    at: &mut [SpAtom],
+    num_atoms: usize,
+    b_switched: &mut bool,
+) {
+    for a in at.iter_mut().take(num_atoms) {
+        std::mem::swap(&mut a.parity, &mut a.parity2);
+        std::mem::swap(&mut a.final_parity, &mut a.final_parity2);
+        std::mem::swap(&mut a.stereo_atom_parity, &mut a.stereo_atom_parity2);
+        std::mem::swap(
+            &mut a.b_has_stereo_or_equ_to_stereo,
+            &mut a.b_has_stereo_or_equ_to_stereo2,
+        );
+        std::mem::swap(&mut a.stereo_bond_neighbor, &mut a.stereo_bond_neighbor2);
+        std::mem::swap(&mut a.stereo_bond_ord, &mut a.stereo_bond_ord2);
+        std::mem::swap(&mut a.stereo_bond_z_prod, &mut a.stereo_bond_z_prod2);
+        std::mem::swap(&mut a.stereo_bond_parity, &mut a.stereo_bond_parity2);
+    }
+    *b_switched = !*b_switched;
+}
+
+/// `FillAllStereoDescriptors`
+pub fn fill_all_stereo_descriptors(
+    at: &[SpAtom],
+    num_atoms: usize,
+    n_canon_rank: &[u16],
+    n_atom_number_canon: &[u16],
+    cs: &mut CanonStatStereo,
+) -> i32 {
+    cs.n_len_carb = 0;
+    cs.n_len_dble = 0;
+    let mut ret = 0;
+    for b_allene in 0..2 {
+        let mut i = 0;
+        while ret == 0 && i < num_atoms {
+            ret = fill_single_stereo_descriptors(
+                at,
+                n_atom_number_canon[i] as usize,
+                -1,
+                n_canon_rank,
+                cs.carb.as_deref_mut(),
+                &mut cs.n_len_carb,
+                cs.n_max_len_carb,
+                cs.dble.as_deref_mut(),
+                &mut cs.n_len_dble,
+                cs.n_max_len_dble,
+                b_allene,
+            );
+            i += 1;
+        }
+    }
+    ret
+}
+
+/// `InvertStereo`: inverts the known parities in `at` and (optionally) in the
+/// linear stereo CTs; `n_atom_number_canon` is filled in
+pub fn invert_stereo(
+    at: &mut [SpAtom],
+    num_at_tg: usize,
+    n_canon_rank: &[u16],
+    n_atom_number_canon: &mut [u16],
+    cs: &mut CanonStatStereo,
+    b_invert_linear_ct_stereo: bool,
+) -> i32 {
+    use super::ichierr::CT_STEREOCOUNT_ERR;
+    let mut num_changes = 0;
+    for i in 0..num_at_tg {
+        n_atom_number_canon[n_canon_rank[i] as usize - 1] = i as u16;
+    }
+    for i in 0..cs.n_len_carb as usize {
+        let c = cs.carb.as_ref().unwrap()[i];
+        if atom_parity_well_def(i32::from(c.parity)) {
+            let j = n_atom_number_canon[c.at_num as usize - 1] as usize;
+            if parity_well_def(i32::from(at[j].parity)) {
+                at[j].parity ^= AB_INV_PARITY_BITS as i8;
+            } else {
+                return CT_STEREOCOUNT_ERR;
+            }
+            if b_invert_linear_ct_stereo {
+                // FIX_STEREOCOUNT_ERR: deliberately worse
+                cs.carb.as_mut().unwrap()[i].parity = AB_PARITY_EVEN as u8;
+            }
+            num_changes += 1;
+            if parity_well_def(i32::from(at[j].stereo_atom_parity)) {
+                at[j].stereo_atom_parity ^= AB_INV_PARITY_BITS as i8;
+            }
+            if parity_well_def(i32::from(at[j].final_parity)) {
+                at[j].final_parity ^= AB_INV_PARITY_BITS as i8;
+            }
+        }
+    }
+    for i in 0..cs.n_len_dble as usize {
+        let d = cs.dble.as_ref().unwrap()[i];
+        if atom_parity_well_def(i32::from(d.parity)) {
+            let j1 = n_atom_number_canon[d.at_num1 as usize - 1] as usize;
+            let cumulene_len = bond_chain_len(i32::from(at[j1].stereo_bond_parity[0]));
+            if cumulene_len % 2 != 0 {
+                let j2 = n_atom_number_canon[d.at_num2 as usize - 1] as usize;
+                if at[j1].stereo_bond_neighbor[1] != 0 || at[j2].stereo_bond_neighbor[1] != 0 {
+                    return CT_STEREOCOUNT_ERR;
+                }
+                if cumulene_len != bond_chain_len(i32::from(at[j2].stereo_bond_parity[0]))
+                    || j1 + 1 != at[j2].stereo_bond_neighbor[0] as usize
+                    || j2 + 1 != at[j1].stereo_bond_neighbor[0] as usize
+                {
+                    return CT_STEREOCOUNT_ERR;
+                }
+                if parity_well_def(i32::from(at[j1].parity))
+                    && parity_well_def(i32::from(at[j2].parity))
+                {
+                    let j = j1.min(j2);
+                    at[j].parity ^= AB_INV_PARITY_BITS as i8;
+                } else {
+                    return CT_STEREOCOUNT_ERR;
+                }
+                if b_invert_linear_ct_stereo {
+                    cs.dble.as_mut().unwrap()[i].parity ^= AB_INV_PARITY_BITS as u8;
+                }
+                num_changes += 1;
+                if parity_well_def(i32::from(at[j1].stereo_bond_parity[0])) {
+                    at[j1].stereo_bond_parity[0] ^= AB_INV_PARITY_BITS as i8;
+                }
+                if parity_well_def(i32::from(at[j2].stereo_bond_parity[0])) {
+                    at[j2].stereo_bond_parity[0] ^= AB_INV_PARITY_BITS as i8;
+                }
+            }
+        }
+    }
+    num_changes
 }
