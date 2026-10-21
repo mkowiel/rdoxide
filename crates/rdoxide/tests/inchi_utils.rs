@@ -8219,3 +8219,356 @@ fn rank_refinement_matches_the_c_code() {
         assert_eq!(got, want, "case {case}");
     }
 }
+
+#[test]
+fn stereo_mapping_helpers_match_the_c_code() {
+    use rdoxide::external::inchi::ichimap::*;
+    use rdoxide::external::inchi::ichister::{AtStereoCarb, AtStereoDble, SpAtom};
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_mapstereo.json")).unwrap();
+    for (case, c) in data.as_array().unwrap().iter().enumerate() {
+        let inp = &c["in"];
+        let atoms = inp["atoms"].as_array().unwrap();
+        let n = atoms.len();
+        let mut at = vec![SpAtom::default(); n + 1];
+        let (mut crank, mut acanon) = (vec![0u16; n + 8], vec![0u16; n + 8]);
+        let (mut r1, mut a1, mut r2, mut a2) = (
+            vec![0u16; n + 8],
+            vec![0u16; n + 8],
+            vec![0u16; n + 8],
+            vec![0u16; n + 8],
+        );
+        for (i, a) in atoms.iter().enumerate() {
+            let g = |k: &str| a[k].as_i64().unwrap();
+            let nb = a["nb"].as_array().unwrap();
+            at[i].valence = nb.len() as i8;
+            at[i].parity = g("par") as i8;
+            at[i].stereo_atom_parity = g("sap") as i8;
+            at[i].num_h = g("nh") as i8;
+            r1[i] = g("rank") as u16;
+            a1[i] = g("an") as u16;
+            r2[i] = g("rank2") as u16;
+            a2[i] = g("an2") as u16;
+            crank[i] = g("crank") as u16;
+            acanon[i] = g("ac") as u16;
+            for (j, q) in nb.iter().enumerate() {
+                at[i].neighbor[j] = q.as_u64().unwrap() as u16;
+            }
+            for (j, s) in a["sb"].as_array().unwrap().iter().enumerate() {
+                let s: Vec<i64> = s
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|x| x.as_i64().unwrap())
+                    .collect();
+                at[i].stereo_bond_neighbor[j] = s[0] as u16;
+                at[i].stereo_bond_ord[j] = s[1] as i8;
+                at[i].stereo_bond_z_prod[j] = s[2] as i8;
+                at[i].stereo_bond_parity[j] = s[3] as i8;
+            }
+        }
+        let st1 = vec![r1.clone(), a1.clone()];
+        let st2 = vec![r2.clone(), a2.clone()];
+        let mut used = vec![0i8; n + 8];
+        set_use_atom_for_stereo(&mut used, &at, n);
+        for m in inp["mask"].as_array().unwrap() {
+            used[m[0].as_u64().unwrap() as usize] = m[1].as_i64().unwrap() as i8;
+        }
+        let ni = n as i32;
+        let mut got: Vec<String> = Vec::new();
+        let join = |v: Vec<String>| v.join(" ");
+        got.push(format!(
+            "U {}",
+            join(used[..n].iter().map(|x| x.to_string()).collect())
+        ));
+        got.push(format!(
+            "A {}",
+            join(
+                (1..=n as u16)
+                    .map(|cr| all_sc_same(cr, &st1, &st2, &acanon, &at).to_string())
+                    .collect()
+            )
+        ));
+        got.push(format!(
+            "P {}",
+            join(
+                (1..=n as u16)
+                    .map(|cr| match b_unique_at_nbr_from_mapping_rank(&st1, cr) {
+                        Some(u) => format!("1,{u}"),
+                        None => "0,-1".to_string(),
+                    })
+                    .collect()
+            )
+        ));
+        {
+            let (mut cr1, mut min, mut first) = (0u16, 0u16, true);
+            let mut s = String::from("X");
+            for _ in 0..12 {
+                let ok = next_sc_at_canon_rank2(
+                    &mut cr1, &mut min, &mut first, &used, &st1, &st2, &acanon, ni,
+                );
+                s += &format!(" {},{},{},{}", i32::from(ok), cr1, min, i32::from(first));
+                if !ok {
+                    break;
+                }
+            }
+            got.push(s);
+        }
+        {
+            let mut v = Vec::new();
+            for a in 1..=n as u16 {
+                for b in 1..=n as u16 {
+                    v.push(all_sb_same(a, b, &st1, &st2, &acanon, &at).to_string());
+                }
+            }
+            got.push(format!("B {}", join(v)));
+        }
+        for al in 0..2 {
+            let (mut cr1, mut cr2, mut m1, mut m2, mut first) = (0u16, 0u16, 0u16, 0u16, true);
+            let mut s = format!("Y{al}");
+            for _ in 0..12 {
+                let ok = next_sb_at_canon_ranks2(
+                    &mut cr1,
+                    &mut cr2,
+                    &mut m1,
+                    &mut m2,
+                    &mut first,
+                    &used,
+                    &st1,
+                    &st2,
+                    &crank,
+                    &acanon,
+                    &at,
+                    ni,
+                    al == 1,
+                );
+                s += &format!(
+                    " {},{},{},{},{},{}",
+                    i32::from(ok),
+                    cr1,
+                    cr2,
+                    m1,
+                    m2,
+                    i32::from(first)
+                );
+                if !ok {
+                    break;
+                }
+            }
+            got.push(s);
+        }
+        {
+            let mut v = Vec::new();
+            for sp in 0..7 {
+                for cp in 0..3 {
+                    for m in 0..8 {
+                        let (mut p, mut q) = (sp, cp);
+                        let r = next_stereo_parity2_test(
+                            &mut p,
+                            &mut q,
+                            m & 1,
+                            (m >> 1) & 1,
+                            (m >> 2) & 1,
+                            (m + 1) & 1,
+                            (m + 3) & 1,
+                            3,
+                        );
+                        v.push(format!("{r},{p},{q}"));
+                    }
+                }
+            }
+            got.push(format!("Z {}", join(v)));
+        }
+        {
+            let ct: Vec<i64> = inp["ct"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|x| x.as_i64().unwrap())
+                .collect();
+            let rows = |k: &str| -> Vec<Vec<i64>> {
+                inp[k]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|r| {
+                        r.as_array()
+                            .unwrap()
+                            .iter()
+                            .map(|x| x.as_i64().unwrap())
+                            .collect()
+                    })
+                    .collect()
+            };
+            let dbl = |k: &str| -> Vec<AtStereoDble> {
+                rows(k)
+                    .iter()
+                    .map(|r| AtStereoDble {
+                        at_num1: r[0] as u16,
+                        at_num2: r[1] as u16,
+                        parity: r[2] as u8,
+                    })
+                    .collect()
+            };
+            let carb = |k: &str| -> Vec<AtStereoCarb> {
+                rows(k)
+                    .iter()
+                    .map(|r| AtStereoCarb {
+                        at_num: r[0] as u16,
+                        parity: r[1] as u8,
+                    })
+                    .collect()
+            };
+            let (d1, d2, c1, c2) = (dbl("d1"), dbl("d2"), carb("c1"), carb("c2"));
+            let f = ct[4];
+            let pd1 = if f & 1 != 0 { None } else { Some(&d1[..]) };
+            let pd2 = if f & 2 != 0 { None } else { Some(&d2[..]) };
+            let pc1 = if f & 4 != 0 { None } else { Some(&c1[..]) };
+            let pc2 = if f & 8 != 0 { None } else { Some(&c2[..]) };
+            let (nd1, nd2, nc1, nc2) = (ct[0] as i32, ct[1] as i32, ct[2] as i32, ct[3] as i32);
+            let mut s = format!(
+                "K {} {} {}",
+                compare_lin_ct_stereo_dble(pd1, nd1, pd2, nd2),
+                compare_lin_ct_stereo_carb(pc1, nc1, pc2, nc2),
+                compare_lin_ct_stereo(pd1, nd1, pc1, nc1, pd2, nd2, pc2, nc2)
+            );
+            if nc1 > 0 && nd1 > 0 {
+                // (the C harness reads c2[0]/d2[0], which are zero-filled when the list is empty)
+                let c20 = c2.first().copied().unwrap_or_default();
+                let d20 = d2.first().copied().unwrap_or_default();
+                s += &format!(
+                    " {} {} {}",
+                    compare_lin_ct_stereo_atom_to_values(
+                        &c1[0],
+                        if c20.at_num != 0 { c20.at_num } else { 1 },
+                        c20.parity
+                    ),
+                    compare_lin_ct_stereo_double_to_values(
+                        &d1[0],
+                        d20.at_num1,
+                        d20.at_num2,
+                        d20.parity
+                    ),
+                    compare_lin_ct_stereo_double_to_values(
+                        &d1[0],
+                        d1[0].at_num1,
+                        d1[0].at_num2,
+                        d1[0].parity
+                    )
+                );
+            }
+            got.push(s);
+        }
+        {
+            let mut eq: Vec<u16> = inp["eq"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|x| x.as_u64().unwrap() as u16)
+                .collect();
+            eq.resize(n + 8, 0);
+            let mut s = String::from("E");
+            for i in 0..n {
+                s += &format!(" {}", n_get_mcr(&mut eq, i as u16));
+            }
+            got.push(s);
+            for j in inp["joins"].as_array().unwrap() {
+                let mut s = format!(
+                    "J {}",
+                    n_join2_mcrs(
+                        &mut eq,
+                        j[0].as_u64().unwrap() as u16,
+                        j[1].as_u64().unwrap() as u16
+                    )
+                );
+                for x in eq.iter().take(n) {
+                    s += &format!(" {x}");
+                }
+                got.push(s);
+            }
+        }
+        {
+            let symm: Vec<u16> = inp["symm"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|x| x.as_u64().unwrap() as u16)
+                .collect();
+            let mut symm = symm;
+            symm.resize(n + 8, 0);
+            let mut ct = CurTree::default();
+            let mut saved: Vec<i32> = Vec::new();
+            let nn = if n > 0 { n as i32 } else { 1 };
+            for o in inp["ops"].as_array().unwrap() {
+                let (op, arg) = (o[0].as_i64().unwrap() as i32, o[1].as_i64().unwrap() as i32);
+                let r = match op {
+                    0 => {
+                        saved.clear();
+                        ct.alloc(if arg > 2 { arg } else { 3 })
+                    }
+                    1 => ct.add_rank(arg as u16),
+                    2 => ct.add_atom(arg % nn),
+                    3 => {
+                        let tp = if saved.is_empty() {
+                            0
+                        } else {
+                            saved[arg as usize % saved.len()]
+                        };
+                        ct.keep_last_atoms_only(tp, 1);
+                        tp
+                    }
+                    4 => ct.remove_if_last_atom(arg % nn),
+                    5 => ct.remove_last_rank(),
+                    6 => ct.remove_last_rank_if_no_atoms(),
+                    7 => {
+                        if saved.is_empty() {
+                            -7
+                        } else {
+                            ct.set_pos(saved[arg as usize % saved.len()])
+                        }
+                    }
+                    8 => ct.is_last_rank(arg as u16),
+                    9 => {
+                        if !ct.tree.is_empty()
+                            && ct.cur_len > 1
+                            && i32::from(ct.tree[ct.cur_len as usize - 1]) - 1 > ct.cur_len - 1
+                        {
+                            -9
+                        } else {
+                            ct.is_last_atom_equ(arg % nn, &symm)
+                        }
+                    }
+                    10 => {
+                        ct.free();
+                        saved.clear();
+                        0
+                    }
+                    _ => {
+                        let p = ct.get_pos();
+                        if saved.len() < 64 {
+                            saved.push(p);
+                        }
+                        p
+                    }
+                };
+                if ct.cur_len < 0 {
+                    ct.cur_len = 0;
+                }
+                let mut s = format!("T {op} {r} {} {}:", ct.cur_len, ct.max_len);
+                if !ct.tree.is_empty() {
+                    for i in 0..ct.cur_len.min(ct.max_len).max(0) as usize {
+                        s += &format!(" {}", ct.tree[i]);
+                    }
+                }
+                got.push(s);
+            }
+        }
+        let want: Vec<String> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| s.as_str().unwrap().to_string())
+            .collect();
+        assert_eq!(got, want, "case {case}");
+    }
+}
