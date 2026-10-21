@@ -9173,3 +9173,199 @@ fn removal_of_calculated_non_stereo_parities_matches_the_c_code() {
         assert_eq!(got, want, "case {case}");
     }
 }
+
+#[test]
+fn stereo_canonical_mapping_matches_the_c_code() {
+    use rdoxide::external::inchi::ichimap::*;
+    use rdoxide::external::inchi::ichimap4::*;
+    use rdoxide::external::inchi::ichister::{AtStereoCarb, AtStereoDble, SpAtom};
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_mapstereo4.json")).unwrap();
+    fn ints(v: &serde_json::Value) -> Vec<i64> {
+        v.as_array()
+            .unwrap()
+            .iter()
+            .map(|x| x.as_i64().unwrap())
+            .collect()
+    }
+    fn pa(t: &str, a: &[u16], n: usize) -> String {
+        let mut s = t.to_string();
+        for x in &a[..n] {
+            s += &format!(" {x}");
+        }
+        s
+    }
+    for (case, c) in data.as_array().unwrap().iter().enumerate() {
+        let inp = &c["in"];
+        let atoms = inp["atoms"].as_array().unwrap();
+        let n = atoms.len();
+        let nmax = n + 2;
+        let mut at = vec![SpAtom::default(); n + 1];
+        let (mut crank, mut r1, mut acanon, mut an) = (
+            vec![0u16; nmax + 8],
+            vec![0u16; nmax + 8],
+            vec![0u16; nmax + 8],
+            vec![0u16; nmax + 8],
+        );
+        for (i, a) in atoms.iter().enumerate() {
+            let g = |k: &str| a[k].as_i64().unwrap();
+            let nb = a["nb"].as_array().unwrap();
+            at[i].valence = nb.len() as i8;
+            at[i].parity = g("par") as i8;
+            at[i].stereo_atom_parity = g("sap") as i8;
+            at[i].num_h = g("nh") as i8;
+            at[i].n_ring_system = inp["rs"][i].as_u64().unwrap() as u16;
+            r1[i] = g("rank") as u16;
+            crank[i] = g("crank") as u16;
+            acanon[i] = g("ac") as u16;
+            an[i] = g("an") as u16;
+            for (j, q) in nb.iter().enumerate() {
+                at[i].neighbor[j] = q.as_u64().unwrap() as u16;
+            }
+            for (j, s) in a["sb"].as_array().unwrap().iter().enumerate() {
+                let s = ints(s);
+                at[i].stereo_bond_neighbor[j] = s[0] as u16;
+                at[i].stereo_bond_ord[j] = s[1] as i8;
+                at[i].stereo_bond_z_prod[j] = s[2] as i8;
+                at[i].stereo_bond_parity[j] = s[3] as i8;
+            }
+        }
+        let ctl = ints(&inp["ctl"]);
+        let mut cs = StereoMapCs {
+            rm: RemoveStereoCs {
+                linear_ct_stereo_carb: inp["carb"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|x| {
+                        let x = ints(x);
+                        AtStereoCarb {
+                            at_num: x[0] as u16,
+                            parity: x[1] as u8,
+                        }
+                    })
+                    .collect(),
+                linear_ct_stereo_dble: inp["dble"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|x| {
+                        let x = ints(x);
+                        AtStereoDble {
+                            at_num1: x[0] as u16,
+                            at_num2: x[1] as u16,
+                            parity: x[2] as u8,
+                        }
+                    })
+                    .collect(),
+                n_symm_rank: r1.clone(),
+                l_num_neigh_list_iter: 0,
+            },
+            b_first_ct: ctl[0] as i32,
+            b_keep_symm_rank: ctl[1] as i32,
+            n_mode: ctl[2] as i32,
+            b_rank_used_for_stereo: vec![0; nmax + 8],
+            b_atom_used_for_stereo: vec![0; nmax + 8],
+            n_prev_atom_number: vec![0; nmax + 8],
+            ..Default::default()
+        };
+        let mut nl = create_neigh_list(n, n, &at, false, None);
+        let mut s1 = vec![vec![0u16; nmax], vec![0u16; nmax]];
+        let mut s2 = vec![vec![0u16; nmax], vec![0u16; nmax]];
+        s1[0][..n].copy_from_slice(&r1[..n]);
+        s1[1][..n].copy_from_slice(&an[..n]);
+        s2[0][..n].copy_from_slice(&r1[..n]);
+        s2[1][..n].copy_from_slice(&an[..n]);
+        let mut tmp = vec![0u16; nmax + 8];
+        let mut canon_to = vec![0u16; nmax + 8];
+        let mut symm_stereo: Vec<u16> = (0..nmax as u16 + 8).collect();
+        for x in symm_stereo.iter_mut().skip(n) {
+            *x = 0;
+        }
+        let mut ct = CurTree::default();
+        ct.alloc(n as i32);
+        let ret = map_stereo_bonds4(
+            &mut at,
+            n,
+            n,
+            nmax,
+            false,
+            &crank,
+            &acanon,
+            &mut canon_to,
+            &r1,
+            &mut s1,
+            &mut s2,
+            &mut tmp,
+            ctl[3] as i32,
+            &mut symm_stereo,
+            &mut nl,
+            &mut cs,
+            &mut ct,
+            0,
+            3,
+        );
+        let mut got = vec![format!(
+            "R {ret} {} {} {} {} {} {} {} {} {} {}",
+            cs.b_first_ct,
+            cs.b_stereo_is_better,
+            cs.counters.l_num_break_ties,
+            cs.counters.l_num_neigh_list_iter,
+            cs.l_num_tot_ct,
+            cs.l_num_decreased_ct,
+            cs.l_num_rejected_ct,
+            cs.l_num_equal_ct,
+            cs.rm.linear_ct_stereo_carb.len(),
+            cs.rm.linear_ct_stereo_dble.len()
+        )];
+        for x in &cs.rm.linear_ct_stereo_carb {
+            got.push(format!("c {} {}", x.at_num, x.parity));
+        }
+        for x in &cs.rm.linear_ct_stereo_dble {
+            got.push(format!("d {} {} {}", x.at_num1, x.at_num2, x.parity));
+        }
+        for a in &at[..n] {
+            let mut s = format!(
+                "a {} {} {} |",
+                a.parity, a.stereo_atom_parity, a.final_parity
+            );
+            for j in 0..3 {
+                s += &format!(
+                    " {},{},{}",
+                    a.stereo_bond_neighbor[j], a.stereo_bond_parity[j], a.stereo_bond_ord[j]
+                );
+            }
+            got.push(s);
+        }
+        let mut u = String::from("U");
+        for i in 0..n {
+            u += &format!(
+                " {},{}",
+                cs.b_rank_used_for_stereo[i], cs.b_atom_used_for_stereo[i]
+            );
+        }
+        got.push(u);
+        got.push(pa("T", &canon_to, n));
+        got.push(pa("S", &symm_stereo, n));
+        got.push(pa("P", &cs.n_prev_atom_number, n));
+        let mut k = format!("K {} {} {} |", ct.cur_len, ct.max_len, ct.incr_len);
+        for i in 0..ct.cur_len.max(0) as usize {
+            k += &format!(" {}", ct.tree[i]);
+        }
+        got.push(k);
+        got.push(format!("Z {} {}", s1.len(), s2.len()));
+        for v in &s1 {
+            got.push(pa(" s1", v, n));
+        }
+        for v in &s2 {
+            got.push(pa(" s2", v, n));
+        }
+        let want: Vec<String> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| s.as_str().unwrap().to_string())
+            .collect();
+        assert_eq!(got, want, "case {case}");
+    }
+}
