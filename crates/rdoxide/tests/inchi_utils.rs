@@ -7045,3 +7045,110 @@ fn stereo_geometry_helpers_match_the_c_code() {
         assert_eq!(got, want, "case {n}: {inp}");
     }
 }
+
+#[test]
+fn stereo_candidate_checks_match_the_c_code() {
+    use rdoxide::external::inchi::ichister::*;
+    use rdoxide::external::inchi::inpdef::InpAtom;
+    use rdoxide::external::inchi::util::get_periodic_table_number;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_sterdetect.json")).unwrap();
+    for (n, c) in data.as_array().unwrap().iter().enumerate() {
+        let inp = &c["in"];
+        let mut got: Vec<String> = Vec::new();
+        if inp["k"].as_u64().unwrap() == 0 {
+            let g = |k: &str| inp[k].as_i64().unwrap() as i32;
+            got.push(format!(
+                "H {}",
+                half_stereo_bond_action(g("p"), g("unk") != 0, g("iso") != 0, g("vab"))
+            ));
+        } else {
+            let mut at: Vec<InpAtom> = Vec::new();
+            for a in inp["atoms"].as_array().unwrap() {
+                let mut x = InpAtom::default();
+                let el = a["el"].as_str().unwrap();
+                x.set_elname(el);
+                x.el_number = get_periodic_table_number(el) as u8;
+                x.charge = a["ch"].as_i64().unwrap() as i8;
+                x.radical = a["rad"].as_i64().unwrap() as i8;
+                x.num_h = a["nh"].as_i64().unwrap() as i8;
+                x.endpoint = a["ep"].as_u64().unwrap() as u16;
+                x.chem_bonds_valence = a["cv"].as_i64().unwrap() as i8;
+                let nb = a["nb"].as_array().unwrap();
+                x.valence = nb.len() as i8;
+                for (j, q) in nb.iter().enumerate() {
+                    x.neighbor[j] = q[0].as_u64().unwrap() as u16;
+                    x.bond_type[j] = q[1].as_u64().unwrap() as u8;
+                }
+                at.push(x);
+            }
+            let mode = inp["mode"].as_u64().unwrap();
+            let nat = at.len();
+            for i in 0..nat {
+                for pe in [0, 7, 14] {
+                    for zz in 0..2 {
+                        got.push(format!(
+                            "S {}",
+                            b_can_inp_atom_be_a_stereo_center(&at, i, pe, zz)
+                        ));
+                    }
+                }
+                for req in 0..4 {
+                    for nd in 0..3 {
+                        got.push(format!(
+                            "R {}",
+                            i32::from(b_inp_atom_has_requird_neigh(
+                                &at,
+                                i,
+                                req,
+                                nd,
+                                (req + nd) & 1
+                            ))
+                        ));
+                    }
+                }
+                let a = &at[i];
+                let (e, ch, r) = (a.elname_str(), a.charge, a.radical);
+                got.push(format!(
+                    "E {} {} {}",
+                    i32::from(b_can_atom_have_a_stereo_bond(e, ch, r)),
+                    i32::from(b_can_atom_be_middle_allene(e, ch, r)),
+                    i32::from(b_can_atom_be_terminal_allene(e, ch, r))
+                ));
+                got.push(format!("T {}", b_is_suitable_hetero_inp_atom(a)));
+                for j in 0..a.valence as usize {
+                    got.push(format!(
+                        "B {}",
+                        get_allowed_stereo_bond_type(i32::from(a.bond_type[j]))
+                    ));
+                }
+            }
+            for i in 0..nat {
+                let mut cp = at.clone();
+                let mut s = format!("O {}", i32::from(b_is_oxide(&mut cp, i)));
+                for j in 0..cp[i].valence as usize {
+                    s += &format!(" {}", cp[i].bond_type[j]);
+                }
+                got.push(s);
+                let mut cp = at.clone();
+                let mut s = format!(
+                    "C {}",
+                    can_be_a_stereo_bond_with_isotopic_h(&mut cp, i, mode)
+                );
+                for a in &cp {
+                    for j in 0..a.valence as usize {
+                        s += &format!(" {}", a.bond_type[j]);
+                    }
+                }
+                got.push(s);
+            }
+        }
+        let want: Vec<String> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| s.as_str().unwrap().to_string())
+            .collect();
+        assert_eq!(got, want, "case {n}: {inp}");
+    }
+}
