@@ -2298,3 +2298,125 @@ pub fn mark_salt_charge_groups(
     }
     tot
 }
+
+pub const SALT_DONOR_ALL: i32 = SALT_DONOR_NEG | SALT_DONOR_H | SALT_P_ACCEPTOR | SALT_P_DONOR;
+pub const SALT_DONOR_NEG2: i32 = SALT_DONOR_NEG | SALT_P_ACCEPTOR;
+pub const SALT_DONOR_H2: i32 = SALT_DONOR_H | SALT_P_DONOR;
+
+/// `MergeSaltTautGroups`: collects the acidic donors/acceptors (tautomeric
+/// or not) and merges their t-groups into one. Returns the number of
+/// changes or an error.
+pub fn merge_salt_taut_groups(
+    at: &mut [InpAtom],
+    num_atoms: i32,
+    sgi: &mut SGroupInfo,
+    tgi: &mut TGroupInfo,
+    cgi: Option<&mut CGroupInfo>,
+    p: &mut super::ichi_bns::BnStruct,
+) -> i32 {
+    use super::ichi_bns::{b_has_acidic_hydrogen, b_has_acidic_minus};
+    use super::ichierr::{BNS_PROGRAM_ERR, BNS_VERT_EDGE_OVFL};
+    use super::inpdef::MAX_ATOMS;
+    if sgi.s_candidate.is_empty() || tgi.t_group.is_none() || cgi.is_none() {
+        return 0;
+    }
+    let max_cand = sgi.max_num_candidates;
+    let mut cur_tg: i32 = MAX_ATOMS as i32;
+    let mut s_subtype_all = 0;
+    let mut n_cand = 0i32;
+    for i in 0..num_atoms as usize {
+        let mut s_subtype = 0i32;
+        let mut s_type = get_salt_charge_type(at, i, Some(tgi), &mut s_subtype);
+        let mut ok = s_type == 0;
+        if !ok {
+            s_type = get_other_salt_charge_type(at, i, Some(tgi), &mut s_subtype, true);
+            ok = s_type == 1;
+        }
+        if !ok {
+            s_type = get_other_salt_type(at, i, &mut s_subtype);
+            ok = s_type == 2;
+        }
+        if !ok && b_has_acidic_hydrogen(at, i) != 0 {
+            s_type = 3;
+            s_subtype = SALT_P_DONOR;
+            ok = true;
+        }
+        if !ok && b_has_acidic_minus(at, i) != 0 {
+            s_type = 3;
+            s_subtype = SALT_P_ACCEPTOR;
+            ok = true;
+        }
+        if !ok {
+            continue;
+        }
+        if n_cand >= max_cand {
+            return BNS_VERT_EDGE_OVFL;
+        }
+        if at[i].endpoint == 0 && do_not_merge_non_taut_atom(at, i) {
+            continue;
+        }
+        if s_subtype & SALT_DONOR_ALL == 0
+            || (s_subtype & SALT_ACCEPTOR != 0 && at[i].endpoint == 0)
+        {
+            continue;
+        }
+        sgi.s_candidate[n_cand as usize] = SCandidate {
+            atnumber: i as u16,
+            type_: s_type as i8,
+            subtype: s_subtype as i8,
+            endpoint: at[i].endpoint,
+        };
+        n_cand += 1;
+        s_subtype_all |= s_subtype;
+    }
+    let forced = tgi.b_taut_flags & super::ichiparm::TG_FLAG_ALLOW_NO_NEGTV_O != 0
+        || tgi.b_taut_flags_done & TG_FLAG_FOUND_SALT_CHARGES_DONE != 0
+        || tgi.tni.b_normalization_flags & FLAG_FORCE_SALT_TAUT != 0;
+    let lacks = s_subtype_all & SALT_DONOR_NEG2 == 0 || s_subtype_all & SALT_DONOR_H2 == 0;
+    let bail = if forced {
+        n_cand <= 1 || (lacks && tgi.num_t_groups == 0)
+    } else {
+        n_cand <= 1 || lacks
+    };
+    if bail {
+        sgi.num_candidates = -1;
+        return 0;
+    }
+    if s_subtype_all & SALT_DONOR_NEG2 == 0 {
+        tgi.b_taut_flags_done |= TG_FLAG_ALLOW_NO_NEGTV_O_DONE;
+    }
+    sgi.num_candidates = n_cand;
+
+    let mut min_endpoints = 0;
+    for i in 0..sgi.num_candidates as usize {
+        let c = sgi.s_candidate[i];
+        let iat = c.atnumber as usize;
+        if i32::from(c.subtype) & SALT_ACCEPTOR != 0 && at[iat].endpoint == 0 {
+            continue;
+        }
+        if i32::from(at[iat].endpoint) != cur_tg || at[iat].endpoint == 0 {
+            min_endpoints += 1;
+        }
+        cur_tg = i32::from(at[iat].endpoint);
+    }
+    if min_endpoints <= 1 {
+        return 0;
+    }
+    let mut end_points = vec![TEndpoint::default(); min_endpoints];
+    cur_tg = MAX_ATOMS as i32;
+    let mut j = 0;
+    for i in 0..sgi.num_candidates as usize {
+        let c = sgi.s_candidate[i];
+        let iat = c.atnumber as usize;
+        if i32::from(c.subtype) == SALT_ACCEPTOR && at[iat].endpoint == 0 {
+            continue;
+        }
+        if i32::from(at[iat].endpoint) != cur_tg || at[iat].endpoint == 0 {
+            add_end_point(&mut end_points[j], at, iat);
+            j += 1;
+        }
+        cur_tg = i32::from(at[iat].endpoint);
+    }
+    let ret = register_end_points(tgi, &mut end_points[..j], at, num_atoms, cgi, Some(p));
+    if ret == -1 { BNS_PROGRAM_ERR } else { ret }
+}
