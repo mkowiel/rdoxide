@@ -573,6 +573,8 @@ pub const MAX_LAYERS: usize = 100;
 /// array is present when the C pointer is not NULL.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct CanonData {
+    /// `nCanonFlags`
+    pub n_canon_flags: i32,
     /// `LinearCT`
     pub linear_ct: Vec<u16>,
     pub n_max_len_linear_ct: i32,
@@ -2290,10 +2292,9 @@ pub fn canon_graph(
     n_atom_number_canon[..n_tg].copy_from_slice(&rho.at_number[..n_tg]);
     cd.n_len_linear_ct = pzb_rho.len_ct - 1;
     let len = cd.n_len_linear_ct.max(0) as usize;
-    if cd.linear_ct.len() < len {
-        cd.linear_ct.resize(len, 0);
+    if !cd.linear_ct.is_empty() {
+        cd.linear_ct[..len].copy_from_slice(&pzb_rho.ctbl[..len]);
     }
-    cd.linear_ct[..len].copy_from_slice(&pzb_rho.ctbl[..len]);
     cc.l_num_tot_ct = cc.l_num_decreased_ct + cc.l_num_rejected_ct + cc.l_num_equal_ct;
     cc.d_group_size = size;
     cc.l_num_generators = n_num_found_generators;
@@ -2390,4 +2391,1249 @@ pub fn fix_canon_equivalence_info(
         n_num_diff_ranks,
         i32::from(b_change_symm_rank) | (2 * i32::from(b_change_curr_rank)),
     )
+}
+
+// ---------------------------------------------------------------------------
+// GetBaseCanonRanking
+// ---------------------------------------------------------------------------
+
+use super::ichierr::{CT_ERR_MAX, CT_ERR_MIN, CT_ISOCOUNT_ERR, CT_UNKNOWN_ERR};
+use super::ichimap::{create_neigh_list, differentiate_ranks2};
+use super::ichitaut::{FLAG_NORM_CONSIDER_TAUT, T_NUM_NO_ISOTOPIC as T_NUM_NO_ISO};
+use super::inpdef::AT_FLAG_ISO_H_POINT;
+use super::runichi3::{TG_FLAG_FOUND_ISOTOPIC_ATOM_DONE, TG_FLAG_FOUND_ISOTOPIC_H_DONE};
+
+pub const TAUT_NON: usize = 0;
+pub const TAUT_YES: usize = 1;
+
+/// `FTCN`: the canonical numbering of a fixed-H or tautomeric structure
+#[derive(Debug, Clone, Default)]
+pub struct Ftcn {
+    pub num_at_tg: usize,
+    pub num_atoms: usize,
+    pub n_canon_flags: i32,
+    pub neigh_list: Option<NeighList>,
+    pub linear_ct: Vec<u16>,
+    pub n_len_linear_ct_at_only: i32,
+    pub n_len_linear_ct: i32,
+    pub n_max_len_linear_ct: i32,
+    pub partition_ct: Partition,
+    pub n_symm_rank_ct: Vec<u16>,
+    pub n_num_h_orig: Vec<i16>,
+    pub n_num_h: Vec<i16>,
+    pub n_len_num_h: i32,
+    pub n_num_h_orig_fix_h: Vec<i16>,
+    pub n_num_h_fix_h: Vec<i16>,
+    pub n_len_num_h_fix_h: i32,
+    pub partition_ct_iso: Partition,
+    pub n_symm_rank_ct_iso: Vec<u16>,
+    pub iso_sort_keys: Vec<i64>,
+    pub iso_sort_keys_orig: Vec<i64>,
+    pub len_iso_sort_keys: i32,
+    pub iso_exchg_atnos: Vec<i8>,
+    pub iso_exchg_atnos_orig: Vec<i8>,
+}
+
+/// `BCN`: the base canonical numbering
+#[derive(Debug, Clone, Default)]
+pub struct Bcn {
+    /// `pRankStack` as pairs (ranks, atom numbers)
+    pub p_rank_stack: Vec<Partition>,
+    pub n_max_len_rank_stack: i32,
+    pub num_max: usize,
+    pub num_at_tg: usize,
+    pub num_atoms: usize,
+    pub ftcn: [Ftcn; 2],
+}
+
+fn returned_error(v: i32) -> bool {
+    (CT_ERR_MIN..=CT_ERR_MAX).contains(&v)
+}
+
+fn clean_iso_keys_if_any(keys: &mut [i64], len: usize) {
+    if !keys.is_empty() {
+        clean_iso_sort_keys(keys, len);
+    }
+}
+
+fn clean_num_h_if_any(v: &mut [i16], len: usize) {
+    if !v.is_empty() {
+        clean_num_h(v, len);
+    }
+}
+
+fn num_h_plus_base(num_h: i8) -> i16 {
+    if num_h != 0 {
+        i16::from(num_h) + BASE_H_NUMBER
+    } else {
+        EMPTY_H_NUMBER
+    }
+}
+
+/// `GetBaseCanonRanking`: the base canonical numbering of a (possibly
+/// tautomeric) structure with its fixed-H and isotopic variants. `at` holds
+/// the tautomeric and non-tautomeric atoms. `time_is_over` replaces
+/// `bInchiTimeIsOver`. Returns 0 or an error code; on success `bcn` has the
+/// results.
+#[allow(clippy::too_many_arguments, unused_assignments, unused_variables)]
+pub fn get_base_canon_ranking(
+    time_is_over: &mut dyn FnMut() -> bool,
+    num_atoms: usize,
+    mut num_at_tg: usize,
+    at: [Option<&[SpAtom]>; 2],
+    mut t_group_info: Option<&mut TGroupInfo>,
+    s: &[AtomSizes; 2],
+    bcn: &mut Bcn,
+    b_fix_iso_fixed_h: bool,
+    large_molecules: bool,
+) -> i32 {
+    let num_max = num_at_tg;
+    let mut pi: Vec<Partition> = Vec::new();
+    let mut pcd: [CanonData; 2] = [CanonData::default(), CanonData::default()];
+    let mut cc = CanonCounts::default();
+    let mut b_use_iso_aux_base = [false; 2];
+    let mut b_taut_ignore_isotopic = 0i32;
+
+    // select the base structure
+    let (i_base, i_other, b_req_non_taut, b_req_taut);
+    let at_yes = at[TAUT_YES].is_some() && s[TAUT_YES].n_len_ct != 0;
+    let at_non = at[TAUT_NON].is_some() && s[TAUT_NON].n_len_ct != 0;
+    let taut_cond = at_yes
+        && t_group_info.as_deref().is_some_and(|t| {
+            s[TAUT_YES].n_len_linear_ct_tautomer > 0
+                && ((t.t_group.is_some() && t.num_t_groups > 0)
+                    || t.tni.b_normalization_flags & FLAG_NORM_CONSIDER_TAUT != 0
+                    || (t.n_num_isotopic_endpoints > 1
+                        && t.b_taut_flags_done
+                            & (TG_FLAG_FOUND_ISOTOPIC_H_DONE | TG_FLAG_FOUND_ISOTOPIC_ATOM_DONE)
+                            != 0))
+        });
+    if taut_cond {
+        i_base = TAUT_YES;
+        b_req_taut = true;
+        let t = t_group_info.as_deref().unwrap();
+        b_use_iso_aux_base[i_base] = s[i_base].n_len_isotopic_endpoints > 1
+            && t.b_taut_flags_done
+                & (TG_FLAG_FOUND_ISOTOPIC_H_DONE | TG_FLAG_FOUND_ISOTOPIC_ATOM_DONE)
+                != 0;
+        if at_non {
+            i_other = TAUT_NON;
+            b_req_non_taut = true;
+        } else {
+            i_other = i_base;
+            b_req_non_taut = false;
+        }
+    } else if at_non {
+        i_base = TAUT_NON;
+        b_req_taut = false;
+        i_other = i_base;
+        b_req_non_taut = true;
+        num_at_tg = num_atoms;
+    } else if at_yes {
+        i_base = TAUT_YES;
+        b_req_taut = false;
+        b_use_iso_aux_base[i_base] = s[i_base].n_len_isotopic_endpoints > 1;
+        i_other = i_base;
+        b_req_non_taut = true;
+        num_at_tg = num_atoms;
+    } else {
+        return CT_UNKNOWN_ERR;
+    }
+    if b_req_taut {
+        let t = t_group_info.as_deref_mut().unwrap();
+        b_taut_ignore_isotopic = t.b_ignore_isotopic;
+        t.b_ignore_isotopic = 1;
+    }
+    let at_base = at[i_base].unwrap();
+    let at_other = at[i_other];
+
+    let ret: i32 = 'run: {
+        macro_rules! fail {
+            ($r:expr) => {{
+                let r = $r;
+                break 'run if returned_error(r) { r } else { CT_CANON_ERR };
+            }};
+        }
+        let mut p_atom_invariant = vec![AtomInvariant2::default(); num_max];
+        let mut n_symm_rank_no_h = vec![0u16; num_max];
+        let mut n_canon_rank_no_h = vec![0u16; num_max];
+        let mut n_atom_number_canon_no_h = vec![0u16; num_max];
+        let mut n_rank = vec![0u16; num_max];
+        let mut n_atom_number = vec![0u16; num_max];
+        let mut n_temp_rank = vec![0u16; num_max];
+        let mut n_rank_aux = vec![0u16; num_max];
+        let mut n_atom_number_aux = vec![0u16; num_max];
+        let mut p_atom_invariant_aux = vec![AtomInvariant2::default(); num_max];
+
+        let mut neigh_yes: Option<NeighList> = None;
+        let mut neigh_non_opt: Option<NeighList>;
+        if b_req_taut {
+            neigh_yes = Some(create_neigh_list(
+                num_atoms,
+                num_at_tg,
+                at_base,
+                false,
+                t_group_info.as_deref(),
+            ));
+            neigh_non_opt = Some(create_neigh_list(
+                num_atoms, num_atoms, at_base, false, None,
+            ));
+        } else {
+            neigh_non_opt = Some(create_neigh_list(
+                num_atoms, num_atoms, at_base, false, None,
+            ));
+        }
+        bcn.n_max_len_rank_stack = 0;
+        bcn.num_max = num_max;
+        bcn.num_at_tg = num_at_tg;
+        bcn.num_atoms = num_atoms;
+
+        let mut l_count = 0i64;
+        fill_out_atom_invariant2(
+            at_base,
+            num_atoms,
+            num_atoms,
+            &mut p_atom_invariant,
+            true,
+            false,
+            false,
+            false,
+            false,
+            None,
+        );
+        let mut n_num_curr_ranks = set_initial_ranks2(
+            num_atoms,
+            &p_atom_invariant,
+            &mut n_rank,
+            &mut n_atom_number,
+        );
+        n_num_curr_ranks = differentiate_ranks2(
+            num_atoms,
+            neigh_non_opt.as_mut().unwrap(),
+            n_num_curr_ranks,
+            &mut n_rank,
+            &mut n_temp_rank,
+            &mut n_atom_number,
+            &mut l_count,
+            0,
+        );
+        let n_max_len_rank_stack = 2 * (num_at_tg as i32 - n_num_curr_ranks) + 8;
+        pi = vec![Partition::default(); (n_max_len_rank_stack / 2).max(1) as usize];
+        bcn.n_max_len_rank_stack = n_max_len_rank_stack;
+        pi[0] = Partition {
+            rank: std::mem::take(&mut n_rank),
+            at_number: std::mem::take(&mut n_atom_number),
+        };
+
+        let io = i_other;
+        let ib = i_base;
+        // the canonical search with the current `pcd[idx]`
+        macro_rules! canon {
+            ($which:expr, $ntg:expr, $dig:expr, $sym:expr, $can:expr, $atn:expr, $idx:expr, $inp:expr, $out:expr) => {{
+                let g: &mut NeighList = if $which == TAUT_NON {
+                    neigh_non_opt.as_mut().unwrap()
+                } else {
+                    neigh_yes.as_mut().unwrap()
+                };
+                canon_graph(
+                    &mut *time_is_over,
+                    num_atoms,
+                    $ntg,
+                    num_max,
+                    $dig,
+                    g,
+                    &mut pi,
+                    &mut $sym,
+                    &mut $can,
+                    &mut $atn,
+                    &mut pcd[$idx],
+                    &mut cc,
+                    $inp,
+                    Some(&mut $out),
+                    large_molecules,
+                )
+            }};
+        }
+        macro_rules! new_ct {
+            ($idx:expr) => {{
+                let cd = &pcd[$idx];
+                c_table_create(
+                    num_atoms,
+                    cd.n_max_len_linear_ct,
+                    cd.n_len_ct_at_only,
+                    cd.num_h.as_ref().map(|_| cd.maxlen_num_h),
+                    cd.num_h_fixed.as_ref().map(|_| cd.maxlen_num_h_fixed),
+                    cd.iso_sort_key.as_ref().map(|_| cd.maxlen_iso_sort_key),
+                    cd.iso_exchg_atnos
+                        .as_ref()
+                        .map(|_| cd.maxlen_iso_exchg_atnos),
+                )
+            }};
+        }
+        // the stage set-up shared by the atoms-only stages of `iOther`
+        macro_rules! other_stage {
+            () => {{
+                let cd = &mut pcd[io];
+                cd.linear_ct = Vec::new();
+                cd.n_max_len_linear_ct = s[io].n_len_ct_at_only + 1;
+                cd.n_len_linear_ct = s[io].n_len_ct_at_only;
+                cd.n_len_ct_at_only = s[io].n_len_ct_at_only;
+                cd.n_aux_rank = None;
+            }};
+        }
+
+        // ---- NoH ----
+        pcd[io].num_h = None;
+        pcd[io].num_h_fixed = None;
+        pcd[io].iso_sort_key = None;
+        pcd[io].iso_exchg_atnos = None;
+        pcd[io].maxlen_iso_sort_key = 0;
+        pcd[io].maxlen_iso_exchg_atnos = 0;
+        other_stage!();
+        pcd[io].n_aux_rank = None;
+        let mut ct_no_h: Option<ConTable> = None;
+        let mut ct_no_taut_h: Option<ConTable> = None;
+        let mut sym_no_h = std::mem::take(&mut n_symm_rank_no_h);
+        let mut can_no_h = std::mem::take(&mut n_canon_rank_no_h);
+        let mut atn_no_h = std::mem::take(&mut n_atom_number_canon_no_h);
+        let ret = canon!(
+            TAUT_NON, num_atoms, false, sym_no_h, can_no_h, atn_no_h, io, None, ct_no_h
+        );
+        if ret < 0 {
+            fail!(ret);
+        }
+        let mut b_changed = 0;
+        {
+            let p0 = &mut pi[0];
+            let (nn, bc) = fix_canon_equivalence_info(
+                num_atoms,
+                &mut sym_no_h,
+                &mut p0.rank,
+                &mut n_temp_rank,
+                &mut p0.at_number,
+            );
+            n_num_curr_ranks = nn;
+            b_changed = bc;
+        }
+        if b_changed & 3 != 0 {
+            ct_no_h = None;
+            pcd[io].n_canon_flags |= CANON_FLAG_NO_H_RECANON;
+            let ret = canon!(
+                TAUT_NON, num_atoms, false, sym_no_h, can_no_h, atn_no_h, io, None, ct_no_h
+            );
+            if ret < 0 {
+                fail!(ret);
+            }
+        }
+
+        // ---- NoTautH ----
+        let maxlen_num_h_no_taut_h = num_atoms as i32 + 1;
+        let mut sym_no_taut_h = vec![0u16; num_max];
+        let mut can_no_taut_h = vec![0u16; num_max];
+        let mut atn_no_taut_h = vec![0u16; num_max];
+        let mut num_h_no_taut_h = vec![0i16; maxlen_num_h_no_taut_h as usize];
+        for i in 0..num_atoms {
+            num_h_no_taut_h[i] = if at_base[i].endpoint == 0 && at_base[i].num_h != 0 {
+                i16::from(at_base[i].num_h) + BASE_H_NUMBER
+            } else {
+                EMPTY_H_NUMBER
+            };
+        }
+        other_stage!();
+        pcd[io].num_h = Some(num_h_no_taut_h.clone());
+        pcd[io].num_h_fixed = None;
+        pcd[io].iso_sort_key = None;
+        pcd[io].iso_exchg_atnos = None;
+        pcd[io].maxlen_num_h = maxlen_num_h_no_taut_h;
+        pcd[io].maxlen_iso_sort_key = 0;
+        pcd[io].maxlen_iso_exchg_atnos = 0;
+
+        n_temp_rank.iter_mut().for_each(|x| *x = 0);
+        for i in 0..num_atoms {
+            let c = sym_no_h[i] as usize - 1;
+            if (n_temp_rank[c] as usize) < i {
+                n_temp_rank[c] = i as u16;
+            }
+        }
+        let mut i = 0;
+        while i < num_atoms {
+            if num_h_no_taut_h[i] != num_h_no_taut_h[n_temp_rank[sym_no_h[i] as usize - 1] as usize]
+            {
+                pcd[io].n_canon_flags |= CANON_FLAG_NO_TAUT_H_DIFF;
+                break;
+            }
+            i += 1;
+        }
+        if i < num_atoms {
+            for x in p_atom_invariant_aux.iter_mut() {
+                *x = AtomInvariant2::default();
+            }
+            for i in 0..num_atoms {
+                p_atom_invariant_aux[i].val[0] = sym_no_h[i];
+                p_atom_invariant_aux[i].val[1] = num_h_no_taut_h[i] as u16;
+            }
+            n_num_curr_ranks = set_initial_ranks2(
+                num_atoms,
+                &p_atom_invariant_aux,
+                &mut n_rank_aux,
+                &mut n_atom_number_aux,
+            );
+            n_num_curr_ranks = differentiate_ranks2(
+                num_atoms,
+                neigh_non_opt.as_mut().unwrap(),
+                n_num_curr_ranks,
+                &mut n_rank_aux,
+                &mut n_temp_rank,
+                &mut n_atom_number_aux,
+                &mut l_count,
+                0,
+            );
+            pcd[io].n_aux_rank = Some(n_rank_aux.clone());
+            let ret = canon!(
+                TAUT_NON,
+                num_atoms,
+                true,
+                sym_no_taut_h,
+                can_no_taut_h,
+                atn_no_taut_h,
+                io,
+                ct_no_h.as_ref(),
+                ct_no_taut_h
+            );
+            if ret < 0 {
+                fail!(ret);
+            }
+        } else {
+            let mut tmp = new_ct!(io);
+            ct_full_copy(&mut tmp, ct_no_h.as_ref().unwrap());
+            for i in 0..num_atoms {
+                tmp.num_h[can_no_h[i] as usize - 1] = num_h_no_taut_h[i];
+            }
+            tmp.len_num_h = num_atoms as i32;
+            ct_no_taut_h = Some(tmp);
+            sym_no_taut_h[..num_atoms].copy_from_slice(&sym_no_h[..num_atoms]);
+            can_no_taut_h[..num_atoms].copy_from_slice(&can_no_h[..num_atoms]);
+            atn_no_taut_h[..num_atoms].copy_from_slice(&atn_no_h[..num_atoms]);
+        }
+
+        // ---- isotopic non-tautomeric (only when tautomerism was not found) ----
+        let mut ct_no_taut_h_iso: Option<ConTable> = None;
+        let mut sym_no_taut_h_iso = Vec::new();
+        let mut can_no_taut_h_iso = Vec::new();
+        let mut atn_no_taut_h_iso = Vec::new();
+        let mut iso_sort_key_no_taut_h: Vec<i64> = Vec::new();
+        let mut len_iso_sort_key_no_taut_h = 0i32;
+        let mut maxlen_iso_sort_key_no_taut_h = 0i32;
+        let mut num_iso_no_taut_h = 0i32;
+        if s[io].num_isotopic_atoms != 0
+            && s[io].b_ignore_isotopic == 0
+            && !b_req_taut
+            && b_req_non_taut
+        {
+            maxlen_iso_sort_key_no_taut_h = num_atoms as i32 + 1;
+            sym_no_taut_h_iso = vec![0u16; num_max];
+            can_no_taut_h_iso = vec![0u16; num_max];
+            atn_no_taut_h_iso = vec![0u16; num_max];
+            iso_sort_key_no_taut_h = vec![0i64; maxlen_iso_sort_key_no_taut_h as usize];
+            num_iso_no_taut_h = 0;
+            for i in 0..num_atoms {
+                let a = &at_base[i];
+                let key = if a.endpoint != 0 {
+                    make_iso_sort_key(i32::from(a.iso_atw_diff), 0, 0, 0)
+                } else {
+                    make_iso_sort_key(
+                        i32::from(a.iso_atw_diff),
+                        i32::from(a.num_iso_h[0]),
+                        i32::from(a.num_iso_h[1]),
+                        i32::from(a.num_iso_h[2]),
+                    )
+                };
+                if key != 0 {
+                    iso_sort_key_no_taut_h[i] = key;
+                    num_iso_no_taut_h += 1;
+                } else {
+                    iso_sort_key_no_taut_h[i] = EMPTY_ISO_SORT_KEY;
+                }
+            }
+            other_stage!();
+            pcd[io].num_h = Some(num_h_no_taut_h.clone());
+            pcd[io].num_h_fixed = None;
+            pcd[io].iso_sort_key = Some(iso_sort_key_no_taut_h.clone());
+            pcd[io].iso_exchg_atnos = None;
+            pcd[io].maxlen_num_h = maxlen_num_h_no_taut_h;
+            len_iso_sort_key_no_taut_h = num_atoms as i32;
+            pcd[io].maxlen_iso_sort_key = maxlen_iso_sort_key_no_taut_h;
+            pcd[io].maxlen_iso_exchg_atnos = 0;
+            let mut i = 0;
+            if num_iso_no_taut_h != 0 {
+                n_temp_rank.iter_mut().for_each(|x| *x = 0);
+                for i in 0..num_atoms {
+                    let c = sym_no_taut_h[i] as usize - 1;
+                    if (n_temp_rank[c] as usize) < i {
+                        n_temp_rank[c] = i as u16;
+                    }
+                }
+                while i < num_atoms {
+                    if iso_sort_key_no_taut_h[i]
+                        != iso_sort_key_no_taut_h
+                            [n_temp_rank[sym_no_taut_h[i] as usize - 1] as usize]
+                    {
+                        pcd[io].n_canon_flags |= CANON_FLAG_ISO_ONLY_NON_TAUT_DIFF;
+                        break;
+                    }
+                    i += 1;
+                }
+            } else {
+                i = num_atoms;
+            }
+            if i < num_atoms {
+                for x in p_atom_invariant_aux.iter_mut() {
+                    *x = AtomInvariant2::default();
+                }
+                for i in 0..num_atoms {
+                    p_atom_invariant_aux[i].val[0] = sym_no_taut_h[i];
+                    p_atom_invariant_aux[i].iso_sort_key = iso_sort_key_no_taut_h[i];
+                }
+                n_num_curr_ranks = set_initial_ranks2(
+                    num_atoms,
+                    &p_atom_invariant_aux,
+                    &mut n_rank_aux,
+                    &mut n_atom_number_aux,
+                );
+                n_num_curr_ranks = differentiate_ranks2(
+                    num_atoms,
+                    neigh_non_opt.as_mut().unwrap(),
+                    n_num_curr_ranks,
+                    &mut n_rank_aux,
+                    &mut n_temp_rank,
+                    &mut n_atom_number_aux,
+                    &mut l_count,
+                    0,
+                );
+                pcd[io].n_aux_rank = Some(n_rank_aux.clone());
+                let ret = canon!(
+                    TAUT_NON,
+                    num_atoms,
+                    true,
+                    sym_no_taut_h_iso,
+                    can_no_taut_h_iso,
+                    atn_no_taut_h_iso,
+                    io,
+                    ct_no_taut_h.as_ref(),
+                    ct_no_taut_h_iso
+                );
+                if ret < 0 {
+                    fail!(ret);
+                }
+            } else {
+                let mut tmp = new_ct!(io);
+                ct_full_copy(&mut tmp, ct_no_taut_h.as_ref().unwrap());
+                for i in 0..num_atoms {
+                    tmp.iso_sort_key[can_no_taut_h[i] as usize - 1] = iso_sort_key_no_taut_h[i];
+                }
+                tmp.len_iso_sort_key = num_atoms as i32;
+                ct_no_taut_h_iso = Some(tmp);
+                sym_no_taut_h_iso[..num_atoms].copy_from_slice(&sym_no_taut_h[..num_atoms]);
+                can_no_taut_h_iso[..num_atoms].copy_from_slice(&can_no_taut_h[..num_atoms]);
+                atn_no_taut_h_iso[..num_atoms].copy_from_slice(&atn_no_taut_h[..num_atoms]);
+            }
+        }
+
+        // ---- tautomeric base ----
+        let mut ct_base: Option<ConTable> = None;
+        let mut ct_base_iso: Option<ConTable> = None;
+        let mut sym_base = Vec::new();
+        let mut can_base = Vec::new();
+        let mut atn_base = Vec::new();
+        let mut sym_base_iso = Vec::new();
+        let mut can_base_iso = Vec::new();
+        let mut atn_base_iso = Vec::new();
+        let mut num_h: Vec<i16> = Vec::new();
+        let mut maxlen_num_h = 0i32;
+        let mut iso_sort_key_base: Vec<i64> = Vec::new();
+        let mut len_iso_sort_key_base = 0i32;
+        let mut iso_exchg_atnos: Vec<i8> = Vec::new();
+        let mut num_iso_base = 0i32;
+        if b_req_taut {
+            maxlen_num_h = (num_atoms + T_NUM_NO_ISO * (num_at_tg - num_atoms) + 1) as i32;
+            sym_base = vec![0u16; num_max];
+            can_base = vec![0u16; num_max];
+            atn_base = vec![0u16; num_max];
+            num_h = vec![0i16; maxlen_num_h as usize];
+            let tgi = t_group_info.as_deref().unwrap();
+            for i in 0..num_atoms {
+                num_h[i] = if at_base[i].endpoint == 0 && at_base[i].num_h != 0 {
+                    i16::from(at_base[i].num_h) + BASE_H_NUMBER
+                } else {
+                    EMPTY_H_NUMBER
+                };
+            }
+            let mut k = num_atoms;
+            for i in num_atoms..num_at_tg {
+                let m = i - num_atoms;
+                for j in 0..T_NUM_NO_ISO {
+                    let v = tgi.t_group.as_ref().unwrap()[m].num[j];
+                    num_h[k] = if v != 0 {
+                        (i32::from(v) + i32::from(BASE_H_NUMBER)) as i16
+                    } else {
+                        EMPTY_H_NUMBER
+                    };
+                    k += 1;
+                }
+            }
+            let len_num_h = k;
+            let cd = &mut pcd[ib];
+            cd.linear_ct = Vec::new();
+            cd.num_h = Some(num_h.clone());
+            cd.num_h_fixed = None;
+            cd.iso_sort_key = None;
+            cd.iso_exchg_atnos = None;
+            cd.n_max_len_linear_ct = s[ib].n_len_ct + 1;
+            cd.maxlen_num_h = maxlen_num_h;
+            cd.n_len_linear_ct = s[ib].n_len_ct;
+            cd.n_len_ct_at_only = s[ib].n_len_ct_at_only;
+            cd.maxlen_iso_sort_key = 0;
+            cd.maxlen_iso_exchg_atnos = 0;
+            cd.n_aux_rank = None;
+
+            fill_out_atom_invariant2(
+                at_base,
+                num_atoms,
+                num_at_tg,
+                &mut p_atom_invariant,
+                true,
+                false,
+                false,
+                true,
+                true,
+                t_group_info.as_deref(),
+            );
+            for i in 0..num_atoms {
+                p_atom_invariant[i].val[0] = pi[0].rank[i];
+            }
+            {
+                let p0 = &mut pi[0];
+                n_num_curr_ranks = set_initial_ranks2(
+                    num_at_tg,
+                    &p_atom_invariant,
+                    &mut p0.rank,
+                    &mut p0.at_number,
+                );
+                n_num_curr_ranks = differentiate_ranks4(
+                    num_at_tg,
+                    neigh_yes.as_mut().unwrap(),
+                    n_num_curr_ranks,
+                    &mut p0.rank,
+                    &mut n_temp_rank,
+                    &mut p0.at_number,
+                    num_atoms as u16,
+                    &mut l_count,
+                );
+            }
+            for x in p_atom_invariant_aux.iter_mut() {
+                *x = AtomInvariant2::default();
+            }
+            for i in 0..num_atoms {
+                p_atom_invariant_aux[i].val[0] = sym_no_taut_h[i];
+                p_atom_invariant_aux[i].val[1] = num_h[i] as u16;
+            }
+            for j in num_atoms..num_at_tg {
+                p_atom_invariant_aux[j].val[0] = pi[0].rank[j];
+            }
+            n_num_curr_ranks = set_initial_ranks2(
+                num_at_tg,
+                &p_atom_invariant_aux,
+                &mut n_rank_aux,
+                &mut n_atom_number_aux,
+            );
+            n_num_curr_ranks = differentiate_ranks4(
+                num_at_tg,
+                neigh_yes.as_mut().unwrap(),
+                n_num_curr_ranks,
+                &mut n_rank_aux,
+                &mut n_temp_rank,
+                &mut n_atom_number_aux,
+                num_atoms as u16,
+                &mut l_count,
+            );
+            pcd[ib].n_aux_rank = Some(n_rank_aux.clone());
+            let ret = canon!(
+                TAUT_YES,
+                num_at_tg,
+                true,
+                sym_base,
+                can_base,
+                atn_base,
+                ib,
+                ct_no_taut_h.as_ref(),
+                ct_base
+            );
+            if ret < 0 {
+                fail!(ret);
+            }
+
+            // tautomeric isotopic structure
+            let tgi_now = t_group_info.as_deref().unwrap();
+            if (s[ib].num_isotopic_atoms != 0 && s[ib].b_ignore_isotopic == 0)
+                || (s[ib].b_has_isotopic_taut_groups != 0 && b_taut_ignore_isotopic == 0)
+                || (b_use_iso_aux_base[ib] && b_taut_ignore_isotopic == 0)
+            {
+                t_group_info.as_deref_mut().unwrap().b_ignore_isotopic = b_taut_ignore_isotopic;
+                sym_base_iso = vec![0u16; num_max];
+                can_base_iso = vec![0u16; num_max];
+                atn_base_iso = vec![0u16; num_max];
+                let mut maxlen_iso_exchg_atnos = 0i32;
+                let mut len_iso_exchg_atnos = 0i32;
+                if b_use_iso_aux_base[ib] {
+                    maxlen_iso_exchg_atnos = num_max as i32 + 1;
+                    iso_exchg_atnos = vec![0i8; maxlen_iso_exchg_atnos as usize];
+                }
+                let mut maxlen_iso_sort_key_base = num_max as i32 + 1;
+                iso_sort_key_base = vec![0i64; maxlen_iso_sort_key_base as usize];
+                num_iso_no_taut_h = 0;
+                let mut num_iso_no_aux_base = 0i32;
+                if !iso_exchg_atnos.is_empty() {
+                    len_iso_exchg_atnos = num_at_tg as i32;
+                }
+                let tgi = t_group_info.as_deref().unwrap();
+                for i in 0..num_atoms {
+                    let a = &at_base[i];
+                    let key;
+                    if a.endpoint != 0
+                        || (!iso_exchg_atnos.is_empty() && a.c_flags & AT_FLAG_ISO_H_POINT != 0)
+                    {
+                        key = make_iso_sort_key(i32::from(a.iso_atw_diff), 0, 0, 0);
+                        if !iso_exchg_atnos.is_empty() {
+                            num_iso_no_aux_base += i32::from(a.endpoint == 0);
+                        }
+                    } else {
+                        key = make_iso_sort_key(
+                            i32::from(a.iso_atw_diff),
+                            i32::from(a.num_iso_h[0]),
+                            i32::from(a.num_iso_h[1]),
+                            i32::from(a.num_iso_h[2]),
+                        );
+                        if !iso_exchg_atnos.is_empty() {
+                            iso_exchg_atnos[i] = 1;
+                        }
+                    }
+                    if key != 0 {
+                        num_iso_no_taut_h += 1;
+                        iso_sort_key_base[i] = key;
+                    } else {
+                        iso_sort_key_base[i] = EMPTY_ISO_SORT_KEY;
+                    }
+                }
+                if !iso_exchg_atnos.is_empty() {
+                    if num_iso_no_aux_base != i32::from(tgi.n_isotopic_endpoint_atom_number[0]) {
+                        fail!(CT_ISOCOUNT_ERR);
+                    }
+                    for i in 1..=num_iso_no_aux_base as usize {
+                        let j = tgi.n_isotopic_endpoint_atom_number[i] as usize;
+                        if at_base[j].endpoint != 0 || at_base[j].c_flags & AT_FLAG_ISO_H_POINT == 0
+                        {
+                            fail!(CT_ISOCOUNT_ERR);
+                        }
+                    }
+                }
+                num_iso_base = 0;
+                if !iso_exchg_atnos.is_empty() {
+                    for i in num_atoms..num_at_tg {
+                        iso_sort_key_base[i] = EMPTY_ISO_SORT_KEY;
+                    }
+                } else {
+                    for i in num_atoms..num_at_tg {
+                        let m = i - num_atoms;
+                        let key = tgi.t_group.as_ref().unwrap()[m].i_weight;
+                        if key != 0 {
+                            num_iso_base += 1;
+                            iso_sort_key_base[i] = key;
+                        } else {
+                            iso_sort_key_base[i] = EMPTY_ISO_SORT_KEY;
+                        }
+                    }
+                }
+                if num_iso_no_aux_base == 0 && !iso_exchg_atnos.is_empty() {
+                    iso_exchg_atnos = Vec::new();
+                    len_iso_exchg_atnos = 0;
+                    maxlen_iso_exchg_atnos = 0;
+                }
+                if num_iso_no_taut_h == 0 && num_iso_base == 0 && !iso_sort_key_base.is_empty() {
+                    iso_sort_key_base = Vec::new();
+                    maxlen_iso_sort_key_base = 0;
+                } else {
+                    len_iso_sort_key_base = num_at_tg as i32;
+                }
+                if iso_exchg_atnos.is_empty() && iso_sort_key_base.is_empty() {
+                    sym_base_iso = Vec::new();
+                    can_base_iso = Vec::new();
+                    atn_base_iso = Vec::new();
+                } else {
+                    let cd = &mut pcd[ib];
+                    cd.linear_ct = Vec::new();
+                    cd.num_h = Some(num_h.clone());
+                    cd.num_h_fixed = None;
+                    cd.iso_sort_key =
+                        (!iso_sort_key_base.is_empty()).then(|| iso_sort_key_base.clone());
+                    cd.iso_exchg_atnos =
+                        (!iso_exchg_atnos.is_empty()).then(|| iso_exchg_atnos.clone());
+                    cd.n_max_len_linear_ct = s[ib].n_len_ct + 1;
+                    cd.maxlen_num_h = maxlen_num_h;
+                    cd.n_len_linear_ct = s[ib].n_len_ct;
+                    cd.n_len_ct_at_only = s[ib].n_len_ct_at_only;
+                    cd.maxlen_iso_sort_key = maxlen_iso_sort_key_base;
+                    cd.maxlen_iso_exchg_atnos = maxlen_iso_exchg_atnos;
+                    cd.n_aux_rank = None;
+                    let mut i;
+                    if num_iso_no_taut_h != 0 || num_iso_base != 0 || num_iso_no_aux_base != 0 {
+                        n_temp_rank.iter_mut().for_each(|x| *x = 0);
+                        for i in 0..num_at_tg {
+                            let c = sym_base[i] as usize - 1;
+                            if (n_temp_rank[c] as usize) < i {
+                                n_temp_rank[c] = i as u16;
+                            }
+                        }
+                        i = 0;
+                        while i < num_at_tg {
+                            let rep = n_temp_rank[sym_base[i] as usize - 1] as usize;
+                            if (!iso_sort_key_base.is_empty()
+                                && iso_sort_key_base[i] != iso_sort_key_base[rep])
+                                || (!iso_exchg_atnos.is_empty()
+                                    && iso_exchg_atnos[i] != iso_exchg_atnos[rep])
+                            {
+                                pcd[ib].n_canon_flags |= CANON_FLAG_ISO_TAUT_DIFF;
+                                break;
+                            }
+                            i += 1;
+                        }
+                    } else {
+                        i = num_at_tg;
+                    }
+                    if i < num_at_tg {
+                        for x in p_atom_invariant_aux.iter_mut() {
+                            *x = AtomInvariant2::default();
+                        }
+                        for i in 0..num_at_tg {
+                            p_atom_invariant_aux[i].val[0] = sym_base[i];
+                            p_atom_invariant_aux[i].iso_sort_key = if iso_sort_key_base.is_empty() {
+                                0
+                            } else {
+                                iso_sort_key_base[i]
+                            };
+                            p_atom_invariant_aux[i].iso_aux_key = if iso_exchg_atnos.is_empty() {
+                                0
+                            } else {
+                                iso_exchg_atnos[i]
+                            };
+                        }
+                        n_num_curr_ranks = set_initial_ranks2(
+                            num_at_tg,
+                            &p_atom_invariant_aux,
+                            &mut n_rank_aux,
+                            &mut n_atom_number_aux,
+                        );
+                        n_num_curr_ranks = differentiate_ranks2(
+                            num_at_tg,
+                            neigh_yes.as_mut().unwrap(),
+                            n_num_curr_ranks,
+                            &mut n_rank_aux,
+                            &mut n_temp_rank,
+                            &mut n_atom_number_aux,
+                            &mut l_count,
+                            0,
+                        );
+                        pcd[ib].n_aux_rank = Some(n_rank_aux.clone());
+                        let ret = canon!(
+                            TAUT_YES,
+                            num_at_tg,
+                            true,
+                            sym_base_iso,
+                            can_base_iso,
+                            atn_base_iso,
+                            ib,
+                            ct_base.as_ref(),
+                            ct_base_iso
+                        );
+                        if ret < 0 {
+                            fail!(ret);
+                        }
+                    } else {
+                        let mut tmp = new_ct!(ib);
+                        ct_full_copy(&mut tmp, ct_base.as_ref().unwrap());
+                        if !iso_sort_key_base.is_empty() {
+                            for i in 0..num_at_tg {
+                                tmp.iso_sort_key[can_base[i] as usize - 1] = iso_sort_key_base[i];
+                            }
+                            tmp.len_iso_sort_key = num_at_tg as i32;
+                        } else {
+                            tmp.len_iso_sort_key = 0;
+                        }
+                        if !iso_exchg_atnos.is_empty() {
+                            for i in 0..num_atoms {
+                                tmp.iso_exchg_atnos[can_base[i] as usize - 1] = iso_exchg_atnos[i];
+                            }
+                            tmp.len_iso_exchg_atnos = num_at_tg as i32;
+                        } else {
+                            tmp.len_iso_exchg_atnos = 0;
+                        }
+                        ct_base_iso = Some(tmp);
+                        sym_base_iso[..num_at_tg].copy_from_slice(&sym_base[..num_at_tg]);
+                        can_base_iso[..num_at_tg].copy_from_slice(&can_base[..num_at_tg]);
+                        atn_base_iso[..num_at_tg].copy_from_slice(&atn_base[..num_at_tg]);
+                    }
+                    t_group_info.as_deref_mut().unwrap().b_ignore_isotopic = 1;
+                }
+            }
+        }
+
+        // ---- "fixed H" ----
+        let mut ct_fix_h: Option<ConTable> = None;
+        let mut ct_fix_h_iso: Option<ConTable> = None;
+        let mut sym_fix_h = Vec::new();
+        let mut can_fix_h = Vec::new();
+        let mut atn_fix_h = Vec::new();
+        let mut sym_fix_h_iso = Vec::new();
+        let mut can_fix_h_iso = Vec::new();
+        let mut atn_fix_h_iso = Vec::new();
+        let mut num_h_fixed: Vec<i16> = Vec::new();
+        if b_req_taut && b_req_non_taut {
+            let maxlen_num_h_fixed = num_atoms as i32 + 1;
+            sym_fix_h = vec![0u16; num_max];
+            can_fix_h = vec![0u16; num_max];
+            atn_fix_h = vec![0u16; num_max];
+            num_h_fixed = vec![0i16; maxlen_num_h_fixed as usize];
+            let at_other = at_other.unwrap();
+            for i in 0..num_atoms {
+                num_h_fixed[i] = if at_base[i].endpoint != 0 {
+                    num_h_plus_base(at_other[i].num_h)
+                } else if at_other[i].num_h != at_base[i].num_h {
+                    i16::from(at_other[i].num_h) - i16::from(at_base[i].num_h) + BASE_H_NUMBER
+                } else {
+                    EMPTY_H_NUMBER
+                };
+            }
+            other_stage!();
+            pcd[io].num_h = Some(num_h_no_taut_h.clone());
+            pcd[io].num_h_fixed = Some(num_h_fixed.clone());
+            pcd[io].iso_sort_key = None;
+            pcd[io].iso_exchg_atnos = None;
+            pcd[io].maxlen_num_h = maxlen_num_h_no_taut_h;
+            pcd[io].maxlen_num_h_fixed = maxlen_num_h_fixed;
+            pcd[io].maxlen_iso_sort_key = 0;
+            pcd[io].maxlen_iso_exchg_atnos = 0;
+            for x in p_atom_invariant_aux.iter_mut() {
+                *x = AtomInvariant2::default();
+            }
+            for i in 0..num_atoms {
+                p_atom_invariant_aux[i].val[0] = sym_base[i];
+                p_atom_invariant_aux[i].val[1] = num_h_fixed[i] as u16;
+            }
+            n_num_curr_ranks = set_initial_ranks2(
+                num_atoms,
+                &p_atom_invariant_aux,
+                &mut n_rank_aux,
+                &mut n_atom_number_aux,
+            );
+            n_num_curr_ranks = differentiate_ranks2(
+                num_atoms,
+                neigh_non_opt.as_mut().unwrap(),
+                n_num_curr_ranks,
+                &mut n_rank_aux,
+                &mut n_temp_rank,
+                &mut n_atom_number_aux,
+                &mut l_count,
+                0,
+            );
+            pcd[io].n_aux_rank = Some(n_rank_aux.clone());
+            let ret = canon!(
+                TAUT_NON,
+                num_atoms,
+                false,
+                sym_fix_h,
+                can_fix_h,
+                atn_fix_h,
+                io,
+                ct_no_taut_h.as_ref(),
+                ct_fix_h
+            );
+            if ret < 0 {
+                fail!(ret);
+            }
+
+            // "fixed H" isotopic
+            let mut iflag = (s[ib].num_isotopic_atoms != 0 && s[ib].b_ignore_isotopic == 0)
+                || (s[ib].b_has_isotopic_taut_groups != 0 && b_taut_ignore_isotopic == 0);
+            if b_fix_iso_fixed_h {
+                iflag = iflag || (s[io].num_isotopic_atoms != 0 && s[io].b_ignore_isotopic == 0);
+            }
+            if iflag {
+                maxlen_iso_sort_key_no_taut_h = num_atoms as i32 + 1;
+                sym_fix_h_iso = vec![0u16; num_max];
+                can_fix_h_iso = vec![0u16; num_max];
+                atn_fix_h_iso = vec![0u16; num_max];
+                iso_sort_key_no_taut_h = vec![0i64; maxlen_iso_sort_key_no_taut_h as usize];
+                for i in 0..num_atoms {
+                    let a = if b_fix_iso_fixed_h {
+                        &at_other[i]
+                    } else {
+                        &at_base[i]
+                    };
+                    let key = make_iso_sort_key(
+                        i32::from(a.iso_atw_diff),
+                        i32::from(a.num_iso_h[0]),
+                        i32::from(a.num_iso_h[1]),
+                        i32::from(a.num_iso_h[2]),
+                    );
+                    if key != 0 {
+                        iso_sort_key_no_taut_h[i] = key;
+                        num_iso_no_taut_h += 1;
+                    } else {
+                        iso_sort_key_no_taut_h[i] = EMPTY_ISO_SORT_KEY;
+                    }
+                }
+                other_stage!();
+                pcd[io].num_h = Some(num_h_no_taut_h.clone());
+                pcd[io].num_h_fixed = Some(num_h_fixed.clone());
+                pcd[io].iso_sort_key = Some(iso_sort_key_no_taut_h.clone());
+                pcd[io].iso_exchg_atnos = None;
+                pcd[io].maxlen_num_h = maxlen_num_h_no_taut_h;
+                pcd[io].maxlen_num_h_fixed = maxlen_num_h_fixed;
+                len_iso_sort_key_no_taut_h = num_atoms as i32;
+                pcd[io].maxlen_iso_sort_key = maxlen_iso_sort_key_no_taut_h;
+                pcd[io].maxlen_iso_exchg_atnos = 0;
+                let mut i;
+                if num_iso_no_taut_h != 0 {
+                    n_temp_rank.iter_mut().for_each(|x| *x = 0);
+                    for i in 0..num_atoms {
+                        let c = sym_fix_h[i] as usize - 1;
+                        if (n_temp_rank[c] as usize) < i {
+                            n_temp_rank[c] = i as u16;
+                        }
+                    }
+                    i = 0;
+                    while i < num_atoms {
+                        if iso_sort_key_no_taut_h[i]
+                            != iso_sort_key_no_taut_h
+                                [n_temp_rank[sym_fix_h[i] as usize - 1] as usize]
+                        {
+                            break;
+                        }
+                        i += 1;
+                    }
+                } else {
+                    i = num_atoms;
+                }
+                if i < num_atoms {
+                    pcd[io].n_canon_flags |= CANON_FLAG_ISO_FIXED_H_DIFF;
+                    for x in p_atom_invariant_aux.iter_mut() {
+                        *x = AtomInvariant2::default();
+                    }
+                    for i in 0..num_atoms {
+                        p_atom_invariant_aux[i].val[0] = sym_fix_h[i];
+                        p_atom_invariant_aux[i].iso_sort_key = iso_sort_key_no_taut_h[i];
+                    }
+                    n_num_curr_ranks = set_initial_ranks2(
+                        num_atoms,
+                        &p_atom_invariant_aux,
+                        &mut n_rank_aux,
+                        &mut n_atom_number_aux,
+                    );
+                    n_num_curr_ranks = differentiate_ranks2(
+                        num_atoms,
+                        neigh_non_opt.as_mut().unwrap(),
+                        n_num_curr_ranks,
+                        &mut n_rank_aux,
+                        &mut n_temp_rank,
+                        &mut n_atom_number_aux,
+                        &mut l_count,
+                        0,
+                    );
+                    pcd[io].n_aux_rank = Some(n_rank_aux.clone());
+                    let ret = canon!(
+                        TAUT_NON,
+                        num_atoms,
+                        true,
+                        sym_fix_h_iso,
+                        can_fix_h_iso,
+                        atn_fix_h_iso,
+                        io,
+                        ct_fix_h.as_ref(),
+                        ct_fix_h_iso
+                    );
+                    if ret < 0 {
+                        fail!(ret);
+                    }
+                } else {
+                    let mut tmp = new_ct!(io);
+                    ct_full_copy(&mut tmp, ct_fix_h.as_ref().unwrap());
+                    for i in 0..num_atoms {
+                        tmp.iso_sort_key[can_fix_h[i] as usize - 1] = iso_sort_key_no_taut_h[i];
+                    }
+                    tmp.len_iso_sort_key = num_atoms as i32;
+                    ct_fix_h_iso = Some(tmp);
+                    sym_fix_h_iso[..num_atoms].copy_from_slice(&sym_fix_h[..num_atoms]);
+                    can_fix_h_iso[..num_atoms].copy_from_slice(&can_fix_h[..num_atoms]);
+                    atn_fix_h_iso[..num_atoms].copy_from_slice(&atn_fix_h[..num_atoms]);
+                }
+            }
+        }
+
+        // ---- consistency check ----
+        let ctb = |c: &ConTable, len: i32| c.ctbl[..len as usize].to_vec();
+        let nh = |c: &ConTable, len: i32| c.num_h[..len as usize].to_vec();
+        let c_no_h = ct_no_h.as_ref().unwrap();
+        let c_no_taut_h = ct_no_taut_h.as_ref().unwrap();
+        let mut cons = false;
+        cons |= c_no_h.len_ct != c_no_taut_h.len_ct
+            || ctb(c_no_h, c_no_h.len_ct) != ctb(c_no_taut_h, c_no_h.len_ct);
+        if b_req_taut {
+            let c_base = ct_base.as_ref().unwrap();
+            if let Some(c_fix) = ct_fix_h.as_ref() {
+                cons |= c_no_taut_h.len_ct != c_fix.len_ct
+                    || ctb(c_no_taut_h, c_no_taut_h.len_ct) != ctb(c_fix, c_no_taut_h.len_ct);
+                cons |= c_no_taut_h.len_num_h != c_fix.len_num_h
+                    || nh(c_no_taut_h, c_no_taut_h.len_num_h) != nh(c_fix, c_no_taut_h.len_num_h);
+            }
+            cons |= c_no_taut_h.len_ct > c_base.len_ct
+                || ctb(c_no_taut_h, c_no_taut_h.len_ct) != ctb(c_base, c_no_taut_h.len_ct);
+            cons |= c_no_taut_h.len_num_h > c_base.len_num_h
+                || nh(c_no_taut_h, c_no_taut_h.len_num_h) != nh(c_base, c_no_taut_h.len_num_h);
+        }
+        if let Some(c_iso) = ct_no_taut_h_iso.as_ref() {
+            cons |= c_no_h.len_ct != c_iso.len_ct
+                || ctb(c_no_h, c_no_h.len_ct) != ctb(c_iso, c_no_h.len_ct);
+            cons |= c_no_taut_h.len_num_h != c_iso.len_num_h
+                || nh(c_no_taut_h, c_no_taut_h.len_num_h) != nh(c_iso, c_no_taut_h.len_num_h);
+        } else if let Some(c_biso) = ct_base_iso.as_ref() {
+            let c_base = ct_base.as_ref().unwrap();
+            cons |= c_biso.len_ct != c_base.len_ct
+                || ctb(c_biso, c_biso.len_ct) != ctb(c_base, c_biso.len_ct);
+            cons |= c_biso.len_num_h != c_base.len_num_h
+                || nh(c_biso, c_biso.len_num_h) != nh(c_base, c_biso.len_num_h);
+            if let Some(c_fiso) = ct_fix_h_iso.as_ref() {
+                cons |= c_fiso.len_ct > c_biso.len_ct
+                    || ctb(c_fiso, c_fiso.len_ct) != ctb(c_biso, c_fiso.len_ct);
+                cons |= c_fiso.len_num_h > c_biso.len_num_h
+                    || nh(c_fiso, c_fiso.len_num_h) != nh(c_biso, c_fiso.len_num_h);
+            }
+        }
+        if cons {
+            fail!(1);
+        }
+        if b_req_taut {
+            t_group_info.unwrap().b_ignore_isotopic = b_taut_ignore_isotopic;
+        }
+
+        // ---- output ----
+        bcn.num_max = num_max;
+        bcn.num_at_tg = num_at_tg;
+        bcn.num_atoms = num_atoms;
+        bcn.ftcn[TAUT_NON].neigh_list = neigh_non_opt.take();
+        bcn.ftcn[TAUT_YES].neigh_list = neigh_yes.take();
+        if b_req_taut {
+            let f = &mut bcn.ftcn[TAUT_YES];
+            let mut c_base = ct_base.take().unwrap();
+            f.num_at_tg = num_at_tg;
+            f.num_atoms = num_atoms;
+            f.linear_ct = std::mem::take(&mut c_base.ctbl);
+            f.n_len_linear_ct_at_only = s[ib].n_len_ct_at_only;
+            f.n_max_len_linear_ct = s[ib].n_len_ct + 1;
+            f.n_len_linear_ct = s[ib].n_len_ct;
+            f.partition_ct = Partition {
+                rank: std::mem::take(&mut can_base),
+                at_number: std::mem::take(&mut atn_base),
+            };
+            f.n_symm_rank_ct = std::mem::take(&mut sym_base);
+            f.n_num_h_orig = std::mem::take(&mut num_h);
+            f.n_num_h = std::mem::take(&mut c_base.num_h);
+            f.n_len_num_h = maxlen_num_h.min(c_base.maxlen_num_h);
+            f.n_num_h_orig_fix_h = Vec::new();
+            f.n_num_h_fix_h = Vec::new();
+            f.n_len_num_h_fix_h = 0;
+            f.n_canon_flags |= pcd[ib].n_canon_flags;
+            let l = f.n_len_num_h as usize;
+            clean_num_h_if_any(&mut f.n_num_h_orig, l);
+            clean_num_h_if_any(&mut f.n_num_h, l);
+            clean_ct(&mut f.linear_ct, f.n_len_linear_ct as usize);
+            if let Some(mut c_biso) = ct_base_iso.take() {
+                f.partition_ct_iso = Partition {
+                    rank: std::mem::take(&mut can_base_iso),
+                    at_number: std::mem::take(&mut atn_base_iso),
+                };
+                f.n_symm_rank_ct_iso = std::mem::take(&mut sym_base_iso);
+                f.iso_sort_keys = std::mem::take(&mut c_biso.iso_sort_key);
+                f.iso_sort_keys_orig = std::mem::take(&mut iso_sort_key_base);
+                f.len_iso_sort_keys = len_iso_sort_key_base;
+                f.iso_exchg_atnos = std::mem::take(&mut c_biso.iso_exchg_atnos);
+                f.iso_exchg_atnos_orig = std::mem::take(&mut iso_exchg_atnos);
+                let l = f.len_iso_sort_keys as usize;
+                clean_iso_keys_if_any(&mut f.iso_sort_keys, l);
+                clean_iso_keys_if_any(&mut f.iso_sort_keys_orig, l);
+            }
+        }
+        if b_req_non_taut {
+            if !b_req_taut {
+                sym_fix_h = std::mem::take(&mut sym_no_taut_h);
+                can_fix_h = std::mem::take(&mut can_no_taut_h);
+                atn_fix_h = std::mem::take(&mut atn_no_taut_h);
+                ct_fix_h = ct_no_taut_h.take();
+                sym_fix_h_iso = std::mem::take(&mut sym_no_taut_h_iso);
+                can_fix_h_iso = std::mem::take(&mut can_no_taut_h_iso);
+                atn_fix_h_iso = std::mem::take(&mut atn_no_taut_h_iso);
+                ct_fix_h_iso = ct_no_taut_h_iso.take();
+                if io == TAUT_YES
+                    && bcn.ftcn[TAUT_NON].neigh_list.is_some()
+                    && bcn.ftcn[TAUT_YES].neigh_list.is_none()
+                {
+                    bcn.ftcn[TAUT_YES].neigh_list = bcn.ftcn[TAUT_NON].neigh_list.take();
+                }
+            }
+            let f = &mut bcn.ftcn[io];
+            let mut c_fix = ct_fix_h.take().unwrap();
+            f.num_at_tg = num_atoms;
+            f.num_atoms = num_atoms;
+            f.linear_ct = std::mem::take(&mut c_fix.ctbl);
+            f.n_len_linear_ct_at_only = s[io].n_len_ct_at_only;
+            f.n_max_len_linear_ct = s[io].n_len_ct_at_only + 1;
+            f.n_len_linear_ct = s[io].n_len_ct_at_only;
+            f.partition_ct = Partition {
+                rank: std::mem::take(&mut can_fix_h),
+                at_number: std::mem::take(&mut atn_fix_h),
+            };
+            f.n_symm_rank_ct = std::mem::take(&mut sym_fix_h);
+            f.n_num_h_orig = std::mem::take(&mut num_h_no_taut_h);
+            f.n_num_h = std::mem::take(&mut c_fix.num_h);
+            f.n_len_num_h = maxlen_num_h_no_taut_h.min(c_fix.maxlen_num_h);
+            f.n_num_h_orig_fix_h = std::mem::take(&mut num_h_fixed);
+            f.n_num_h_fix_h = std::mem::take(&mut c_fix.num_h_fixed);
+            f.n_len_num_h_fix_h = num_atoms as i32;
+            f.n_canon_flags |= pcd[io].n_canon_flags;
+            let l = f.n_len_num_h as usize;
+            clean_num_h_if_any(&mut f.n_num_h_orig, l);
+            clean_num_h_if_any(&mut f.n_num_h_orig_fix_h, l);
+            clean_num_h_if_any(&mut f.n_num_h, l);
+            clean_num_h_if_any(&mut f.n_num_h_fix_h, l);
+            clean_ct(&mut f.linear_ct, f.n_len_linear_ct as usize);
+            if let Some(mut c_fiso) = ct_fix_h_iso.take() {
+                f.partition_ct_iso = Partition {
+                    rank: std::mem::take(&mut can_fix_h_iso),
+                    at_number: std::mem::take(&mut atn_fix_h_iso),
+                };
+                f.n_symm_rank_ct_iso = std::mem::take(&mut sym_fix_h_iso);
+                f.iso_sort_keys = std::mem::take(&mut c_fiso.iso_sort_key);
+                f.iso_sort_keys_orig = std::mem::take(&mut iso_sort_key_no_taut_h);
+                f.len_iso_sort_keys = len_iso_sort_key_no_taut_h;
+                let l = f.len_iso_sort_keys as usize;
+                clean_iso_keys_if_any(&mut f.iso_sort_keys, l);
+                clean_iso_keys_if_any(&mut f.iso_sort_keys_orig, l);
+            }
+        }
+        0
+    };
+    // the first two arrays of the rank stack belong to this function
+    if !pi.is_empty() {
+        pi[0] = Partition::default();
+    }
+    bcn.p_rank_stack = pi;
+    ret
 }
