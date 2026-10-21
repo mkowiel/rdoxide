@@ -14132,3 +14132,136 @@ fn ichiprt1_bond_writer_matches_the_c_code() {
         assert_eq!(vec![got], want, "case {ci}: {}", c["in"]);
     }
 }
+
+#[test]
+fn ichiprt1_orig_struct_and_reversibility_match_the_c_code() {
+    use rdoxide::external::inchi::ichi_io::{
+        INCHI_IOS_TYPE_STRING, InchiIosString, InchiIostream, IosFile, inchi_ios_init,
+        inchi_strbuf_init,
+    };
+    use rdoxide::external::inchi::ichiprt1::*;
+    use rdoxide::external::inchi::inpdef::InpAtom;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_prt1g.json")).unwrap();
+    fn coord(t: &mut InchiTok) -> MolCoord {
+        let s = t.s();
+        let mut c = [b'X'; MOL_COORD_LEN];
+        for (d, b) in c.iter_mut().zip(s.bytes()) {
+            *d = match b {
+                b'_' => b' ',
+                b'~' => 0,
+                x => x,
+            };
+        }
+        c
+    }
+    for (ci, c) in data.as_array().unwrap().iter().enumerate() {
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        let mut t = InchiTok(c["in"].as_str().unwrap().split_whitespace());
+        let n = t.i() as usize;
+        let has_coord = t.i() != 0;
+        let alloc = t.i() as i32;
+        let plain = t.i() as i32;
+        let second = t.i() as i32;
+        let ntag = t.i() as i32;
+        let fh = t.i() as i32;
+        let lfopt = t.i() != 0;
+        let chiral = t.i() as i32;
+        let n_zy = t.i() as i32;
+        let mut at = vec![InpAtom::default(); n];
+        let mut coords = vec![[0u8; MOL_COORD_LEN]; n];
+        for (k, a) in at.iter_mut().enumerate() {
+            let el = t.s();
+            a.set_elname(&el);
+            a.el_number = t.i() as u8;
+            a.valence = t.i() as i8;
+            for m in 0..a.valence as usize {
+                a.neighbor[m] = t.i() as u16;
+            }
+            for m in 0..a.valence as usize {
+                a.bond_type[m] = t.i() as u8;
+            }
+            for m in 0..a.valence as usize {
+                a.bond_stereo[m] = t.i() as i8;
+            }
+            a.chem_bonds_valence = t.i() as i8;
+            for m in 0..3 {
+                a.sb_parity[m] = t.i() as i8;
+            }
+            for m in 0..3 {
+                a.sb_ord[m] = t.i() as i8;
+            }
+            for m in 0..3 {
+                a.sn_ord[m] = t.i() as i8;
+            }
+            a.orig_at_number = t.i() as u16;
+            a.num_h = t.i() as i8;
+            a.charge = t.i() as i8;
+            a.radical = t.i() as i8;
+            for m in 0..3 {
+                a.num_iso_h[m] = t.i() as i8;
+            }
+            a.iso_atw_diff = t.i() as i8;
+            for m in 0..3 {
+                let mc = coord(&mut t);
+                if m == 0 {
+                    coords[k] = mc;
+                }
+            }
+        }
+        let mut err = String::new();
+        let fill = orig_struct_fill_out(
+            n,
+            n_zy,
+            has_coord.then_some(&coords[..]),
+            &at,
+            chiral,
+            &mut err,
+        );
+        let (ret, os) = match &fill {
+            Ok(o) => (0, Some(o.clone())),
+            Err(e) => (*e, None),
+        };
+        let o = os.clone().unwrap_or_default();
+        let f = |s: &Option<String>| s.clone().unwrap_or_else(|| "-".to_string());
+        let mut lines = vec![format!(
+            "{ret} {} {} [{}] [{}] [{}] [{err}]",
+            o.num_atoms,
+            o.n_zy,
+            f(&o.sz_atoms),
+            f(&o.sz_bonds),
+            f(&o.sz_coord)
+        )];
+        let mut sb = InchiIosString::default();
+        inchi_strbuf_init(&mut sb, alloc, 16);
+        let mut out = InchiIostream::default();
+        inchi_ios_init(&mut out, INCHI_IOS_TYPE_STRING, IosFile::None);
+        let mut io = InchiOutCtl {
+            b_plain_text_tags: plain,
+            b_second_non_taut_pass: second,
+            n_tag: ntag,
+            b_fh_tag: fh,
+            ..Default::default()
+        };
+        let (lf, _) = set_line_separators(if lfopt { 0x80 } else { 0 });
+        let r = output_auxinfo_reversibility_info(&mut out, &mut sb, os.as_ref(), &mut io, lf);
+        lines.push(format!(
+            "{r} [{}] [{}] {}",
+            io.sz_tag2,
+            strbuf_str(&out.s),
+            sb.n_used_length
+        ));
+        let got: Vec<String> = lines
+            .join("\n")
+            .split('\n')
+            .filter(|l| !l.is_empty())
+            .map(String::from)
+            .collect();
+        assert_eq!(got, want, "case {ci}: {}", c["in"]);
+    }
+}

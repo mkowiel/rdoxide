@@ -730,3 +730,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-21 — Stage None: I8i OutputAUXINFO_* layers (except reversibility/polymer) differential-tested against C (7915 cases)
 * 2026-10-21 — Stage None: I8j CleanOrigCoord/WriteOrigCoord/WriteOrigAtoms differential-tested against C (9000 cases)
 * 2026-10-21 — Stage None: I8k WriteOrigBonds differential-tested against C (9000 cases)
+* 2026-10-21 — Stage None: I8l OrigStruct_FillOut and OutputAUXINFO_ReversibilityInfo differential-tested against C (6000 cases)

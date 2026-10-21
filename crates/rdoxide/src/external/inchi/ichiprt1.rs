@@ -1849,10 +1849,8 @@ pub fn clean_orig_coord(sz_coord: &mut MolCoord, delim: u8) -> i32 {
         } else {
             len = q;
             let mut last = len;
-            if let Some(p) = v
-                .iter()
-                .position(|&c| matches!(c, b'e' | b'E' | b'd' | b'D'))
-            {
+            // the C code looks for 'e', then 'E', then 'd', then 'D'
+            if let Some(p) = b"eEdD".iter().find_map(|&x| v.iter().position(|&c| c == x)) {
                 last = p;
                 let (e, _) = strtol10(&sz_val[last + 1..]);
                 if e != 0 {
@@ -2302,4 +2300,198 @@ pub fn write_orig_bonds(
     }
     *i = if num_inp_atoms > 0 { j } else { 0 };
     buf
+}
+
+/// `ORIG_STRUCT` (the polymer and V3000 pointers are not ported yet)
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct OrigStruct {
+    pub num_atoms: i32,
+    pub sz_atoms: Option<String>,
+    pub sz_bonds: Option<String>,
+    pub sz_coord: Option<String>,
+    pub n_zy: i32,
+}
+
+/// `ORIG_STR_BUFLEN`
+const ORIG_STR_BUFLEN: usize = 7 * super::inpdef::MAXVAL + 2;
+
+/// `OrigStruct_FillOut`: the text of the original structure (`-1` on
+/// failure); `sz_coord` is the coordinate array of the input (`None` for no
+/// coordinates), `err` receives the structure error messages
+pub fn orig_struct_fill_out(
+    num_inp_atoms: usize,
+    n_zy: i32,
+    sz_coord: Option<&[MolCoord]>,
+    at: &[InpAtom],
+    chiral_flag: i32,
+    err: &mut String,
+) -> Result<OrigStruct, i32> {
+    let mut o = OrigStruct {
+        n_zy,
+        ..Default::default()
+    };
+    if let Some(coord) = sz_coord {
+        let (mut len_coord, mut i) = (0, 0);
+        loop {
+            let s = write_orig_coord(num_inp_atoms, coord, &mut i, ORIG_STR_BUFLEN);
+            if s.is_empty() {
+                break;
+            }
+            len_coord += s.len();
+        }
+        let mut i = 0;
+        let s = write_orig_coord(num_inp_atoms, coord, &mut i, len_coord + 1);
+        if s.len() == len_coord && i == num_inp_atoms {
+            o.sz_coord = Some(s);
+        } else {
+            return Err(-1);
+        }
+    }
+    let (mut len_atoms, mut i) = (0, 0);
+    loop {
+        let s = write_orig_atoms(num_inp_atoms, at, &mut i, ORIG_STR_BUFLEN, chiral_flag);
+        if s.is_empty() {
+            break;
+        }
+        len_atoms += s.len();
+        if num_inp_atoms == 0 {
+            break;
+        }
+    }
+    let mut i = 0;
+    let s = write_orig_atoms(num_inp_atoms, at, &mut i, len_atoms + 1, chiral_flag);
+    if s.len() == len_atoms && i == num_inp_atoms {
+        o.sz_atoms = Some(s);
+    } else {
+        return Err(-1);
+    }
+    let (mut len_bonds, mut i) = (0, 1);
+    loop {
+        let s = write_orig_bonds(num_inp_atoms, at, &mut i, ORIG_STR_BUFLEN, err);
+        if s.is_empty() {
+            break;
+        }
+        len_bonds += s.len();
+        if num_inp_atoms == 0 {
+            break;
+        }
+    }
+    let mut i = 1;
+    let s = write_orig_bonds(num_inp_atoms, at, &mut i, len_bonds + 2, err);
+    if s.len() == len_bonds && i == num_inp_atoms {
+        o.sz_bonds = Some(s);
+    } else {
+        return Err(-1);
+    }
+    o.num_atoms = num_inp_atoms as i32;
+    Ok(o)
+}
+
+/// `OutputAUXINFO_ReversibilityInfo`
+pub fn output_auxinfo_reversibility_info(
+    out_file: &mut InchiIostream,
+    strbuf: &mut InchiIosString,
+    orig: Option<&OrigStruct>,
+    io: &mut InchiOutCtl,
+    lf: &str,
+) -> i32 {
+    let Some(o) = orig.filter(|o| {
+        io.b_second_non_taut_pass == 0
+            && o.num_atoms != 0
+            && o.sz_atoms.is_some()
+            && o.sz_bonds.is_some()
+            && o.sz_coord.is_some()
+    }) else {
+        return 0;
+    };
+    let end = if io.b_plain_text_tags != 0 { "" } else { "\n" };
+    let max_line_len = 80.min(strbuf.n_allocated_length);
+    io.b_tag1 = AL_REVR | io.b_fh_tag;
+    io.sz_tag1 = aux_tag(io, io.b_tag1);
+
+    // atoms /A:
+    io.b_tag2 = io.b_tag1 | AL_ATMR;
+    io.sz_tag2 = aux_tag(io, io.b_tag2);
+    inchi_strbuf_reset(strbuf);
+    aux_print(out_file, &format!("{}{}", io.sz_tag2, strbuf_str(strbuf)));
+    let p = o.sz_atoms.as_deref().unwrap_or("").as_bytes();
+    let length = p.len() as i32;
+    io.tot_len = strbuf.n_used_length;
+    let line_len = max_line_len - io.tot_len;
+    let at = |k: i32| -> u8 { p.get(k as usize).copied().unwrap_or(0) };
+    let mut cur_pos = 0;
+    while cur_pos < length {
+        let mut last_pos;
+        if length - cur_pos >= line_len {
+            last_pos = cur_pos + line_len;
+            while cur_pos < last_pos && !at(last_pos).is_ascii_uppercase() {
+                last_pos -= 1;
+            }
+        } else {
+            last_pos = length;
+        }
+        if last_pos > cur_pos {
+            let mut chunk = p[cur_pos as usize..last_pos as usize].to_vec();
+            // always show "Zy" as "Zz"
+            let mut k = 0;
+            while k + 1 < chunk.len() {
+                if chunk[k] == b'Z' && chunk[k + 1] == b'y' {
+                    chunk[k + 1] = b'z';
+                    k += 1;
+                } else {
+                    k += 1;
+                }
+            }
+            aux_print(
+                out_file,
+                &format!("{}{end}", String::from_utf8_lossy(&chunk)),
+            );
+        } else {
+            break;
+        }
+        cur_pos = last_pos;
+    }
+    if !lf.is_empty() {
+        aux_print(out_file, lf);
+    }
+    inchi_strbuf_reset(strbuf);
+
+    // bonds /B: and coordinates /C:
+    for (tag_bit, text) in [(AL_BNDR, &o.sz_bonds), (AL_XYZR, &o.sz_coord)] {
+        io.b_tag2 = io.b_tag1 | tag_bit;
+        io.sz_tag2 = aux_tag(io, io.b_tag2);
+        inchi_strbuf_reset(strbuf);
+        aux_print(out_file, &format!("{}{}", io.sz_tag2, strbuf_str(strbuf)));
+        let p = text.as_deref().unwrap_or("").as_bytes();
+        let length = p.len() as i32;
+        let line_len = max_line_len - io.tot_len;
+        let mut cur_pos = 0;
+        while cur_pos < length {
+            let mut last_pos;
+            if length - cur_pos >= line_len {
+                last_pos = cur_pos + line_len - 1;
+                while cur_pos < last_pos && p[last_pos as usize] != b';' {
+                    last_pos -= 1;
+                }
+                if cur_pos < last_pos {
+                    last_pos += 1;
+                }
+            } else {
+                last_pos = length;
+            }
+            if last_pos > cur_pos {
+                let chunk =
+                    String::from_utf8_lossy(&p[cur_pos as usize..last_pos as usize]).into_owned();
+                aux_print(out_file, &format!("{chunk}{end}"));
+                inchi_strbuf_reset(strbuf);
+            } else {
+                break;
+            }
+            cur_pos = last_pos;
+        }
+        if !lf.is_empty() {
+            aux_print(out_file, lf);
+        }
+    }
+    0
 }
