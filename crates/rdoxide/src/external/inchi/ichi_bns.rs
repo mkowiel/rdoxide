@@ -6435,3 +6435,236 @@ pub fn set_forbidden_edges(
     // REMOVE_ION_PAIRS_FIX_BONDS is 1; RESET_EDGE_FORBIDDEN_MASK is 1
     num_found + fix_special_bonds(p, at, num_atoms, forbidden_mask)
 }
+
+// ---- blocks and non-stereo bonds of alternating-bond graphs ----
+
+/// `BT_*` bond types of `nBondTypeInpAltBns` (stored in `BnsEdge::pass`)
+pub const BT_ALTERN_BOND: i8 = 1;
+pub const BT_OTHER_ALTERN_BOND: i8 = 2;
+pub const BT_ALTERN_NS_BOND: i8 = 4;
+pub const BT_TAUTOM_BOND: i8 = 8;
+pub const BT_IGNORE_BOND: i8 = 0;
+pub const BT_ALT_BOND_MASK: i8 = BT_ALTERN_BOND | BT_OTHER_ALTERN_BOND;
+
+/// `MarkRingSystemsAltBns` (`BNS_MARK_ONLY_BLOCKS` is 1): finds the blocks
+/// of the graph of alternating bonds; `edge.flow` gets the block number and
+/// `edge.cap` the number of atoms in the block. Returns the number of
+/// blocks.
+pub fn mark_ring_systems_alt_bns(p: &mut BnStruct) -> i32 {
+    let num_atoms = p.num_atoms as usize;
+    let num_bonds = p.num_bonds as usize;
+    let mut stack_atom = vec![0usize; num_atoms];
+    let mut ring_stack = vec![0usize; num_atoms];
+    let mut bond_stack = vec![0usize; num_bonds];
+    let mut dfs_number = vec![0u16; num_atoms];
+    let mut low_number = vec![0u16; num_atoms];
+    let mut neigh_numb = vec![0usize; num_atoms];
+    let mut n_blocks = 0;
+    let valence = |p: &BnStruct, v: usize| p.vert[v].num_adj_edges as usize;
+    let iedge = |p: &BnStruct, v: usize, k: usize| p.iedge[p.vert[v].iedge + k] as usize;
+    for start in 0..num_atoms {
+        if dfs_number[start] != 0 {
+            continue;
+        }
+        let found =
+            (0..valence(p, start)).any(|i| p.edge[iedge(p, start, i)].pass & BT_ALTERN_BOND != 0);
+        if !found {
+            continue;
+        }
+        let mut n_dfs: u16 = 0;
+        let mut top_stack: isize = -1;
+        let mut top_ring: isize = -1;
+        let mut top_bond: isize = -1;
+        neigh_numb.fill(0);
+        n_dfs += 1;
+        low_number[start] = n_dfs;
+        dfs_number[start] = n_dfs;
+        top_stack += 1;
+        stack_atom[top_stack as usize] = start;
+        top_ring += 1;
+        ring_stack[top_ring as usize] = start;
+        loop {
+            // advance
+            let mut i;
+            loop {
+                i = stack_atom[top_stack as usize];
+                let j = neigh_numb[i];
+                if valence(p, i) <= j {
+                    break;
+                }
+                neigh_numb[i] += 1;
+                let w = iedge(p, i, j);
+                if p.edge[w].pass & BT_ALT_BOND_MASK == 0 {
+                    continue;
+                }
+                let u = (p.edge[w].neighbor12 as usize) ^ i;
+                if dfs_number[u] == 0 && num_bonds != 0 {
+                    top_stack += 1;
+                    stack_atom[top_stack as usize] = u;
+                    top_ring += 1;
+                    ring_stack[top_ring as usize] = u;
+                    top_bond += 1;
+                    bond_stack[top_bond as usize] = w;
+                    n_dfs += 1;
+                    low_number[u] = n_dfs;
+                    dfs_number[u] = n_dfs;
+                } else if (top_stack == 0 || u != stack_atom[top_stack as usize - 1])
+                    && dfs_number[u] < dfs_number[i]
+                    && num_bonds != 0
+                {
+                    // back edge, first visit
+                    top_bond += 1;
+                    bond_stack[top_bond as usize] = w;
+                    if low_number[i] > dfs_number[u] {
+                        low_number[i] = dfs_number[u];
+                    }
+                }
+            }
+            neigh_numb[i] = 0;
+            // back up
+            if i != start {
+                let u = stack_atom[top_stack as usize - 1];
+                if low_number[i] >= dfs_number[u] {
+                    n_blocks += 1;
+                    let mut n_at_in_block: i32 = 1;
+                    while top_ring >= 0 {
+                        let j = ring_stack[top_ring as usize];
+                        top_ring -= 1;
+                        n_at_in_block += 1;
+                        if i == j {
+                            break;
+                        }
+                    }
+                    while top_bond >= 0 {
+                        let w = bond_stack[top_bond as usize];
+                        top_bond -= 1;
+                        let e = &mut p.edge[w];
+                        e.flow = n_blocks;
+                        e.cap = n_at_in_block;
+                        let n1 = e.neighbor1 as usize;
+                        let n12 = e.neighbor12 as usize;
+                        if (i == n1 && u == (i ^ n12)) || (u == n1 && i == (u ^ n12)) {
+                            break;
+                        }
+                    }
+                } else if low_number[u] > low_number[i] {
+                    low_number[u] = low_number[i];
+                }
+            }
+            top_stack -= 1;
+            if top_stack < 0 {
+                break;
+            }
+        }
+    }
+    n_blocks
+}
+
+/// `ReInitBnStructForAltBns`: strips the groups and classifies the bonds by
+/// the `BT_*` types; returns the number of alternating bonds to test or an
+/// error
+pub fn re_init_bn_struct_for_alt_bns(
+    p: &mut BnStruct,
+    at: &mut [InpAtom],
+    num_atoms: i32,
+    b_unkn_alt_as_no_stereo: bool,
+) -> i32 {
+    use super::ichitaut::{BOND_ALT12NS, BOND_ALTERN, BOND_TAUTOM};
+    let mut num_to_test = 0;
+    if b_unkn_alt_as_no_stereo {
+        for j in 0..p.num_edges as usize {
+            p.edge[j].pass = 0;
+        }
+    }
+    let ret = re_init_bn_struct(p, at, num_atoms as usize, false);
+    if ret != 0
+        || p.num_atoms != num_atoms
+        || p.num_vertices != num_atoms
+        || p.num_bonds != p.num_edges
+    {
+        return super::ichierr::BNS_REINIT_ERR;
+    }
+    for v in 0..num_atoms as usize {
+        let nadj = p.vert[v].num_adj_edges as usize;
+        for j in 0..nadj {
+            let ie = p.iedge[p.vert[v].iedge + j] as usize;
+            if p.edge[ie].neighbor1 as usize != v {
+                continue;
+            }
+            let mut bond_type = i32::from(at[v].bond_type[j]) & BOND_TYPE_MASK;
+            let v2 = (p.edge[ie].neighbor12 as usize) ^ v;
+            if at[v].endpoint != 0 || at[v2].endpoint != 0 {
+                bond_type = 0;
+            }
+            // FIX_EITHER_DB_AS_NONSTEREO is 0
+            let bt = if bond_type == BOND_ALTERN {
+                num_to_test += 1;
+                BT_ALTERN_BOND
+            } else if bond_type == BOND_ALT_123
+                || bond_type == BOND_ALT_13
+                || bond_type == BOND_ALT_23
+            {
+                BT_OTHER_ALTERN_BOND
+            } else if bond_type == BOND_TAUTOM {
+                BT_TAUTOM_BOND
+            } else if bond_type == BOND_ALT12NS {
+                BT_ALTERN_NS_BOND
+            } else {
+                BT_IGNORE_BOND
+            };
+            let e = &mut p.edge[ie];
+            e.pass = bt;
+            e.cap = 0;
+            e.flow = 0;
+            // nBondNonStereoAltBns, nBlockNumberAltBns and nNumAtInBlockAltBns
+            // share cap and flow; RESET_EDGE_FORBIDDEN_MASK is 1
+            e.forbidden &= p.edge_forbidden_mask;
+        }
+        let st = &mut p.vert[v].st_edge;
+        st.cap0 = 0;
+        st.cap = 0;
+        st.flow0 = 0;
+        st.flow = 0;
+    }
+    num_to_test
+}
+
+/// `MarkNonStereoAltBns`: marks the alternating bonds outside rings as
+/// non-stereo; returns the number of marked bonds
+pub fn mark_non_stereo_alt_bns(
+    p: &BnStruct,
+    at: &mut [InpAtom],
+    num_atoms: i32,
+    b_unkn_alt_as_no_stereo: bool,
+) -> i32 {
+    use super::ichitaut::{BOND_ALT12NS, BOND_ALTERN};
+    if p.num_atoms != num_atoms || p.num_vertices != num_atoms || p.num_bonds != p.num_edges {
+        return super::ichierr::BNS_REINIT_ERR;
+    }
+    let mut ret = 0;
+    for ibond in 0..p.num_bonds as usize {
+        let e = &p.edge[ibond];
+        if e.pass != BT_ALTERN_BOND && e.pass != BT_IGNORE_BOND {
+            continue;
+        }
+        let iat1 = e.neighbor1 as usize;
+        let iat2 = (e.neighbor12 as usize) ^ iat1;
+        let ib1 = e.neigh_ord[0] as usize;
+        let ib2 = e.neigh_ord[1] as usize;
+        let is_alt = (i32::from(at[iat1].bond_type[ib1]) & BOND_TYPE_MASK) == BOND_ALTERN;
+        if (e.pass == BT_ALTERN_BOND && e.cap <= 3) || (e.pass == BT_IGNORE_BOND && is_alt) {
+            if b_unkn_alt_as_no_stereo {
+                if is_alt {
+                    at[iat1].bond_stereo[ib1] = super::ichister::STEREO_DBLE_EITHER;
+                    at[iat2].bond_stereo[ib2] = super::ichister::STEREO_DBLE_EITHER;
+                    ret += 1;
+                }
+            } else {
+                at[iat1].bond_type[ib1] = BOND_ALT12NS as u8;
+                at[iat2].bond_type[ib2] = BOND_ALT12NS as u8;
+                ret += 1;
+            }
+        }
+    }
+    ret
+}
