@@ -350,3 +350,62 @@ pub fn get_dfs_order_4ct(
     }
     Some(out)
 }
+
+/// `CheckCanonNumberingCorrectness`: recomputes the connection table with the
+/// final (non-isotopic, then isotopic) numbering; `CT_CANON_ERR` if a warning
+/// or error bit was set, else 0.
+pub fn check_canon_numbering_correctness(
+    num_atoms: usize,
+    num_at_tg: usize,
+    at: &[SpAtom],
+    cs: &mut super::ichicano::CanonStat,
+) -> i32 {
+    use super::ichicano::update_full_linear_ct;
+    use super::ichierr::CT_CANON_ERR;
+    const WARN_FAILED_STEREO: i32 = 0x0001;
+    const WARN_FAILED_ISOTOPIC: i32 = 0x0002;
+    const WARN_FAILED_ISOTOPIC_STEREO: i32 = 0x0004;
+    const ERR_NO_CANON_RESULTS: i32 = 0x0008;
+    let mut n_error_code = 0;
+    let mut rank = vec![0u16; num_at_tg + 1];
+    let ord = if cs.n_len_canon_ord_stereo > 0 {
+        Some(cs.n_canon_ord_stereo.clone())
+    } else if cs.n_len_canon_ord > 0 {
+        Some(cs.n_canon_ord.clone())
+    } else {
+        None
+    };
+    match ord {
+        Some(o) => {
+            for i in 0..num_at_tg {
+                rank[o[i] as usize] = (i + 1) as u16;
+            }
+            if update_full_linear_ct(num_atoms, num_at_tg, at, &rank, &o, cs, false) != 0 {
+                n_error_code |= WARN_FAILED_STEREO;
+            }
+        }
+        None => n_error_code |= ERR_NO_CANON_RESULTS,
+    }
+    if n_error_code & ERR_NO_CANON_RESULTS == 0 {
+        let ord = if cs.n_len_canon_ord_isotopic_stereo > 0 {
+            Some(cs.n_canon_ord_isotopic_stereo.clone())
+        } else if cs.n_len_canon_ord_isotopic > 0 {
+            Some(cs.n_canon_ord_isotopic.clone())
+        } else {
+            None
+        };
+        if let Some(o) = ord {
+            for i in 0..num_at_tg {
+                rank[o[i] as usize] = (i + 1) as u16;
+            }
+            if update_full_linear_ct(num_atoms, num_at_tg, at, &rank, &o, cs, false) != 0 {
+                n_error_code |= if cs.n_len_canon_ord_isotopic_stereo != 0 {
+                    WARN_FAILED_ISOTOPIC_STEREO
+                } else {
+                    WARN_FAILED_ISOTOPIC
+                };
+            }
+        }
+    }
+    if n_error_code != 0 { CT_CANON_ERR } else { 0 }
+}

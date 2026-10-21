@@ -2,7 +2,7 @@
 and `Canon_INChI` / `Canon_INChI3` of ichicano.c (the final canonical
 numbering with the isotopic and stereo optimization) run on the result of
 `GetBaseCanonRanking`, followed by `FillOutINChI` of ichimak2.c (the "FO"
-lines), compiled with the upstream source included.
+lines) and `CheckCanonNumberingCorrectness` ("FK"), compiled with the upstream source included.
 
     python tools/inchi_cano2_reference.py
 """
@@ -32,6 +32,7 @@ HARNESS = r"""
 #include <stdlib.h>
 #include <string.h>
 #include "ichicano.c"
+int CheckCanonNumberingCorrectness( int num_atoms, int num_at_tg, sp_ATOM *at, CANON_STAT *pCS, CANON_GLOBALS *pCG, int bTautomeric, char *pStrErrStruct );
 int FillOutINChI( INChI *pINChI, INChI_Aux *pINChI_Aux, int num_atoms, int num_at_tg, int num_removed_H, sp_ATOM *at, inp_ATOM *norm_at,
                   CANON_STAT *pCS, CANON_GLOBALS *pCG, int bTautomeric, INCHI_MODE nUserMode, char *pStrErrStruct, int bNoWarnings );
 int CreateCompositeNormAtom() { return 0; }
@@ -298,6 +299,14 @@ int main(void) {
                 pu("FY", cs.nCanonOrdStereo, cs.nCanonOrdStereo ? nat : 0);
                 pu("FZ", cs.nCanonOrdIsotopicStereo, cs.nCanonOrdIsotopicStereo ? nat : 0);
                 printf("FG"); if (haveTgi) { for (int i = 0; i < 4 * ntgs; i++) printf(" %d", tgi.tGroupNumber[i]); printf(" |"); for (int i = 0; i < nE; i++) printf(" %d", epl[i]); } printf("\n");
+                {
+                    char se2[STR_ERR_LEN]; se2[0] = 0;
+                    int kr = CheckCanonNumberingCorrectness(nA, nat, at, &cs, &cg, k, se2);
+                    printf("FK %d\n", kr);
+                    pu("FM", cs.LinearCT, cs.LinearCT ? cs.nLenLinearCT : 0);
+                    pu("FN", cs.LinearCT2, cs.LinearCT2 ? cs.nLenLinearCT2 : 0);
+                    printf("FP %d %d %d\n", cs.nLenLinearCT, cs.nLenLinearCT2, cs.nLenLinearCTAtOnly2);
+                }
             }
         }
     }
