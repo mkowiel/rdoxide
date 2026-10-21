@@ -13280,3 +13280,104 @@ fn ichiprt3_aux_equivalence_and_inversion_match_the_c_code() {
         assert_eq!(vec![got], want, "case {ci}: {}", c["in"]);
     }
 }
+
+#[test]
+fn ichiprt3_aux_numbering_charge_and_transposition_match_the_c_code() {
+    use rdoxide::external::inchi::ichi::{InChIAux, InChISort, OrigInfo};
+    use rdoxide::external::inchi::ichi_io::{InchiIosString, inchi_strbuf_init};
+    use rdoxide::external::inchi::ichiprt3::*;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_prt3d.json")).unwrap();
+    fn opt_u16(t: &mut InchiTok) -> Vec<u16> {
+        if t.i() == 0 {
+            return Vec::new();
+        }
+        let l = t.i();
+        (0..l).map(|_| t.i() as u16).collect()
+    }
+    fn aux(t: &mut InchiTok) -> Option<InChIAux> {
+        if t.i() == 0 {
+            return None;
+        }
+        let mut a = InChIAux {
+            n_number_of_atoms: t.i() as i32,
+            n_number_of_t_groups: t.i() as i32,
+            b_deleted: t.i() as i32,
+            b_is_isotopic: t.i() as i32,
+            ..Default::default()
+        };
+        a.n_constit_equ_numbers = opt_u16(t);
+        a.n_constit_equ_t_group_numbers = opt_u16(t);
+        a.n_constit_equ_isotopic_numbers = opt_u16(t);
+        a.n_constit_equ_isotopic_t_group_numbers = opt_u16(t);
+        a.n_orig_at_nos_in_canon_ord = opt_u16(t);
+        a.n_isotopic_orig_at_nos_in_canon_ord = opt_u16(t);
+        a.n_orig_at_nos_in_canon_ord_inv = opt_u16(t);
+        a.n_isotopic_orig_at_nos_in_canon_ord_inv = opt_u16(t);
+        if t.i() != 0 {
+            let l = t.i();
+            a.orig_info = (0..l)
+                .map(|_| OrigInfo {
+                    c_charge: t.i() as i8,
+                    c_radical: t.i() as i8,
+                    c_unusual_valence: t.i() as i8,
+                })
+                .collect();
+        }
+        Some(a)
+    }
+    for (ci, c) in data.as_array().unwrap().iter().enumerate() {
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        let mut t = InchiTok(c["in"].as_str().unwrap().split_whitespace());
+        let cmd = t.s();
+        let n = t.i() as usize;
+        let ot = t.i() as i32;
+        let mult = t.i() != 0;
+        let sorts = |t: &mut InchiTok| -> Vec<InChISort> {
+            (0..n)
+                .map(|i| InChISort {
+                    p_inchi: [t.inchi(), t.inchi()],
+                    p_inchi_aux: [aux(t), aux(t)],
+                    ord_number: i as i16,
+                })
+                .collect()
+        };
+        let mut a = sorts(&mut t);
+        let mut b = sorts(&mut t);
+        let tm = t.i() as i32;
+        let second = t.i() != 0;
+        let omit = t.i() != 0;
+        for s in a.iter_mut() {
+            s.ord_number = t.i() as i16;
+        }
+        for s in b.iter_mut() {
+            s.ord_number = t.i() as i16;
+        }
+        let mut sb = InchiIosString::default();
+        inchi_strbuf_init(&mut sb, 16, 16);
+        let mut ovf = 0;
+        let ret = match cmd.as_str() {
+            "numb" => str_aux_numb(&a, &mut sb, &mut ovf, ot, tm, n, second, omit),
+            "invnumb" => str_aux_inv_sp3_numb(&a, &mut sb, &mut ovf, ot, tm, n, second, omit),
+            "isonumb" => str_aux_iso_numb(&a, &mut sb, &mut ovf, ot, tm, n, second, omit),
+            "invisonumb" => {
+                str_aux_inv_iso_sp3_numb(&a, &mut sb, &mut ovf, ot, tm, n, second, omit)
+            }
+            "crv" => str_aux_charge_rad_val(&a, &mut sb, &mut ovf, ot, tm, n, mult),
+            "trans" => {
+                let tr = bin_aux_taut_trans(&a, &b, ot, n);
+                str_aux_taut_trans(tr, &mut sb, &mut ovf, tm, n)
+            }
+            other => panic!("{other}"),
+        };
+        let p = sb.p_str.as_ref().unwrap();
+        let len = p.iter().position(|&c| c == 0).unwrap_or(p.len());
+        let got = format!("{ret} {ovf} [{}]", String::from_utf8_lossy(&p[..len]));
+        assert_eq!(vec![got], want, "case {ci}: {}", c["in"]);
+    }
+}

@@ -352,7 +352,11 @@ pub fn eql_orig_info(a1: Option<&InChIAux>, a2: Option<&InChIAux>) -> bool {
     a1.n_number_of_atoms == a2.n_number_of_atoms
         && has_orig_info(&a1.orig_info, n)
         && !a2.orig_info.is_empty()
-        && a1.orig_info[..n as usize] == *a2.orig_info.get(..n as usize).unwrap_or(&[])
+        && (0..n as usize).all(|i| {
+            // the C arrays are zero-padded past their end
+            a1.orig_info.get(i).copied().unwrap_or_default()
+                == a2.orig_info.get(i).copied().unwrap_or_default()
+        })
 }
 
 /// `bHasEquString`

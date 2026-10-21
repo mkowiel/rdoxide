@@ -8,7 +8,11 @@
 use super::ichi::{InChI, InChIAux, InChISort, compare_taut_non_iso_part_of_inchi};
 use super::ichi_io::{InchiIosString, inchi_strbuf_printf};
 use super::ichiprt1::{II_EQU, IIT_NONTAUT, S_COMP_DELIM, equ_string};
-use super::ichiprt2::{make_delim, make_eq_str, make_h_string, make_mult, make_taut_string};
+use super::ichiprt2::{
+    EQL_NUM, EQL_NUM_INV, EQL_NUM_ISO, eql_inchi_aux_num, eql_orig_info, has_orig_info,
+    make_crv_string, make_ct_string, make_delim, make_eq_str, make_h_string, make_mult,
+    make_taut_string,
+};
 
 pub const OUT_N1: i32 = 0;
 pub const OUT_T1: i32 = 1;
@@ -1542,4 +1546,527 @@ pub fn str_aux_inv_iso_sp3(
             }
         }),
     )
+}
+
+// ---------------------------------------------------------------------------
+// Numbering substrings of the AuxInfo: there is no previous component to
+// compare to, only the equivalence to another numbering of the same component
+
+/// What a numbering layer sees of one component
+struct NumbItem<'a> {
+    inchi: Option<&'a InChI>,
+    aux: Option<&'a InChIAux>,
+    taut_inchi: Option<&'a InChI>,
+    taut_aux: Option<&'a InChIAux>,
+}
+
+type NumbEq<'a> = dyn Fn(&NumbItem) -> i32 + 'a;
+type NumbPrint<'a> = dyn Fn(&NumbItem, &mut InchiIosString, &mut i32) + 'a;
+
+/// The loop shared by `str_AuxNumb`, `str_AuxInvSp3Numb`, `str_AuxIsoNumb`
+/// and `str_AuxInvIsoSp3Numb`; `aux_needs_inchi` mirrors
+/// `pINChI_Aux = pINChI ? is->pINChI_Aux[ii] : NULL`.
+#[allow(clippy::too_many_arguments)]
+fn run_numb(
+    is0: &[InChISort],
+    strbuf: &mut InchiIosString,
+    overflow: &mut i32,
+    out_type: i32,
+    num_components: usize,
+    second_non_taut_pass: bool,
+    aux_needs_inchi: bool,
+    eq2taut_of: &NumbEq,
+    print: &NumbPrint,
+) -> i32 {
+    let u0 = used(strbuf);
+    let mut next = 0;
+    let mut prev_equ: Option<&str> = None;
+    let mut mult_prev_equ = 0;
+    for is in &is0[..num_components] {
+        let ii = get_ii(out_type, is);
+        let inchi = (ii >= 0)
+            .then(|| is.p_inchi[ii as usize].as_ref())
+            .flatten();
+        let aux = if aux_needs_inchi && inchi.is_none() {
+            None
+        } else if ii >= 0 {
+            is.p_inchi_aux[ii as usize].as_ref()
+        } else {
+            None
+        };
+        let (mut taut_inchi, mut taut_aux) = (None, None);
+        if second_non_taut_pass {
+            let ii2 = get_ii(OUT_T1, is);
+            if ii2 >= 0 {
+                taut_inchi = is.p_inchi[ii2 as usize].as_ref();
+                taut_aux = if aux_needs_inchi && taut_inchi.is_none() {
+                    None
+                } else {
+                    is.p_inchi_aux[ii2 as usize].as_ref()
+                };
+            }
+        }
+        let item = NumbItem {
+            inchi,
+            aux,
+            taut_inchi,
+            taut_aux,
+        };
+        let eq2taut = eq2taut_of(&item);
+        if eq2taut != 0 {
+            let curr_equ = equ_string(eq2taut);
+            if mult_prev_equ != 0 && prev_equ.is_some() {
+                if prev_equ == Some(curr_equ) {
+                    mult_prev_equ += 1;
+                } else {
+                    if next != 0 {
+                        make_delim(Some(S_COMP_DELIM), strbuf, overflow);
+                    }
+                    next += 1;
+                    make_eq_str(prev_equ, mult_prev_equ, strbuf, overflow);
+                    prev_equ = Some(curr_equ);
+                    mult_prev_equ = 1;
+                }
+            } else {
+                prev_equ = Some(curr_equ);
+                mult_prev_equ = 1;
+            }
+        } else {
+            if mult_prev_equ != 0 && prev_equ.is_some() {
+                if next != 0 {
+                    make_delim(Some(S_COMP_DELIM), strbuf, overflow);
+                }
+                next += 1;
+                make_eq_str(prev_equ, mult_prev_equ, strbuf, overflow);
+                prev_equ = None;
+                mult_prev_equ = 0;
+            }
+            if next != 0 {
+                make_delim(Some(S_COMP_DELIM), strbuf, overflow);
+            }
+            next += 1;
+            print(&item, strbuf, overflow);
+        }
+    }
+    if mult_prev_equ != 0 && prev_equ.is_some() {
+        if next != 0 {
+            make_delim(Some(S_COMP_DELIM), strbuf, overflow);
+        }
+        make_eq_str(prev_equ, mult_prev_equ, strbuf, overflow);
+    }
+    used(strbuf) - u0
+}
+
+fn print_ct(ct: &[u16], n: i32, taut_mode: i32, strbuf: &mut InchiIosString, overflow: &mut i32) {
+    make_ct_string(
+        &padded(ct, n),
+        n,
+        false,
+        None,
+        0,
+        strbuf,
+        taut_mode,
+        overflow,
+    );
+}
+
+/// the C arrays are longer than they are used: reads past the end see zeros
+fn padded<T: Clone + Default>(v: &[T], n: i32) -> Vec<T> {
+    let mut v = v.to_vec();
+    if v.len() < n.max(0) as usize {
+        v.resize(n as usize, T::default());
+    }
+    v
+}
+
+fn comp_inv2abs(s: Option<&InChIStereo>) -> bool {
+    s.is_some_and(|s| s.n_comp_inv2_abs != 0)
+}
+
+/// `str_AuxNumb`: the numbering of the atoms
+#[allow(clippy::too_many_arguments)]
+pub fn str_aux_numb(
+    is0: &[InChISort],
+    strbuf: &mut InchiIosString,
+    overflow: &mut i32,
+    out_type: i32,
+    taut_mode: i32,
+    num_components: usize,
+    second_non_taut_pass: bool,
+    omit_repetitions: bool,
+) -> i32 {
+    run_numb(
+        is0,
+        strbuf,
+        overflow,
+        out_type,
+        num_components,
+        second_non_taut_pass,
+        true,
+        &|it| {
+            if second_non_taut_pass
+                && omit_repetitions
+                && it.inchi.is_some()
+                && it.aux.is_some_and(|a| a.n_number_of_atoms > 0)
+                && it.taut_inchi.is_some_and(|t| t.b_deleted == 0)
+                && eql_inchi_aux_num(it.aux, EQL_NUM, it.taut_aux, EQL_NUM)
+            {
+                II_NUMB | IIT_NONTAUT
+            } else {
+                0
+            }
+        },
+        &|it, sb, ov| {
+            if let Some(a) = it
+                .aux
+                .filter(|a| it.inchi.is_some() && a.n_number_of_atoms != 0)
+            {
+                print_ct(
+                    &a.n_orig_at_nos_in_canon_ord,
+                    a.n_number_of_atoms,
+                    taut_mode,
+                    sb,
+                    ov,
+                );
+            }
+        },
+    )
+}
+
+/// `str_AuxInvSp3Numb`: the numbering with inverted tetrahedral stereo
+#[allow(clippy::too_many_arguments)]
+pub fn str_aux_inv_sp3_numb(
+    is0: &[InChISort],
+    strbuf: &mut InchiIosString,
+    overflow: &mut i32,
+    out_type: i32,
+    taut_mode: i32,
+    num_components: usize,
+    second_non_taut_pass: bool,
+    omit_repetitions: bool,
+) -> i32 {
+    run_numb(
+        is0,
+        strbuf,
+        overflow,
+        out_type,
+        num_components,
+        second_non_taut_pass,
+        true,
+        &|it| {
+            let inv = it.inchi.is_some_and(|c| comp_inv2abs(sp2_of(c)));
+            if !(omit_repetitions && inv) {
+                return 0;
+            }
+            let (a, t) = (it.aux, it.taut_aux);
+            if second_non_taut_pass {
+                if it.taut_inchi.is_some() && eql_inchi_aux_num(a, EQL_NUM_INV, t, EQL_NUM) {
+                    II_STEREO_INV | II_NUMB | IIT_NONTAUT
+                } else if eql_inchi_aux_num(a, EQL_NUM_INV, a, EQL_NUM) {
+                    II_STEREO_INV | II_NUMB | IIT_NONTAUT | II_EQ2_NONTAUT
+                } else if it.taut_inchi.is_some_and(|c| comp_inv2abs(sp2_of(c)))
+                    && eql_inchi_aux_num(a, EQL_NUM_INV, t, EQL_NUM_INV)
+                {
+                    II_STEREO_INV | II_NUMB | IIT_NONTAUT | II_EQ2_INV
+                } else {
+                    0
+                }
+            } else if eql_inchi_aux_num(a, EQL_NUM_INV, a, EQL_NUM) {
+                II_STEREO_INV | II_NUMB
+            } else {
+                0
+            }
+        },
+        &|it, sb, ov| {
+            if let (Some(c), Some(a)) = (it.inchi, it.aux)
+                && a.n_number_of_atoms != 0
+                && sp2_of(c).is_some_and(|s| s.n_number_of_stereo_centers != 0)
+                && comp_inv2abs(sp2_of(c))
+                && !a.n_orig_at_nos_in_canon_ord_inv.is_empty()
+            {
+                print_ct(
+                    &a.n_orig_at_nos_in_canon_ord_inv,
+                    a.n_number_of_atoms,
+                    taut_mode,
+                    sb,
+                    ov,
+                );
+            }
+        },
+    )
+}
+
+/// `str_AuxIsoNumb`: the isotopic numbering
+#[allow(clippy::too_many_arguments)]
+pub fn str_aux_iso_numb(
+    is0: &[InChISort],
+    strbuf: &mut InchiIosString,
+    overflow: &mut i32,
+    out_type: i32,
+    taut_mode: i32,
+    num_components: usize,
+    second_non_taut_pass: bool,
+    omit_repetitions: bool,
+) -> i32 {
+    run_numb(
+        is0,
+        strbuf,
+        overflow,
+        out_type,
+        num_components,
+        second_non_taut_pass,
+        false,
+        &|it| {
+            let Some(a) = it.aux.filter(|a| omit_repetitions && a.b_is_isotopic != 0) else {
+                return 0;
+            };
+            let t = it.taut_aux;
+            if second_non_taut_pass {
+                if eql_inchi_aux_num(Some(a), EQL_NUM_ISO, t, EQL_NUM) {
+                    II_NUMB | IIT_NONTAUT | IIT_ISO
+                } else if eql_inchi_aux_num(Some(a), EQL_NUM_ISO, Some(a), EQL_NUM) {
+                    II_NUMB | IIT_NONTAUT | IIT_ISO | II_EQ2_NONTAUT
+                } else if eql_inchi_aux_num(Some(a), EQL_NUM_ISO, t, EQL_NUM_ISO) {
+                    II_NUMB | IIT_NONTAUT | IIT_ISO | II_EQ2_ISO
+                } else {
+                    0
+                }
+            } else if eql_inchi_aux_num(Some(a), EQL_NUM_ISO, Some(a), EQL_NUM) {
+                II_NUMB | IIT_ISO
+            } else {
+                0
+            }
+        },
+        &|it, sb, ov| {
+            if let Some(a) = it.aux.filter(|a| {
+                a.n_number_of_atoms != 0
+                    && a.b_is_isotopic != 0
+                    && !a.n_isotopic_orig_at_nos_in_canon_ord.is_empty()
+            }) {
+                print_ct(
+                    &a.n_isotopic_orig_at_nos_in_canon_ord,
+                    a.n_number_of_atoms,
+                    taut_mode,
+                    sb,
+                    ov,
+                );
+            }
+        },
+    )
+}
+
+/// `str_AuxInvIsoSp3Numb`: the isotopic numbering with inverted stereo
+#[allow(clippy::too_many_arguments)]
+pub fn str_aux_inv_iso_sp3_numb(
+    is0: &[InChISort],
+    strbuf: &mut InchiIosString,
+    overflow: &mut i32,
+    out_type: i32,
+    taut_mode: i32,
+    num_components: usize,
+    second_non_taut_pass: bool,
+    omit_repetitions: bool,
+) -> i32 {
+    let both = EQL_NUM_INV | EQL_NUM_ISO;
+    let base = II_STEREO_INV | IIT_ISO | II_NUMB;
+    run_numb(
+        is0,
+        strbuf,
+        overflow,
+        out_type,
+        num_components,
+        second_non_taut_pass,
+        true,
+        &|it| {
+            let (Some(c), Some(a)) = (it.inchi, it.aux) else {
+                return 0;
+            };
+            let iso_inv = a.b_is_isotopic != 0
+                && comp_inv2abs(iso_of(c))
+                && a.n_number_of_atoms > 0
+                && !a.n_isotopic_orig_at_nos_in_canon_ord_inv.is_empty();
+            if !(omit_repetitions && iso_inv) {
+                return 0;
+            }
+            let (ao, t) = (Some(a), it.taut_aux);
+            if second_non_taut_pass {
+                let tc = it.taut_inchi;
+                let tinv = tc.is_some_and(|c| comp_inv2abs(sp2_of(c)));
+                let tiso_inv = tc.is_some_and(|c| comp_inv2abs(iso_of(c)));
+                let nt = base | IIT_NONTAUT;
+                if tc.is_some() && eql_inchi_aux_num(ao, both, t, EQL_NUM) {
+                    nt
+                } else if eql_inchi_aux_num(ao, both, ao, EQL_NUM) {
+                    nt | II_EQ2_NONTAUT
+                } else if tc.is_some() && eql_inchi_aux_num(ao, both, t, EQL_NUM_ISO) {
+                    nt | II_EQ2_ISO
+                } else if eql_inchi_aux_num(ao, both, ao, EQL_NUM_ISO) {
+                    nt | II_EQ2_NONTAUT | II_EQ2_ISO
+                } else if tc.is_some()
+                    && t.is_some()
+                    && tinv
+                    && eql_inchi_aux_num(ao, both, t, EQL_NUM_INV)
+                {
+                    nt | II_EQ2_INV
+                } else if comp_inv2abs(iso_of(c)) && eql_inchi_aux_num(ao, both, ao, EQL_NUM_INV) {
+                    nt | II_EQ2_INV | II_EQ2_NONTAUT
+                } else if tiso_inv && eql_inchi_aux_num(ao, both, t, both) {
+                    nt | II_EQ2_INV | II_EQ2_ISO
+                } else {
+                    0
+                }
+            } else if eql_inchi_aux_num(ao, both, ao, EQL_NUM) {
+                base
+            } else if eql_inchi_aux_num(ao, both, ao, EQL_NUM_ISO) {
+                base | II_EQ2_ISO
+            } else if c.stereo.is_some()
+                && comp_inv2abs(iso_of(c))
+                && eql_inchi_aux_num(ao, both, ao, EQL_NUM_INV)
+            {
+                base | II_EQ2_INV
+            } else {
+                0
+            }
+        },
+        &|it, sb, ov| {
+            if let (Some(c), Some(a)) = (it.inchi, it.aux)
+                && a.b_is_isotopic != 0
+                && a.n_number_of_atoms != 0
+                && iso_of(c).is_some_and(|s| s.n_number_of_stereo_centers != 0)
+                && comp_inv2abs(iso_of(c))
+                && !a.n_isotopic_orig_at_nos_in_canon_ord_inv.is_empty()
+            {
+                print_ct(
+                    &a.n_isotopic_orig_at_nos_in_canon_ord_inv,
+                    a.n_number_of_atoms,
+                    taut_mode,
+                    sb,
+                    ov,
+                );
+            }
+        },
+    )
+}
+
+/// `str_AuxChargeRadVal`: charges, radicals and unusual valences
+pub fn str_aux_charge_rad_val(
+    is0: &[InChISort],
+    strbuf: &mut InchiIosString,
+    overflow: &mut i32,
+    out_type: i32,
+    taut_mode: i32,
+    num_components: usize,
+    use_multipliers: bool,
+) -> i32 {
+    let u0 = used(strbuf);
+    let aux_at = |i: usize| -> Option<&InChIAux> {
+        if i < num_components {
+            let ii = get_ii(out_type, &is0[i]);
+            if ii >= 0 {
+                return is0[i].p_inchi_aux[ii as usize].as_ref();
+            }
+        }
+        None
+    };
+    let mut prev: Option<&InChIAux> = None;
+    let (mut mult, mut next) = (0, 0);
+    for i in 0..=num_components {
+        let cur = aux_at(i);
+        if use_multipliers && eql_orig_info(cur, prev) {
+            mult += 1;
+            continue;
+        }
+        if i != 0 {
+            if next != 0 {
+                make_delim(Some(S_COMP_DELIM), strbuf, overflow);
+            }
+            next += 1;
+            if let Some(p) = prev.filter(|p| {
+                p.n_number_of_atoms != 0 && has_orig_info(&p.orig_info, p.n_number_of_atoms)
+            }) {
+                make_mult(mult + 1, "*", strbuf, 0, overflow);
+                make_crv_string(
+                    &padded(&p.orig_info, p.n_number_of_atoms),
+                    p.n_number_of_atoms,
+                    false,
+                    strbuf,
+                    taut_mode,
+                    overflow,
+                );
+            }
+        }
+        prev = cur;
+        mult = 0;
+    }
+    used(strbuf) - u0
+}
+
+/// `bin_AuxTautTrans`: the transposition of the component numbers between
+/// the tautomeric and the non-tautomeric ordering (`None` when the two
+/// orderings agree)
+pub fn bin_aux_taut_trans(
+    is0: &[InChISort],
+    is20: &[InChISort],
+    out_type: i32,
+    num_components: usize,
+) -> Option<(Vec<u16>, Vec<u16>)> {
+    let pair = |i: usize| -> Option<(&InChISort, &InChISort)> {
+        let (is, is2) = (&is0[i], &is20[i]);
+        let ii = get_ii(out_type, is);
+        let ii2 = get_ii(OUT_T1, is2);
+        let c = (ii >= 0)
+            .then(|| is.p_inchi[ii as usize].as_ref())
+            .flatten()?;
+        let t = (ii2 >= 0)
+            .then(|| is2.p_inchi[ii2 as usize].as_ref())
+            .flatten()?;
+        (c.n_number_of_atoms > 0 && t.n_number_of_atoms > 0 && is.ord_number != is2.ord_number)
+            .then_some((is, is2))
+    };
+    let mut trans: Option<(Vec<u16>, Vec<u16>)> = None;
+    for i in 0..num_components {
+        if let Some((is, _)) = pair(i) {
+            let t = trans
+                .get_or_insert_with(|| (vec![0; num_components + 1], vec![0; num_components + 1]));
+            t.0[is.ord_number as usize] = (i + 1) as u16;
+        }
+    }
+    let (n, mut s) = trans?;
+    for i in 0..num_components {
+        if let Some((_, is2)) = pair(i)
+            && n[is2.ord_number as usize] != 0
+        {
+            s[i + 1] = n[is2.ord_number as usize];
+        }
+    }
+    Some((n, s))
+}
+
+/// `str_AuxTautTrans`: the transposition, cycle after cycle
+pub fn str_aux_taut_trans(
+    trans: Option<(Vec<u16>, Vec<u16>)>,
+    strbuf: &mut InchiIosString,
+    overflow: &mut i32,
+    taut_mode: i32,
+    num_components: usize,
+) -> i32 {
+    let u0 = used(strbuf);
+    if let Some((mut n, mut s)) = trans {
+        for i in 1..=num_components {
+            if s[i] != 0 {
+                let (mut j, mut len) = (i, 0usize);
+                while s[j] != 0 {
+                    let k = s[j] as usize;
+                    n[len] = j as u16;
+                    s[j] = 0;
+                    j = k;
+                    len += 1;
+                }
+                make_delim(Some("("), strbuf, overflow);
+                make_ct_string(&n, len as i32, false, None, 0, strbuf, taut_mode, overflow);
+                make_delim(Some(")"), strbuf, overflow);
+            }
+        }
+    }
+    used(strbuf) - u0
 }
