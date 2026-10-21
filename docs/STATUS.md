@@ -268,6 +268,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 152 | done |
 | 153 | done |
 | 154 | done |
+| 155 | done |
 
 ## Python package files
 
@@ -592,3 +593,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-19 — Stage 152: I4g: bSetBnsToCheckAltPath, restore, flow checks
 * 2026-10-19 — Stage 153: I4h: SetBondsFromBnStructFlow, SetAtomBondType, RestoreBnStructFlow
 * 2026-10-19 — Stage 154: I4i: SetRadEndpoints2, RemoveRadEndpoints, NodeSet helpers
+* 2026-10-19 — Stage 155: I4j: GetAtomChargeType, IsZOX

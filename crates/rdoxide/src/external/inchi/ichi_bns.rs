@@ -3164,3 +3164,451 @@ pub fn set_rad_endpoints2(p: &mut BnStruct, bd: &mut BnData, rad_srch_mode: i32)
     }
     0
 }
+
+// ---- atom charge/H types (`GetAtomChargeType`) ----
+
+use super::inpdef::{
+    ATT_ACIDIC_CO, ATT_ACIDIC_S, ATT_ATOM_N, ATT_ATOM_P, ATT_HAL_ACID, ATT_HAL_ANION, ATT_N_O,
+    ATT_NO, ATT_NONE, ATT_NP_MINUS_V23, ATT_O_PLUS, ATT_OH_MINUS, ATT_OO, ATT_OTHER_NEG_O,
+    ATT_OTHER_ZO, ATT_PROTON, ATT_ZOO,
+};
+
+/// `AT_TYPE_TOTALS`
+pub mod attot {
+    pub const NUM_NP_PLUS: usize = 0;
+    pub const NUM_NP_PROTON: usize = 1;
+    pub const NUM_NP_H: usize = 2;
+    pub const NUM_N_MINUS: usize = 3;
+    pub const NUM_NP: usize = 4;
+    pub const NUM_ON: usize = 5;
+    pub const NUM_COH: usize = 6;
+    pub const NUM_CSH: usize = 7;
+    pub const NUM_ZOH: usize = 8;
+    pub const NUM_OOH: usize = 9;
+    pub const NUM_ZOOH: usize = 10;
+    pub const NUM_NOH: usize = 11;
+    pub const NUM_N_OH: usize = 12;
+    pub const NUM_CO: usize = 13;
+    pub const NUM_ZO: usize = 14;
+    pub const NUM_NO: usize = 15;
+    pub const NUM_N_O: usize = 16;
+    pub const NUM_CO_MINUS: usize = 17;
+    pub const NUM_CS_MINUS: usize = 18;
+    pub const NUM_ZO_MINUS: usize = 19;
+    pub const NUM_OO_MINUS: usize = 20;
+    pub const NUM_ZOO_MINUS: usize = 21;
+    pub const NUM_NO_MINUS: usize = 22;
+    pub const NUM_N_O_MINUS: usize = 23;
+    pub const NUM_O_MINUS: usize = 24;
+    pub const NUM_OH_PLUS: usize = 25;
+    pub const NUM_O_PLUS: usize = 26;
+    pub const NUM_PROTON: usize = 27;
+    pub const NUM_HAL_ANION: usize = 28;
+    pub const NUM_HAL_ACID: usize = 29;
+    pub const NUM_ERRORS: usize = 30;
+    pub const TOT_CHARGE: usize = 31;
+    pub const NUM_CHARGES: usize = 32;
+    pub const ARRAY_LEN: usize = 33;
+}
+
+/// `ATBIT_*`
+pub mod atbit {
+    use super::attot::*;
+    pub const NP_PLUS: i32 = 1 << NUM_NP_PLUS;
+    pub const NP_PROTON: i32 = 1 << NUM_NP_PROTON;
+    pub const NP_H: i32 = 1 << NUM_NP_H;
+    pub const N_MINUS: i32 = 1 << NUM_N_MINUS;
+    pub const NP: i32 = 1 << NUM_NP;
+    pub const ON: i32 = 1 << NUM_ON;
+    pub const COH: i32 = 1 << NUM_COH;
+    pub const CSH: i32 = 1 << NUM_CSH;
+    pub const ZOH: i32 = 1 << NUM_ZOH;
+    pub const OOH: i32 = 1 << NUM_OOH;
+    pub const ZOOH: i32 = 1 << NUM_ZOOH;
+    pub const NOH: i32 = 1 << NUM_NOH;
+    pub const N_OH: i32 = 1 << NUM_N_OH;
+    pub const CO: i32 = 1 << NUM_CO;
+    pub const ZO: i32 = 1 << NUM_ZO;
+    pub const NO: i32 = 1 << NUM_NO;
+    pub const N_O: i32 = 1 << NUM_N_O;
+    pub const CO_MINUS: i32 = 1 << NUM_CO_MINUS;
+    pub const CS_MINUS: i32 = 1 << NUM_CS_MINUS;
+    pub const ZO_MINUS: i32 = 1 << NUM_ZO_MINUS;
+    pub const OO_MINUS: i32 = 1 << NUM_OO_MINUS;
+    pub const ZOO_MINUS: i32 = 1 << NUM_ZOO_MINUS;
+    pub const NO_MINUS: i32 = 1 << NUM_NO_MINUS;
+    pub const N_O_MINUS: i32 = 1 << NUM_N_O_MINUS;
+    pub const O_MINUS: i32 = 1 << NUM_O_MINUS;
+    pub const OH_PLUS: i32 = 1 << NUM_OH_PLUS;
+    pub const O_PLUS: i32 = 1 << NUM_O_PLUS;
+    pub const PROTON: i32 = 1 << NUM_PROTON;
+    pub const HAL_ANION: i32 = 1 << NUM_HAL_ANION;
+    pub const HAL_ACID: i32 = 1 << NUM_HAL_ACID;
+    pub const ERRORS: i32 = 1 << NUM_ERRORS;
+}
+
+/// `is_Z_atom`
+pub fn is_z_atom(el: u8) -> bool {
+    use super::util::*;
+    matches!(
+        el,
+        EL_NUMBER_C
+            | EL_NUMBER_N
+            | EL_NUMBER_P
+            | EL_NUMBER_AS
+            | EL_NUMBER_SB
+            | EL_NUMBER_S
+            | EL_NUMBER_SE
+            | EL_NUMBER_TE
+            | EL_NUMBER_CL
+            | EL_NUMBER_BR
+            | EL_NUMBER_I
+    )
+}
+
+fn is_chalcogen(el: u8) -> bool {
+    use super::util::*;
+    el == EL_NUMBER_O || el == EL_NUMBER_S || el == EL_NUMBER_SE || el == EL_NUMBER_TE
+}
+
+/// `IsZOX`: the number of terminal `=O` (O, S, Se, Te) on the Z neighbor `ord`
+/// of `at_x`
+pub fn is_zox(atom: &[InpAtom], at_x: usize, ord: usize) -> i32 {
+    let z = &atom[atom[at_x].neighbor[ord] as usize];
+    let mut num_o = 0;
+    for i in 0..z.valence as usize {
+        let neigh = z.neighbor[i] as usize;
+        if neigh == at_x {
+            continue;
+        }
+        let n = &atom[neigh];
+        if n.valence == 1
+            && n.chem_bonds_valence == 2
+            && n.charge == 0
+            && n.radical == 0
+            && is_chalcogen(n.el_number)
+        {
+            num_o += 1;
+        }
+    }
+    num_o
+}
+
+/// `GetAtomChargeType`: the type of an atom for proton/charge moving and its
+/// bit mask; the totals are updated when given. `b_subtract`: 0 or -2 add,
+/// 1 or 2 subtract (-2 and 2 ignore adjacent ions). The mask is `None` when
+/// the C code leaves `*pMask` unset.
+pub fn get_atom_charge_type(
+    atom: &[InpAtom],
+    at_no: usize,
+    mut totals: Option<&mut [i32]>,
+    b_subtract: i32,
+) -> (i32, Option<i32>) {
+    use super::util::*;
+    let at = &atom[at_no];
+    let delta = if b_subtract > 0 { -1 } else { 1 };
+    let b_no_adj_ion = b_subtract == 0 || b_subtract == 1;
+    let mut b_unsat_n_has_terminal_o = 0;
+    let mut type_ = i32::from(ATT_NONE);
+    let mut mask = 0i32;
+    let mut mask_out: Option<i32> = None;
+    let el = at.el_number;
+    let charge = i32::from(at.charge);
+    'exit: {
+        'count: {
+            if at.radical != 0 && i32::from(at.radical) != super::incomdef::RADICAL_SINGLET {
+                break 'exit;
+            }
+            if is_el_a_metal(i32::from(el)) {
+                break 'exit;
+            }
+            if !(-1..=1).contains(&charge) {
+                break 'exit;
+            }
+            if at.valence == 0
+                && charge == 1
+                && at.num_h == 0
+                && at.radical == 0
+                && el == EL_NUMBER_H
+            {
+                type_ = i32::from(ATT_PROTON);
+                mask = atbit::PROTON;
+                break 'count;
+            }
+            if at.valence == 0
+                && charge == -1
+                && at.num_h == 0
+                && at.radical == 0
+                && (el == EL_NUMBER_F
+                    || el == EL_NUMBER_CL
+                    || el == EL_NUMBER_BR
+                    || el == EL_NUMBER_I)
+            {
+                type_ = i32::from(ATT_HAL_ANION);
+                mask = atbit::HAL_ANION;
+                break 'count;
+            }
+            if (at.valence == 0
+                && charge == 0
+                && at.num_h == 1
+                && at.radical == 0
+                && (el == EL_NUMBER_F
+                    || el == EL_NUMBER_CL
+                    || el == EL_NUMBER_BR
+                    || el == EL_NUMBER_I))
+                || (at.valence == 0
+                    && charge == 0
+                    && at.num_h == 2
+                    && at.radical == 0
+                    && is_chalcogen(el))
+            {
+                type_ = i32::from(ATT_HAL_ACID);
+                mask = atbit::HAL_ACID;
+                break 'count;
+            }
+            if detect_unusual_el_valence(
+                i32::from(el),
+                charge,
+                i32::from(at.radical),
+                i32::from(at.chem_bonds_valence),
+                i32::from(at.num_h),
+                i32::from(at.valence),
+            ) != 0
+            {
+                break 'exit;
+            }
+            let (mut num_z, mut num_m, mut num_o) = (0, 0, 0);
+            for i in 0..at.valence as usize {
+                let neigh = at.neighbor[i] as usize;
+                let nb = &atom[neigh];
+                if !(-1..=1).contains(&i32::from(nb.charge)) {
+                    break 'exit;
+                }
+                if nb.charge != 0 && at.charge != 0 {
+                    if b_no_adj_ion {
+                        // FIX_RENUM_BUG_FOR_CASE_OF_ACIDIC_OH_AT_P_PLUS
+                        break 'count;
+                    }
+                    type_ = i32::from(ATT_NONE);
+                    mask = 0;
+                    break 'count;
+                }
+                if detect_unusual_el_valence(
+                    i32::from(nb.el_number),
+                    i32::from(nb.charge),
+                    i32::from(nb.radical),
+                    i32::from(nb.chem_bonds_valence),
+                    i32::from(nb.num_h),
+                    i32::from(nb.valence),
+                ) != 0
+                {
+                    break 'exit;
+                }
+                if is_z_atom(nb.el_number) {
+                    num_z += 1;
+                }
+                if is_el_a_metal(i32::from(nb.el_number)) {
+                    num_m += 1;
+                }
+                num_o += i32::from(nb.el_number == EL_NUMBER_O);
+                if el == EL_NUMBER_N
+                    && at.valence == 2
+                    && at.charge == 0
+                    && nb.valence == 1
+                    && nb.chem_bonds_valence == 2
+                    && is_chalcogen(nb.el_number)
+                {
+                    b_unsat_n_has_terminal_o += 1;
+                }
+            }
+            if is_chalcogen(el) {
+                if charge == 1 {
+                    type_ = i32::from(ATT_O_PLUS);
+                    mask |= if at.num_h != 0 {
+                        atbit::OH_PLUS
+                    } else {
+                        atbit::O_PLUS
+                    };
+                } else if at.valence > 1 {
+                    break 'exit;
+                } else if at.valence != 0 && !(num_z != 0 || num_o != 0) {
+                    if num_m == i32::from(at.valence) {
+                        break 'exit;
+                    }
+                    break 'count;
+                } else if at.valence != 0 {
+                    let neigh = at.neighbor[0] as usize;
+                    let nb = &atom[neigh];
+                    if nb.charge == 0
+                        && nb.el_number == EL_NUMBER_C
+                        && nb.chem_bonds_valence > nb.valence
+                    {
+                        type_ = i32::from(ATT_ACIDIC_CO);
+                        if at.num_h == 1 {
+                            mask |= atbit::COH;
+                        } else if charge == -1 {
+                            mask |= atbit::CO_MINUS;
+                        } else if at.num_h == 0 && charge == 0 {
+                            mask |= atbit::CO;
+                        } else {
+                            mask |= atbit::ERRORS;
+                        }
+                    } else if nb.charge == 0
+                        && is_chalcogen(nb.el_number)
+                        && nb.chem_bonds_valence == nb.valence
+                    {
+                        type_ = i32::from(ATT_OO);
+                        if at.num_h == 1 {
+                            mask |= atbit::OOH;
+                        } else if charge == -1 {
+                            mask |= atbit::OO_MINUS;
+                        } else {
+                            mask |= atbit::ERRORS;
+                        }
+                    } else if nb.charge == 0
+                        && nb.chem_bonds_valence == nb.valence
+                        && nb.el_number == EL_NUMBER_C
+                        && el != EL_NUMBER_O
+                    {
+                        type_ = i32::from(ATT_ACIDIC_S);
+                        if at.num_h == 1 {
+                            mask |= atbit::CSH;
+                        } else if charge == -1 {
+                            mask |= atbit::CS_MINUS;
+                        } else {
+                            mask |= atbit::ERRORS;
+                        }
+                    } else if nb.el_number == EL_NUMBER_N
+                        && nb.valence == 2
+                        && (nb.num_h == 0 || (nb.num_h == 1 && nb.charge == 1))
+                    {
+                        type_ = i32::from(ATT_NO);
+                        if at.num_h == 1 {
+                            mask |= atbit::NOH;
+                        } else if charge == -1 {
+                            mask |= atbit::NO_MINUS;
+                        } else if nb.charge == 1 || nb.charge == 0 {
+                            mask |= atbit::NO;
+                        } else {
+                            mask |= atbit::ERRORS;
+                        }
+                    } else if nb.el_number == EL_NUMBER_N {
+                        type_ = i32::from(ATT_N_O);
+                        if at.num_h == 1 {
+                            mask |= atbit::N_OH;
+                        } else if charge == -1 {
+                            mask |= atbit::N_O_MINUS;
+                        } else if nb.charge == 1 {
+                            mask |= atbit::N_O;
+                        } else {
+                            mask |= atbit::ERRORS;
+                        }
+                    } else if nb.el_number != EL_NUMBER_C
+                        && nb.el_number != EL_NUMBER_O
+                        && !is_el_a_metal(i32::from(nb.el_number))
+                        && nb.chem_bonds_valence > nb.valence
+                    {
+                        if at.chem_bonds_valence == 1 && is_zox(atom, at_no, 0) != 0 {
+                            type_ = i32::from(ATT_ZOO);
+                            if at.num_h == 1 {
+                                mask |= atbit::ZOOH;
+                            } else if charge == -1 {
+                                mask |= atbit::ZOO_MINUS;
+                            } else {
+                                mask |= atbit::ERRORS;
+                            }
+                        } else {
+                            type_ = i32::from(ATT_OTHER_ZO);
+                            if at.num_h == 1 {
+                                mask |= atbit::ZOH;
+                            } else if charge == -1 {
+                                mask |= atbit::ZO_MINUS;
+                            } else if at.num_h == 0 {
+                                mask |= atbit::ZO;
+                            } else {
+                                mask |= atbit::ERRORS;
+                            }
+                        }
+                    } else if charge == -1 && !is_el_a_metal(i32::from(nb.el_number)) {
+                        type_ = i32::from(ATT_OTHER_NEG_O);
+                        mask |= atbit::O_MINUS;
+                    }
+                } else if charge == -1 && at.num_h == 1 {
+                    type_ = i32::from(ATT_OH_MINUS);
+                    mask |= atbit::O_MINUS;
+                }
+            } else if (el == EL_NUMBER_N || el == EL_NUMBER_P)
+                && (0..=3).contains(&at.valence)
+                && i32::from(at.chem_bonds_valence) + i32::from(at.num_h) == 3 + charge
+            {
+                if at.valence != 0 && num_z == 0 {
+                    if num_m == i32::from(at.valence) {
+                        break 'exit;
+                    }
+                    break 'count;
+                }
+                type_ = i32::from(if el == EL_NUMBER_N {
+                    ATT_ATOM_N
+                } else {
+                    ATT_ATOM_P
+                });
+                match charge {
+                    -1 => {
+                        if el == EL_NUMBER_N {
+                            mask |= atbit::N_MINUS;
+                            if at.num_h != 0 {
+                                mask |= atbit::NP_H;
+                            } else if at.valence == 1
+                                && at.chem_bonds_valence >= 2
+                                && i32::from(at.bond_type[0]) & 0xf0 != 0
+                            {
+                                type_ |= i32::from(ATT_NP_MINUS_V23);
+                            }
+                        }
+                    }
+                    0 => {
+                        if at.num_h != 0 {
+                            mask |= atbit::NP_H;
+                        } else if b_unsat_n_has_terminal_o == 1 {
+                            mask |= atbit::ON;
+                        } else {
+                            mask |= atbit::NP;
+                        }
+                    }
+                    1 => {
+                        if at.num_h != 0 {
+                            mask |= atbit::NP_PROTON;
+                        } else if at.chem_bonds_valence > at.valence {
+                            mask |= atbit::NP_PLUS;
+                        } else {
+                            type_ = 0;
+                        }
+                    }
+                    _ => mask |= 1 << attot::NUM_ERRORS,
+                }
+            }
+        }
+        // count_mask_bits
+        if let Some(t) = totals.as_mut() {
+            if mask != 0 && mask & atbit::ERRORS == 0 {
+                for (i, slot) in t.iter_mut().enumerate().take(attot::ARRAY_LEN) {
+                    if 1i32.checked_shl(i as u32).unwrap_or(0) & mask != 0 {
+                        *slot += delta;
+                    }
+                }
+            }
+            if charge != 0 {
+                t[attot::TOT_CHARGE] += delta * charge;
+                t[attot::NUM_CHARGES] += delta;
+            }
+        }
+        mask_out = Some(mask);
+    }
+    if mask & atbit::ERRORS != 0 {
+        type_ = 0;
+        if let Some(t) = totals.as_mut() {
+            t[attot::NUM_ERRORS] += 1;
+        }
+    }
+    (type_, mask_out)
+}
