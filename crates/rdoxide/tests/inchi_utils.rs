@@ -11197,3 +11197,152 @@ fn final_canonical_numbering_matches_the_c_code() {
         assert_eq!(got, want, "case {case}");
     }
 }
+
+#[test]
+fn atom_copy_isotopic_keys_and_hill_formulas_match_the_c_code() {
+    use rdoxide::external::inchi::ichican2::set_atom_iso_sort_keys;
+    use rdoxide::external::inchi::ichimake::{
+        compare_hill_formulas, compare_hill_formulas_no_h, inp2sp_atom,
+    };
+    use rdoxide::external::inchi::ichister::SpAtom;
+    use rdoxide::external::inchi::ichitaut::{TGroup, TGroupInfo};
+    use rdoxide::external::inchi::inpdef::InpAtom;
+    fn sgn(x: i32) -> i32 {
+        x.signum()
+    }
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_make1.json")).unwrap();
+    for (ci, c) in data.as_array().unwrap().iter().enumerate() {
+        let inp = c["in"].as_str().unwrap();
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        let mut lines = inp.lines();
+        let head: Vec<&str> = lines.next().unwrap().split_whitespace().collect();
+        let mut got: Vec<String> = Vec::new();
+        match head[0] {
+            "A" => {
+                let n: usize = head[1].parse().unwrap();
+                let mut ia = vec![InpAtom::default(); n];
+                for a in ia.iter_mut() {
+                    let t: Vec<&str> = lines.next().unwrap().split_whitespace().collect();
+                    let el = t[0].as_bytes();
+                    a.elname = [0; 6];
+                    a.elname[..el.len().min(6)].copy_from_slice(&el[..el.len().min(6)]);
+                    let v: usize = t[1].parse().unwrap();
+                    a.valence = v as i8;
+                    for j in 0..v {
+                        a.neighbor[j] = t[2 + 2 * j].parse().unwrap();
+                        a.bond_type[j] = t[3 + 2 * j].parse().unwrap();
+                    }
+                    let x: Vec<i32> = t[2 + 2 * v..].iter().map(|s| s.parse().unwrap()).collect();
+                    a.chem_bonds_valence = x[0] as i8;
+                    a.orig_at_number = x[1] as u16;
+                    a.orig_compt_at_numb = x[2] as u16;
+                    a.endpoint = x[3] as u16;
+                    a.iso_atw_diff = x[4] as i8;
+                    a.num_h = x[5] as i8;
+                    a.c_flags = x[6] as i8;
+                    a.num_iso_h = [x[7] as i8, x[8] as i8, x[9] as i8];
+                    a.charge = x[10] as i8;
+                    a.radical = x[11] as i8;
+                    a.n_block_system = x[12] as u16;
+                    a.b_cut_vertex = x[13] as i8;
+                    a.n_ring_system = x[14] as u16;
+                    a.n_num_at_in_ring_system = x[15] as u16;
+                }
+                let mut at = vec![SpAtom::default(); n];
+                inp2sp_atom(&ia, &mut at);
+                for a in &at {
+                    let el = a.elname.iter().take_while(|&&b| b != 0).count();
+                    let mut s = format!(
+                        "{} {} {} |",
+                        std::str::from_utf8(&a.elname[..el]).unwrap(),
+                        a.el_number,
+                        a.valence
+                    );
+                    for j in 0..a.valence as usize {
+                        s += &format!(" {} {}", a.neighbor[j], a.bond_type[j]);
+                    }
+                    s += &format!(
+                        " | {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {}",
+                        a.chem_bonds_valence,
+                        a.orig_at_number,
+                        a.orig_compt_at_numb,
+                        a.endpoint,
+                        a.iso_atw_diff,
+                        a.num_h,
+                        a.c_flags,
+                        a.num_iso_h[0],
+                        a.num_iso_h[1],
+                        a.num_iso_h[2],
+                        a.charge,
+                        a.radical,
+                        a.n_block_system,
+                        a.b_cut_vertex,
+                        a.n_ring_system,
+                        a.n_num_at_in_ring_system
+                    );
+                    got.push(s);
+                }
+            }
+            "B" => {
+                let n: usize = head[1].parse().unwrap();
+                let hastg: i32 = head[2].parse().unwrap();
+                let ng: usize = head[3].parse().unwrap();
+                let hasiso: i32 = head[4].parse().unwrap();
+                let wantflag: i32 = head[5].parse().unwrap();
+                let mut at = vec![SpAtom::default(); n];
+                for a in at.iter_mut() {
+                    let x: Vec<i32> = lines
+                        .next()
+                        .unwrap()
+                        .split_whitespace()
+                        .map(|s| s.parse().unwrap())
+                        .collect();
+                    a.endpoint = x[0] as u16;
+                    a.iso_atw_diff = x[1] as i8;
+                    a.c_flags = x[2] as i8;
+                    a.num_iso_h = [x[3] as i8, x[4] as i8, x[5] as i8];
+                }
+                let mut tgi = TGroupInfo::default();
+                if hastg != 0 {
+                    tgi.t_group = Some(vec![TGroup::default(); 2]);
+                    tgi.num_t_groups = ng;
+                }
+                if hasiso != 0 {
+                    tgi.n_isotopic_endpoint_atom_number = vec![1, 2];
+                }
+                let mut flag = -7;
+                let nis = set_atom_iso_sort_keys(
+                    &mut at,
+                    if hastg >= 0 { Some(&tgi) } else { None },
+                    if wantflag != 0 { Some(&mut flag) } else { None },
+                );
+                got.push(format!("{nis} {flag}"));
+                for a in &at {
+                    got.push(format!("{}", a.iso_sort_key));
+                }
+            }
+            _ => {
+                let t: Vec<&str> = inp.split_whitespace().collect();
+                let f = |s: &str| {
+                    if s == "-" {
+                        String::new()
+                    } else {
+                        s.to_string()
+                    }
+                };
+                let (f1, f2) = (f(t[1]), f(t[2]));
+                let (mut a, mut b) = (0, 0);
+                let r1 = compare_hill_formulas(&f1, &f2);
+                let r2 = compare_hill_formulas_no_h(&f1, &f2, &mut a, &mut b);
+                got.push(format!("{} {} {a} {b}", sgn(r1), sgn(r2)));
+            }
+        }
+        assert_eq!(got, want, "case {ci}: {inp}");
+    }
+}
