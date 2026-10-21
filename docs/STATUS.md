@@ -321,6 +321,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 205 | ichimake started: inp2spATOM, CompareHillFormulas(NoH), set_atom_iso_sort_keys; ichi_bns complete |
 | 206 | INChI result structures (module ichi); CompINChI2/TautVsNonTaut/stereo comparators of ichimake |
 | 207 | CompINChILayers, MarkUnusedAndEmptyLayers, INChI_SegmentAction, Eql_INChI_Stereo |
+| 208 | GetDfsOrder4CT, mystrrev of ichimake |
 
 ## Python package files
 
@@ -698,3 +699,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-21 — Stage 205: I7a: ichimake start (inp2spATOM, Hill formulas, iso sort keys), 5100 differential cases
 * 2026-10-21 — Stage 206: I7b: INChI structs + component comparators, 8000 differential cases
 * 2026-10-21 — Stage 207: I7c: layer difference marking, 10000 differential cases
+* 2026-10-21 — Stage 208: I7d: DFS order of the connection table, 6000 differential cases

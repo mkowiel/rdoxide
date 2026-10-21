@@ -11570,3 +11570,39 @@ fn inchi_layer_difference_marking_matches_the_c_code() {
         assert_eq!(got, want, "case {ci}: {inp}");
     }
 }
+
+#[test]
+fn dfs_order_of_the_connection_table_matches_the_c_code() {
+    use rdoxide::external::inchi::ichimake::{get_dfs_order_4ct, mystrrev};
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_make4.json")).unwrap();
+    for (ci, c) in data.as_array().unwrap().iter().enumerate() {
+        let inp = c["in"].as_str().unwrap();
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        let mut t = InchiTok(inp.split_whitespace());
+        let n = t.i() as usize;
+        let len = t.i() as usize;
+        let mode = t.i() as i32;
+        let has_h = t.i() != 0;
+        let ct: Vec<u16> = (0..len).map(|_| t.i() as u16).collect();
+        let h: Vec<i8> = (0..n).map(|_| t.i() as i8).collect();
+        let sl = t.i() as usize;
+        let mut s: Vec<u8> = (0..sl).map(|_| t.i() as u8).collect();
+        let first = match get_dfs_order_4ct(&ct, len, has_h.then_some(&h[..]), n, mode) {
+            None => "NULL".to_string(),
+            Some(o) => o
+                .chunks(3)
+                .take_while(|t| t[0] != 0)
+                .map(|t| format!(" {} {} {}", t[0], t[1], t[2]))
+                .collect(),
+        };
+        mystrrev(&mut s);
+        let got = vec![first, String::from_utf8(s).unwrap()];
+        assert_eq!(got, want, "case {ci}: {inp}");
+    }
+}
