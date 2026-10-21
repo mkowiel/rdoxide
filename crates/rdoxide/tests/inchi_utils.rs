@@ -2788,3 +2788,118 @@ fn flow_to_bond_transfer_matches_the_c_code() {
         assert_eq!(got, want, "{inp}");
     }
 }
+
+#[test]
+fn radical_endpoints_match_the_c_code() {
+    use rdoxide::external::inchi::ichi_bns::*;
+    use rdoxide::external::inchi::inpdef::InpAtom;
+    fn dump_all(p: &BnStruct, bd: &BnData, at: &[InpAtom], got: &mut Vec<String>) {
+        got.push(format!(
+            "C {} {} {} {}",
+            p.num_vertices, p.num_edges, p.tot_st_cap, p.tot_st_flow
+        ));
+        for v in p.vert.iter().take(p.num_vertices as usize) {
+            let e = &v.st_edge;
+            let mut s = format!(
+                "V {} {} {} {} {} {} {} {} |",
+                v.type_, e.cap, e.cap0, e.flow, e.flow0, e.pass, v.num_adj_edges, v.max_adj_edges
+            );
+            for k in 0..v.num_adj_edges as usize {
+                s += &format!(" {}", p.iedge[v.iedge + k]);
+            }
+            got.push(s);
+        }
+        for e in p.edge.iter().take(p.num_edges as usize) {
+            got.push(format!(
+                "E {} {} {} {} {} {} {} {} {}",
+                e.cap,
+                e.cap0,
+                e.flow,
+                e.flow0,
+                e.pass,
+                e.neighbor1,
+                e.neighbor12,
+                e.neigh_ord[0],
+                e.neigh_ord[1]
+            ));
+        }
+        let mut s = format!(
+            "R {} {} {} |",
+            bd.n_num_rad_endpoints, bd.n_num_rad_edges, bd.n_num_radicals
+        );
+        for i in 0..bd.n_num_rad_endpoints as usize {
+            s += &format!(" {}", bd.rad_endpoints[i]);
+        }
+        s += " |";
+        for i in 0..bd.n_num_rad_edges as usize {
+            s += &format!(" {}", bd.rad_edges[i]);
+        }
+        got.push(s);
+        let mut s = String::from("Q");
+        for a in at {
+            s += &format!(" {}", a.radical);
+        }
+        got.push(s);
+    }
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_bnrad.json")).unwrap();
+    for c in data.as_array().unwrap() {
+        let inp = &c["in"];
+        let mut at: Vec<InpAtom> = Vec::new();
+        for a in inp["atoms"].as_array().unwrap() {
+            let mut x = InpAtom {
+                valence: a["v"].as_i64().unwrap() as i8,
+                chem_bonds_valence: a["cbv"].as_i64().unwrap() as i8,
+                el_number: a["el"].as_u64().unwrap() as u8,
+                radical: a["rad"].as_i64().unwrap() as i8,
+                c_point: a["vt"].as_u64().unwrap() as u16,
+                ..Default::default()
+            };
+            for (j, e) in a["nb"].as_array().unwrap().iter().enumerate() {
+                x.neighbor[j] = e[0].as_u64().unwrap() as u16;
+                x.bond_type[j] = e[1].as_u64().unwrap() as u8;
+            }
+            at.push(x);
+        }
+        let n = at.len();
+        let (mut p, _) = allocate_and_init_bn_struct(
+            &mut at,
+            n,
+            inp["ma"].as_i64().unwrap() as i32,
+            inp["me"].as_i64().unwrap() as i32,
+            inp["mp"].as_i64().unwrap() as i32,
+        );
+        for i in 0..n {
+            let vt = u32::from(at[i].c_point);
+            p.vert[i].type_ |= (((vt & 0x1c) << 1) | ((vt & 3) << 9)) as u16;
+        }
+        let mut bd = allocate_and_init_bn_data(p.max_vertices);
+        let len = 2 * p.max_vertices as usize + 8;
+        bd.rad_endpoints = vec![0; len];
+        bd.rad_edges = vec![0; len];
+        let rm = inp["rm"].as_i64().unwrap() as i32;
+        let ret = if inp["which"].as_i64().unwrap() == 1 {
+            set_rad_endpoints(&mut p, &mut bd, rm)
+        } else {
+            set_rad_endpoints2(&mut p, &mut bd, rm)
+        };
+        let mut got = vec![format!("X {ret}")];
+        dump_all(&p, &bd, &at, &mut got);
+        let with_at = inp["withat"].as_i64().unwrap() == 1;
+        if inp["rf"].as_i64().unwrap() == 1 {
+            let r = restore_radicals_only(&p, &bd, if with_at { Some(&mut at) } else { None });
+            got.push(format!("S {r}"));
+            dump_all(&p, &bd, &at, &mut got);
+        }
+        let r = remove_rad_endpoints(&mut p, &mut bd, if with_at { Some(&mut at) } else { None });
+        got.push(format!("Y {r}"));
+        dump_all(&p, &bd, &at, &mut got);
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        assert_eq!(got, want, "{inp}");
+    }
+}
