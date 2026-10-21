@@ -39,6 +39,10 @@ static INChI_Aux *rd_aux(void) {
     for (int i = 0; i < 3; i++) a->nNumRemovedIsotopicH[i] = rd();
     return a;
 }
+static void dumpn(const char *nm, AT_NUMB *a, S_CHAR *b, int n) {
+    printf(" %s", nm);
+    for (int i = 0; i < n; i++) printf(",%d:%d", a[i], b[i]);
+}
 static void dump(const char *nm, AT_NUMB *a, int n) {
     printf(" %s", nm);
     for (int i = 0; i < n; i++) printf(",%d", a[i]);
@@ -68,6 +72,31 @@ int main(void) {
         dump("scu1", icr.sc_undef_in1_only, icr.num_sc_undef_in1_only);
         dump("scu2", icr.sc_undef_in2_only, icr.num_sc_undef_in2_only);
         printf("\n");
+        ICR q;
+        int err = 0;
+        INCHI_MODE f = CompareReversedINChI2(c1, c2, a1, a2, &q, &err);
+        printf("%llu %d %d %d %d %d %d", (unsigned long long)f, q.tot_num_H1, q.tot_num_H2, q.num_taut_H1, q.num_taut_H2, q.num_taut_M1, q.num_taut_M2);
+        dump("e1", q.endp_in1_only, q.num_endp_in1_only);
+        dump("e2", q.endp_in2_only, q.num_endp_in2_only);
+        dumpn("dp", q.diff_pos_H_at, (S_CHAR*)q.diff_pos_H_nH, q.num_diff_pos_H);
+        dumpn("f1", q.fixed_H_at1_more, (S_CHAR*)q.fixed_H_nH1_more, q.num_fixed_H1_more);
+        dumpn("f2", q.fixed_H_at2_more, (S_CHAR*)q.fixed_H_nH2_more, q.num_fixed_H2_more);
+        dump("sc1", q.sc_in1_only, q.num_sc_in1_only);
+        dump("sc2", q.sc_in2_only, q.num_sc_in2_only);
+        dump("sb1", q.sb_in1_only, q.num_sb_in1_only);
+        dump("sb2", q.sb_in2_only, q.num_sb_in2_only);
+        dump("sbu1", q.sb_undef_in1_only, q.num_sb_undef_in1_only);
+        dump("sbu2", q.sb_undef_in2_only, q.num_sb_undef_in2_only);
+        dump("scu1", q.sc_undef_in1_only, q.num_sc_undef_in1_only);
+        dump("scu2", q.sc_undef_in2_only, q.num_sc_undef_in2_only);
+        printf("\n");
+        ICR q2;
+        memset(&q2, 0, sizeof(q2));
+        q2.flags = rd();
+        INCHI_MODE mask = rd();
+        INCHI_MODE x1 = 0, x2 = 0;
+        int r = CompareIcr(&q, &q2, &x1, &x2, mask);
+        printf("%d %llu %llu\n", r, (unsigned long long)x1, (unsigned long long)x2);
     }
     return 0;
 }
@@ -114,8 +143,19 @@ def mut_stereo(rng, s):
     return s
 
 
+def taut(rng, n):
+    if rng.random() < 0.35:
+        return []
+    groups = []
+    for _ in range(rng.choice([1, 1, 2, 3])):
+        eps = sorted(rng.sample(range(1, n + 2), rng.randrange(1, min(n + 1, 4) + 1)))
+        groups.append([len(eps) + 2, rng.choice([0, 1, 2]), rng.choice([0, 0, 1])] + eps)
+    return [len(groups)] + [x for g in groups for x in g]
+
+
 def comp(rng):
     c = m2.comp(rng)
+    c["taut"] = taut(rng, c["n"])
     c["st"] = stereo(rng)
     c["sti"] = stereo(rng)
     c["del"] = rng.choice([0, 0, 0, 0, 0, 1])
@@ -133,8 +173,13 @@ def mutate(rng, c):
         c["sti"] = None
         c["st"] = mut_stereo(rng, c["st"])
     if rng.random() < 0.3:
+        old = c["taut"]
         c = m2.mutate(rng, c)
         c["err"] = 0
+        if c["taut"] != old:
+            c["taut"] = taut(rng, c["n"])
+    if rng.random() < 0.2:
+        c["taut"] = taut(rng, c["n"])
     return c
 
 
@@ -160,7 +205,8 @@ def main():
         miss = rng.random()
         t1 = None if miss < 0.04 else m2.tok(c1)
         t2 = None if 0.04 <= miss < 0.08 else m2.tok(c2)
-        cases.append(" ".join([t1 or "0", t2 or "0", tok_aux(a1), tok_aux(a2)]))
+        mask = rng.choice([0xFFFFFFFF, 0x7FFFFFFF, 0x1F, 0xFF00, rng.randrange(0, 1 << 31)])
+        cases.append(" ".join([t1 or "0", t2 or "0", tok_aux(a1), tok_aux(a2)]) + f" {rng.randrange(0, 1 << 31)} {mask}")
     stdin = f"{len(cases)}\n" + "\n".join(cases) + "\n"
     objs = ma.build_lib()
     with tempfile.TemporaryDirectory() as d:

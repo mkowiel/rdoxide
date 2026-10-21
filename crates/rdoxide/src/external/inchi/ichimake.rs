@@ -1053,6 +1053,34 @@ pub fn create_inchi(
 // ---------------------------------------------------------------------------
 // Comparison of the InChI of a reversed structure with the input InChI
 
+pub const IDIF_PROBLEM: i32 = 0x0000_0001;
+pub const IDIF_NUM_AT: i32 = 0x0000_0001;
+pub const IDIF_ATOMS: i32 = 0x0000_0001;
+pub const IDIF_NUM_EL: i32 = 0x0000_0001;
+pub const IDIF_CON_LEN: i32 = 0x0000_0001;
+pub const IDIF_CON_TBL: i32 = 0x0000_0001;
+pub const IDIF_POSITION_H: i32 = 0x0000_0002;
+pub const IDIF_MORE_FH: i32 = 0x0000_0004;
+pub const IDIF_LESS_FH: i32 = 0x0000_0008;
+pub const IDIF_MORE_H: i32 = 0x0000_0010;
+pub const IDIF_LESS_H: i32 = 0x0000_0020;
+pub const IDIF_NO_TAUT: i32 = 0x0000_0040;
+pub const IDIF_WRONG_TAUT: i32 = 0x0000_0080;
+pub const IDIF_SINGLE_TG: i32 = 0x0000_0100;
+pub const IDIF_MULTIPLE_TG: i32 = 0x0000_0200;
+pub const IDIF_NUM_TG: i32 = 0x0000_0400;
+pub const IDIF_EXTRA_TG_ENDP: i32 = 0x0000_0800;
+pub const IDIF_MISS_TG_ENDP: i32 = 0x0000_1000;
+pub const IDIF_DIFF_TG_ENDP: i32 = 0x0000_2000;
+pub const IDIF_TG: i32 = 0x0000_4000;
+pub const IDIF_NUM_ISO_AT: i32 = 0x0000_8000;
+pub const IDIF_ISO_AT: i32 = 0x0001_0000;
+pub const IDIF_CHARGE: i32 = 0x0002_0000;
+pub const IDIF_REM_PROT: i32 = 0x0004_0000;
+pub const IDIF_REM_ISO_H: i32 = 0x0008_0000;
+pub const ICR_MAX_ENDP_IN1_ONLY: usize = 32;
+pub const ICR_MAX_ENDP_IN2_ONLY: usize = 32;
+pub const ICR_MAX_DIFF_FIXED_H: usize = 32;
 pub const IDIF_SC_INV: i32 = 0x0010_0000;
 pub const IDIF_SC_PARITY: i32 = 0x0020_0000;
 pub const IDIF_SC_EXTRA_UNDF: i32 = 0x0040_0000;
@@ -1075,6 +1103,19 @@ pub const ICR_MAX_SC_UNDF: usize = 32;
 /// The stereo part of `ICR` (`tagInChICompareResults`).
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Icr {
+    pub flags: u64,
+    pub tot_num_h1: i32,
+    pub tot_num_h2: i32,
+    pub num_taut_h1: i32,
+    pub num_taut_h2: i32,
+    pub num_taut_m1: i32,
+    pub num_taut_m2: i32,
+    pub endp_in1_only: Vec<u16>,
+    pub endp_in2_only: Vec<u16>,
+    /// (atom index, difference in the number of H)
+    pub diff_pos_h: Vec<(u16, i8)>,
+    pub fixed_h1_more: Vec<(u16, i8)>,
+    pub fixed_h2_more: Vec<(u16, i8)>,
     pub sc_in1_only: Vec<u16>,
     pub sc_in2_only: Vec<u16>,
     pub sb_in1_only: Vec<u16>,
@@ -1485,4 +1526,291 @@ pub fn compare_reversed_inchi(
         }
     }
     0
+}
+
+/// `CompareIcr`: returns (result, bits only in `icr1`, bits only in `icr2`)
+pub fn compare_icr(icr1: &Icr, icr2: &Icr, mask: u64) -> (i32, u64, u64) {
+    let (mut flg1, mut flg2, mut cur_bit) = (icr1.flags, icr2.flags, 1u64);
+    let (mut in1, mut in2) = (0u64, 0u64);
+    let (mut extra1, mut extra2) = (0, 0);
+    let mut i = 0;
+    while flg1 != 0 || flg2 != 0 {
+        if mask & cur_bit != 0 {
+            let (b1, b2) = (flg1 & 1, flg2 & 1);
+            if b1 != 0 && b2 == 0 {
+                in1 |= 1 << i;
+                extra1 += 1;
+            } else if b1 == 0 && b2 != 0 {
+                in2 |= 1 << i;
+                extra2 += 1;
+            }
+        }
+        i += 1;
+        flg1 >>= 1;
+        flg2 >>= 1;
+        cur_bit <<= 1;
+    }
+    let ret = if extra1 != 0 && extra2 == 0 {
+        1
+    } else if extra1 == 0 && extra2 != 0 {
+        -1
+    } else if in1 == 0 && in2 == 0 {
+        0
+    } else {
+        2
+    };
+    (ret, in1, in2)
+}
+
+/// `CompareReversedINChI2`; the error argument (allocation failure) is
+/// always 0.
+pub fn compare_reversed_inchi2(
+    i1: Option<&InChI>,
+    i2: Option<&InChI>,
+    a1: Option<&InChIAux>,
+    a2: Option<&InChIAux>,
+    icr: &mut Icr,
+) -> u64 {
+    *icr = Icr::default();
+    let (i1, i2) = match (i1, i2) {
+        (None, None) => return 0,
+        (Some(a), Some(b)) => (a, b),
+        _ => {
+            icr.flags = IDIF_PROBLEM as u64;
+            return icr.flags;
+        }
+    };
+    let ret = compare_reversed_inchi2_body(i1, i2, a1, a2, icr);
+    icr.flags = ret as u64;
+    ret as u64
+}
+
+fn compare_reversed_inchi2_body(
+    i1: &InChI,
+    i2: &InChI,
+    a1: Option<&InChIAux>,
+    a2: Option<&InChIAux>,
+    icr: &mut Icr,
+) -> i32 {
+    let mut ret = 0;
+    if i1.n_error_code != i2.n_error_code || i1.n_error_code != 0 {
+        return ret | IDIF_PROBLEM;
+    }
+    if i1.n_number_of_atoms != i2.n_number_of_atoms {
+        return ret | IDIF_NUM_AT;
+    }
+    let n = i1.n_number_of_atoms.max(0) as usize;
+    if n > 0 {
+        if i1.n_atom[..n] != i2.n_atom[..n] {
+            return ret | IDIF_ATOMS;
+        }
+        if i1.n_num_h[..n] != i2.n_num_h[..n] {
+            ret |= IDIF_POSITION_H;
+            for j in 0..n {
+                if i1.n_num_h[j] != i2.n_num_h[j] && icr.diff_pos_h.len() < ICR_MAX_DIFF_FIXED_H {
+                    icr.diff_pos_h
+                        .push((j as u16, i1.n_num_h[j].wrapping_sub(i2.n_num_h[j])));
+                }
+            }
+        }
+        if i1.n_num_h_fixed.is_some() || i2.n_num_h_fixed.is_some() {
+            let has =
+                |f: &Option<Vec<i8>>| f.as_ref().is_some_and(|v| v[..n].iter().any(|&x| x != 0));
+            let (h1, h2) = (has(&i1.n_num_h_fixed), has(&i2.n_num_h_fixed));
+            if h1 && !h2 {
+                let f1 = i1.n_num_h_fixed.as_ref().unwrap();
+                for (i, &x) in f1[..n].iter().enumerate() {
+                    if x != 0 && icr.fixed_h1_more.len() < ICR_MAX_DIFF_FIXED_H {
+                        icr.fixed_h1_more.push((i as u16, x));
+                    }
+                }
+                ret |= IDIF_MORE_FH;
+            } else if !h1 && h2 {
+                let f2 = i2.n_num_h_fixed.as_ref().unwrap();
+                for (i, &x) in f2[..n].iter().enumerate() {
+                    if x != 0 && icr.fixed_h2_more.len() < ICR_MAX_DIFF_FIXED_H {
+                        icr.fixed_h2_more.push((i as u16, x));
+                    }
+                }
+                ret |= IDIF_LESS_FH;
+            } else if h1 && h2 {
+                let (f1, f2) = (
+                    i1.n_num_h_fixed.as_ref().unwrap(),
+                    i2.n_num_h_fixed.as_ref().unwrap(),
+                );
+                if f1[..n] != f2[..n] {
+                    for i in 0..n {
+                        if f1[i] > f2[i] {
+                            if icr.fixed_h1_more.len() < ICR_MAX_DIFF_FIXED_H {
+                                icr.fixed_h1_more
+                                    .push((i as u16, f1[i].wrapping_sub(f2[i])));
+                            }
+                        } else if f1[i] < f2[i] && icr.fixed_h2_more.len() < ICR_MAX_DIFF_FIXED_H {
+                            icr.fixed_h2_more
+                                .push((i as u16, f2[i].wrapping_sub(f1[i])));
+                        }
+                    }
+                    if !icr.fixed_h1_more.is_empty() {
+                        ret |= IDIF_MORE_FH;
+                    }
+                    if !icr.fixed_h2_more.is_empty() {
+                        ret |= IDIF_LESS_FH;
+                    }
+                }
+            }
+        }
+    }
+
+    let (mut num_h1, mut num_h2) = (0, 0);
+    let ret2 = compare_hill_formulas_no_h(
+        i1.sz_hill_formula.as_deref().unwrap_or(""),
+        i2.sz_hill_formula.as_deref().unwrap_or(""),
+        &mut num_h1,
+        &mut num_h2,
+    );
+    icr.tot_num_h1 = num_h1;
+    icr.tot_num_h2 = num_h2;
+    if ret2 != 0 {
+        return ret | IDIF_NUM_EL;
+    }
+    if num_h1 > num_h2 {
+        ret |= IDIF_MORE_H;
+    }
+    if num_h1 < num_h2 {
+        ret |= IDIF_LESS_H;
+    }
+    if i1.len_conn_table != i2.len_conn_table {
+        return ret | IDIF_CON_LEN;
+    }
+    let lc = i1.len_conn_table.max(0) as usize;
+    if lc > 0 && i1.n_conn_table[..lc] != i2.n_conn_table[..lc] {
+        return ret | IDIF_CON_TBL;
+    }
+
+    let n1 = if i1.len_tautomer != 0 {
+        i1.n_tautomer[0] as i32
+    } else {
+        0
+    };
+    let n2 = if i2.len_tautomer != 0 {
+        i2.n_tautomer[0] as i32
+    } else {
+        0
+    };
+    if n1 == 0 && n2 != 0 {
+        ret |= IDIF_NO_TAUT;
+    } else if n1 != 0 && n2 == 0 {
+        ret |= IDIF_WRONG_TAUT;
+    } else if n1 == 1 && n2 > 1 {
+        ret |= IDIF_SINGLE_TG;
+    } else if n1 > 1 && n2 == 1 {
+        ret |= IDIF_MULTIPLE_TG;
+    } else if n1 != n2 {
+        ret |= IDIF_NUM_TG;
+    }
+
+    if n1 != 0 || n2 != 0 {
+        let collect = |t: &[u16], len: i32| {
+            let g = |k: usize| i32::from(t.get(k).copied().unwrap_or(0));
+            let (mut nh, mut nm, mut pe) = (0, 0, Vec::new());
+            let mut m = 1usize;
+            while (m as i32) < len {
+                let l = g(m) as usize;
+                m += 1;
+                nh += g(m);
+                nm += g(m + 1);
+                for j in 2..l {
+                    pe.push(t.get(m + j).copied().unwrap_or(0));
+                }
+                m += l;
+            }
+            pe.sort_unstable();
+            (nh, nm, pe)
+        };
+        let (h1, m1, pe1) = collect(&i1.n_tautomer, i1.len_tautomer);
+        let (h2, m2, pe2) = collect(&i2.n_tautomer, i2.len_tautomer);
+        icr.num_taut_h1 = h1;
+        icr.num_taut_h2 = h2;
+        icr.num_taut_m1 = m1;
+        icr.num_taut_m2 = m2;
+        let (mut j1, mut j2) = (0, 0);
+        let (mut num_eq, mut only1, mut only2) = (0, 0, 0);
+        while j1 < pe1.len() && j2 < pe2.len() {
+            if pe1[j1] == pe2[j2] {
+                j1 += 1;
+                j2 += 1;
+                num_eq += 1;
+            } else if pe1[j1] < pe2[j2] {
+                if icr.endp_in1_only.len() < ICR_MAX_ENDP_IN1_ONLY {
+                    icr.endp_in1_only.push(pe1[j1]);
+                }
+                j1 += 1;
+                only1 += 1;
+            } else {
+                if icr.endp_in2_only.len() < ICR_MAX_ENDP_IN2_ONLY {
+                    icr.endp_in2_only.push(pe2[j2]);
+                }
+                j2 += 1;
+                only2 += 1;
+            }
+        }
+        for &e in &pe1[j1..] {
+            if icr.endp_in1_only.len() < ICR_MAX_ENDP_IN1_ONLY {
+                icr.endp_in1_only.push(e);
+            }
+            only1 += 1;
+        }
+        for &e in &pe2[j2..] {
+            if icr.endp_in2_only.len() < ICR_MAX_ENDP_IN2_ONLY {
+                icr.endp_in2_only.push(e);
+            }
+            only2 += 1;
+        }
+        if only1 != 0 {
+            ret |= IDIF_EXTRA_TG_ENDP;
+        }
+        if only2 != 0 {
+            ret |= IDIF_MISS_TG_ENDP;
+        }
+        if !(only1 == 0 && only2 == 0 && num_eq != 0) {
+            ret |= IDIF_DIFF_TG_ENDP;
+        }
+    }
+
+    let (lt1, lt2) = (i1.len_tautomer, i2.len_tautomer);
+    if lt1 > 1
+        && lt2 > 1
+        && (lt1 != lt2 || i1.n_tautomer[..lt1 as usize] != i2.n_tautomer[..lt1 as usize])
+    {
+        ret |= IDIF_TG;
+    }
+    if i1.n_number_of_isotopic_atoms != i2.n_number_of_isotopic_atoms {
+        ret |= IDIF_NUM_ISO_AT;
+    } else {
+        let ni = i1.n_number_of_isotopic_atoms.max(0) as usize;
+        if ni > 0 && i1.isotopic_atom[..ni] != i2.isotopic_atom[..ni] {
+            ret |= IDIF_ISO_AT;
+        }
+    }
+    if i1.n_total_charge != i2.n_total_charge {
+        ret |= IDIF_CHARGE;
+    }
+    if let Some(a1) = a1 {
+        if a1.n_num_removed_protons != 0
+            && a2.is_none_or(|a2| a2.n_num_removed_protons != a1.n_num_removed_protons)
+        {
+            ret |= IDIF_REM_PROT;
+        }
+        if a2.is_none_or(|a2| a2.n_num_removed_isotopic_h != a1.n_num_removed_isotopic_h) {
+            ret |= IDIF_REM_ISO_H;
+        }
+    }
+    let pick = |i: &InChI| match i.stereo_isotopic.as_ref() {
+        Some(s) if s.n_number_of_stereo_bonds + s.n_number_of_stereo_centers != 0 => {
+            Some(s.clone())
+        }
+        _ => i.stereo.clone(),
+    };
+    let (s1, s2) = (pick(i1), pick(i2));
+    ret | compare_reversed_stereo_inchi2(s1.as_ref(), s2.as_ref(), icr)
 }

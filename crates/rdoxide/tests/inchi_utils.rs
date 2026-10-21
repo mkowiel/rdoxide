@@ -12402,7 +12402,8 @@ fn create_inchi_matches_the_c_code() {
 fn reversed_inchi_comparison_matches_the_c_code() {
     use rdoxide::external::inchi::ichi::InChIAux;
     use rdoxide::external::inchi::ichimake::{
-        Icr, compare_reversed_inchi, compare_reversed_stereo_inchi, compare_reversed_stereo_inchi2,
+        Icr, compare_icr, compare_reversed_inchi, compare_reversed_inchi2,
+        compare_reversed_stereo_inchi, compare_reversed_stereo_inchi2,
     };
     let data: serde_json::Value =
         serde_json::from_str(include_str!("../../../tests/data/inchi_cmprev.json")).unwrap();
@@ -12458,5 +12459,44 @@ fn reversed_inchi_comparison_matches_the_c_code() {
             dump("scu2", &icr.sc_undef_in2_only),
         );
         assert_eq!(l, want[2], "case {ci}");
+
+        let mut q = Icr::default();
+        let f = compare_reversed_inchi2(c1.as_ref(), c2.as_ref(), a1.as_ref(), a2.as_ref(), &mut q);
+        let dn = |nm: &str, v: &[(u16, i8)]| {
+            let mut s = format!(" {nm}");
+            for (a, b) in v {
+                s += &format!(",{a}:{b}");
+            }
+            s
+        };
+        let l = format!(
+            "{f} {} {} {} {} {} {}{}{}{}{}{}{}{}{}{}{}{}{}{}",
+            q.tot_num_h1,
+            q.tot_num_h2,
+            q.num_taut_h1,
+            q.num_taut_h2,
+            q.num_taut_m1,
+            q.num_taut_m2,
+            dump("e1", &q.endp_in1_only),
+            dump("e2", &q.endp_in2_only),
+            dn("dp", &q.diff_pos_h),
+            dn("f1", &q.fixed_h1_more),
+            dn("f2", &q.fixed_h2_more),
+            dump("sc1", &q.sc_in1_only),
+            dump("sc2", &q.sc_in2_only),
+            dump("sb1", &q.sb_in1_only),
+            dump("sb2", &q.sb_in2_only),
+            dump("sbu1", &q.sb_undef_in1_only),
+            dump("sbu2", &q.sb_undef_in2_only),
+            dump("scu1", &q.sc_undef_in1_only),
+            dump("scu2", &q.sc_undef_in2_only),
+        );
+        assert_eq!(l, want[3], "case {ci}");
+        let q2 = Icr {
+            flags: t.i() as u64,
+            ..Icr::default()
+        };
+        let (r, x1, x2) = compare_icr(&q, &q2, t.i() as u64);
+        assert_eq!(format!("{r} {x1} {x2}"), want[4], "case {ci}");
     }
 }
