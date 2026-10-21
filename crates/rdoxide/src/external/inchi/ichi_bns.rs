@@ -14,7 +14,9 @@
 //! are offsets into [`BnStruct::iedge`]; the `alt_path` pointer is an index
 //! into [`BnStruct::altp`].
 
-use super::ichierr::{BNS_ALTPATH_OVFL, BNS_WRONG_PARMS, is_bns_error};
+use super::ichierr::{
+    BNS_ALTPATH_OVFL, BNS_BOND_ERR, BNS_PROGRAM_ERR, BNS_WRONG_PARMS, is_bns_error,
+};
 use super::ichitaut::is_centerpoint_elem;
 use super::incomdef::{BOND_TYPE_DOUBLE, BOND_TYPE_SINGLE, BOND_TYPE_TRIPLE, RADICAL_DOUBLET};
 use super::inpdef::{BOND_TYPE_MASK, InpAtom};
@@ -2264,4 +2266,421 @@ pub fn set_bns_to_check_alt_path(
         return super::ichierr::BNS_SET_ALTP_ERR;
     }
     BNS_CHK_ALTP_SET_SUCCESS
+}
+
+// ---- transferring the flow of the network to the bonds of the structure ----
+
+pub const BOND_ALT_123: i32 = 5;
+pub const BOND_ALT_13: i32 = 6;
+pub const BOND_ALT_23: i32 = 7;
+pub const BOND_MARK_ALT12: i32 = 0x10;
+pub const BOND_MARK_ALT123: i32 = 0x20;
+pub const BOND_MARK_ALT13: i32 = 0x30;
+pub const BOND_MARK_ALT23: i32 = 0x40;
+pub const BOND_MARK_ALT12NS: i32 = 0x50;
+pub const BOND_MARK_MASK: i32 = 0x70;
+pub const BNS_EF_SAVE_ALL: i32 = BNS_EF_CHNG_FLOW | BNS_EF_CHNG_BONDS | BNS_EF_UPD_RAD_ORI;
+pub const BNS_EF_ALTR_NS: i32 = BNS_EF_ALTR_BONDS | BNS_EF_SET_NOSTEREO;
+pub const BNS_EF_CHNG_RSTR: i32 = BNS_EF_CHNG_FLOW | BNS_EF_RSTR_FLOW;
+
+/// `RestoreEdgeFlow`
+pub fn restore_edge_flow(edge: &mut BnsEdge, delta: i32, b_change_flow: i32) -> i32 {
+    match b_change_flow & BNS_EF_CHNG_RSTR {
+        BNS_EF_CHNG_FLOW => edge.flow0 = edge.flow,
+        BNS_EF_CHNG_RSTR => edge.flow -= delta,
+        _ => {}
+    }
+    0
+}
+
+/// `SetAtomBondType`: sets the types of the two halves of a bond from the
+/// flow of its edge; returns the number of changed bonds or an error
+pub fn set_atom_bond_type(
+    edge: &BnsEdge,
+    bond_type12: &mut u8,
+    bond_type21: &mut u8,
+    delta: i32,
+    b_change_flow: i32,
+) -> i32 {
+    use super::ichitaut::{BOND_ALT12NS, BOND_ALTERN, BOND_TAUTOM};
+    let mut ret = 0;
+    if edge.pass == 0 {
+        return 0;
+    }
+    let (mut flow1, mut flow2);
+    match b_change_flow & BNS_EF_CHNG_RSTR {
+        0 | BNS_EF_RSTR_FLOW => {
+            flow1 = edge.flow0;
+            flow2 = flow1 + delta;
+        }
+        _ => {
+            flow2 = edge.flow;
+            flow1 = edge.flow0;
+        }
+    }
+    if b_change_flow & BNS_EF_CHNG_BONDS != 0 && b_change_flow & BNS_EF_ALTR_NS != BNS_EF_ALTR_NS {
+        let new_bond_type = (flow2 + BOND_TYPE_SINGLE) as u8;
+        if *bond_type12 != new_bond_type {
+            *bond_type12 = new_bond_type;
+            *bond_type21 = new_bond_type;
+            ret += 1;
+        }
+    } else if b_change_flow & BNS_EF_ALTR_BONDS != 0 {
+        if flow1 == flow2 {
+            return ret;
+        }
+        if flow1 > flow2 {
+            std::mem::swap(&mut flow1, &mut flow2);
+        }
+        let mut bond_type = i32::from(*bond_type12) & BOND_TYPE_MASK;
+        let bond_mark;
+        match bond_type {
+            t if t == BOND_TYPE_SINGLE || t == BOND_TYPE_DOUBLE || t == BOND_TYPE_TRIPLE => {
+                if flow1 == 0 && flow2 == 1 {
+                    if b_change_flow & BNS_EF_SET_NOSTEREO != 0 {
+                        bond_mark = BOND_MARK_ALT12NS;
+                        bond_type = BOND_ALT12NS;
+                    } else {
+                        bond_mark = BOND_MARK_ALT12;
+                        bond_type = BOND_ALTERN;
+                    }
+                } else if flow1 == 0 && flow2 == 2 {
+                    bond_mark = BOND_MARK_ALT13;
+                    bond_type = BOND_ALT_13;
+                } else if flow1 == 1 && flow2 == 2 {
+                    bond_mark = BOND_MARK_ALT23;
+                    bond_type = BOND_ALT_23;
+                } else {
+                    return BNS_BOND_ERR;
+                }
+            }
+            BOND_TAUTOM => {
+                if flow1 == 0 && flow2 == 1 {
+                    bond_mark = BOND_MARK_ALT12NS;
+                } else if flow1 == 1 && flow2 == 2 {
+                    bond_mark = BOND_MARK_ALT23;
+                } else {
+                    return BNS_BOND_ERR;
+                }
+            }
+            _ => {
+                let mut new_bond_type = bond_type;
+                let mut mark = i32::from(*bond_type12) & BOND_MARK_MASK;
+                match mark {
+                    BOND_MARK_ALT12 | BOND_MARK_ALT12NS => {
+                        if mark == BOND_MARK_ALT12
+                            && b_change_flow & BNS_EF_SET_NOSTEREO != 0
+                            && flow1 == 0
+                            && flow2 == 1
+                        {
+                            mark = BOND_MARK_ALT12NS;
+                            new_bond_type = BOND_ALT12NS;
+                        } else if flow1 == 2 || flow2 == 2 {
+                            mark = BOND_MARK_ALT123;
+                            new_bond_type = BOND_ALT_123;
+                        }
+                    }
+                    BOND_MARK_ALT13 => {
+                        if flow1 == 1 || flow2 == 1 {
+                            mark = BOND_MARK_ALT123;
+                            new_bond_type = BOND_ALT_123;
+                        }
+                    }
+                    BOND_MARK_ALT23 => {
+                        if flow1 == 0 || flow2 == 0 {
+                            mark = BOND_MARK_ALT123;
+                            new_bond_type = BOND_ALT_123;
+                        }
+                    }
+                    BOND_MARK_ALT123 => {}
+                    0 => {
+                        if flow1 == 0 && flow2 == 1 {
+                            mark = BOND_MARK_ALT12;
+                        } else if flow1 == 0 && flow2 == 2 {
+                            mark = BOND_MARK_ALT13;
+                        } else if flow1 == 1 && flow2 == 2 {
+                            mark = BOND_MARK_ALT23;
+                        } else {
+                            return BNS_BOND_ERR;
+                        }
+                    }
+                    _ => return BNS_BOND_ERR,
+                }
+                match bond_type {
+                    BOND_TAUTOM => {}
+                    BOND_ALTERN | BOND_ALT12NS | BOND_ALT_123 | BOND_ALT_13 | BOND_ALT_23 => {
+                        bond_type = new_bond_type;
+                    }
+                    _ => return BNS_BOND_ERR,
+                }
+                bond_mark = mark;
+            }
+        }
+        let nb = (bond_type | bond_mark) as u8;
+        if nb != *bond_type12 {
+            *bond_type12 = nb;
+            *bond_type21 = nb;
+            ret += 1;
+        }
+    }
+    ret
+}
+
+/// `RestoreBnStructFlow`
+pub fn restore_bn_struct_flow(p: &mut BnStruct, b_change_flow: i32) -> i32 {
+    let mut err = 0;
+    for pass in (0..p.num_altp as usize).rev() {
+        p.alt_path = Some(pass);
+        let (mut v1, n, mut delta, v_last) = {
+            let ap = &p.altp[pass];
+            (
+                ap[I_ALTP_START_ATOM].number(),
+                ap[I_ALTP_PATH_LEN].number(),
+                ap[I_ALTP_FLOW].flow[0],
+                ap[I_ALTP_END_ATOM].number(),
+            )
+        };
+        let mut v2 = NO_VERTEX;
+        if b_change_flow & BNS_EF_CHNG_RSTR == BNS_EF_CHNG_RSTR {
+            p.vert[v1 as usize].st_edge.flow -= delta;
+        } else if b_change_flow & BNS_EF_SAVE_ALL == BNS_EF_SAVE_ALL {
+            p.vert[v1 as usize].st_edge.flow0 = p.vert[v1 as usize].st_edge.flow;
+        }
+        for i in 0..n as usize {
+            let ineigh1 = p.altp[pass][I_ALTP_NEIGHBOR + i].ineigh(0) as usize;
+            let ie = p.iedge[p.vert[v1 as usize].iedge + ineigh1] as usize;
+            v2 = i32::from(p.edge[ie].neighbor12) ^ v1;
+            restore_edge_flow(&mut p.edge[ie], delta, b_change_flow);
+            p.edge[ie].pass = 0;
+            delta = -delta;
+            v1 = v2;
+        }
+        if v2 != v_last {
+            err = BNS_PROGRAM_ERR;
+        } else if b_change_flow & BNS_EF_CHNG_RSTR == BNS_EF_CHNG_RSTR {
+            p.vert[v2 as usize].st_edge.flow += delta;
+        } else if b_change_flow & BNS_EF_SAVE_ALL == BNS_EF_SAVE_ALL {
+            p.vert[v2 as usize].st_edge.flow0 = p.vert[v2 as usize].st_edge.flow;
+        }
+    }
+    err
+}
+
+/// `SetAtomRadAndChemValFromVertexCapFlow`
+pub fn set_atom_rad_and_chem_val_from_vertex_cap_flow(
+    p: &BnStruct,
+    atom: &mut [InpAtom],
+    v1: usize,
+) -> i32 {
+    let vert = &p.vert[v1];
+    let at = &mut atom[v1];
+    let mut n_changes = 0;
+    if vert.st_edge.pass == 0 {
+        return 0;
+    }
+    let c = i32::from(at.chem_bonds_valence) - i32::from(at.valence);
+    if c >= 0 && c != vert.st_edge.flow {
+        at.chem_bonds_valence = (i32::from(at.valence) + vert.st_edge.flow) as i8;
+        n_changes += 1;
+    }
+    let radical = match vert.st_edge.cap - vert.st_edge.flow {
+        0 => 0,
+        1 => super::incomdef::RADICAL_DOUBLET,
+        2 => super::incomdef::RADICAL_TRIPLET,
+        _ => return BNS_BOND_ERR,
+    } as i8;
+    if radical != at.radical {
+        at.radical = radical;
+        n_changes += 1;
+    }
+    n_changes
+}
+
+/// `SetBondsFromBnStructFlow`
+pub fn set_bonds_from_bn_struct_flow(
+    p: &mut BnStruct,
+    at: &mut [InpAtom],
+    num_atoms: i32,
+    b_change_flow0: i32,
+) -> i32 {
+    let b_change_flow = b_change_flow0 & !BNS_EF_SET_NOSTEREO;
+    let mut err = 0;
+    let mut ret = 0;
+    for pass in (0..p.num_altp as usize).rev() {
+        p.alt_path = Some(pass);
+        let (mut v1, n, mut delta, v_last) = {
+            let ap = &p.altp[pass];
+            (
+                ap[I_ALTP_START_ATOM].number(),
+                ap[I_ALTP_PATH_LEN].number(),
+                ap[I_ALTP_FLOW].flow[0],
+                ap[I_ALTP_END_ATOM].number(),
+            )
+        };
+        let mut b_change_flow_add;
+        if b_change_flow0 & BNS_EF_SET_NOSTEREO != 0
+            && (p.vert[v1 as usize].st_edge.cap0 > p.vert[v1 as usize].st_edge.flow0
+                || p.vert[v_last as usize].st_edge.cap0 > p.vert[v_last as usize].st_edge.flow0)
+        {
+            b_change_flow_add = BNS_EF_SET_NOSTEREO;
+            ret |= 2;
+        } else {
+            b_change_flow_add = 0;
+        }
+        if b_change_flow & BNS_EF_CHNG_RSTR != BNS_EF_CHNG_RSTR
+            && b_change_flow & BNS_EF_SAVE_ALL == BNS_EF_SAVE_ALL
+            && v1 < num_atoms
+        {
+            let r = set_atom_rad_and_chem_val_from_vertex_cap_flow(p, at, v1 as usize);
+            if r < 0 {
+                err = BNS_PROGRAM_ERR;
+            } else {
+                ret |= i32::from(r > 0);
+            }
+        }
+        p.vert[v1 as usize].st_edge.pass = 0;
+        let mut v0 = NO_VERTEX;
+        let mut v2 = NO_VERTEX;
+        for i in 0..n as usize {
+            let nb = p.altp[pass][I_ALTP_NEIGHBOR + i];
+            let (ineigh1, ineigh2) = (nb.ineigh(0) as usize, nb.ineigh(1) as usize);
+            let ie = p.iedge[p.vert[v1 as usize].iedge + ineigh1] as usize;
+            v2 = i32::from(p.edge[ie].neighbor12) ^ v1;
+            if b_change_flow & BNS_EF_CHNG_BONDS != 0 && v1 < num_atoms {
+                if v0 >= num_atoms && v2 < num_atoms {
+                    at[v1 as usize].chem_bonds_valence += delta as i8;
+                } else if v0 < num_atoms && v2 >= num_atoms && v0 != NO_VERTEX {
+                    at[v1 as usize].chem_bonds_valence -= delta as i8;
+                }
+            }
+            if p.edge[ie].pass != 0 {
+                if v1 < num_atoms
+                    && ineigh1 < at[v1 as usize].valence as usize
+                    && v2 < num_atoms
+                    && ineigh2 < at[v2 as usize].valence as usize
+                {
+                    if b_change_flow0 & BNS_EF_ALTR_NS == BNS_EF_ALTR_NS
+                        && b_change_flow0 & BNS_EF_SAVE_ALL == BNS_EF_SAVE_ALL
+                    {
+                        b_change_flow_add =
+                            if at[v1 as usize].n_ring_system != at[v2 as usize].n_ring_system {
+                                BNS_EF_ALTR_NS
+                            } else {
+                                0
+                            };
+                    }
+                    let mut t12 = at[v1 as usize].bond_type[ineigh1];
+                    let mut t21 = at[v2 as usize].bond_type[ineigh2];
+                    let r = set_atom_bond_type(
+                        &p.edge[ie],
+                        &mut t12,
+                        &mut t21,
+                        delta,
+                        b_change_flow | b_change_flow_add,
+                    );
+                    at[v1 as usize].bond_type[ineigh1] = t12;
+                    at[v2 as usize].bond_type[ineigh2] = t21;
+                    if r < 0 {
+                        err = BNS_PROGRAM_ERR;
+                    } else {
+                        ret |= i32::from(r > 0);
+                    }
+                }
+                p.edge[ie].pass = 0;
+            }
+            delta = -delta;
+            v0 = v1;
+            v1 = v2;
+        }
+        if v2 != v_last {
+            err = BNS_PROGRAM_ERR;
+        } else if b_change_flow & BNS_EF_CHNG_RSTR != BNS_EF_CHNG_RSTR
+            && b_change_flow & BNS_EF_SAVE_ALL == BNS_EF_SAVE_ALL
+            && v2 < num_atoms
+        {
+            let r = set_atom_rad_and_chem_val_from_vertex_cap_flow(p, at, v2 as usize);
+            if r < 0 {
+                err = BNS_PROGRAM_ERR;
+            } else {
+                ret |= i32::from(r > 0);
+            }
+        }
+        p.vert[v2 as usize].st_edge.pass = 0;
+    }
+    if err != 0 { err } else { ret }
+}
+
+/// `bSetBondsAfterCheckOneBond`
+pub fn set_bonds_after_check_one_bond(
+    p: &mut BnStruct,
+    fcd: &[BnsFlowChanges],
+    n_test_flow: i32,
+    at: &mut [InpAtom],
+    num_atoms: i32,
+    b_change_flow0: i32,
+) -> i32 {
+    let b_change_flow0 = b_change_flow0 & !BNS_EF_CHNG_RSTR;
+    if b_change_flow0 == 0 {
+        return 0;
+    }
+    let mut b_change_flow = b_change_flow0 & !BNS_EF_SET_NOSTEREO;
+    let mut n_changes = 0;
+    let mut b_error = 0;
+    let mut n = 0usize;
+    while fcd[n].iedge != NO_VERTEX {
+        n += 1;
+    }
+    if b_change_flow0 & BNS_EF_SET_NOSTEREO != 0 {
+        for (ifcd, f) in fcd.iter().enumerate().take(n) {
+            let e = p.edge[f.iedge as usize];
+            if e.pass == 0 {
+                continue;
+            }
+            let new_flow = if ifcd == 0 && n_test_flow >= 0 {
+                n_test_flow
+            } else {
+                e.flow
+            };
+            let v1 = i32::from(e.neighbor1);
+            let v2 = i32::from(e.neighbor12) ^ v1;
+            if v1 < num_atoms && v2 < num_atoms && new_flow != e.flow0 {
+                let (a, b) = (&p.vert[v1 as usize].st_edge, &p.vert[v2 as usize].st_edge);
+                if (a.cap0 == a.flow0) != (a.cap == a.flow)
+                    || (b.cap0 == b.flow0) != (b.cap == b.flow)
+                {
+                    b_change_flow |= BNS_EF_SET_NOSTEREO;
+                    n_changes |= BNS_EF_SET_NOSTEREO;
+                }
+            }
+        }
+    }
+    for ifcd in (0..n).rev() {
+        let ie = fcd[ifcd].iedge as usize;
+        if p.edge[ie].pass == 0 {
+            continue;
+        }
+        let new_flow = if ifcd == 0 && n_test_flow >= 0 {
+            n_test_flow
+        } else {
+            p.edge[ie].flow
+        };
+        let e = p.edge[ie];
+        let v1 = i32::from(e.neighbor1);
+        let v2 = i32::from(e.neighbor12) ^ v1;
+        if v1 < num_atoms && v2 < num_atoms && b_change_flow != 0 && new_flow != e.flow0 {
+            let (i1, i2) = (e.neigh_ord[0] as usize, e.neigh_ord[1] as usize);
+            let mut t12 = at[v1 as usize].bond_type[i1];
+            let mut t21 = at[v2 as usize].bond_type[i2];
+            let r = set_atom_bond_type(&e, &mut t12, &mut t21, new_flow - e.flow0, b_change_flow);
+            at[v1 as usize].bond_type[i1] = t12;
+            at[v2 as usize].bond_type[i2] = t21;
+            if !is_bns_error(r) {
+                n_changes |= i32::from(r > 0);
+            } else {
+                b_error = r;
+            }
+        }
+        p.edge[ie].pass = 0;
+    }
+    if b_error != 0 { b_error } else { n_changes }
 }
