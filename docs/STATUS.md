@@ -293,6 +293,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 177 | done |
 | 178 | done |
 | 179 | done |
+| 180 | done |
 
 ## Python package files
 
@@ -642,3 +643,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-21 — Stage 177: I5f: pyrazole 5-member ring tautomerism
 * 2026-10-21 — Stage 178: I5g: tropolone 7-/5-member ring tautomerism (MarkTautomerGroups complete)
 * 2026-10-21 — Stage 179: I6a: mark_alt_bonds_and_taut_groups (main normalization driver)
+* 2026-10-21 — Stage 180: I6b: CountTautomerGroups, SortTautomerGroupsAndEndpoints, set_tautomer_iso_sort_keys

@@ -664,6 +664,8 @@ pub struct TGroup {
     pub n_group_number: u16,
     pub n_num_endpoints: u16,
     pub n_first_endpoint_at_no_pos: u16,
+    /// `iWeight`: isotopic "weight" of the mobile groups
+    pub i_weight: i64,
 }
 
 /// `TNI`: the protons and explicit H removed by the normalization
@@ -689,6 +691,10 @@ pub struct TGroupInfo {
     /// `nIsotopicEndpointAtomNumber`: [0] = count, then non-tautomeric atoms
     pub n_isotopic_endpoint_atom_number: Vec<u16>,
     pub n_num_isotopic_endpoints: i32,
+    /// `nEndpointAtomNumber` (filled by `CountTautomerGroups`)
+    pub n_endpoint_atom_number: Vec<u16>,
+    pub n_num_endpoints: i32,
+    pub b_ignore_isotopic: i32,
     /// `num_iso_H`
     pub num_iso_h: [i16; super::incomdef::NUM_H_ISOTOPES],
 }
@@ -4769,4 +4775,236 @@ pub fn mark_alt_bonds_and_taut_groups(
     } else {
         n
     }
+}
+
+// ---- t-group counting and sorting for the connection table ----
+
+/// `T_GROUP_ISOWT_MULT`
+pub const T_GROUP_ISOWT_MULT: i64 = 1024;
+/// `TGSO_TOTAL_LEN`
+pub const TGSO_TOTAL_LEN: usize = 4;
+/// `T_GROUP_HDR_LEN`
+pub const T_GROUP_HDR_LEN: usize = 1 + T_NUM_NO_ISOTOPIC;
+/// `FLAG_NORM_CONSIDER_TAUT`
+pub const FLAG_NORM_CONSIDER_TAUT: u64 =
+    0x0001 | 0x0002 | 0x0004 | 0x0008 | 0x0010 | 0x0020 | 0x0080 | 0x0040;
+
+/// `set_tautomer_iso_sort_keys`: sets the isotopic weights of the t-groups,
+/// returns the number of t-groups with a non-zero weight
+pub fn set_tautomer_iso_sort_keys(tgi: &mut TGroupInfo) -> i32 {
+    let num_t_groups = tgi.num_t_groups;
+    if tgi.t_group.is_none() || num_t_groups == 0 || tgi.n_num_isotopic_endpoints != 0 {
+        return 0;
+    }
+    let mut num_iso_t_groups = 0;
+    for g in tgi.t_group.as_mut().unwrap()[..num_t_groups].iter_mut() {
+        g.i_weight = 0;
+        let mut mult: i64 = 1;
+        let mut j = T_NUM_ISOTOPIC as i32 - 1;
+        loop {
+            g.i_weight += mult * i64::from(g.num[T_NUM_NO_ISOTOPIC + j as usize]);
+            j -= 1;
+            if j < 0 {
+                break;
+            }
+            mult *= T_GROUP_ISOWT_MULT;
+        }
+        num_iso_t_groups += i32::from(g.i_weight != 0);
+    }
+    num_iso_t_groups
+}
+
+/// `CountTautomerGroups`: renumbers the t-groups, drops those that are gone
+/// or contain no mobile H and fills `nEndpointAtomNumber`/`tGroupNumber`.
+/// `endpoint` holds `sp_ATOM::endpoint` of each atom. Returns the length of
+/// the tautomeric part of the linear CT, 0 or an error.
+pub fn count_tautomer_groups(endpoint: &mut [u16], num_atoms: usize, tgi: &mut TGroupInfo) -> i32 {
+    use super::ichierr::CT_TAUCOUNT_ERR;
+    if tgi.t_group.is_none() || tgi.max_num_t_groups == 0 {
+        return 0;
+    }
+    let mut num_t = tgi.num_t_groups;
+    tgi.n_endpoint_atom_number = Vec::new();
+    tgi.t_group_number = Vec::new();
+    let mut t_group = tgi.t_group.take().unwrap();
+    let mut num_groups_no_h = 0;
+    let max_t_group = t_group[..num_t]
+        .iter()
+        .map(|g| g.n_group_number)
+        .max()
+        .unwrap_or(0) as usize;
+    let mut taut_group_number = vec![0u16; if max_t_group != 0 { max_t_group + 1 } else { 0 }];
+    let mut n_end_atoms = vec![0u16; 0];
+    let mut curr_pos: Vec<u16>;
+    let mut t_group_number: Vec<u16>;
+    let mut n_num_endpoints: i32 = 0;
+    let mut n_new_group_number: u16 = 0;
+    let mut ret = 0;
+    let mut err = false;
+    let mut done_ok = false;
+    'body: {
+        for e in endpoint.iter().take(num_atoms) {
+            let j = *e as usize;
+            if j == 0 {
+                continue;
+            }
+            if j > max_t_group {
+                err = true;
+                break 'body;
+            }
+            taut_group_number[j] += 1;
+            n_num_endpoints += 1;
+        }
+        if n_num_endpoints == 0 {
+            break 'body; // not a tautomer
+        }
+        n_end_atoms = vec![0u16; n_num_endpoints as usize];
+        curr_pos = vec![0u16; num_t];
+        let mut i = 0;
+        while i < num_t {
+            let mut b_no_h = false;
+            let group_number = t_group[i].n_group_number as usize;
+            let mut num_h = i32::from(t_group[i].num[0]);
+            for j in 1..T_NUM_NO_ISOTOPIC {
+                num_h -= i32::from(t_group[i].num[j]);
+            }
+            if t_group[i].n_num_endpoints != taut_group_number[group_number] || {
+                b_no_h = t_group[i].num[0] == t_group[i].num[1];
+                b_no_h
+            } {
+                if taut_group_number[group_number] == 0 || b_no_h {
+                    num_t -= 1;
+                    if i < num_t {
+                        t_group.copy_within(i + 1..num_t + 1, i);
+                    }
+                    if b_no_h {
+                        taut_group_number[group_number] = 0;
+                        num_groups_no_h += 1;
+                    }
+                } else {
+                    err = true;
+                    break 'body;
+                }
+            } else {
+                n_new_group_number += 1;
+                taut_group_number[group_number] = n_new_group_number;
+                t_group[i].n_group_number = n_new_group_number;
+                let pos = if i != 0 {
+                    t_group[i - 1].n_first_endpoint_at_no_pos + t_group[i - 1].n_num_endpoints
+                } else {
+                    0
+                };
+                t_group[i].n_first_endpoint_at_no_pos = pos;
+                curr_pos[i] = pos;
+                t_group[i].num[0] = num_h as u16;
+                // REMOVE_TGROUP_CHARGE == 0: the (-) charges are kept
+                i += 1;
+            }
+        }
+        if num_t != n_new_group_number as usize {
+            err = true;
+            break 'body;
+        }
+        if n_new_group_number == 0 {
+            if num_groups_no_h == 0 {
+                err = true;
+            }
+            break 'body;
+        }
+        t_group_number = vec![0u16; n_new_group_number as usize * TGSO_TOTAL_LEN];
+        for (i, v) in t_group_number
+            .iter_mut()
+            .take(n_new_group_number as usize)
+            .enumerate()
+        {
+            *v = i as u16;
+        }
+        for (i, e) in endpoint.iter_mut().take(num_atoms).enumerate() {
+            let j = *e as usize;
+            if j != 0 {
+                *e = taut_group_number[j];
+                let jn = *e as i32 - 1;
+                if jn >= 0 {
+                    let jn = jn as usize;
+                    if curr_pos[jn]
+                        >= t_group[jn].n_first_endpoint_at_no_pos + t_group[jn].n_num_endpoints
+                    {
+                        err = true;
+                        break 'body;
+                    }
+                    n_end_atoms[curr_pos[jn] as usize] = i as u16;
+                    curr_pos[jn] += 1;
+                } else {
+                    n_num_endpoints -= 1;
+                }
+            }
+        }
+        tgi.num_t_groups = n_new_group_number as usize;
+        tgi.n_num_endpoints = n_num_endpoints;
+        tgi.n_endpoint_atom_number = std::mem::take(&mut n_end_atoms);
+        tgi.t_group_number = std::mem::take(&mut t_group_number);
+        done_ok = true;
+    }
+    tgi.t_group = Some(t_group);
+    if done_ok {
+        return n_num_endpoints + (T_GROUP_HDR_LEN as i32) * i32::from(n_new_group_number) + 1;
+    }
+    if err {
+        ret = CT_TAUCOUNT_ERR;
+    }
+    tgi.n_num_endpoints = 0;
+    tgi.num_t_groups = 0;
+    if ret == 0
+        && (tgi.tni.b_normalization_flags & FLAG_NORM_CONSIDER_TAUT != 0
+            || (tgi.n_num_isotopic_endpoints > 1
+                && tgi.b_taut_flags_done
+                    & (super::runichi3::TG_FLAG_FOUND_ISOTOPIC_H_DONE
+                        | super::runichi3::TG_FLAG_FOUND_ISOTOPIC_ATOM_DONE)
+                    != 0))
+    {
+        ret = 1;
+    }
+    ret
+}
+
+/// `SortTautomerGroupsAndEndpoints`: sorts the endpoints within each t-group
+/// by atom rank and the t-groups by their ranks (located at
+/// `n_rank[num_atoms..num_at_tg]`)
+pub fn sort_tautomer_groups_and_endpoints(
+    tgi: &mut TGroupInfo,
+    num_atoms: usize,
+    num_at_tg: usize,
+    n_rank: &[u16],
+) -> i32 {
+    use super::ichierr::CT_TAUCOUNT_ERR;
+    use super::ichisort::insertions_sort;
+    let num_t_groups = num_at_tg as i64 - num_atoms as i64;
+    if num_t_groups <= 0 || tgi.n_num_endpoints < 2 {
+        return 0;
+    }
+    let num_t_groups = num_t_groups as usize;
+    let groups: Vec<TGroup> = tgi
+        .t_group
+        .as_ref()
+        .map(|t| t[..num_t_groups].to_vec())
+        .unwrap_or_default();
+    for g in &groups {
+        if g.n_num_endpoints < 2 {
+            continue;
+        }
+        let first = g.n_first_endpoint_at_no_pos as usize;
+        let n = g.n_num_endpoints as usize;
+        if n as i32 + first as i32 > tgi.n_num_endpoints {
+            return CT_TAUCOUNT_ERR;
+        }
+        insertions_sort(&mut tgi.n_endpoint_atom_number[first..first + n], |a, b| {
+            i32::from(n_rank[*a as usize]) - i32::from(n_rank[*b as usize])
+        });
+    }
+    if tgi.num_t_groups > 1 {
+        insertions_sort(&mut tgi.t_group_number[..num_t_groups], |a, b| {
+            i32::from(n_rank[num_atoms + *a as usize]) - i32::from(n_rank[num_atoms + *b as usize])
+        });
+    }
+    tgi.num_t_groups as i32
 }

@@ -6756,3 +6756,115 @@ fn main_normalization_matches_the_c_code() {
     }
     assert!(seen.len() > 6, "{seen:?}");
 }
+
+#[test]
+fn tautomer_group_counting_matches_the_c_code() {
+    use rdoxide::external::inchi::ichitaut::{
+        TGroup, TGroupInfo, count_tautomer_groups, set_tautomer_iso_sort_keys,
+        sort_tautomer_groups_and_endpoints,
+    };
+    use rdoxide::external::inchi::runichi3::TG_FLAG_FOUND_ISOTOPIC_H_DONE;
+    fn join(v: &[u16]) -> String {
+        v.iter().map(|x| format!(" {x}")).collect()
+    }
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_tgcount.json")).unwrap();
+    let mut seen = std::collections::BTreeMap::new();
+    for c in data.as_array().unwrap() {
+        let inp = &c["in"];
+        let mut ep: Vec<u16> = inp["ep"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_u64().unwrap() as u16)
+            .collect();
+        let n = ep.len();
+        let groups = inp["groups"].as_array().unwrap();
+        let g = groups.len();
+        let mut t_group = vec![TGroup::default(); g + 3];
+        for (i, gr) in groups.iter().enumerate() {
+            let v: Vec<u64> = gr
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|x| x.as_u64().unwrap())
+                .collect();
+            t_group[i].n_group_number = v[0] as u16;
+            t_group[i].n_num_endpoints = v[1] as u16;
+            for q in 0..5 {
+                t_group[i].num[q] = v[2 + q] as u16;
+            }
+        }
+        let mut tgi = TGroupInfo {
+            t_group: Some(t_group),
+            num_t_groups: g,
+            max_num_t_groups: inp["maxg"].as_u64().unwrap() as usize,
+            n_num_isotopic_endpoints: inp["niso"].as_i64().unwrap() as i32,
+            b_taut_flags_done: if inp["done"].as_i64().unwrap() != 0 {
+                TG_FLAG_FOUND_ISOTOPIC_H_DONE
+            } else {
+                0
+            },
+            ..Default::default()
+        };
+        tgi.tni.b_normalization_flags = inp["norm"].as_u64().unwrap();
+        let mut got = Vec::new();
+        let w = set_tautomer_iso_sort_keys(&mut tgi);
+        let mut s = format!("K {w}");
+        for t in &tgi.t_group.as_ref().unwrap()[..g] {
+            s += &format!(" {}", t.i_weight);
+        }
+        got.push(s);
+        let ret = count_tautomer_groups(&mut ep, n, &mut tgi);
+        *seen.entry(ret.clamp(-1, 1)).or_insert(0) += 1;
+        got.push(format!(
+            "R {ret} {} {}",
+            tgi.num_t_groups, tgi.n_num_endpoints
+        ));
+        for t in &tgi.t_group.as_ref().unwrap()[..tgi.num_t_groups] {
+            let nums: String = t.num.iter().map(|x| format!(" {x}")).collect();
+            got.push(format!(
+                "T {} {} {} |{}",
+                t.n_group_number, t.n_num_endpoints, t.n_first_endpoint_at_no_pos, nums
+            ));
+        }
+        got.push(format!("P{}", join(&ep)));
+        got.push(format!(
+            "E{}",
+            join(
+                &tgi.n_endpoint_atom_number[..tgi
+                    .n_endpoint_atom_number
+                    .len()
+                    .min(tgi.n_num_endpoints.max(0) as usize)]
+            )
+        ));
+        got.push(format!("W{}", join(&tgi.t_group_number)));
+        let rank: Vec<u16> = inp["rank"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_u64().unwrap() as u16)
+            .collect();
+        let nat = n + tgi.num_t_groups;
+        let sr = sort_tautomer_groups_and_endpoints(&mut tgi, n, nat, &rank);
+        got.push(format!("S {sr}"));
+        got.push(format!(
+            "E{}",
+            join(
+                &tgi.n_endpoint_atom_number[..tgi
+                    .n_endpoint_atom_number
+                    .len()
+                    .min(tgi.n_num_endpoints.max(0) as usize)]
+            )
+        ));
+        got.push(format!("W{}", join(&tgi.t_group_number)));
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        assert_eq!(got, want, "{inp}");
+    }
+    assert!(seen.len() == 3, "{seen:?}");
+}
