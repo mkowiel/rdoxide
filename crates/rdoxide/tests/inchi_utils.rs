@@ -12719,8 +12719,9 @@ fn create_one_structure_inchi_matches_the_c_code() {
         let mut nc = NormCanonFlags::default();
         let mut got: Vec<String> = Vec::new();
         for ii in 0..2 {
+            let mut log = rdoxide::external::inchi::ichi_io::InchiIostream::default();
             let ret = create_one_structure_inchi(
-                &mut sd, &ip, ii, &mut orig, &mut prep, &mut res, &mut nc,
+                &mut sd, &ip, &mut log, 1, ii, &mut orig, &mut prep, &mut res, &mut nc,
             );
             got.push(format!(
                 "S{ii} {ret} {} {} {} [{}] {} {} {} {} {}",

@@ -338,6 +338,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 222 | InChI port I9c: V3000 Molfile reader wired into the Molfile driver, differential-tested on 3449 fuzzed V3000 molfiles vs the C library |
 | 223 | InChI port I9d: ReadMolfile and the SD-file data readers of mol_fmt4, differential-tested on 2286 molfiles vs the C library |
 | 224 | InChI port I9e: mol2atom (Molfile to inp_ATOM, valences, polymer and V3000 containers), differential-tested on 2281 molfiles vs the C library |
+| 225 | InChI port I9f: molfile text to InChI string pipeline (option parsing, GetOneStructure, ProcessOneStructureEx, output assembly), differential-tested on 2990 molfiles vs the C library |
 
 ## Python package files
 
@@ -744,3 +745,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-21 — Stage 222: I9c molfmt3: V3000 Molfile reader differential-tested against C (3449 cases)
 * 2026-10-21 — Stage 223: I9d molfmt4: ReadMolfile + SDFile data readers differential-tested against C (2286 cases)
 * 2026-10-21 — Stage 224: I9e mol2atom: Molfile to atom array differential-tested against C (2281 cases)
+* 2026-10-22 — Stage 225: I9f inchi_dll_b: MakeINCHIFromMolfileText differential-tested against C (2990 cases)

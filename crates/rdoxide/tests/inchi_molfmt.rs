@@ -725,3 +725,35 @@ fn molfile_to_inp_atoms_matches_c() {
         assert_eq!(out, want, "case {ci}: {inp}");
     }
 }
+
+#[test]
+fn molfile_text_to_inchi_matches_c() {
+    use rdoxide::external::inchi::inchi_dll_b::make_inchi_from_molfile_text;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_mol2inchi.json")).unwrap();
+    let h = |s: &Option<String>| match s {
+        None => "-".to_string(),
+        Some(t) if t.is_empty() => "=".to_string(),
+        Some(t) => hex(t.as_bytes()),
+    };
+    for (ci, c) in data.as_array().unwrap().iter().enumerate() {
+        let t: Vec<&str> = c["in"].as_str().unwrap().split(' ').collect();
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        let opts = (t[0] == "1").then(|| if t[1] == "=" { Vec::new() } else { unhex(t[1]) });
+        let mol = unhex(t[2]);
+        let (ret, out) = make_inchi_from_molfile_text(&mol, opts.as_deref());
+        let got = [
+            format!("R {ret}"),
+            format!("I {}", h(&out.sz_inchi)),
+            format!("X {}", h(&out.sz_aux_info)),
+            format!("M {}", h(&out.sz_message)),
+            format!("L {}", h(&out.sz_log)),
+        ];
+        assert_eq!(got.as_slice(), want.as_slice(), "case {ci}: {}", c["in"]);
+    }
+}

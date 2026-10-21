@@ -55,6 +55,8 @@ pub struct StructData {
     pub num_non_taut: [i32; 3],
     pub num_components: [i32; 3],
     pub b_user_quit_component: i32,
+    /// `bChiralFlag`
+    pub b_chiral_flag: i32,
 }
 
 /// `OrigAtData_bCheckUnusualValences`: counts atoms with an unusual valence
@@ -368,4 +370,91 @@ pub fn preprocess_one_structure(
     sd.taut_flags[INCHI_BAS] |= b_taut_flags;
     sd.taut_flags_done[INCHI_BAS] |= b_taut_flags_done;
     sd.n_error_type
+}
+
+/// `OAD_ValidateAndSortOutPseudoElementAtoms` for structures without polymer
+/// data: the pseudoelement atoms `*`, `Zz` and `Zy` become `Zy`; sets
+/// `orig.n_zy`. Returns the error code (0 for none).
+fn oad_validate_and_sort_out_pseudo_element_atoms(
+    orig: &mut OrigAtomData,
+    treat_polymers: i32,
+    b_np_zz: i32,
+    p_str_err: &mut String,
+) -> i32 {
+    use super::molfmt::treat_err;
+    let mut err = 0;
+    let mut n_pseudo = 0;
+    let pseudos_allowed = b_np_zz == 1 || treat_polymers != super::ichiparm::POLYMERS_NO;
+    let nat = orig.num_inp_atoms;
+    for k in 0..nat {
+        let name_len = orig.at[k]
+            .elname
+            .iter()
+            .position(|&c| c == 0)
+            .unwrap_or(orig.at[k].elname.len());
+        let name = orig.at[k].elname[..name_len].to_vec();
+        let is_zy = name == b"Zy";
+        let is_star = name == b"*";
+        let is_zz = !is_star && name == b"Zz";
+        if is_star || is_zz || is_zy {
+            n_pseudo += 1;
+            if !pseudos_allowed {
+                treat_err(&mut err, 70 + 5, p_str_err, "Invalid element(s):");
+                treat_err(&mut err, 70 + 5, p_str_err, &String::from_utf8_lossy(&name));
+                continue;
+            }
+            if orig.at[k].valence > 1 || orig.at[k].chem_bonds_valence > 1 {
+                treat_err(
+                    &mut err,
+                    70 + 7,
+                    p_str_err,
+                    "Invalid pseudo element(s) bonding",
+                );
+                continue;
+            }
+            orig.at[k].elname[0] = b'Z';
+            orig.at[k].elname[1] = b'y';
+            orig.at[k].elname[2] = 0;
+        }
+    }
+    orig.n_zy = n_pseudo;
+    if orig.n_zy != 0 && b_np_zz == 0 {
+        treat_err(
+            &mut err,
+            70 + 4,
+            p_str_err,
+            "Polymer-unrelated pseudoatoms are not allowed",
+        );
+    }
+    if err != 0 {
+        orig.valid_polymer = 0;
+    }
+    err
+}
+
+/// `OAD_ValidatePolymerAndPseudoElementData` for structures without polymer
+/// data (`orig.polymer` is `None`; the polymer unit checks are not ported).
+/// Returns the error code (0 for none).
+pub fn oad_validate_polymer_and_pseudo_element_data(
+    orig: &mut OrigAtomData,
+    treat_polymers: i32,
+    b_np_zz: i32,
+    p_str_err: &mut String,
+) -> i32 {
+    use super::molfmt::treat_err;
+    orig.valid_polymer = 0;
+    let mut err =
+        oad_validate_and_sort_out_pseudo_element_atoms(orig, treat_polymers, b_np_zz, p_str_err);
+    if err != 0 {
+        return err;
+    }
+    if orig.n_zy > 0 && b_np_zz == 0 {
+        treat_err(
+            &mut err,
+            9,
+            p_str_err,
+            "Non-polymer-related Zz/star atoms are not allowed",
+        );
+    }
+    err
 }
