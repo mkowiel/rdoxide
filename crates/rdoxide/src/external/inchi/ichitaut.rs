@@ -2539,6 +2539,7 @@ enum TautRule {
     Pt39,
     Pt13,
     Pt18,
+    Ket,
 }
 
 impl TautRule {
@@ -2552,6 +2553,7 @@ impl TautRule {
             TautRule::Pt39 => ALT_PATH_MODE_TAUTOM_PT_39_00,
             TautRule::Pt13 => ALT_PATH_MODE_TAUTOM_PT_13_00,
             TautRule::Pt18 => ALT_PATH_MODE_TAUTOM_PT_18_00,
+            TautRule::Ket => ALT_PATH_MODE_TAUTOM_KET,
         }
     }
 
@@ -2564,6 +2566,7 @@ impl TautRule {
             TautRule::Pt39 => n_get_endpoint_info_pt_39_00(at, iat, eif),
             TautRule::Pt13 => n_get_endpoint_info_pt_13_00(at, iat, eif),
             TautRule::Pt18 => n_get_endpoint_info_pt_18_00(at, iat, eif),
+            TautRule::Ket => n_get_endpoint_info_ket(at, iat, eif),
         }
     }
 
@@ -2577,6 +2580,7 @@ impl TautRule {
             TautRule::Pt39 => TG_FLAG_PT_39_00,
             TautRule::Pt13 => TG_FLAG_PT_13_00,
             TautRule::Pt18 => TG_FLAG_PT_18_00,
+            TautRule::Ket => TG_FLAG_KETO_ENOL_TAUT,
         }
     }
 
@@ -2593,10 +2597,11 @@ fn allowed_edge(p: &super::ichi_bns::BnStruct, iat: usize, ibond: usize) -> bool
         || p.edge[p.iedge[p.vert[iat].iedge + ibond] as usize].forbidden == 0
 }
 
-/// `MarkTautomerGroups` for the 1,3 tautomerism loops (the generic one and
-/// `PT_22_00`, `PT_16_00`, `PT_06_00`, `PT_39_00`, `PT_13_00`, `PT_18_00`).
-/// Returns the number of changes or an error. The keto-enol, 1,5 and ring
-/// rules that follow in C are not ported yet.
+/// `MarkTautomerGroups` for the 1,3 tautomerism loops (the generic one,
+/// `PT_22_00`, `PT_16_00`, `PT_06_00`, `PT_39_00`, `PT_13_00`, `PT_18_00` and
+/// keto-enol).
+/// Returns the number of changes or an error. The 1,5 and ring rules that
+/// follow in C are not ported yet.
 pub fn mark_tautomer_groups(
     at: &mut [InpAtom],
     num_atoms: i32,
@@ -2636,6 +2641,7 @@ pub fn mark_tautomer_groups(
     let mut end_point = [TEndpoint::default(); MAXVAL];
     let mut bond_pos = [TBondPos::default(); MAXVAL];
     let mut eif1 = EndpointInfo::default();
+    let mut eif2 = EndpointInfo::default();
     for rule in [
         TautRule::Generic,
         TautRule::Pt22,
@@ -2644,6 +2650,7 @@ pub fn mark_tautomer_groups(
         TautRule::Pt39,
         TautRule::Pt13,
         TautRule::Pt18,
+        TautRule::Ket,
     ] {
         if rule != TautRule::Generic && tgi.b_taut_flags & rule.flag() == 0 {
             continue;
@@ -2676,6 +2683,12 @@ pub fn mark_tautomer_groups(
                     TautRule::Pt39 => cp.el_number == EL_NUMBER_N && cp.valence == 3,
                     TautRule::Pt13 | TautRule::Pt18 => {
                         cp.el_number == EL_NUMBER_C && cp.valence == 2
+                    }
+                    TautRule::Ket => {
+                        is_centerpoint_elem_ket(cp.el_number)
+                            && cp.charge == 0
+                            && cp.radical == 0
+                            && 4 == i32::from(cp.chem_bonds_valence) + i32::from(cp.num_h)
                     }
                 };
                 if !(bond_ok && elem_ok && allowed_edge(p, i, j)) {
@@ -2712,7 +2725,11 @@ pub fn mark_tautomer_groups(
                     } else {
                         continue;
                     }
-                    let endpoint_valence = rule.info(at, endpoint, &mut eif1);
+                    let endpoint_valence = if rule == TautRule::Ket {
+                        rule.info(at, endpoint, &mut eif2)
+                    } else {
+                        rule.info(at, endpoint, &mut eif1)
+                    };
                     if endpoint_valence == 0 {
                         continue;
                     }
@@ -2780,9 +2797,9 @@ pub fn mark_tautomer_groups(
                     if possibly == 0 {
                         continue;
                     }
-                    if wide {
+                    if wide || rule == TautRule::Ket {
                         num_o += i32::from(endpoint_valence == 2);
-                        num_x += if rule == TautRule::Pt13 {
+                        num_x += if matches!(rule, TautRule::Pt13 | TautRule::Ket) {
                             i32::from(endpoint_valence == 4)
                         } else {
                             i32::from(endpoint_valence == 3)
@@ -2808,6 +2825,7 @@ pub fn mark_tautomer_groups(
                 let extra = match rule {
                     TautRule::Pt39 => num_o == 1 && num_x < 2,
                     TautRule::Pt13 | TautRule::Pt18 => num_o == 1 && num_x == 1,
+                    TautRule::Ket => num_o == 1 && num_x != 0,
                     _ => true,
                 };
                 if !(n_end > 1
