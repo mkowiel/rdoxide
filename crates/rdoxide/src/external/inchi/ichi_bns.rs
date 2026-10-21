@@ -3612,3 +3612,392 @@ pub fn get_atom_charge_type(
     }
     (type_, mask_out)
 }
+
+// ---- applying the flow changes to charges and H counts ----
+
+use super::ichister::{AB_PARITY_UNDF, atom_parity_well_def, get_opposite_sb_atom};
+use super::ichitaut::TGroupInfo;
+use super::incomdef::NUM_H_ISOTOPES;
+
+pub const MAX_ALT_AATG_ARRAY_LEN: usize = 127;
+pub const AATG_MARK_IN_PATH: i8 = 1;
+const MAX_NUM_STEREO_BONDS_: usize = 3;
+const MIN_NUM_STEREO_BOND_NEIGH: i32 = 2;
+
+/// `BN_AATG` (the members used by the flow analysis)
+#[derive(Debug, Clone, Default)]
+pub struct BnAatg {
+    pub n_num_found: i32,
+    pub n_marked_atom: Vec<i8>,
+}
+
+/// `MarkAtomsAtTautGroups`
+pub fn mark_atoms_at_taut_groups(
+    p: &mut BnStruct,
+    num_atoms: i32,
+    aatg: &mut BnAatg,
+    mut n_end1: i32,
+    mut n_end2: i32,
+) -> i32 {
+    let mut err = 0;
+    let mut c_delta = [0i8; MAX_ALT_AATG_ARRAY_LEN];
+    let mut n_vertex = [0u16; MAX_ALT_AATG_ARRAY_LEN];
+    let mut n_len_delta = 0usize;
+    for pass in (0..p.num_altp as usize).rev() {
+        p.alt_path = Some(pass);
+        let (mut v1, n, mut delta, v_last) = {
+            let ap = &p.altp[pass];
+            (
+                ap[I_ALTP_START_ATOM].number(),
+                ap[I_ALTP_PATH_LEN].number(),
+                ap[I_ALTP_FLOW].flow[0],
+                ap[I_ALTP_END_ATOM].number(),
+            )
+        };
+        let v_first = v1;
+        let mut v2 = NO_VERTEX;
+        aatg.n_num_found = 0;
+        if n_end1 != v_first && n_end1 != v_last {
+            n_end1 = -1;
+        }
+        if n_end2 != v_first && n_end2 != v_last {
+            n_end2 = -1;
+        }
+        for i in 0..n as usize {
+            let ineigh1 = p.altp[pass][I_ALTP_NEIGHBOR + i].ineigh(0) as usize;
+            let ie = p.iedge[p.vert[v1 as usize].iedge + ineigh1] as usize;
+            v2 = i32::from(p.edge[ie].neighbor12) ^ v1;
+            let t1 = if v1 >= 0 {
+                p.vert[v1 as usize].type_
+            } else {
+                0
+            };
+            let tg1 = t1 & (BNS_VERT_TYPE_TGROUP | BNS_VERT_TYPE_TEMP) != 0;
+            let tg2 = p.vert[v2 as usize].type_ & (BNS_VERT_TYPE_TGROUP | BNS_VERT_TYPE_TEMP) != 0;
+            let mut push = |d: i32, v: i32| {
+                if n_len_delta < MAX_ALT_AATG_ARRAY_LEN {
+                    c_delta[n_len_delta] = d as i8;
+                    n_vertex[n_len_delta] = v as u16;
+                    n_len_delta += 1;
+                }
+            };
+            if v1 >= num_atoms
+                && tg1
+                && (0..num_atoms).contains(&v2)
+                && p.vert[v2 as usize].type_ & BNS_VERT_TYPE_ATOM != 0
+            {
+                push(delta, v2);
+            } else if v2 >= num_atoms
+                && tg2
+                && (0..num_atoms).contains(&v1)
+                && p.vert[v1 as usize].type_ & BNS_VERT_TYPE_ATOM != 0
+            {
+                push(delta, v1);
+            } else if (0 <= v1 && v1 == n_end1) || (v1 == n_end2 && (0..num_atoms).contains(&v2)) {
+                push(-delta, v1);
+            } else if (0 <= v2 && v2 == n_end1) || (v2 == n_end2 && (0..num_atoms).contains(&v1)) {
+                push(-delta, v2);
+            }
+            delta = -delta;
+            v1 = v2;
+        }
+        if v2 != v_last {
+            err = BNS_PROGRAM_ERR;
+        } else {
+            let mut last_i: i32 = -1;
+            let mut n_num_found = 0;
+            for i in 1..n_len_delta {
+                let j = i - 1;
+                if (c_delta[j] > 0 && c_delta[i] > 0) || (c_delta[j] < 0 && c_delta[i] < 0) {
+                    if j as i32 == last_i {
+                        return 0;
+                    }
+                    if aatg.n_marked_atom[n_vertex[j] as usize] & AATG_MARK_IN_PATH == 0 {
+                        n_num_found += 1;
+                    }
+                    if aatg.n_marked_atom[n_vertex[i] as usize] & AATG_MARK_IN_PATH == 0 {
+                        n_num_found += 1;
+                    }
+                    last_i = i as i32;
+                }
+            }
+            if n_num_found != 4 {
+                return 0;
+            }
+            for i in 1..n_len_delta {
+                let j = i - 1;
+                if (c_delta[j] > 0 && c_delta[i] > 0) || (c_delta[j] < 0 && c_delta[i] < 0) {
+                    for v in [n_vertex[i - 1], n_vertex[i]] {
+                        if aatg.n_marked_atom[v as usize] & AATG_MARK_IN_PATH == 0 {
+                            aatg.n_marked_atom[v as usize] |= AATG_MARK_IN_PATH;
+                            aatg.n_num_found += 1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if err != 0 { err } else { aatg.n_num_found }
+}
+
+/// `EliminatePlusMinusChargeAmbiguity`: replaces (+)--N==(-) with (+)==N--(-)
+pub fn eliminate_plus_minus_charge_ambiguity(p: &mut BnStruct, num_atoms: i32) -> i32 {
+    let mut err = 0;
+    let mut ret = 0;
+    for pass in (0..p.num_altp as usize).rev() {
+        p.alt_path = Some(pass);
+        let (mut v1, n, v_last) = {
+            let ap = &p.altp[pass];
+            (
+                ap[I_ALTP_START_ATOM].number(),
+                ap[I_ALTP_PATH_LEN].number(),
+                ap[I_ALTP_END_ATOM].number(),
+            )
+        };
+        let mut v0 = NO_VERTEX;
+        let mut v2 = NO_VERTEX;
+        for i in 0..n as usize {
+            let ineigh1 = p.altp[pass][I_ALTP_NEIGHBOR + i].ineigh(0) as usize;
+            let ie = p.iedge[p.vert[v1 as usize].iedge + ineigh1] as usize;
+            v2 = i32::from(p.edge[ie].neighbor12) ^ v1;
+            if v1 < num_atoms
+                && ((v0 >= num_atoms && p.vert[v0 as usize].type_ & BNS_VERT_TYPE_C_GROUP != 0)
+                    || (v2 >= num_atoms && p.vert[v2 as usize].type_ & BNS_VERT_TYPE_C_GROUP != 0))
+            {
+                let (mut cg_pos, mut cg_neg) = (0i32, 0i32);
+                let (mut neigh_pos, mut neigh_neg) = (-1i32, -1i32);
+                let mut n_found = 0;
+                let mut k = i32::from(p.vert[v1 as usize].num_adj_edges) - 1;
+                while k >= 0 && (neigh_pos < 0 || neigh_neg < 0) {
+                    let ne = p.iedge[p.vert[v1 as usize].iedge + k as usize] as usize;
+                    let v = i32::from(p.edge[ne].neighbor12) ^ v1;
+                    let vt = p.vert[v as usize].type_;
+                    if vt & BNS_VERT_TYPE_C_GROUP != 0 {
+                        if vt & BNS_VERT_TYPE_C_NEGATIVE != 0 {
+                            cg_neg = v;
+                            neigh_neg = k;
+                        } else {
+                            cg_pos = v;
+                            neigh_pos = k;
+                        }
+                        n_found += 1;
+                    }
+                    k -= 1;
+                }
+                if n_found == 2 && neigh_pos >= 0 && neigh_neg >= 0 {
+                    let base = p.vert[v1 as usize].iedge;
+                    let ep = p.iedge[base + neigh_pos as usize] as usize;
+                    let en = p.iedge[base + neigh_neg as usize] as usize;
+                    if p.edge[ep].flow < p.edge[en].flow {
+                        let dflow = p.edge[en].flow - p.edge[ep].flow;
+                        p.edge[ep].flow += dflow;
+                        p.vert[cg_pos as usize].st_edge.cap += dflow;
+                        p.vert[cg_pos as usize].st_edge.flow += dflow;
+                        p.edge[en].flow -= dflow;
+                        p.vert[cg_neg as usize].st_edge.cap -= dflow;
+                        p.vert[cg_neg as usize].st_edge.flow -= dflow;
+                        ret += 1;
+                    }
+                }
+            }
+            v0 = v1;
+            v1 = v2;
+        }
+        if v2 != v_last {
+            err = BNS_PROGRAM_ERR;
+        }
+    }
+    if err != 0 { err } else { ret }
+}
+
+/// `AddChangedAtHChargeBNS`
+pub fn add_changed_at_h_charge_bns(
+    at: &mut [InpAtom],
+    num_atoms: i32,
+    totals: Option<&mut [i32]>,
+    mark: &mut [i8],
+) -> i32 {
+    let mut totals = totals;
+    let mut num = 0;
+    for i in 0..num_atoms as usize {
+        if mark[i] != 0 {
+            mark[i] = 0;
+            let (t, _) = get_atom_charge_type(at, i, totals.as_deref_mut(), -2);
+            at[i].at_type = t as u16;
+            num += 1;
+        }
+    }
+    num
+}
+
+/// `AddOrRemoveExplOrImplH`: adds or removes implicit/explicit H of an atom;
+/// returns the part of `n_delta` that was done
+pub fn add_or_remove_expl_or_impl_h(
+    n_delta: i32,
+    at: &mut [InpAtom],
+    num_atoms: i32,
+    at_no: usize,
+    tgi: &mut TGroupInfo,
+) -> i32 {
+    if n_delta == 0 {
+        return 0;
+    }
+    if n_delta > 0 {
+        at[at_no].num_h += n_delta as i8;
+        tgi.tni.n_num_removed_protons -= 1;
+        return n_delta;
+    }
+    let mut n_num2remove = -n_delta;
+    let mut n_removed_expl = tgi.tni.n_num_removed_explicit_h;
+    let tot_num_iso_h: i32 = at[at_no].num_iso_h.iter().map(|&x| i32::from(x)).sum();
+    let mut num_h = i32::from(at[at_no].num_h);
+    let mut num_iso_h = at[at_no].num_iso_h;
+    let nat = num_atoms as usize;
+    let mut i = 0usize;
+    while (i as i32) < n_removed_expl {
+        if at[nat + i].neighbor[0] as usize == at_no {
+            let orig_no = at[nat + i].orig_at_number;
+            n_removed_expl -= 1;
+            if n_removed_expl > i as i32 {
+                at[nat + i..=nat + n_removed_expl as usize].rotate_left(1);
+            }
+            if at[at_no].sb_parity[0] != 0 {
+                let mut m = 0;
+                while m < MAX_NUM_STEREO_BONDS_ && at[at_no].sb_parity[m] != 0 {
+                    if at[at_no].sn_orig_at_num[m] == orig_no {
+                        if i32::from(at[at_no].valence) >= MIN_NUM_STEREO_BOND_NEIGH {
+                            let k = usize::from(at[at_no].sb_ord[m] == 0);
+                            at[at_no].sn_ord[m] = k as i8;
+                            let nb = at[at_no].neighbor[k] as usize;
+                            at[at_no].sn_orig_at_num[m] = at[nb].orig_at_number;
+                            if atom_parity_well_def(i32::from(at[at_no].sb_parity[m])) {
+                                at[at_no].sb_parity[m] = 3 - at[at_no].sb_parity[m];
+                            }
+                        } else {
+                            at[at_no].sn_ord[m] = -99;
+                            at[at_no].sn_orig_at_num[m] = 0;
+                            if atom_parity_well_def(i32::from(at[at_no].sb_parity[m])) {
+                                let (len, pnxt, _pi2c, pord) =
+                                    get_opposite_sb_atom(at, at_no, at[at_no].sb_ord[m] as usize);
+                                if len > 0 {
+                                    at[at_no].sb_parity[m] = AB_PARITY_UNDF as i8;
+                                    at[pnxt].sb_parity[pord] = AB_PARITY_UNDF as i8;
+                                }
+                            }
+                        }
+                    }
+                    m += 1;
+                }
+            }
+        } else {
+            i += 1;
+        }
+    }
+    let mut iso: i32 = -1;
+    while iso < NUM_H_ISOTOPES as i32 && n_num2remove > 0 {
+        if iso < 0 {
+            while tot_num_iso_h < num_h && n_num2remove > 0 {
+                num_h -= 1;
+                tgi.tni.n_num_removed_protons += 1;
+                n_num2remove -= 1;
+            }
+        } else {
+            let u = iso as usize;
+            while num_iso_h[u] != 0 && num_h != 0 && n_num2remove > 0 {
+                num_h -= 1;
+                num_iso_h[u] -= 1;
+                tgi.tni.n_num_removed_protons_isotopic[u] += 1;
+                tgi.tni.n_num_removed_protons += 1;
+                n_num2remove -= 1;
+            }
+        }
+        iso += 1;
+    }
+    if n_delta + n_num2remove < 0 {
+        at[at_no].num_h = num_h as i8;
+        at[at_no].num_iso_h = num_iso_h;
+        tgi.tni.n_num_removed_explicit_h = n_removed_expl;
+    }
+    n_delta + n_num2remove
+}
+
+/// `SubtractOrChangeAtHChargeBNS`
+pub fn subtract_or_change_at_h_charge_bns(
+    p: &mut BnStruct,
+    at: &mut [InpAtom],
+    num_atoms: i32,
+    mut totals: Option<&mut [i32]>,
+    mut mark: Option<&mut [i8]>,
+    mut tgi: Option<&mut TGroupInfo>,
+    b_subtract: bool,
+) -> i32 {
+    let mut err = 0;
+    let mut ret = 0;
+    for pass in (0..p.num_altp as usize).rev() {
+        p.alt_path = Some(pass);
+        let (mut v1, n, mut delta, v_last) = {
+            let ap = &p.altp[pass];
+            (
+                ap[I_ALTP_START_ATOM].number(),
+                ap[I_ALTP_PATH_LEN].number(),
+                ap[I_ALTP_FLOW].flow[0],
+                ap[I_ALTP_END_ATOM].number(),
+            )
+        };
+        let mut v0 = NO_VERTEX;
+        let mut v2 = NO_VERTEX;
+        for i in 0..n as usize {
+            let ineigh1 = p.altp[pass][I_ALTP_NEIGHBOR + i].ineigh(0) as usize;
+            let ie = p.iedge[p.vert[v1 as usize].iedge + ineigh1] as usize;
+            v2 = i32::from(p.edge[ie].neighbor12) ^ v1;
+            if v1 < num_atoms && (v0 >= num_atoms || v2 >= num_atoms) {
+                let (mut n_delta_h, mut n_delta_charge) = (0, 0);
+                if v0 >= num_atoms {
+                    let t = p.vert[v0 as usize].type_;
+                    if t & BNS_VERT_TYPE_TGROUP != 0 {
+                        n_delta_h -= delta;
+                    } else if t & BNS_VERT_TYPE_C_GROUP != 0 {
+                        n_delta_charge += delta;
+                    }
+                }
+                if v2 >= num_atoms {
+                    let t = p.vert[v2 as usize].type_;
+                    if t & BNS_VERT_TYPE_TGROUP != 0 {
+                        n_delta_h += delta;
+                    } else if t & BNS_VERT_TYPE_C_GROUP != 0 {
+                        n_delta_charge -= delta;
+                    }
+                }
+                if n_delta_h != 0 || n_delta_charge != 0 {
+                    if b_subtract {
+                        let m = mark.as_deref_mut().expect("mark");
+                        if m[v1 as usize] == 0 {
+                            get_atom_charge_type(at, v1 as usize, totals.as_deref_mut(), 2);
+                            ret += 1;
+                            m[v1 as usize] += 1;
+                        }
+                    } else {
+                        at[v1 as usize].charge += n_delta_charge as i8;
+                        if n_delta_h != 0 {
+                            add_or_remove_expl_or_impl_h(
+                                n_delta_h,
+                                at,
+                                num_atoms,
+                                v1 as usize,
+                                tgi.as_deref_mut().expect("t_group_info"),
+                            );
+                        }
+                        ret += 1;
+                    }
+                }
+            }
+            delta = -delta;
+            v0 = v1;
+            v1 = v2;
+        }
+        if v2 != v_last {
+            err = BNS_PROGRAM_ERR;
+        }
+    }
+    if err != 0 { err } else { ret }
+}

@@ -2015,6 +2015,7 @@ fn charge_groups_and_salt_types_match_the_c_code() {
         let tgi = TGroupInfo {
             num_t_groups: tgs.len(),
             t_group: (hastg != 0).then_some(tgs),
+            ..Default::default()
         };
         let tg_opt = (hastg != 2).then_some(&tgi);
         let mut got: Vec<String> = Vec::new();
@@ -2965,4 +2966,310 @@ fn atom_charge_types_match_the_c_code() {
         assert_eq!(got, want, "{}", c["in"]);
     }
     assert!(types.len() > 12, "only {} types seen", types.len());
+}
+
+#[test]
+fn flow_changes_of_charges_and_hydrogens_match_the_c_code() {
+    use rdoxide::external::inchi::ichi_bns::*;
+    use rdoxide::external::inchi::ichitaut::TGroupInfo;
+    use rdoxide::external::inchi::inpdef::InpAtom;
+    fn ints(v: &serde_json::Value) -> Vec<i32> {
+        v.as_array()
+            .unwrap()
+            .iter()
+            .map(|x| x.as_i64().unwrap() as i32)
+            .collect()
+    }
+    fn dump_atoms(at: &[InpAtom], t: &TGroupInfo, got: &mut Vec<String>) {
+        for a in at {
+            got.push(format!(
+                "A {} {} {} {} {},{},{} t{} s{},{},{} o{},{},{} n{},{},{} g{},{},{} r{} nb{}",
+                a.charge,
+                a.num_h,
+                a.radical,
+                a.chem_bonds_valence,
+                a.num_iso_h[0],
+                a.num_iso_h[1],
+                a.num_iso_h[2],
+                a.at_type,
+                a.sb_parity[0],
+                a.sb_parity[1],
+                a.sb_parity[2],
+                a.sb_ord[0],
+                a.sb_ord[1],
+                a.sb_ord[2],
+                a.sn_ord[0],
+                a.sn_ord[1],
+                a.sn_ord[2],
+                a.sn_orig_at_num[0],
+                a.sn_orig_at_num[1],
+                a.sn_orig_at_num[2],
+                a.orig_at_number,
+                a.neighbor[0]
+            ));
+        }
+        got.push(format!(
+            "I {} {} {},{},{}",
+            t.tni.n_num_removed_explicit_h,
+            t.tni.n_num_removed_protons,
+            t.tni.n_num_removed_protons_isotopic[0],
+            t.tni.n_num_removed_protons_isotopic[1],
+            t.tni.n_num_removed_protons_isotopic[2]
+        ));
+    }
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_bnchargeh.json")).unwrap();
+    let (mut n_marked, mut n_changed) = (0, 0);
+    for c in data.as_array().unwrap() {
+        let inp = &c["in"];
+        let mut at: Vec<InpAtom> = Vec::new();
+        for a in inp["atoms"].as_array().unwrap() {
+            let iso = ints(&a["iso"]);
+            let (sbp, sbo, sno, sng) = (
+                ints(&a["sbp"]),
+                ints(&a["sbo"]),
+                ints(&a["sno"]),
+                ints(&a["sng"]),
+            );
+            let mut x = InpAtom {
+                valence: a["v"].as_i64().unwrap() as i8,
+                chem_bonds_valence: a["cbv"].as_i64().unwrap() as i8,
+                el_number: a["el"].as_u64().unwrap() as u8,
+                radical: a["rad"].as_i64().unwrap() as i8,
+                c_point: a["vt"].as_u64().unwrap() as u16,
+                charge: a["chg"].as_i64().unwrap() as i8,
+                num_h: a["nh"].as_i64().unwrap() as i8,
+                orig_at_number: a["orig"].as_u64().unwrap() as u16,
+                ..Default::default()
+            };
+            for k in 0..3 {
+                x.num_iso_h[k] = iso[k] as i8;
+                x.sb_parity[k] = sbp[k] as i8;
+                x.sb_ord[k] = sbo[k] as i8;
+                x.sn_ord[k] = sno[k] as i8;
+                x.sn_orig_at_num[k] = sng[k] as u16;
+            }
+            for (j, e) in a["nb"].as_array().unwrap().iter().enumerate() {
+                x.neighbor[j] = e[0].as_u64().unwrap() as u16;
+                x.bond_type[j] = e[1].as_u64().unwrap() as u8;
+            }
+            at.push(x);
+        }
+        let n = at.len();
+        let hs = inp["hs"].as_array().unwrap();
+        for h in hs {
+            let mut x = InpAtom {
+                el_number: 1,
+                valence: 1,
+                orig_at_number: h[1].as_u64().unwrap() as u16,
+                ..Default::default()
+            };
+            x.neighbor[0] = h[0].as_u64().unwrap() as u16;
+            at.push(x);
+        }
+        let (mut p, _) = allocate_and_init_bn_struct(
+            &mut at,
+            n,
+            inp["ma"].as_i64().unwrap() as i32,
+            inp["me"].as_i64().unwrap() as i32,
+            inp["mp"].as_i64().unwrap() as i32,
+        );
+        for i in 0..n {
+            let vt = u32::from(at[i].c_point);
+            p.vert[i].type_ |= (((vt & 0x1c) << 1) | ((vt & 3) << 9)) as u16;
+        }
+        for o in inp["ops"].as_array().unwrap() {
+            let o = ints(o);
+            let (op, a, b, x, y, z) = (o[0], o[1], o[2], o[3], o[4], o[5]);
+            let mut dots = 5;
+            let nv = p.num_vertices;
+            if op == 10 {
+                if a >= nv {
+                    continue;
+                }
+                add_new_vertex(&mut p, a, x, y, z, &mut dots);
+            } else if op == 11 {
+                if a < p.num_atoms || a >= nv {
+                    continue;
+                }
+                p.vert[a as usize].type_ = x as u16;
+            } else {
+                if a >= nv || b >= nv || a == b {
+                    continue;
+                }
+                add_new_edge(&mut p, a, b, x, y);
+            }
+        }
+        let mut bd = allocate_and_init_bn_data(p.max_vertices);
+        let mut ret = 0;
+        if !inp["walk"].as_bool().unwrap() {
+            ret = run_balanced_network_search(&mut p, &mut bd, inp["bcf"].as_i64().unwrap() as i32);
+        } else {
+            // a random walk along the edges stands for an alternating path
+            let mut lcg = inp["seed"].as_u64().unwrap() as u32;
+            let mut rnd = |m: u32| -> i32 {
+                lcg = lcg.wrapping_mul(1103515245).wrapping_add(12345) & 0x7fff_ffff;
+                ((lcg >> 8) % m) as i32
+            };
+            p.num_altp = 0;
+            let np = inp["np"].as_i64().unwrap() as i32;
+            for pass in 0..np.min(p.max_altp) {
+                let mut v = -1;
+                for _ in 0..20 {
+                    let c2 = rnd(p.num_vertices as u32);
+                    if p.vert[c2 as usize].num_adj_edges > 0 {
+                        v = c2;
+                        break;
+                    }
+                }
+                if v < 0 {
+                    continue;
+                }
+                let l = (1 + rnd(10)).min(p.max_vertices);
+                let start = v;
+                let delta = if rnd(2) != 0 { 1 } else { -1 };
+                let mut k = 0usize;
+                while (k as i32) < l {
+                    let pv = p.vert[v as usize];
+                    if pv.num_adj_edges == 0 {
+                        break;
+                    }
+                    let o = rnd(u32::from(pv.num_adj_edges));
+                    let e = p.edge[p.iedge[pv.iedge + o as usize] as usize];
+                    let v2 = i32::from(e.neighbor12) ^ v;
+                    let o2 = if v2 == i32::from(e.neighbor1) {
+                        e.neigh_ord[0]
+                    } else {
+                        e.neigh_ord[1]
+                    };
+                    p.altp[pass as usize][I_ALTP_NEIGHBOR + k].set_ineigh(0, o as u16);
+                    p.altp[pass as usize][I_ALTP_NEIGHBOR + k].set_ineigh(1, o2);
+                    v = v2;
+                    k += 1;
+                }
+                if k == 0 {
+                    continue;
+                }
+                let ap = &mut p.altp[pass as usize];
+                ap[I_ALTP_START_ATOM].set_number(start);
+                ap[I_ALTP_END_ATOM].set_number(v);
+                ap[I_ALTP_PATH_LEN].set_number(k as i32);
+                ap[I_ALTP_FLOW].flow[0] = delta;
+                p.num_altp += 1;
+            }
+        }
+        let mut got = vec![format!("X {ret} {} {}", p.num_altp, p.num_vertices)];
+        for a in 0..p.num_altp.min(p.max_altp) as usize {
+            let ap = &p.altp[a];
+            let len = ap[I_ALTP_PATH_LEN].number();
+            let mut s = format!(
+                "P {} {} {} {}",
+                ap[I_ALTP_START_ATOM].number(),
+                ap[I_ALTP_END_ATOM].number(),
+                len,
+                ap[I_ALTP_FLOW].flow[0]
+            );
+            for j in 0..len as usize {
+                let e = &ap[I_ALTP_NEIGHBOR + j];
+                s += &format!(" {},{}", e.ineigh(0), e.ineigh(1));
+            }
+            got.push(s);
+        }
+        let mkseed = inp["mk"].as_i64().unwrap();
+        let mut aatg = BnAatg {
+            n_num_found: 0,
+            n_marked_atom: (0..2 * p.max_vertices as usize + 8)
+                .map(|i| {
+                    if i < n {
+                        ((mkseed >> (i % 8)) & 1) as i8
+                    } else {
+                        0
+                    }
+                })
+                .collect(),
+        };
+        let r1 = mark_atoms_at_taut_groups(
+            &mut p,
+            n as i32,
+            &mut aatg,
+            inp["e1"].as_i64().unwrap() as i32,
+            inp["e2"].as_i64().unwrap() as i32,
+        );
+        let mut s = format!("M {r1} {} |", aatg.n_num_found);
+        for m in &aatg.n_marked_atom[..p.num_vertices as usize] {
+            s += &format!(" {m}");
+        }
+        got.push(s);
+        n_marked += i32::from(aatg.n_num_found > 0);
+        got.push(format!(
+            "E {}",
+            eliminate_plus_minus_charge_ambiguity(&mut p, n as i32)
+        ));
+        let mut s = String::from("V");
+        for v in p.vert.iter().take(p.num_vertices as usize) {
+            s += &format!(" {}:{}:{}", v.type_, v.st_edge.cap, v.st_edge.flow);
+        }
+        got.push(s);
+        let mut s = String::from("F");
+        for e in p.edge.iter().take(p.num_edges as usize) {
+            s += &format!(" {}", e.flow);
+        }
+        got.push(s);
+        let mut tgi = TGroupInfo::default();
+        tgi.tni.n_num_removed_explicit_h = hs.len() as i32;
+        tgi.tni.n_num_removed_protons = 1;
+        let mut mark2 = vec![0i8; n + 1];
+        let mut totals = [0i32; attot::ARRAY_LEN];
+        let r3 = subtract_or_change_at_h_charge_bns(
+            &mut p,
+            &mut at,
+            n as i32,
+            Some(&mut totals),
+            Some(&mut mark2),
+            None,
+            true,
+        );
+        let mut s = format!("S {r3} |");
+        for m in &mark2[..n] {
+            s += &format!(" {m}");
+        }
+        s += " |";
+        for t in totals {
+            s += &format!(" {t}");
+        }
+        got.push(s);
+        let r4 = add_changed_at_h_charge_bns(&mut at, n as i32, Some(&mut totals), &mut mark2);
+        let mut s = format!("D {r4} |");
+        for t in totals {
+            s += &format!(" {t}");
+        }
+        got.push(s);
+        let r5 = subtract_or_change_at_h_charge_bns(
+            &mut p,
+            &mut at,
+            n as i32,
+            None,
+            None,
+            Some(&mut tgi),
+            false,
+        );
+        got.push(format!("C {r5}"));
+        n_changed += i32::from(r5 > 0);
+        dump_atoms(&at, &tgi, &mut got);
+        for hc in inp["hc"].as_array().unwrap() {
+            let hc = ints(hc);
+            let r6 =
+                add_or_remove_expl_or_impl_h(hc[0], &mut at, n as i32, hc[1] as usize, &mut tgi);
+            got.push(format!("H {r6}"));
+            dump_atoms(&at, &tgi, &mut got);
+        }
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        assert_eq!(got, want, "{inp}");
+    }
+    assert!(n_marked > 0 && n_changed > 100, "{n_marked} {n_changed}");
 }
