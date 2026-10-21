@@ -12788,3 +12788,294 @@ fn create_one_structure_inchi_matches_the_c_code() {
         assert_eq!(got, want, "case {ci}");
     }
 }
+
+#[test]
+#[allow(clippy::too_many_lines)]
+fn ichiprt2_strings_match_the_c_code() {
+    use rdoxide::external::inchi::ichi::{
+        InChI, InChIAux, InChIIsotopicAtom, InChIIsotopicTGroup, OrigInfo,
+    };
+    use rdoxide::external::inchi::ichi_io::{InchiIosString, inchi_strbuf_init};
+    use rdoxide::external::inchi::ichiprt2::*;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_prt2.json")).unwrap();
+    fn opt_u16(t: &mut InchiTok) -> Vec<u16> {
+        if t.i() == 0 {
+            return Vec::new();
+        }
+        let l = t.i();
+        (0..l).map(|_| t.i() as u16).collect()
+    }
+    fn aux(t: &mut InchiTok) -> Option<InChIAux> {
+        if t.i() == 0 {
+            return None;
+        }
+        let mut a = InChIAux {
+            n_number_of_atoms: t.i() as i32,
+            n_number_of_t_groups: t.i() as i32,
+            b_deleted: t.i() as i32,
+            b_is_isotopic: t.i() as i32,
+            ..Default::default()
+        };
+        a.n_constit_equ_numbers = opt_u16(t);
+        a.n_constit_equ_t_group_numbers = opt_u16(t);
+        a.n_constit_equ_isotopic_numbers = opt_u16(t);
+        a.n_constit_equ_isotopic_t_group_numbers = opt_u16(t);
+        a.n_orig_at_nos_in_canon_ord = opt_u16(t);
+        a.n_isotopic_orig_at_nos_in_canon_ord = opt_u16(t);
+        a.n_orig_at_nos_in_canon_ord_inv = opt_u16(t);
+        a.n_isotopic_orig_at_nos_in_canon_ord_inv = opt_u16(t);
+        if t.i() != 0 {
+            let l = t.i();
+            a.orig_info = (0..l)
+                .map(|_| OrigInfo {
+                    c_charge: t.i() as i8,
+                    c_radical: t.i() as i8,
+                    c_unusual_valence: t.i() as i8,
+                })
+                .collect();
+        }
+        Some(a)
+    }
+    fn iso_inchi(t: &mut InchiTok) -> Option<InChI> {
+        if t.i() == 0 {
+            return None;
+        }
+        let mut c = InChI {
+            b_deleted: t.i() as i32,
+            ..Default::default()
+        };
+        let l = t.i();
+        c.n_number_of_isotopic_atoms = l as i32;
+        if t.i() != 0 {
+            for _ in 0..l {
+                c.isotopic_atom.push(InChIIsotopicAtom {
+                    n_atom_number: t.i() as u16,
+                    n_iso_difference: t.i() as i16,
+                    n_num_h: t.i() as i16,
+                    n_num_d: t.i() as i16,
+                    n_num_t: t.i() as i16,
+                });
+            }
+        }
+        let l = t.i();
+        c.n_number_of_isotopic_t_groups = l as i32;
+        if t.i() != 0 {
+            for _ in 0..l {
+                c.isotopic_t_group.push(InChIIsotopicTGroup {
+                    n_t_group_number: t.i() as u16,
+                    n_num_h: t.i() as u16,
+                    n_num_d: t.i() as u16,
+                    n_num_t: t.i() as u16,
+                });
+            }
+        }
+        Some(c)
+    }
+    for (ci, c) in data.as_array().unwrap().iter().enumerate() {
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        let mut t = InchiTok(c["in"].as_str().unwrap().split_whitespace());
+        let cmd = t.s();
+        let mut sb = InchiIosString::default();
+        inchi_strbuf_init(&mut sb, 16, 16);
+        let mut ovf = 0i32;
+        let mut ret = 0i32;
+        let text = |sb: &InchiIosString| {
+            let p = sb.p_str.as_ref().unwrap();
+            let n = p.iter().position(|&c| c == 0).unwrap_or(p.len());
+            String::from_utf8_lossy(&p[..n]).into_owned()
+        };
+        let got: Vec<String> = match cmd.as_str() {
+            "abc" | "dec" => {
+                let hd = t.i();
+                let d = t.s();
+                let v = t.i() as i32;
+                let bl = t.i() as i32;
+                let delim = (hd != 0).then_some(d.as_str());
+                let mut buf = [0x7fu8; 64];
+                let r = if cmd == "abc" {
+                    make_abc_number(&mut buf, bl, delim, v)
+                } else {
+                    make_dec_number(&mut buf, bl, delim, v)
+                };
+                let s = if r >= 0 {
+                    let n = buf.iter().position(|&c| c == 0).unwrap_or(64);
+                    String::from_utf8_lossy(&buf[..n]).into_owned()
+                } else {
+                    String::new()
+                };
+                vec![format!("{r} [{s}]")]
+            }
+            "eqlaux" => {
+                let (a1, a2) = (aux(&mut t), aux(&mut t));
+                let (e1, e2) = (t.i() as i32, t.i() as i32);
+                let oi = a1
+                    .as_ref()
+                    .filter(|a| !a.orig_info.is_empty())
+                    .is_some_and(|a| has_orig_info(&a.orig_info, a.n_number_of_atoms));
+                vec![
+                    format!(
+                        "{} {} {}",
+                        i32::from(eql_inchi_aux_equ(a1.as_ref(), e1, a2.as_ref(), e2)),
+                        i32::from(eql_inchi_aux_num(a1.as_ref(), e1 & 3, a2.as_ref(), e2 & 3)),
+                        i32::from(eql_orig_info(a1.as_ref(), a2.as_ref()))
+                    ),
+                    format!("{}", i32::from(oi)),
+                ]
+            }
+            "eqliso" => {
+                let (i1, i2) = (iso_inchi(&mut t), iso_inchi(&mut t));
+                vec![format!(
+                    "{}",
+                    i32::from(eql_inchi_isotopic(i1.as_ref(), i2.as_ref()))
+                )]
+            }
+            "hasequ" => {
+                let l = t.i();
+                let a: Vec<u16> = (0..l).map(|_| t.i() as u16).collect();
+                vec![format!("{}", i32::from(has_equ_string(&a, l as i32)))]
+            }
+            _ => {
+                match cmd.as_str() {
+                    "mult" => {
+                        let m = t.i() as i32;
+                        let d = t.s();
+                        let mode = t.i() as i32;
+                        ovf = t.i() as i32;
+                        ret = make_mult(m, &d, &mut sb, mode, &mut ovf);
+                    }
+                    "delim" => {
+                        let has = t.i();
+                        let d = t.s();
+                        ovf = t.i() as i32;
+                        ret = make_delim((has != 0).then_some(d.as_str()), &mut sb, &mut ovf);
+                    }
+                    "eqstr" => {
+                        let has = t.i();
+                        let d = t.s();
+                        let m = t.i() as i32;
+                        ovf = t.i() as i32;
+                        ret = make_eq_str((has != 0).then_some(d.as_str()), m, &mut sb, &mut ovf);
+                    }
+                    "ct" => {
+                        let l = t.i();
+                        let ct: Vec<u16> = (0..l).map(|_| t.i() as u16).collect();
+                        let na = t.i() as usize;
+                        let has_h = t.i();
+                        let h: Vec<i8> = (0..na).map(|_| t.i() as i8).collect();
+                        let ad = t.i() != 0;
+                        let mode = t.i() as i32;
+                        ret = make_ct_string(
+                            &ct,
+                            l as i32,
+                            ad,
+                            (has_h != 0).then_some(h.as_slice()),
+                            na,
+                            &mut sb,
+                            mode,
+                            &mut ovf,
+                        );
+                    }
+                    "h" => {
+                        let ad = t.i() != 0;
+                        let l = t.i();
+                        let a: Vec<i8> = (0..l).map(|_| t.i() as i8).collect();
+                        let mode = t.i() as i32;
+                        ret = make_h_string(ad, &a, l as i32, &mut sb, mode, &mut ovf);
+                    }
+                    "taut" => {
+                        let l = t.i();
+                        let a: Vec<u16> = (0..l).map(|_| t.i() as u16).collect();
+                        let ad = t.i() != 0;
+                        let mode = t.i() as i32;
+                        ret = make_taut_string(&a, l as i32, ad, &mut sb, mode, &mut ovf);
+                    }
+                    "crv" => {
+                        let l = t.i();
+                        let a: Vec<OrigInfo> = (0..l)
+                            .map(|_| OrigInfo {
+                                c_charge: t.i() as i8,
+                                c_radical: t.i() as i8,
+                                c_unusual_valence: t.i() as i8,
+                            })
+                            .collect();
+                        let ad = t.i() != 0;
+                        let mode = t.i() as i32;
+                        ret = make_crv_string(&a, l as i32, ad, &mut sb, mode, &mut ovf);
+                    }
+                    "equ" => {
+                        let l = t.i();
+                        let a: Vec<u16> = (0..l).map(|_| t.i() as u16).collect();
+                        let ad = t.i() != 0;
+                        let mode = t.i() as i32;
+                        ret = make_equ_string(&a, l as i32, ad, &mut sb, mode, &mut ovf);
+                    }
+                    "isoatom" => {
+                        let l = t.i();
+                        let a: Vec<InChIIsotopicAtom> = (0..l)
+                            .map(|_| InChIIsotopicAtom {
+                                n_atom_number: t.i() as u16,
+                                n_iso_difference: t.i() as i16,
+                                n_num_h: t.i() as i16,
+                                n_num_d: t.i() as i16,
+                                n_num_t: t.i() as i16,
+                            })
+                            .collect();
+                        let mode = t.i() as i32;
+                        ret = make_iso_atom_string(&a, l as i32, &mut sb, mode, &mut ovf);
+                    }
+                    "isotaut" => {
+                        let l = t.i();
+                        let a: Vec<InChIIsotopicTGroup> = (0..l)
+                            .map(|_| InChIIsotopicTGroup {
+                                n_t_group_number: t.i() as u16,
+                                n_num_h: t.i() as u16,
+                                n_num_d: t.i() as u16,
+                                n_num_t: t.i() as u16,
+                            })
+                            .collect();
+                        let mode = t.i() as i32;
+                        ret = make_iso_taut_string(&a, l as i32, &mut sb, mode, &mut ovf);
+                    }
+                    "isoh" => {
+                        let h = [t.i() as i32, t.i() as i32, t.i() as i32];
+                        let mode = t.i() as i32;
+                        ret = make_iso_h_string(&h, &mut sb, mode, &mut ovf);
+                    }
+                    "stereo" => {
+                        let l = t.i() as i32;
+                        let a1 = opt_u16(&mut t);
+                        let a2 = opt_u16(&mut t);
+                        let p: Vec<i8> = opt_u16(&mut t).into_iter().map(|x| x as i8).collect();
+                        let _ad = t.i();
+                        let mode = t.i() as i32;
+                        ret = make_stereo_string(
+                            (!a1.is_empty()).then_some(a1.as_slice()),
+                            (!a2.is_empty()).then_some(a2.as_slice()),
+                            (!p.is_empty()).then_some(p.as_slice()),
+                            l,
+                            &mut sb,
+                            mode,
+                            &mut ovf,
+                        );
+                    }
+                    "seq" => {
+                        let l = t.i();
+                        let a: Vec<i32> = (0..l).map(|_| t.i() as i32).collect();
+                        print_sequence_of_nums_compressing_ranges(&a, &mut sb);
+                        ret = 0;
+                    }
+                    other => panic!("unknown command {other}"),
+                }
+                vec![format!("{ret} {ovf} [{}]", text(&sb))]
+            }
+        };
+        let _ = &mut ret;
+        assert_eq!(got, want, "case {ci}: {}", c["in"]);
+    }
+}

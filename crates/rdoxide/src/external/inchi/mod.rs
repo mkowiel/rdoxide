@@ -32,6 +32,7 @@ pub mod ichimap;
 pub mod ichimap4;
 pub mod ichinorm;
 pub mod ichiparm;
+pub mod ichiprt2;
 pub mod ichiring;
 pub mod ichisort;
 pub mod ichister;
