@@ -2054,3 +2054,462 @@ pub fn get_min_new_rank(n_atom_rank: &[u16], n_atom_numb: &[u16], n_rank1: u16) 
     }
     if i >= 0 { n_rank2 + 1 } else { 1 }
 }
+
+// ---------------------------------------------------------------------------
+// ichimap2.c: breaking neighbor ties and the symmetric path traversal used to
+// remove parities of non-stereogenic elements
+// ---------------------------------------------------------------------------
+
+use super::ichierr::CT_REMOVE_STEREO_ERR;
+
+pub const MAP_MODE_STD: i32 = 0;
+pub const MAP_MODE_C2V: i32 = 1;
+pub const MAP_MODE_C2: i32 = 2;
+pub const MAP_MODE_S4: i32 = 3;
+
+fn diff_basic(
+    num_at_tg: usize,
+    neigh_list: &mut NeighList,
+    n_num: i32,
+    stack: &mut [Vec<u16>],
+    n_temp_rank: &mut [u16],
+    l_num_iter: &mut i64,
+) -> i32 {
+    let (a, b) = stack.split_at_mut(1);
+    differentiate_ranks_basic(
+        num_at_tg,
+        neigh_list,
+        n_num,
+        &mut a[0],
+        n_temp_rank,
+        &mut b[0],
+        l_num_iter,
+        1,
+    )
+}
+
+/// `BreakNeighborsTie`: maps neighbor `in1` of stereo center `ia` onto `in2`
+/// (rank stack 1 onto rank stack 2); returns the number of different ranks
+/// plus one, 0 when the mapping is impossible, -1 on an error
+#[allow(clippy::too_many_arguments)]
+pub fn break_neighbors_tie(
+    at: &[SpAtom],
+    num_atoms: usize,
+    num_at_tg: usize,
+    ib: usize,
+    ia: usize,
+    neigh_num: &[u16],
+    in1: usize,
+    in2: usize,
+    mode: i32,
+    st1: &mut [Vec<u16>],
+    st2: &mut [Vec<u16>],
+    n_temp_rank: &mut [u16],
+    neigh_list: &mut NeighList,
+    n_symm_rank: &[u16],
+    n_canon_rank: &[u16],
+    nl1: &mut NeighList,
+    nl2: &mut NeighList,
+    l_num_iter: &mut i64,
+) -> i32 {
+    let n1 = neigh_num[in1] as usize;
+    let n2 = neigh_num[in2] as usize;
+    let mut other_neigh = [0usize; 2];
+    let val = i32::from(at[ia].valence);
+    if (mode == MAP_MODE_S4 && in1 != 0)
+        || (mode != MAP_MODE_STD && val != MAX_NUM_STEREO_ATOM_NEIGH as i32)
+        || (mode != MAP_MODE_STD && n_symm_rank[n1] != n_symm_rank[n2])
+    {
+        return 0;
+    }
+    st1[0][..num_at_tg].copy_from_slice(&n_symm_rank[..num_at_tg]);
+    {
+        let (a, b) = st1.split_at_mut(1);
+        let r: &[u16] = &a[0];
+        insertions_sort(&mut b[0][..num_at_tg], |x, y| comp_ranks_ord(r, *x, *y));
+    }
+    let mut n_num_diff_ranks = {
+        let (a, b) = st1.split_at_mut(1);
+        sorted_equ_info_to_ranks_in_place(&mut a[0], &b[0], num_at_tg).0
+    };
+    if val <= MAX_NUM_STEREO_ATOM_NEIGH as i32 && mode != 0 {
+        let mut m = 0;
+        for i in 0..val as usize {
+            if i != in1 && i != in2 {
+                other_neigh[m] = neigh_num[i] as usize;
+                m += 1;
+            }
+        }
+    }
+    if (mode != MAP_MODE_STD && n_symm_rank[other_neigh[0]] != n_symm_rank[other_neigh[1]])
+        || (mode == MAP_MODE_S4 && n_symm_rank[n1] != n_symm_rank[other_neigh[1]])
+    {
+        return 0;
+    }
+    if st1[0][ia] != n_symm_rank[ia] {
+        st1[0][ia] = n_symm_rank[ia];
+        n_num_diff_ranks = diff_basic(
+            num_at_tg,
+            neigh_list,
+            n_num_diff_ranks,
+            st1,
+            n_temp_rank,
+            l_num_iter,
+        );
+    }
+    if ib < num_atoms {
+        let r1 = st1[0][ib];
+        let r2 = get_min_new_rank(&st1[0], &st1[1], r1);
+        if r2 != r1 {
+            st1[0][ib] = r2;
+            n_num_diff_ranks = diff_basic(
+                num_at_tg,
+                neigh_list,
+                n_num_diff_ranks,
+                st1,
+                n_temp_rank,
+                l_num_iter,
+            );
+        }
+    }
+    if st1[0][n1] != st1[0][n2] {
+        return 0;
+    }
+    let n_rank1 = st1[0][n1];
+    let n_rank2 = get_min_new_rank(&st1[0], &st1[1], n_rank1);
+    st2[0][..num_at_tg].copy_from_slice(&st1[0][..num_at_tg]);
+    st2[1][..num_at_tg].copy_from_slice(&st1[1][..num_at_tg]);
+    st1[0][n1] = n_rank2;
+    let mut n_diff1 = diff_basic(
+        num_at_tg,
+        neigh_list,
+        n_num_diff_ranks,
+        st1,
+        n_temp_rank,
+        l_num_iter,
+    );
+    st2[0][n2] = n_rank2;
+    let mut n_diff2 = diff_basic(
+        num_at_tg,
+        neigh_list,
+        n_num_diff_ranks,
+        st2,
+        n_temp_rank,
+        l_num_iter,
+    );
+    if n_diff1 != n_diff2 {
+        return -1;
+    }
+    if mode == MAP_MODE_C2V || mode == MAP_MODE_C2 || mode == MAP_MODE_S4 {
+        for i in 0..=2usize {
+            let (nn1, nn2);
+            if mode == MAP_MODE_S4 {
+                match i {
+                    0 => {
+                        nn1 = n2;
+                        nn2 = other_neigh[1 - in2 % 2];
+                    }
+                    1 => {
+                        nn1 = other_neigh[1 - in2 % 2];
+                        nn2 = other_neigh[in2 % 2];
+                    }
+                    _ => {
+                        nn1 = other_neigh[in2 % 2];
+                        nn2 = n1;
+                    }
+                }
+            } else if i == 0 {
+                nn1 = n2;
+                nn2 = n1;
+            } else if mode == MAP_MODE_C2V {
+                nn1 = other_neigh[i - 1];
+                nn2 = other_neigh[i - 1];
+            } else {
+                nn1 = other_neigh[i - 1];
+                nn2 = other_neigh[2 - i];
+            }
+            let r10 = st1[0][nn1];
+            let r20 = st2[0][nn2];
+            let r1 = get_min_new_rank(&st1[0], &st1[1], r10);
+            let r2 = get_min_new_rank(&st2[0], &st2[1], r20);
+            if r10 == r20 && r1 == r2 {
+                if r10 != r1 {
+                    st1[0][nn1] = r1;
+                    n_diff1 = diff_basic(
+                        num_at_tg,
+                        neigh_list,
+                        n_num_diff_ranks,
+                        st1,
+                        n_temp_rank,
+                        l_num_iter,
+                    );
+                    st2[0][nn2] = r2;
+                    n_diff2 = diff_basic(
+                        num_at_tg,
+                        neigh_list,
+                        n_num_diff_ranks,
+                        st2,
+                        n_temp_rank,
+                        l_num_iter,
+                    );
+                    if n_diff1 != n_diff2 {
+                        return -1;
+                    }
+                }
+            } else {
+                return 0;
+            }
+        }
+    }
+    // BREAK_ONE_MORE_SC_TIE
+    if ib >= num_atoms && val == MAX_NUM_STEREO_ATOM_NEIGH as i32 {
+        let r1 = st1[0][n2];
+        let mut num_eq = 0;
+        for i in 0..val as usize {
+            num_eq += i32::from(r1 == st1[0][at[ia].neighbor[i] as usize]);
+        }
+        if num_eq == MAX_NUM_STEREO_ATOM_NEIGH as i32 - 1 {
+            let mut i = r1 as i32 - 1;
+            let mut r2 = 0u16;
+            while i >= 0 {
+                r2 = st1[0][st1[1][i as usize] as usize];
+                if r1 != r2 {
+                    break;
+                }
+                i -= 1;
+            }
+            let r2 = if i >= 0 { r2 + 1 } else { 1 };
+            n_num_diff_ranks = n_diff1;
+            st1[0][n2] = r2;
+            n_diff1 = diff_basic(
+                num_at_tg,
+                neigh_list,
+                n_num_diff_ranks,
+                st1,
+                n_temp_rank,
+                l_num_iter,
+            );
+            st2[0][n1] = r2;
+            n_diff2 = diff_basic(
+                num_at_tg,
+                neigh_list,
+                n_num_diff_ranks,
+                st2,
+                n_temp_rank,
+                l_num_iter,
+            );
+        }
+    }
+    if n_diff1 != n_diff2 {
+        return -1;
+    }
+    for i in 0..num_at_tg {
+        if st1[0][st1[1][i] as usize] != st2[0][st2[1][i] as usize] {
+            return -1;
+        }
+    }
+    sort_neigh_lists_by_symm_and_canon_rank(num_atoms, nl1, &st1[0], n_canon_rank);
+    sort_neigh_lists_by_symm_and_canon_rank(num_atoms, nl2, &st2[0], n_canon_rank);
+    n_diff1 + 1
+}
+
+/// `CheckNextSymmNeighborsAndBonds`
+#[allow(clippy::too_many_arguments)]
+pub fn check_next_symm_neighbors_and_bonds(
+    at: &[SpAtom],
+    cur1: u16,
+    cur2: u16,
+    n1: u16,
+    n2: u16,
+    n_avoid_check_atom: &[u16],
+    n_visited1: &[u16],
+    n_visited2: &[u16],
+    n_visit_ord1: &[u16],
+    n_visit_ord2: &[u16],
+    n_rank1: &[u16],
+    n_rank2: &[u16],
+) -> i32 {
+    let (c1, c2, m1, m2) = (cur1 as usize, cur2 as usize, n1 as usize, n2 as usize);
+    if n_rank1[m1] != n_rank2[m2] {
+        return -1;
+    }
+    match i32::from(n_visited1[m1] == 0) + i32::from(n_visited2[m2] == 0) {
+        0 => {
+            if n_visited1[m1] != n2 + 1 || n_visited2[m2] != n1 + 1 {
+                return -1;
+            }
+        }
+        1 => return -1,
+        _ => {}
+    }
+    if n_visit_ord1[m1] != n_visit_ord2[m2] {
+        return -1;
+    }
+    let find = |c: usize, n: u16| -> (usize, u16, bool) {
+        let (mut i, mut s, mut k) = (0usize, 0u16, false);
+        while i < MAX_NUM_STEREO_BONDS {
+            s = at[c].stereo_bond_neighbor[i];
+            if s == 0 {
+                break;
+            }
+            k = at[c].neighbor[at[c].stereo_bond_ord[i] as usize] == n;
+            if k {
+                break;
+            }
+            i += 1;
+        }
+        (i, s, k)
+    };
+    let (i1, s1, k1) = find(c1, n1);
+    let (i2, s2, k2) = find(c2, n2);
+    if k1 != k2 {
+        return 0;
+    }
+    if k1 {
+        let (s1, s2) = (s1 - 1, s2 - 1);
+        let a = n_avoid_check_atom;
+        let b1 = (cur1 != a[0] || s1 != a[1]) && (cur1 != a[1] || s1 != a[0]);
+        let b2 = (cur2 != a[0] || s2 != a[1]) && (cur2 != a[1] || s2 != a[0]);
+        if b1 != b2 {
+            return 0;
+        }
+        if !b1 && !b2 {
+            return 1;
+        }
+        let (p1, p2) = (
+            i32::from(at[c1].stereo_bond_parity[i1]),
+            i32::from(at[c2].stereo_bond_parity[i2]),
+        );
+        if at[c1].stereo_bond_parity[i1] != at[c2].stereo_bond_parity[i2]
+            && parity_known(p1)
+            && parity_known(p2)
+        {
+            return 0;
+        }
+    }
+    1
+}
+
+/// `CreateCheckSymmPaths` (`mode` is only passed on, as in the C code): parallel DFS from `cur1` and `cur2` comparing the
+/// known parities of the stereo atoms and bonds met on the way
+#[allow(clippy::too_many_arguments, clippy::only_used_in_recursion)]
+pub fn create_check_symm_paths(
+    at: &[SpAtom],
+    prev1: u16,
+    cur1: u16,
+    prev2: u16,
+    cur2: u16,
+    n_avoid_check_atom: &[u16],
+    n_visited1: &mut [u16],
+    n_visited2: &mut [u16],
+    n_visit_ord1: &mut [u16],
+    n_visit_ord2: &mut [u16],
+    nl1: &NeighList,
+    nl2: &NeighList,
+    n_rank1: &[u16],
+    n_rank2: &[u16],
+    n_length: &mut u16,
+    b_parities_inverted: &mut i32,
+    mode: i32,
+) -> i32 {
+    let (c1, c2) = (cur1 as usize, cur2 as usize);
+    let mut b_zero = 0i32;
+    n_visited1[c1] = cur2 + 1;
+    n_visited2[c2] = cur1 + 1;
+    *n_length += 1;
+    n_visit_ord1[c1] = *n_length;
+    n_visit_ord2[c2] = *n_length;
+    let (sp1, sp2) = (
+        i32::from(at[c1].stereo_atom_parity),
+        i32::from(at[c2].stereo_atom_parity),
+    );
+    if parity_well_def(sp1) && parity_well_def(sp2) {
+        if *b_parities_inverted < 0 {
+            *b_parities_inverted = (sp1 + sp2) % 2;
+        } else if *b_parities_inverted != (sp1 + sp2) % 2 {
+            return 0;
+        }
+    } else if parity_known(sp1) && parity_known(sp2) && sp1 != sp2 {
+        return 0;
+    }
+    if cur1 != cur2
+        && at[c1].stereo_bond_neighbor[0] == 0
+        && at[c2].stereo_bond_neighbor[0] == 0
+        && parity_known(i32::from(at[c1].parity)) != parity_known(i32::from(at[c2].parity))
+    {
+        return 0;
+    }
+    if at[c1].valence != at[c2].valence {
+        return CT_REMOVE_STEREO_ERR;
+    }
+    if at[c1].valence == 1 {
+        return 1;
+    }
+    if nl1[c1][0] != nl2[c2][0] || i32::from(nl1[c1][0]) != i32::from(at[c1].valence) {
+        return CT_REMOVE_STEREO_ERR;
+    }
+    let (mut k, mut k1, mut k2) = (1, 1usize, 1usize);
+    while k < i32::from(at[c1].valence) {
+        let mut n1 = nl1[c1][k1];
+        if n1 == prev1 {
+            k1 += 1;
+            n1 = nl1[c1][k1];
+        }
+        let mut n2 = nl2[c2][k2];
+        if n2 == prev2 {
+            k2 += 1;
+            n2 = nl2[c2][k2];
+        }
+        let ret = check_next_symm_neighbors_and_bonds(
+            at,
+            cur1,
+            cur2,
+            n1,
+            n2,
+            n_avoid_check_atom,
+            n_visited1,
+            n_visited2,
+            n_visit_ord1,
+            n_visit_ord2,
+            n_rank1,
+            n_rank2,
+        );
+        if ret <= 0 {
+            return ret;
+        }
+        if n_visited1[n1 as usize] == 0 {
+            let same = at[c1].n_ring_system == at[n1 as usize].n_ring_system;
+            let pb: &mut i32 = if same {
+                &mut *b_parities_inverted
+            } else {
+                &mut b_zero
+            };
+            let ret = create_check_symm_paths(
+                at,
+                cur1,
+                n1,
+                cur2,
+                n2,
+                n_avoid_check_atom,
+                n_visited1,
+                n_visited2,
+                n_visit_ord1,
+                n_visit_ord2,
+                nl1,
+                nl2,
+                n_rank1,
+                n_rank2,
+                n_length,
+                pb,
+                mode,
+            );
+            if ret <= 0 {
+                return ret;
+            }
+        }
+        k += 1;
+        k1 += 1;
+        k2 += 1;
+    }
+    1
+}

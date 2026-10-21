@@ -8742,3 +8742,187 @@ fn mapping_of_ties_and_parities_matches_the_c_code() {
         assert_eq!(got, want, "case {case}");
     }
 }
+
+#[test]
+fn neighbor_tie_breaking_and_symmetric_paths_match_the_c_code() {
+    use rdoxide::external::inchi::ichimap::*;
+    use rdoxide::external::inchi::ichister::SpAtom;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_mapbreak.json")).unwrap();
+    fn ints(v: &serde_json::Value) -> Vec<i64> {
+        v.as_array()
+            .unwrap()
+            .iter()
+            .map(|x| x.as_i64().unwrap())
+            .collect()
+    }
+    fn pa(a: &[u16], n: usize) -> String {
+        let mut s = String::new();
+        for x in &a[..n] {
+            s += &format!(" {x}");
+        }
+        s + " |"
+    }
+    fn pnl(nl: &NeighList, n: usize) -> String {
+        let mut s = String::new();
+        for l in nl.iter().take(n) {
+            s += &format!(
+                " [{}]",
+                l.iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<_>>()
+                    .join(",")
+            );
+        }
+        s
+    }
+    for (case, c) in data.as_array().unwrap().iter().enumerate() {
+        let inp = &c["in"];
+        let atoms = inp["atoms"].as_array().unwrap();
+        let n = atoms.len();
+        let nmax = n + 2;
+        let mut at = vec![SpAtom::default(); n + 1];
+        let (mut crank, mut r1, mut r2) = (
+            vec![0u16; nmax + 8],
+            vec![0u16; nmax + 8],
+            vec![0u16; nmax + 8],
+        );
+        for (i, a) in atoms.iter().enumerate() {
+            let g = |k: &str| a[k].as_i64().unwrap();
+            let nb = a["nb"].as_array().unwrap();
+            at[i].valence = nb.len() as i8;
+            at[i].parity = g("par") as i8;
+            at[i].stereo_atom_parity = g("sap") as i8;
+            at[i].num_h = g("nh") as i8;
+            at[i].n_ring_system = inp["rs"][i].as_u64().unwrap() as u16;
+            r1[i] = g("rank") as u16;
+            r2[i] = g("rank2") as u16;
+            crank[i] = g("crank") as u16;
+            for (j, q) in nb.iter().enumerate() {
+                at[i].neighbor[j] = q.as_u64().unwrap() as u16;
+            }
+            for (j, s) in a["sb"].as_array().unwrap().iter().enumerate() {
+                let s = ints(s);
+                at[i].stereo_bond_neighbor[j] = s[0] as u16;
+                at[i].stereo_bond_ord[j] = s[1] as i8;
+                at[i].stereo_bond_z_prod[j] = s[2] as i8;
+                at[i].stereo_bond_parity[j] = s[3] as i8;
+            }
+        }
+        let mut got: Vec<String> = Vec::new();
+        let v16 = |v: &serde_json::Value| -> Vec<u16> {
+            let mut x: Vec<u16> = ints(v).iter().map(|x| *x as u16).collect();
+            x.resize(nmax, 0);
+            x
+        };
+        for ch in inp["checks"].as_array().unwrap() {
+            let h = ch.as_array().unwrap();
+            let i = |k: usize| h[k].as_i64().unwrap() as u16;
+            let (v1, v2, o1, o2) = (v16(&h[7]), v16(&h[8]), v16(&h[9]), v16(&h[10]));
+            let rr2 = if h[6].as_i64().unwrap() != 0 {
+                &r1
+            } else {
+                &r2
+            };
+            let r = check_next_symm_neighbors_and_bonds(
+                &at,
+                i(0),
+                i(1),
+                i(2),
+                i(3),
+                &[i(4), i(5)],
+                &v1,
+                &v2,
+                &o1,
+                &o2,
+                &r1,
+                rr2,
+            );
+            got.push(format!("C {r}"));
+        }
+        let nlp = create_neigh_list(n, n, &at, false, None);
+        for p in inp["paths"].as_array().unwrap() {
+            let h = ints(p);
+            let (mut v1, mut v2, mut o1, mut o2) = (
+                vec![0u16; nmax],
+                vec![0u16; nmax],
+                vec![0u16; nmax],
+                vec![0u16; nmax],
+            );
+            let mut len = 0u16;
+            let mut inv = h[6] as i32;
+            let rr2 = if h[8] != 0 { &r1 } else { &r2 };
+            let ret = create_check_symm_paths(
+                &at,
+                h[0] as u16,
+                h[1] as u16,
+                h[2] as u16,
+                h[3] as u16,
+                &[h[4] as u16, h[5] as u16],
+                &mut v1,
+                &mut v2,
+                &mut o1,
+                &mut o2,
+                &nlp,
+                &nlp,
+                &r1,
+                rr2,
+                &mut len,
+                &mut inv,
+                h[7] as i32,
+            );
+            got.push(format!(
+                "P {ret} {len} {inv} |{}{}{}{}",
+                pa(&v1, n),
+                pa(&v2, n),
+                pa(&o1, n),
+                pa(&o2, n)
+            ));
+        }
+        for b in inp["breaks"].as_array().unwrap() {
+            let h = ints(b);
+            let (ib, ia, in1, in2, mode, symm2) = (
+                h[0] as usize,
+                h[1] as usize,
+                h[2] as usize,
+                h[3] as usize,
+                h[4] as i32,
+                h[5],
+            );
+            let mut nn = [0u16; 4];
+            let nv = (at[ia].valence as usize).min(4);
+            nn[..nv].copy_from_slice(&at[ia].neighbor[..nv]);
+            let mut s1 = vec![vec![0u16; nmax], vec![0u16; nmax]];
+            let mut s2 = vec![vec![0u16; nmax], vec![0u16; nmax]];
+            for (d, x) in s1[1].iter_mut().zip(&h[6..6 + n]) {
+                *d = *x as u16;
+            }
+            let mut tmp = vec![0u16; nmax + 8];
+            let mut nl = create_neigh_list(n, n, &at, false, None);
+            let mut nl1 = create_neigh_list(n, n, &at, false, None);
+            let mut nl2 = create_neigh_list(n, n, &at, false, None);
+            let mut iter = 0i64;
+            let sr = if symm2 != 0 { &r2 } else { &r1 };
+            let ret = break_neighbors_tie(
+                &at, n, n, ib, ia, &nn, in1, in2, mode, &mut s1, &mut s2, &mut tmp, &mut nl, sr,
+                &crank, &mut nl1, &mut nl2, &mut iter,
+            );
+            got.push(format!(
+                "B {ret} {iter} |{}{}{}{}",
+                pa(&s1[0], n),
+                pa(&s1[1], n),
+                pa(&s2[0], n),
+                pa(&s2[1], n)
+            ));
+            got.push(pnl(&nl1, n));
+            got.push(pnl(&nl2, n));
+        }
+        let want: Vec<String> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| s.as_str().unwrap().to_string())
+            .collect();
+        assert_eq!(got, want, "case {case}");
+    }
+}
