@@ -5176,3 +5176,597 @@ pub fn b_has_acidic_minus(at: &[InpAtom], i: usize) -> i32 {
         0
     }
 }
+
+// ---- hard proton addition and removal ----
+
+use super::ichierr::BNS_RADICAL_ERR;
+use super::ichiparm::{
+    TG_FLAG_HARD_ADD_REM_PROTONS, TG_FLAG_TEST_TAUT__SALTS,
+    TG_FLAG_TEST_TAUT2_SALTS as TG_FLAG_TEST_TAUT2_SALTS64,
+};
+
+pub const FLAG_PROTON_NPO_SIMPLE_REMOVED: u64 = 0x0001;
+pub const FLAG_PROTON_NP_HARD_REMOVED: u64 = 0x0002;
+pub const FLAG_PROTON_AC_SIMPLE_ADDED: u64 = 0x0004;
+pub const FLAG_PROTON_AC_HARD_REMOVED: u64 = 0x0010;
+pub const FLAG_PROTON_AC_HARD_ADDED: u64 = 0x0020;
+pub const FLAG_PROTON_AC_SIMPLE_REMOVED: u64 = 0x0008;
+pub const FLAG_PROTON_CHARGE_CANCEL: u64 = 0x0040;
+
+const HARD_TYP_POS: i32 = ATTYP_N;
+const HARD_MSK_POS: i32 = ATBIT_MSK_NP;
+const AR_HARD_MSK_HA: i32 = atbit::CO | atbit::NO;
+const AR_HARD_TYP_HA: i32 = (ATT_ACIDIC_CO | ATT_NO) as i32;
+const AR_HARD_MSK_HN: i32 = (ATBIT_MSK_NP | ATBIT_MSK_OS) & !AR_HARD_MSK_HA;
+const AR_HARD_TYP_HN: i32 = ATTYP_N | ATTYP_OS;
+const AA_HARD_MSK_NEG: i32 = (ATBIT_MSK_NP | ATBIT_MSK_OS) & !(atbit::CO | atbit::NO);
+
+fn totals(aatg: &BnAatg) -> &[i32] {
+    aatg.n_at_type_totals.as_deref().expect("nAtTypeTotals")
+}
+
+/// charges (positive, negative) from the totals
+fn charge_counts(aatg: &BnAatg) -> (i32, i32) {
+    let t = totals(aatg);
+    (
+        (t[attot::NUM_CHARGES] + t[attot::TOT_CHARGE]) / 2,
+        (t[attot::NUM_CHARGES] - t[attot::TOT_CHARGE]) / 2,
+    )
+}
+
+fn set_group_types(p: &mut BnStruct) {
+    p.type_cn = BNS_VERT_TYPE_C_GROUP | BNS_VERT_TYPE_C_NEGATIVE;
+    p.type_t = BNS_VERT_TYPE_TGROUP;
+    p.type_tacn = BNS_VERT_TYPE_ACID;
+}
+
+/// removes the groups (the first of `groups` that were created) in order;
+/// returns the first error
+fn remove_groups(at: &mut [InpAtom], num_atoms: i32, p: &mut BnStruct, groups: &[i32]) -> i32 {
+    let mut ret = 0;
+    for &g in groups {
+        if g >= num_atoms {
+            let ret2 = remove_last_group_from_bn_struct(at, num_atoms, g, p);
+            if ret == 0 && ret2 != 0 {
+                ret = ret2;
+            }
+        }
+    }
+    ret
+}
+
+/// the repeated alternating-path search of the hard proton functions: runs
+/// `bExistsAltPath` until no path is found (or `limit` paths were found);
+/// returns the number of found paths, `Err` on a BNS error. `neutralize`
+/// counts neutralized ion pairs the way the C code does for the two kinds of
+/// search.
+#[allow(clippy::too_many_arguments)]
+fn hard_alt_path_loop(
+    p: &mut BnStruct,
+    bd: &mut BnData,
+    aatg: &mut BnAatg,
+    at: &mut [InpAtom],
+    num_atoms: i32,
+    v_double: i32,
+    v_single: i32,
+    limit: Option<i32>,
+    count_proton: bool,
+    check_removed_protons: bool,
+    n_neutralized: &mut i32,
+) -> Result<i32, i32> {
+    let mut found = 0;
+    loop {
+        let prev_charges = totals(aatg)[attot::NUM_CHARGES];
+        let prev_removed = aatg
+            .t_group_info
+            .as_ref()
+            .map_or(0, |t| t.tni.n_num_removed_protons);
+        let ret = exists_alt_path(
+            p,
+            bd,
+            Some(&mut *aatg),
+            at,
+            num_atoms,
+            v_double,
+            v_single,
+            ALT_PATH_MODE_REM_PROTON,
+        );
+        if is_bns_error(ret) {
+            return Err(ret);
+        }
+        if check_removed_protons {
+            let curr = aatg
+                .t_group_info
+                .as_ref()
+                .map_or(0, |t| t.tni.n_num_removed_protons);
+            let want = if count_proton {
+                prev_removed + (ret & 1)
+            } else {
+                prev_removed
+            };
+            if curr != want {
+                return Err(BNS_RADICAL_ERR);
+            }
+        }
+        if ret & 1 != 0 {
+            let cur = totals(aatg)[attot::NUM_CHARGES];
+            if count_proton {
+                found += 1;
+                if prev_charges > cur + 1 {
+                    *n_neutralized += (prev_charges - (cur - 1)) / 2;
+                }
+            } else if prev_charges > cur {
+                *n_neutralized += (prev_charges - cur) / 2;
+            }
+        }
+        let go_on = ret & 1 != 0 && limit.is_none_or(|l| found < l);
+        if !go_on {
+            return Ok(found);
+        }
+    }
+}
+
+/// the neutralizing pass of the hard proton functions: ion pairs like
+/// >N(+)=-O(-) => >N-=O are removed along (-) -> (+) paths
+#[allow(clippy::too_many_arguments)]
+fn hard_neutralize_loop(
+    p: &mut BnStruct,
+    bd: &mut BnData,
+    aatg: &mut BnAatg,
+    at: &mut [InpAtom],
+    num_atoms: i32,
+    cg_minus: i32,
+    cg_plus: i32,
+    check_removed_protons: bool,
+    n_neutralized: &mut i32,
+) -> Result<(), i32> {
+    hard_alt_path_loop(
+        p,
+        bd,
+        aatg,
+        at,
+        num_atoms,
+        cg_minus,
+        cg_plus,
+        None,
+        false,
+        check_removed_protons,
+        n_neutralized,
+    )
+    .map(|_| ())
+}
+
+fn finish_hard(
+    at: &mut [InpAtom],
+    num_atoms: i32,
+    p: &mut BnStruct,
+    groups: &[i32],
+    aatg: &BnAatg,
+    (pos, neg): (i32, i32),
+    expected_diff: i32,
+    n_canceled: Option<&mut i32>,
+    n_neutralized: i32,
+) -> Option<i32> {
+    let ret = remove_groups(at, num_atoms, p, groups);
+    p.type_cn = 0;
+    p.type_t = 0;
+    p.type_tacn = 0;
+    if ret != 0 {
+        return Some(ret);
+    }
+    let (pos2, neg2) = charge_counts(aatg);
+    if (pos - neg) - (pos2 - neg2) != expected_diff {
+        return Some(BNS_PROGRAM_ERR);
+    }
+    if let Some(c) = n_canceled {
+        // FIX_CANCEL_CHARGE_COUNT_BUG is 0: the count is replaced
+        *c = 2 * n_neutralized;
+    }
+    None
+}
+
+/// `HardRemoveAcidicProtons`: moves up to `num2remove` protons to acidic
+/// groups along alternating paths; returns the number moved
+#[allow(clippy::too_many_arguments)]
+pub fn hard_remove_acidic_protons(
+    at: &mut [InpAtom],
+    num_atoms: i32,
+    aatg: &mut BnAatg,
+    num2remove: i32,
+    n_canceled: Option<&mut i32>,
+    p: &mut BnStruct,
+    bd: &mut BnData,
+) -> i32 {
+    let counts = charge_counts(aatg);
+    set_group_types(p);
+    let cg_plus = create_c_group_in_bn_struct(at, num_atoms, p, ATTYP_N, ATBIT_MSK_NP, 1);
+    let cg_minus =
+        create_c_group_in_bn_struct(at, num_atoms, p, PR_HARD_TYP_NEG, PR_HARD_MSK_NEG, -1);
+    set_group_types(p);
+    let tg_other = create_t_group_in_bn_struct(at, num_atoms, p, AR_HARD_TYP_HN, AR_HARD_MSK_HN);
+    let tg_acid = create_t_group_in_bn_struct(at, num_atoms, p, AR_HARD_TYP_HA, AR_HARD_MSK_HA);
+    let mut n_neutralized = 0;
+    let mut moved = 0;
+    if tg_other >= num_atoms && tg_acid >= num_atoms {
+        match hard_alt_path_loop(
+            p,
+            bd,
+            aatg,
+            at,
+            num_atoms,
+            tg_other,
+            tg_acid,
+            Some(num2remove),
+            true,
+            false,
+            &mut n_neutralized,
+        ) {
+            Ok(n) => moved = n,
+            Err(e) => return e,
+        }
+        if moved != 0
+            && cg_minus >= num_atoms
+            && cg_plus >= num_atoms
+            && totals(aatg)[attot::NUM_CHARGES] > totals(aatg)[attot::TOT_CHARGE].abs()
+        {
+            if let Err(e) = hard_neutralize_loop(
+                p,
+                bd,
+                aatg,
+                at,
+                num_atoms,
+                cg_minus,
+                cg_plus,
+                false,
+                &mut n_neutralized,
+            ) {
+                return e;
+            }
+        }
+    }
+    match finish_hard(
+        at,
+        num_atoms,
+        p,
+        &[tg_acid, tg_other, cg_minus, cg_plus],
+        aatg,
+        counts,
+        0,
+        n_canceled,
+        n_neutralized,
+    ) {
+        Some(e) => e,
+        None => moved,
+    }
+}
+
+/// `HardAddAcidicProtons`: moves up to `num2add` protons to acidic anions
+#[allow(clippy::too_many_arguments)]
+pub fn hard_add_acidic_protons(
+    at: &mut [InpAtom],
+    num_atoms: i32,
+    aatg: &mut BnAatg,
+    num2add: i32,
+    n_canceled: Option<&mut i32>,
+    p: &mut BnStruct,
+    bd: &mut BnData,
+) -> i32 {
+    let counts = charge_counts(aatg);
+    set_group_types(p);
+    let cg_plus = create_c_group_in_bn_struct(at, num_atoms, p, ATTYP_N, ATBIT_MSK_NP, 1);
+    let cg_minus_co = create_c_group_in_bn_struct(
+        at,
+        num_atoms,
+        p,
+        (ATT_ACIDIC_CO | ATT_NO) as i32,
+        atbit::CO | atbit::NO,
+        -1,
+    );
+    let cg_minus_other =
+        create_c_group_in_bn_struct(at, num_atoms, p, ATTYP_N | ATTYP_OS, AA_HARD_MSK_NEG, -1);
+    set_group_types(p);
+    let tg_h = create_t_group_in_bn_struct(
+        at,
+        num_atoms,
+        p,
+        ATTYP_N | ATTYP_OS,
+        ATBIT_MSK_NP | ATBIT_MSK_OS,
+    );
+    let mut n_neutralized = 0;
+    let mut moved = 0;
+    if cg_minus_other >= num_atoms && cg_minus_co >= num_atoms {
+        match hard_alt_path_loop(
+            p,
+            bd,
+            aatg,
+            at,
+            num_atoms,
+            cg_minus_other,
+            cg_minus_co,
+            Some(num2add),
+            true,
+            false,
+            &mut n_neutralized,
+        ) {
+            Ok(n) => moved = n,
+            Err(e) => return e,
+        }
+        if moved != 0
+            && cg_minus_other >= num_atoms
+            && cg_plus >= num_atoms
+            && totals(aatg)[attot::NUM_CHARGES] > totals(aatg)[attot::TOT_CHARGE].abs()
+        {
+            if let Err(e) = hard_neutralize_loop(
+                p,
+                bd,
+                aatg,
+                at,
+                num_atoms,
+                cg_minus_other,
+                cg_plus,
+                false,
+                &mut n_neutralized,
+            ) {
+                return e;
+            }
+        }
+    }
+    match finish_hard(
+        at,
+        num_atoms,
+        p,
+        &[tg_h, cg_minus_other, cg_minus_co, cg_plus],
+        aatg,
+        counts,
+        0,
+        n_canceled,
+        n_neutralized,
+    ) {
+        Some(e) => e,
+        None => moved,
+    }
+}
+
+/// `HardRemoveHplusNP`: removes H(+) from cationic N/P along alternating
+/// paths to a t-group; returns the number of removed protons
+#[allow(clippy::too_many_arguments)]
+pub fn hard_remove_hplus_np(
+    at: &mut [InpAtom],
+    num_atoms: i32,
+    b_cancel_charges_always: bool,
+    n_canceled: Option<&mut i32>,
+    aatg: &mut BnAatg,
+    p: &mut BnStruct,
+    bd: &mut BnData,
+) -> i32 {
+    let counts = charge_counts(aatg);
+    set_group_types(p);
+    let cg_plus = create_c_group_in_bn_struct(at, num_atoms, p, HARD_TYP_POS, HARD_MSK_POS, 1);
+    let cg_minus =
+        create_c_group_in_bn_struct(at, num_atoms, p, PR_HARD_TYP_NEG, PR_HARD_MSK_NEG, -1);
+    let tg_h = create_t_group_in_bn_struct(at, num_atoms, p, PR_HARD_TYP_H, PR_HARD_MSK_H);
+    let mut n_neutralized = 0;
+    let mut removed = 0;
+    if tg_h >= num_atoms && cg_plus >= num_atoms {
+        // FIX_N_MINUS_NORN_BUG is 0: no neutralizing pass before the removal
+        match hard_alt_path_loop(
+            p,
+            bd,
+            aatg,
+            at,
+            num_atoms,
+            tg_h,
+            cg_plus,
+            None,
+            true,
+            true,
+            &mut n_neutralized,
+        ) {
+            Ok(n) => removed = n,
+            Err(e) => return e,
+        }
+        if (removed != 0 || b_cancel_charges_always)
+            && cg_minus >= num_atoms
+            && cg_plus >= num_atoms
+            && totals(aatg)[attot::NUM_CHARGES] > totals(aatg)[attot::TOT_CHARGE].abs()
+        {
+            if let Err(e) = hard_neutralize_loop(
+                p,
+                bd,
+                aatg,
+                at,
+                num_atoms,
+                cg_minus,
+                cg_plus,
+                true,
+                &mut n_neutralized,
+            ) {
+                return e;
+            }
+        }
+    }
+    match finish_hard(
+        at,
+        num_atoms,
+        p,
+        &[tg_h, cg_minus, cg_plus],
+        aatg,
+        counts,
+        removed,
+        n_canceled,
+        n_neutralized,
+    ) {
+        Some(e) => e,
+        None => removed,
+    }
+}
+
+/// `mark_at_type`: sets `at_type` of all atoms and the totals; returns the
+/// number of charges
+pub fn mark_at_type(atom: &mut [InpAtom], num_atoms: i32, totals: Option<&mut [i32]>) -> i32 {
+    let mut totals = totals;
+    if let Some(t) = totals.as_deref_mut() {
+        t[..attot::ARRAY_LEN].fill(0);
+    }
+    for i in 0..num_atoms as usize {
+        let (type_, _) = get_atom_charge_type(atom, i, totals.as_deref_mut(), 0);
+        atom[i].at_type = type_ as _;
+    }
+    totals.map_or(0, |t| t[attot::NUM_CHARGES])
+}
+
+/// `RemoveNPProtonsAndAcidCharges`: the removal and addition of protons that
+/// neutralizes the structure (TECHMAN-5.1, 5.2); returns 0 or an error code
+pub fn remove_np_protons_and_acid_charges(
+    at: &mut [InpAtom],
+    num_atoms: i32,
+    aatg: &mut BnAatg,
+    p: &mut BnStruct,
+    bd: &mut BnData,
+) -> i32 {
+    let mut n_canceled = 0;
+    let taut_flags = aatg
+        .t_group_info
+        .as_ref()
+        .expect("t_group_info")
+        .b_taut_flags;
+    let allow_hard = taut_flags & TG_FLAG_TEST_TAUT__SALTS != 0
+        && taut_flags & TG_FLAG_TEST_TAUT2_SALTS64 != 0
+        && taut_flags & TG_FLAG_MOVE_POS_CHARGES != 0
+        && taut_flags & TG_FLAG_HARD_ADD_REM_PROTONS != 0;
+    if aatg.n_marked_atom.is_empty() {
+        aatg.n_marked_atom = vec![0; num_atoms as usize];
+        aatg.n_num_found = 0;
+    }
+    let mut ret = 0;
+    let mut b_error = 0;
+    'body: {
+        let num = totals(aatg)[attot::NUM_NP_PROTON] + totals(aatg)[attot::NUM_OH_PLUS];
+        if num != 0 {
+            let mut tgi = aatg.t_group_info.take().expect("t_group_info");
+            ret = simple_remove_hplus_npo(
+                at,
+                num_atoms,
+                aatg.n_at_type_totals.as_deref_mut(),
+                &mut tgi,
+            );
+            aatg.t_group_info = Some(tgi);
+            if ret != num {
+                b_error = BNS_PROGRAM_ERR;
+                break 'body;
+            }
+            if ret > 0 {
+                aatg.t_group_info
+                    .as_mut()
+                    .unwrap()
+                    .tni
+                    .b_normalization_flags |= FLAG_PROTON_NPO_SIMPLE_REMOVED;
+            }
+        }
+        if totals(aatg)[attot::NUM_NP_PLUS] != 0 && allow_hard {
+            ret = hard_remove_hplus_np(at, num_atoms, true, Some(&mut n_canceled), aatg, p, bd);
+            if is_bns_error(ret) {
+                b_error = ret;
+                break 'body;
+            }
+            if ret > 0 {
+                aatg.t_group_info
+                    .as_mut()
+                    .unwrap()
+                    .tni
+                    .b_normalization_flags |= FLAG_PROTON_NP_HARD_REMOVED;
+            }
+        }
+        let tot_charge = totals(aatg)[attot::TOT_CHARGE];
+        if tot_charge > 0 {
+            ret = simple_remove_acidic_protons(at, num_atoms, aatg, tot_charge);
+            if is_bns_error(ret) {
+                b_error = ret;
+                break 'body;
+            }
+            if ret > 0 {
+                aatg.t_group_info
+                    .as_mut()
+                    .unwrap()
+                    .tni
+                    .b_normalization_flags |= FLAG_PROTON_AC_SIMPLE_REMOVED;
+            }
+            if totals(aatg)[attot::TOT_CHARGE] > 0 && allow_hard {
+                let n = totals(aatg)[attot::TOT_CHARGE];
+                ret = hard_remove_acidic_protons(
+                    at,
+                    num_atoms,
+                    aatg,
+                    n,
+                    Some(&mut n_canceled),
+                    p,
+                    bd,
+                );
+                if is_bns_error(ret) {
+                    b_error = ret;
+                    break 'body;
+                }
+                if ret > 0 {
+                    let ret2 = simple_remove_acidic_protons(at, num_atoms, aatg, ret);
+                    if ret2 != ret {
+                        b_error = BNS_PROGRAM_ERR;
+                        break 'body;
+                    }
+                    aatg.t_group_info
+                        .as_mut()
+                        .unwrap()
+                        .tni
+                        .b_normalization_flags |= FLAG_PROTON_AC_HARD_REMOVED;
+                }
+            }
+        } else if tot_charge < 0 {
+            ret = simple_add_acidic_protons(at, num_atoms, aatg, -tot_charge);
+            if is_bns_error(ret) {
+                b_error = ret;
+                break 'body;
+            }
+            if ret > 0 {
+                aatg.t_group_info
+                    .as_mut()
+                    .unwrap()
+                    .tni
+                    .b_normalization_flags |= FLAG_PROTON_AC_SIMPLE_ADDED;
+            }
+            if totals(aatg)[attot::TOT_CHARGE] < 0 && allow_hard {
+                let n = -totals(aatg)[attot::TOT_CHARGE];
+                ret = hard_add_acidic_protons(at, num_atoms, aatg, n, Some(&mut n_canceled), p, bd);
+                if is_bns_error(ret) {
+                    b_error = ret;
+                    break 'body;
+                }
+                if ret > 0 {
+                    let ret2 = simple_add_acidic_protons(at, num_atoms, aatg, ret);
+                    if ret2 != ret {
+                        b_error = BNS_PROGRAM_ERR;
+                        break 'body;
+                    }
+                    aatg.t_group_info
+                        .as_mut()
+                        .unwrap()
+                        .tni
+                        .b_normalization_flags |= FLAG_PROTON_AC_HARD_ADDED;
+                }
+            }
+        }
+        if n_canceled != 0 {
+            aatg.t_group_info
+                .as_mut()
+                .unwrap()
+                .tni
+                .b_normalization_flags |= FLAG_PROTON_CHARGE_CANCEL;
+        }
+    }
+    if b_error != 0 {
+        ret = if is_bns_error(b_error) {
+            b_error
+        } else {
+            BNS_PROGRAM_ERR
+        };
+    }
+    ret
+}
