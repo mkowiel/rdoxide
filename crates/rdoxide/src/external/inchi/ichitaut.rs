@@ -685,6 +685,7 @@ pub struct TGroupInfo {
     pub t_group_number: Vec<u16>,
     pub tni: Tni,
     pub b_taut_flags: u64,
+    pub b_taut_flags_done: u64,
 }
 
 /// `C_GROUP_INFO` (the c-group list)
@@ -1768,4 +1769,375 @@ pub fn find_accessible_end_points(
     *num_end_points = j;
     *num_bond_pos = j;
     j as i32
+}
+
+/// `TG_FLAG_ALLOW_NO_NEGTV_O_DONE`
+pub const TG_FLAG_ALLOW_NO_NEGTV_O_DONE: u64 = 0x0000_0040;
+/// `TG_FLAG_FOUND_SALT_CHARGES_DONE`
+pub const TG_FLAG_FOUND_SALT_CHARGES_DONE: u64 = 0x0000_2000;
+/// `FLAG_FORCE_SALT_TAUT` (`FIX_N_MINUS_NORN_BUG` is 0)
+pub const FLAG_FORCE_SALT_TAUT: u64 = 0x0002 | 0x0010 | 0x0020;
+/// `SALT_DONOR`
+pub const SALT_DONOR: i32 = SALT_DONOR_NEG | SALT_DONOR_H;
+/// `SALT_SELECTED`
+pub const SALT_SELECTED: i32 = 32;
+
+/// `S_GROUP_INFO`: the "salt" candidates
+#[derive(Debug, Clone, Default)]
+pub struct SGroupInfo {
+    pub s_candidate: Vec<SCandidate>,
+    pub max_num_candidates: i32,
+    /// 0 = uninitialized, -1 = no candidates found
+    pub num_candidates: i32,
+    pub num_other_candidates: i32,
+    pub num_p_only_candidates: i32,
+}
+
+/// `MarkSaltChargeGroups2`: finds acceptor and donor pairs of "salt"
+/// candidates connected by alternating paths and merges the candidates into
+/// one t-group. Returns 0 (no changes), 1 (new salt tautomerism), 2 (only
+/// charges: no movable H), 5 (not only acidic atoms merged) or an error.
+pub fn mark_salt_charge_groups2(
+    at: &mut [InpAtom],
+    num_atoms: i32,
+    sgi: &mut SGroupInfo,
+    tgi: &mut TGroupInfo,
+    cgi: Option<&mut CGroupInfo>,
+    p: &mut super::ichi_bns::BnStruct,
+    bd: &mut super::ichi_bns::BnData,
+) -> i32 {
+    let mut n_other_changes = 0;
+    let mut tot = 0;
+    if sgi.s_candidate.is_empty() || sgi.max_num_candidates <= 0 {
+        return 0;
+    }
+    mark_salt_charge_groups2_body(
+        at,
+        num_atoms,
+        sgi,
+        tgi,
+        cgi,
+        p,
+        bd,
+        &mut n_other_changes,
+        &mut tot,
+    );
+    if n_other_changes != 0 && tot == 1 {
+        tot = 5;
+    }
+    tot
+}
+
+#[allow(clippy::too_many_arguments)]
+fn mark_salt_charge_groups2_body(
+    at: &mut [InpAtom],
+    num_atoms: i32,
+    sgi: &mut SGroupInfo,
+    tgi: &mut TGroupInfo,
+    cgi: Option<&mut CGroupInfo>,
+    p: &mut super::ichi_bns::BnStruct,
+    bd: &mut super::ichi_bns::BnData,
+    n_other_changes: &mut i32,
+    tot: &mut i32,
+) {
+    use super::ichi_bns::{
+        ALT_PATH_MODE_ADD2H_CHG, ALT_PATH_MODE_ADD2H_TST, ALT_PATH_MODE_REM2H_CHG,
+        ALT_PATH_MODE_REM2H_TST, b_is_hard_rem_h_candidate, exists_alt_path,
+    };
+    use super::ichierr::{
+        BNS_OUT_OF_RAM, BNS_PROGRAM_ERR, BNS_RADICAL_ERR, BNS_VERT_EDGE_OVFL, is_bns_error,
+    };
+    const DISABLE_CANDIDATE: i8 = 10;
+    const ACCEPTOR_PAIR: u8 = 1;
+    const DONOR_PAIR: u8 = 2;
+    let max_cand = sgi.max_num_candidates as usize;
+    let mut n_cand = sgi.num_candidates;
+    let hard_added_removed = tgi.tni.b_normalization_flags & FLAG_FORCE_SALT_TAUT != 0;
+    let mut s_subtype_all = 0;
+    if n_cand <= -2 || tgi.t_group.is_none() {
+        return;
+    }
+    // all candidates, including those of the other types
+    n_cand = 0;
+    let mut n_other_cand = 0;
+    let mut s_subtype = 0i32;
+    for i in 0..num_atoms as usize {
+        let mut s_type = get_salt_charge_type(at, i, Some(tgi), &mut s_subtype);
+        let mut ok = s_type == 0;
+        if !ok {
+            s_type = get_other_salt_charge_type(at, i, Some(tgi), &mut s_subtype, true);
+            ok = s_type == 1;
+        }
+        if !ok {
+            s_type = get_other_salt_type(at, i, &mut s_subtype);
+            ok = s_type == 2;
+        }
+        if !ok && hard_added_removed {
+            s_type = b_is_hard_rem_h_candidate(at, i, &mut s_subtype);
+            ok = s_type == 4;
+        }
+        if ok {
+            if n_cand as usize >= max_cand {
+                *tot = BNS_VERT_EDGE_OVFL;
+                return;
+            }
+            sgi.s_candidate[n_cand as usize] = SCandidate {
+                atnumber: i as u16,
+                type_: s_type as i8,
+                subtype: s_subtype as i8,
+                endpoint: at[i].endpoint,
+            };
+            n_cand += 1;
+            n_other_cand += i32::from(s_type == 1);
+            s_subtype_all |= s_subtype;
+        }
+    }
+    let allow_no_neg = tgi.b_taut_flags & super::ichiparm::TG_FLAG_ALLOW_NO_NEGTV_O != 0
+        || tgi.b_taut_flags_done & TG_FLAG_FOUND_SALT_CHARGES_DONE != 0
+        || tgi.tni.b_normalization_flags & FLAG_FORCE_SALT_TAUT != 0;
+    let no_donor = if allow_no_neg {
+        s_subtype_all & SALT_DONOR == 0
+    } else {
+        s_subtype_all & SALT_DONOR_NEG == 0 || n_other_cand == n_cand
+    };
+    if n_cand <= 1 || s_subtype_all & SALT_ACCEPTOR == 0 || no_donor {
+        sgi.num_candidates = 0;
+        return;
+    }
+    if s_subtype_all & SALT_DONOR_NEG == 0 {
+        tgi.b_taut_flags_done |= TG_FLAG_ALLOW_NO_NEGTV_O_DONE;
+    }
+    let n_cand = n_cand as usize;
+    // mark redundant candidates: one candidate per t-group is left in
+    let mut n_left = 0usize;
+    for i in 0..n_cand {
+        // oss-fuzz #45059 guard of the C code: reads the element after the last
+        if n_cand < max_cand && sgi.s_candidate[n_cand].type_ == 2 {
+            sgi.s_candidate[i].type_ -= DISABLE_CANDIDATE;
+            n_left += 1;
+            continue;
+        }
+        if sgi.s_candidate[i].endpoint != 0 {
+            for j in (0..i).rev() {
+                if sgi.s_candidate[i].endpoint == sgi.s_candidate[j].endpoint {
+                    sgi.s_candidate[i].type_ -= DISABLE_CANDIDATE;
+                    n_left += 1;
+                    break;
+                }
+            }
+        }
+    }
+    let n_left = n_cand - n_left;
+    sgi.num_candidates = 0;
+    sgi.s_candidate[..n_cand].sort_by(|a, b| comp_candidates(a, b).cmp(&0));
+    if n_left == 0 {
+        *tot = BNS_OUT_OF_RAM;
+        return;
+    }
+    let mut c_pair = vec![0u8; n_left * n_left];
+    let pair = |c: &Vec<u8>, a: usize, b: usize| c[a + b * n_left];
+    let (mut n_donor_pairs, mut n_acceptor_pairs) = (0, 0);
+    let (mut fi, mut fj) = (0usize, 0usize);
+    let mut found_two = false;
+    'search: for i in 0..n_left {
+        let (mut cur_donor, mut cur_acceptor) = (0, 0);
+        for j in 0..=i {
+            if i == j && sgi.s_candidate[i].endpoint == 0 {
+                continue;
+            }
+            let (si, sj) = (sgi.s_candidate[i], sgi.s_candidate[j]);
+            if i32::from(si.subtype) & SALT_ACCEPTOR != 0
+                && i32::from(sj.subtype) & SALT_ACCEPTOR != 0
+            {
+                let ret = exists_alt_path(
+                    p,
+                    bd,
+                    None,
+                    at,
+                    num_atoms,
+                    i32::from(si.atnumber),
+                    i32::from(sj.atnumber),
+                    ALT_PATH_MODE_ADD2H_TST,
+                );
+                if ret != 0 {
+                    if is_bns_error(ret) {
+                        *tot = ret;
+                        return;
+                    }
+                    if ret & 1 != 0 {
+                        if (ret & !3) >> 2 != 0 {
+                            *tot = BNS_RADICAL_ERR;
+                            return;
+                        }
+                        c_pair[i + j * n_left] |= ACCEPTOR_PAIR;
+                    }
+                }
+            }
+            if i32::from(si.subtype) & SALT_DONOR != 0 && i32::from(sj.subtype) & SALT_DONOR != 0 {
+                let ret = exists_alt_path(
+                    p,
+                    bd,
+                    None,
+                    at,
+                    num_atoms,
+                    i32::from(si.atnumber),
+                    i32::from(sj.atnumber),
+                    ALT_PATH_MODE_REM2H_TST,
+                );
+                if ret != 0 {
+                    if is_bns_error(ret) {
+                        *tot = ret;
+                        return;
+                    }
+                    if ret & 1 != 0 {
+                        if (ret & !3) >> 2 != 0 {
+                            *tot = BNS_RADICAL_ERR;
+                            return;
+                        }
+                        c_pair[i + j * n_left] |= DONOR_PAIR;
+                    }
+                }
+            }
+            if pair(&c_pair, i, j) & ACCEPTOR_PAIR != 0 {
+                cur_acceptor += 1;
+                if n_donor_pairs != 0 {
+                    for i1 in 0..i {
+                        for j1 in 0..=i1 {
+                            if j1 != j && i1 != j && pair(&c_pair, i1, j1) & DONOR_PAIR != 0 {
+                                found_two = true;
+                                fi = i;
+                                fj = j;
+                                break 'search;
+                            }
+                        }
+                    }
+                }
+            }
+            if pair(&c_pair, i, j) & DONOR_PAIR != 0 {
+                cur_donor += 1;
+                if n_acceptor_pairs != 0 {
+                    for i1 in 0..i {
+                        for j1 in 0..=i1 {
+                            if j1 != j && i1 != j && pair(&c_pair, i1, j1) & ACCEPTOR_PAIR != 0 {
+                                found_two = true;
+                                fi = i;
+                                fj = j;
+                                break 'search;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        n_donor_pairs += cur_donor;
+        n_acceptor_pairs += cur_acceptor;
+    }
+    if !found_two {
+        return;
+    }
+    // both a donor and an acceptor pair have been found
+    let (i1, j1) = (fi, fj);
+    let mut n_marked = 0usize;
+    for i in 0..n_left {
+        for j in 0..=i {
+            let already = i < i1 || (i == i1 && j <= j1);
+            for (st_mask, mode, flag) in [
+                (SALT_ACCEPTOR, ALT_PATH_MODE_ADD2H_CHG, ACCEPTOR_PAIR),
+                (SALT_DONOR, ALT_PATH_MODE_REM2H_CHG, DONOR_PAIR),
+            ] {
+                let run = (already && pair(&c_pair, i, j) & flag != 0) || !already;
+                if !run {
+                    continue;
+                }
+                let (si, sj) = (sgi.s_candidate[i], sgi.s_candidate[j]);
+                if i32::from(si.subtype) & st_mask != 0 && i32::from(sj.subtype) & st_mask != 0 {
+                    let ret = exists_alt_path(
+                        p,
+                        bd,
+                        None,
+                        at,
+                        num_atoms,
+                        i32::from(si.atnumber),
+                        i32::from(sj.atnumber),
+                        mode,
+                    );
+                    if ret != 0 {
+                        if is_bns_error(ret) {
+                            *tot = ret;
+                            return;
+                        }
+                        if ret & 1 != 0 {
+                            if (ret & !3) >> 2 != 0 {
+                                *tot = BNS_RADICAL_ERR;
+                                return;
+                            }
+                            c_pair[i + j * n_left] |= flag;
+                            for k in [i, j] {
+                                if i32::from(sgi.s_candidate[k].subtype) & SALT_SELECTED == 0 {
+                                    sgi.s_candidate[k].subtype |= SALT_SELECTED as i8;
+                                    n_marked += 1;
+                                    if sgi.s_candidate[k].endpoint == 0
+                                        && sgi.s_candidate[k].type_ != 0
+                                    {
+                                        *n_other_changes += 1;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    let mut bt_group_has_neg_only = true;
+    let mut i1 = 0usize;
+    if n_marked != 0 {
+        let mut end_points = vec![TEndpoint::default(); n_marked];
+        let mut j = 0usize;
+        for i in 0..n_left {
+            if i32::from(sgi.s_candidate[i].subtype) & SALT_SELECTED != 0 {
+                sgi.s_candidate[i].subtype ^= SALT_SELECTED as i8;
+                if j < n_marked {
+                    i1 = sgi.s_candidate[i].atnumber as usize;
+                    add_end_point(&mut end_points[j], at, i1);
+                }
+                j += 1;
+            }
+        }
+        if j != n_marked {
+            *tot = BNS_PROGRAM_ERR;
+            return;
+        }
+        let mut ret = register_end_points(tgi, &mut end_points, at, num_atoms, cgi, Some(p));
+        if ret == -1 {
+            ret = BNS_PROGRAM_ERR;
+        }
+        if ret < 0 {
+            *tot = ret;
+            return;
+        }
+        *tot += i32::from(ret > 0);
+        for i in n_left..n_cand {
+            sgi.s_candidate[i].type_ += DISABLE_CANDIDATE;
+            let j1 = sgi.s_candidate[i].atnumber as usize;
+            if at[j1].endpoint == at[i1].endpoint
+                && sgi.s_candidate[i].endpoint == 0
+                && sgi.s_candidate[i].type_ != 0
+            {
+                *n_other_changes += 1;
+            }
+        }
+        bt_group_has_neg_only = false;
+        let tg = tgi.t_group.as_ref().unwrap();
+        for g in &tg[..tgi.num_t_groups] {
+            if g.n_group_number == at[i1].endpoint && g.num[0] == g.num[1] {
+                bt_group_has_neg_only = true;
+                break;
+            }
+        }
+    }
+    *tot = i32::from(*tot > 0);
+    if *tot != 0 && bt_group_has_neg_only {
+        *tot = 2;
+    }
 }
