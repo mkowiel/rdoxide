@@ -1303,3 +1303,390 @@ pub fn can_be_a_stereo_bond_with_isotopic_h(at: &mut [InpAtom], cur_at: usize, n
     }
     num_stereo_bonds
 }
+
+// ---------------------------------------------------------------------------
+// half stereo bond parity
+// ---------------------------------------------------------------------------
+
+pub const MIN_ANGLE_DBOND: f64 = 0.087156;
+pub const MAX_SINE: f64 = std::f64::consts::FRAC_1_SQRT_2;
+pub const AB_PARITY_0D: i32 = 8;
+
+/// `bAtomHasValence3`
+pub fn b_atom_has_valence3(elname: &str, charge: i8, radical: i8) -> bool {
+    elname == "N" && charge == 0 && radical_ok(radical)
+}
+
+/// `GetHalfStereobond0DParity`
+pub fn get_half_stereobond_0d_parity(
+    at: &mut [InpAtom],
+    cur_at: usize,
+    sb_neigh_orig_at_numb: &[u16],
+    n_num_explict_attachments: usize,
+    mut bond_parity: i32,
+    n_flag: i8,
+) -> i32 {
+    let mut last_parity = 0i32;
+    let mut m = 0;
+    while m < MAX_NUM_STEREO_BONDS && at[cur_at].sb_parity[m] != 0 {
+        let a = &at[cur_at];
+        let mut cur_parity = 0i32;
+        let mut icur2nxt: i32 = -1;
+        let mut icur2neigh: i32 = -1;
+        let ord = i32::from(a.sb_ord[m]);
+        let valid = ord >= 0 && ord < i32::from(a.valence) && {
+            let nxt_at = a.neighbor[ord as usize] as usize;
+            at[nxt_at].valence as usize <= MAX_NUM_STEREO_BONDS && at[nxt_at].orig_at_number != 0
+        };
+        if !valid {
+            m += 1;
+            continue;
+        }
+        let nxt_at = a.neighbor[ord as usize] as usize;
+        let next_orig = at[nxt_at].orig_at_number;
+        for (i, &orig) in sb_neigh_orig_at_numb
+            .iter()
+            .enumerate()
+            .take(n_num_explict_attachments)
+        {
+            if a.sn_orig_at_num[m] == orig {
+                icur2neigh = i as i32;
+            } else if next_orig == orig {
+                icur2nxt = i as i32;
+            }
+        }
+        if icur2neigh >= 0 && icur2nxt >= 0 {
+            let sbp = i32::from(a.sb_parity[m]);
+            if atom_parity_well_def(sbp) {
+                let cur_order_parity =
+                    (icur2nxt + icur2neigh + i32::from(icur2nxt > icur2neigh) - 1) % 2;
+                cur_parity = 2 - (cur_order_parity + sbp) % 2;
+            } else {
+                cur_parity = sbp;
+            }
+        }
+        if last_parity == 0 {
+            last_parity = cur_parity;
+        } else if last_parity != cur_parity && cur_parity != 0 {
+            if atom_parity_well_def(last_parity) {
+                if atom_parity_well_def(cur_parity) {
+                    last_parity = 0;
+                    break;
+                }
+            } else if atom_parity_well_def(cur_parity) {
+                last_parity = cur_parity;
+            } else {
+                last_parity = cur_parity.min(last_parity);
+            }
+        }
+        m += 1;
+    }
+    if last_parity != 0 {
+        bond_parity = last_parity;
+        at[cur_at].b_used_0d_parity |= n_flag;
+    }
+    bond_parity
+}
+
+/// `half_stereo_bond_parity`: the parity of one end of a stereo bond.
+/// The removed explicit terminal H atoms are `at[removed_h_start..removed_h_start + num_removed_h]`
+/// (the C code passes a pointer into the same array).
+#[allow(clippy::too_many_arguments)]
+pub fn half_stereo_bond_parity(
+    at: &mut [InpAtom],
+    cur_at: usize,
+    removed_h_start: usize,
+    num_removed_h: usize,
+    mut z_dir: Option<&mut [i8; 3]>,
+    b_pointed_edge_stereo: i32,
+    v_ab_parity_unknown: i32,
+) -> i32 {
+    use super::ichierr::CT_ISO_H_ERR;
+    use super::incomdef::NUM_H_ISOTOPES;
+    use super::inpdef::{AT_FLAG_ISO_H_POINT, FLAG_SB_0D};
+    let one_pi = std::f64::consts::PI;
+    let two_pi = 2.0 * one_pi;
+    let mut at_coord = [[0.0f64; 3]; 3];
+    let mut tmp = [0.0f64; 3];
+    let mut pnt = [[0.0f64; 3]; 3];
+    let mut bond_parity = AB_PARITY_UNDF;
+    let mut num_ex_h = 0usize;
+    let mut num_either_single = 0;
+    let mut num_iso_h = [0i32; NUM_H_ISOTOPES + 1];
+    let mut index_h = [0usize; 5];
+    let b_ignore_isotopic_h = at[cur_at].c_flags & AT_FLAG_ISO_H_POINT != 0;
+    let mut sb_neigh_orig_at_numb = [0u16; 3];
+
+    if let Some(z) = z_dir.as_deref_mut() {
+        if z[0] == 0 && z[1] == 0 && z[2] == 0 {
+            z[2] = 100;
+        }
+    }
+    let num_h = i32::from(at[cur_at].num_h);
+    if num_h > NUM_H_ISOTOPES as i32 {
+        return 0;
+    }
+    let valence = i32::from(at[cur_at].valence);
+    if valence + num_h > MAX_NUM_STEREO_BOND_NEIGH || valence + num_h < MIN_NUM_STEREO_BOND_NEIGH {
+        return 0;
+    }
+    if !b_can_atom_have_a_stereo_bond(
+        at[cur_at].elname_str(),
+        at[cur_at].charge,
+        at[cur_at].radical,
+    ) {
+        return 0;
+    }
+    let mut num_n_h = 0;
+    if !b_ignore_isotopic_h {
+        num_n_h = num_h;
+        for j in 0..NUM_H_ISOTOPES {
+            let k = i32::from(at[cur_at].num_iso_h[j]);
+            if k > 1 {
+                return AB_PARITY_IISO;
+            }
+            num_n_h -= k;
+        }
+    }
+    if num_n_h > 1 {
+        return AB_PARITY_IISO;
+    }
+    if num_n_h < 0 {
+        return CT_ISO_H_ERR;
+    }
+
+    // the "goto exit_function" paths are the `'body` breaks
+    'body: {
+        if num_removed_h > 0 {
+            for j in 0..num_removed_h {
+                let h = &at[removed_h_start + j];
+                if h.neighbor[0] as usize == cur_at {
+                    let k = if b_ignore_isotopic_h {
+                        0
+                    } else {
+                        i32::from(h.iso_atw_diff)
+                    };
+                    if (0..=NUM_H_ISOTOPES as i32).contains(&k) {
+                        num_iso_h[k as usize] += 1;
+                        if num_iso_h[k as usize] > 1 {
+                            return CT_ISO_H_ERR;
+                        }
+                        index_h[num_ex_h] = j;
+                        num_ex_h += 1;
+                    } else {
+                        return CT_ISO_H_ERR;
+                    }
+                }
+            }
+            let num_i_h = num_h - num_ex_h as i32;
+            if num_i_h > 1 {
+                bond_parity = -AB_PARITY_UNDF;
+                break 'body;
+            }
+        }
+        if valence + (num_ex_h as i32) < MIN_NUM_STEREO_BOND_NEIGH {
+            return if num_h == 1 {
+                AB_PARITY_UNDF
+            } else {
+                -AB_PARITY_UNDF
+            };
+        }
+        let b_valence3 = b_atom_has_valence3(
+            at[cur_at].elname_str(),
+            at[cur_at].charge,
+            at[cur_at].radical,
+        );
+        if valence + num_ex_h as i32 == MIN_NUM_STEREO_BOND_NEIGH
+            && !b_valence3
+            && !((num_n_h == 1 && num_iso_h[0] == 0) || (num_h == 1 && num_ex_h == 0))
+        {
+            break 'body;
+        }
+
+        // coordinates of the neighbors
+        let mut n_attach = 0usize;
+        for k in 0..2 {
+            let count = if k == 0 { num_ex_h } else { valence as usize };
+            for j in 0..count {
+                let (next, z0, n_type);
+                if k == 0 {
+                    let nx = removed_h_start + index_h[j];
+                    next = nx;
+                    at_coord[n_attach][0] = at[nx].x - at[cur_at].x;
+                    at_coord[n_attach][1] = at[nx].y - at[cur_at].y;
+                    sb_neigh_orig_at_numb[n_attach] = at[nx].orig_at_number;
+                    let (zz, t) = get_z_coord(
+                        at,
+                        nx,
+                        0,
+                        -(b_pointed_edge_stereo & PES_BIT_POINT_EDGE_STEREO),
+                    );
+                    z0 = -zz;
+                    n_type = t;
+                } else {
+                    next = at[cur_at].neighbor[j] as usize;
+                    at_coord[n_attach][0] = at[next].x - at[cur_at].x;
+                    at_coord[n_attach][1] = at[next].y - at[cur_at].y;
+                    sb_neigh_orig_at_numb[n_attach] = at[next].orig_at_number;
+                    let (zz, t) = get_z_coord(
+                        at,
+                        cur_at,
+                        j,
+                        b_pointed_edge_stereo & PES_BIT_POINT_EDGE_STEREO,
+                    );
+                    z0 = zz;
+                    n_type = t;
+                }
+                let _ = next;
+                let mut z = z0;
+                let mut n_type = n_type;
+                match n_type {
+                    ZTYPE_EITHER => num_either_single += 1,
+                    ZTYPE_UP | ZTYPE_DOWN => {
+                        if k == 0 {
+                            n_type = -n_type;
+                        }
+                        z = len2(&[at_coord[n_attach][0], at_coord[n_attach][1]]);
+                        if n_type == ZTYPE_DOWN {
+                            z = -z;
+                        }
+                    }
+                    _ => {}
+                }
+                at_coord[n_attach][2] = z;
+                n_attach += 1;
+            }
+        }
+        if num_either_single != 0 {
+            bond_parity = v_ab_parity_unknown;
+            break 'body;
+        }
+        if n_attach == 2 {
+            for j in 0..3 {
+                at_coord[2][j] = -(at_coord[0][j] + at_coord[1][j]);
+            }
+            // (nSbNeighOrigAtNumb[2] = 0: implicit H or lone pair)
+            sb_neigh_orig_at_numb[2] = 0;
+        }
+        for j in 0..3 {
+            tmp[j] = len3(&at_coord[j]);
+        }
+        let mut min_tmp = tmp[0].min(tmp[1].min(tmp[2]));
+        let mut max_tmp = tmp[0].max(tmp[1].max(tmp[2]));
+        if min_tmp < MIN_BOND_LEN || min_tmp < MIN_SINE * max_tmp {
+            if at[cur_at].sb_parity[0] != 0 {
+                bond_parity = get_half_stereobond_0d_parity(
+                    at,
+                    cur_at,
+                    &sb_neigh_orig_at_numb,
+                    n_attach,
+                    bond_parity,
+                    FLAG_SB_0D,
+                );
+            }
+            break 'body;
+        }
+        for j in 0..3 {
+            at_coord[j] = mult3(&at_coord[j], 1.0 / tmp[j]);
+        }
+        for j in 0..3 {
+            pnt[j] = diff3(&at_coord[j], &at_coord[(j + 1) % 3]);
+            tmp[j] = len3(&pnt[j]);
+            if tmp[j] < MIN_SINE {
+                break 'body;
+            }
+            pnt[j] = mult3(&pnt[j], 1.0 / tmp[j]);
+        }
+        let mut tmp1 = len3(&cross_prod3(&pnt[0], &pnt[1]));
+        let mut k = 0usize;
+        for j in 1..3 {
+            let tmp2 = len3(&cross_prod3(&pnt[j], &pnt[(j + 1) % 3]));
+            if tmp2 > tmp1 {
+                tmp1 = tmp2;
+                k = j;
+            }
+        }
+        let p0 = k;
+        let p1 = (k + 1) % 3;
+        let p2 = (k + 2) % 3;
+        pnt[p2] = cross_prod3(&pnt[p0], &pnt[p1]);
+        tmp[p2] = len3(&pnt[p2]);
+        if tmp[p2] < MIN_SINE * tmp[p0] * tmp[p1] {
+            break 'body;
+        }
+        pnt[p2] = mult3(
+            &pnt[p2],
+            (if pnt[p2][2] > 0.0 { 1.0 } else { -1.0 }) / tmp[p2],
+        );
+        min_tmp = dot_prod3(&at_coord[0], &pnt[p2]);
+        pnt[p0] = mult3(&pnt[p2], min_tmp);
+        pnt[p0] = diff3(&at_coord[0], &pnt[p0]);
+        tmp[p0] = len3(&pnt[p0]);
+        pnt[p0] = mult3(&pnt[p0], 1.0 / tmp[p0]);
+        pnt[p1] = cross_prod3(&pnt[p2], &pnt[p0]);
+        for j in 0..3 {
+            let temp = at_coord[j];
+            for k in 0..3 {
+                at_coord[j][k] = dot_prod3(&temp, &pnt[(k + p0) % 3]);
+            }
+            tmp[j] = (at_coord[j][0] * at_coord[j][0] + at_coord[j][1] * at_coord[j][1]).sqrt();
+            at_coord[j] = mult3(&at_coord[j], 1.0 / tmp[j]);
+        }
+        let s = (at_coord[1][0] * at_coord[2][1] - at_coord[1][1] * at_coord[2][0]).abs();
+        let c = at_coord[1][0] * at_coord[2][0] + at_coord[1][1] * at_coord[2][1];
+        if s < MIN_SINE && c > 0.5 {
+            break 'body;
+        }
+        let c = at_coord[0][0];
+        let s = at_coord[0][1];
+        for j in 0..MAX_NUM_STEREO_BOND_NEIGH as usize {
+            let t1 = c * at_coord[j][0] + s * at_coord[j][1];
+            let t2 = -s * at_coord[j][0] + c * at_coord[j][1];
+            at_coord[j][0] = t1;
+            at_coord[j][1] = t2;
+        }
+        tmp1 = at_coord[1][1].atan2(at_coord[1][0]);
+        let mut tmp2 = at_coord[2][1].atan2(at_coord[2][0]);
+        if tmp1 < 0.0 {
+            tmp1 += two_pi;
+        }
+        if tmp2 < 0.0 {
+            tmp2 += two_pi;
+        }
+        bond_parity = 2 - i32::from(tmp1 < tmp2);
+        if let Some(z) = z_dir {
+            for j in 0..3 {
+                let v = pnt[p2][j];
+                z[j] = (if v >= 0.0 {
+                    (0.5 + 100.0 * v).floor()
+                } else {
+                    -(0.5 - 100.0 * v).floor()
+                }) as i8;
+            }
+        }
+        if n_attach > 2 {
+            min_tmp = tmp1.min(tmp2);
+            max_tmp = tmp1.max(tmp2);
+            if min_tmp > one_pi - MIN_SINE
+                || max_tmp < one_pi + MIN_SINE
+                || max_tmp - min_tmp > one_pi - MIN_SINE
+            {
+                at[cur_at].b_ambiguous_stereo |= AMBIGUOUS_STEREO as i8;
+            } else if at_coord[0][2].abs() > MAX_SINE {
+                at[cur_at].b_ambiguous_stereo |= AMBIGUOUS_STEREO as i8;
+            }
+        } else if n_attach == 2 {
+            min_tmp = (tmp1 - one_pi).abs();
+            if min_tmp < MIN_SINE {
+                bond_parity = AB_PARITY_UNDF;
+            } else if min_tmp < MIN_ANGLE_DBOND {
+                at[cur_at].b_ambiguous_stereo |= AMBIGUOUS_STEREO as i8;
+            }
+        }
+    }
+
+    if num_h > 1 && bond_parity > 0 && bond_parity & AB_PARITY_0D == 0 {
+        bond_parity = -bond_parity;
+    }
+    bond_parity
+}
