@@ -602,3 +602,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-19 — Stage 157: I4l: bExistsAltPath, bExistsAnyAltPath
 * 2026-10-19 — Stage 158: I4m: AddTGroups2BnStruct, AddCGroups2BnStruct, ReInitBnStructAddGroups
 * 2026-10-19 — Stage 159: I4n: CreateCGroupInBnStruct, CreateTGroupInBnStruct, RemoveLastGroupFromBnStruct
+* 2026-10-19 — Stage None: InChI port I4o: simple H+/acidic proton add/remove and the proton predicates, differentially tested; upstream_speed.html not regenerated (no runtime effect).

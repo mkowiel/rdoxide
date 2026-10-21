@@ -3783,3 +3783,170 @@ fn single_group_creation_and_removal_match_the_c_code() {
     }
     assert!(created > 100 && removed > 50, "{created} {removed}");
 }
+
+#[test]
+fn simple_proton_moves_match_the_c_code() {
+    use rdoxide::external::inchi::ichi_bns::*;
+    use rdoxide::external::inchi::ichitaut::TGroupInfo;
+    use rdoxide::external::inchi::inpdef::InpAtom;
+    fn ints(v: &serde_json::Value) -> Vec<i32> {
+        v.as_array()
+            .unwrap()
+            .iter()
+            .map(|x| x.as_i64().unwrap() as i32)
+            .collect()
+    }
+    fn dump(at: &[InpAtom], t: &TGroupInfo, totals: &[i32], got: &mut Vec<String>) {
+        for a in at {
+            got.push(format!(
+                "A {} {} {} {} {},{},{} t{} s{},{},{} o{},{},{} n{},{},{} g{},{},{} r{} nb{}",
+                a.charge,
+                a.num_h,
+                a.radical,
+                a.chem_bonds_valence,
+                a.num_iso_h[0],
+                a.num_iso_h[1],
+                a.num_iso_h[2],
+                a.at_type,
+                a.sb_parity[0],
+                a.sb_parity[1],
+                a.sb_parity[2],
+                a.sb_ord[0],
+                a.sb_ord[1],
+                a.sb_ord[2],
+                a.sn_ord[0],
+                a.sn_ord[1],
+                a.sn_ord[2],
+                a.sn_orig_at_num[0],
+                a.sn_orig_at_num[1],
+                a.sn_orig_at_num[2],
+                a.orig_at_number,
+                a.neighbor[0]
+            ));
+        }
+        got.push(format!(
+            "I {} {} {},{},{}",
+            t.tni.n_num_removed_explicit_h,
+            t.tni.n_num_removed_protons,
+            t.tni.n_num_removed_protons_isotopic[0],
+            t.tni.n_num_removed_protons_isotopic[1],
+            t.tni.n_num_removed_protons_isotopic[2]
+        ));
+        let tot: Vec<String> = totals.iter().map(|x| format!(" {x}")).collect();
+        got.push(format!("T{}", tot.concat()));
+    }
+    fn queries(at: &[InpAtom], n: usize, got: &mut Vec<String>) {
+        for i in 0..n {
+            let mut sub = 0;
+            let r = b_is_hard_rem_h_candidate(at, i, &mut sub);
+            got.push(format!(
+                "Q {r} {sub} {} {} {}",
+                b_has_acidic_hydrogen(at, i),
+                b_has_other_exchangable_h(at, i),
+                b_has_acidic_minus(at, i)
+            ));
+        }
+    }
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_bnsimple.json")).unwrap();
+    let mut moved = [0; 3];
+    for c in data.as_array().unwrap() {
+        let inp = &c["in"];
+        let mut at: Vec<InpAtom> = Vec::new();
+        for a in inp["atoms"].as_array().unwrap() {
+            let iso = ints(&a["iso"]);
+            let (sbp, sbo, sno, sng) = (
+                ints(&a["sbp"]),
+                ints(&a["sbo"]),
+                ints(&a["sno"]),
+                ints(&a["sng"]),
+            );
+            let mut x = InpAtom {
+                valence: a["v"].as_i64().unwrap() as i8,
+                chem_bonds_valence: a["cbv"].as_i64().unwrap() as i8,
+                el_number: a["el"].as_u64().unwrap() as u8,
+                radical: a["rad"].as_i64().unwrap() as i8,
+                charge: a["chg"].as_i64().unwrap() as i8,
+                num_h: a["nh"].as_i64().unwrap() as i8,
+                orig_at_number: a["orig"].as_u64().unwrap() as u16,
+                ..Default::default()
+            };
+            for k in 0..3 {
+                x.num_iso_h[k] = iso[k] as i8;
+                x.sb_parity[k] = sbp[k] as i8;
+                x.sb_ord[k] = sbo[k] as i8;
+                x.sn_ord[k] = sno[k] as i8;
+                x.sn_orig_at_num[k] = sng[k] as u16;
+            }
+            for (j, e) in a["nb"].as_array().unwrap().iter().enumerate() {
+                x.neighbor[j] = e[0].as_u64().unwrap() as u16;
+                x.bond_type[j] = e[1].as_u64().unwrap() as u8;
+            }
+            at.push(x);
+        }
+        let n = at.len();
+        let hs = inp["hs"].as_array().unwrap();
+        for h in hs {
+            let mut x = InpAtom {
+                el_number: 1,
+                valence: 1,
+                orig_at_number: h[1].as_u64().unwrap() as u16,
+                ..Default::default()
+            };
+            x.neighbor[0] = h[0].as_u64().unwrap() as u16;
+            at.push(x);
+        }
+        let mut tgi = TGroupInfo::default();
+        tgi.tni.n_num_removed_explicit_h = hs.len() as i32;
+        tgi.tni.n_num_removed_protons = 1;
+        let mut totals = vec![0i32; attot::ARRAY_LEN];
+        for i in 0..n {
+            get_atom_charge_type(&at, i, Some(&mut totals), 0);
+        }
+        let mut aatg = BnAatg {
+            n_at_type_totals: Some(totals.clone()),
+            t_group_info: Some(tgi.clone()),
+            ..Default::default()
+        };
+        let mut got: Vec<String> = Vec::new();
+        queries(&at, n, &mut got);
+        dump(&at, &tgi, &totals, &mut got);
+        for o in inp["ops"].as_array().unwrap() {
+            let o = ints(o);
+            let (op, a) = (o[0], o[1]);
+            let r = match op {
+                0 => {
+                    let t = if a != 0 { Some(&mut totals[..]) } else { None };
+                    simple_remove_hplus_npo(&mut at, n as i32, t, &mut tgi)
+                }
+                1 | 2 => {
+                    // the C code works on one structure for both the totals
+                    // and the group info
+                    aatg.n_at_type_totals = Some(totals.clone());
+                    aatg.t_group_info = Some(tgi.clone());
+                    let r = if op == 1 {
+                        simple_remove_acidic_protons(&mut at, n as i32, &mut aatg, a)
+                    } else {
+                        simple_add_acidic_protons(&mut at, n as i32, &mut aatg, a)
+                    };
+                    totals = aatg.n_at_type_totals.clone().unwrap();
+                    tgi = aatg.t_group_info.clone().unwrap();
+                    r
+                }
+                _ => unreachable!(),
+            };
+            moved[op as usize] += r;
+            got.push(format!("R {op} {r}"));
+            queries(&at, n, &mut got);
+            dump(&at, &tgi, &totals, &mut got);
+        }
+        let want: Vec<String> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|x| x.as_str().unwrap().to_string())
+            .collect();
+        assert_eq!(got, want, "{inp}");
+    }
+    assert!(moved.iter().all(|&m| m > 30), "{moved:?}");
+}
