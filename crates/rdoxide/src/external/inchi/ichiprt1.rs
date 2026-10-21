@@ -109,7 +109,7 @@ use super::ichi::{
     INCHI_SEGM_FILL, InChISort, inchi_segment_action,
 };
 use super::ichi_io::{
-    InchiIosString, InchiIostream, inchi_ios_print_nodisplay, inchi_strbuf_printf,
+    InchiIosString, InchiIostream, inchi_ios_print, inchi_ios_print_nodisplay, inchi_strbuf_printf,
     inchi_strbuf_reset, inchi_strbuf_update,
 };
 use super::ichican2::TAUT_YES;
@@ -124,6 +124,7 @@ pub const INCHI_BAS: i32 = 0;
 pub const INCHI_REC: i32 = 1;
 pub const INCHI_OUT_PLAIN_TEXT: i32 = 0x0040;
 pub const INCHI_OUT_PLAIN_TEXT_COMMENTS: i32 = 0x0080;
+pub const INCHI_OUT_WINCHI_WINDOW: i32 = 0x0200;
 pub const INCHI_OUT_TABBED_OUTPUT: i32 = 0x0400;
 pub const INCHI_OUT_STDINCHI: i32 = 0x4000;
 const INCHI_NAME: &str = "InChI";
@@ -362,6 +363,18 @@ pub struct InchiOutCtl {
     pub n_segm_action: i32,
     pub num_comp: [i32; 2],
     pub num_iso_h: [i32; 3],
+    pub b_atom_equ: [i32; 2],
+    pub b_taut_equ: [i32; 2],
+    pub b_inv_stereo: [i32; 2],
+    pub b_inv_stereo_orig_numb: [i32; 2],
+    pub b_isotopic_orig_numb: [i32; 2],
+    pub b_isotopic_atom_equ: [i32; 2],
+    pub b_isotopic_taut_equ: [i32; 2],
+    pub b_inv_isotopic_stereo: [i32; 2],
+    pub b_inv_isotopic_stereo_orig_numb: [i32; 2],
+    pub b_ign_uu_sp3_iso: [i32; 2],
+    pub b_ign_uu_sp2_iso: [i32; 2],
+    pub b_charges_rad_val: [i32; 2],
     pub b_relative_stereo: [i32; 2],
     pub b_racemic_stereo: [i32; 2],
     pub b_isotopic_relative_stereo: [i32; 2],
@@ -1235,6 +1248,491 @@ pub fn output_inchi_fixed_h_layer_with_sublayers(
             };
         }
         io.b_fh_tag = 0;
+    }
+    0
+}
+
+use super::ichiprt3 as p3;
+
+fn aux_print(out_file: &mut InchiIostream, text: &str) {
+    inchi_ios_print(Some(out_file), text);
+}
+
+fn aux_tag(io: &mut InchiOutCtl, bits: i32) -> String {
+    sz_get_tag(&AUX_LBL, io.n_tag, bits, &mut io.b_always)
+}
+
+/// `OutputAUXINFO_HeaderAndNormalization_type`
+pub fn output_auxinfo_header_and_normalization_type(
+    out_file: &mut InchiIostream,
+    strbuf: &mut InchiIosString,
+    output_options: i32,
+    basic_or_reconnected: i32,
+    num_components2: [i32; 2],
+    io: &mut InchiOutCtl,
+    lf: &str,
+) -> i32 {
+    if basic_or_reconnected == INCHI_BAS {
+        inchi_strbuf_printf(strbuf, "AuxInfo=");
+        let nl = if output_options & INCHI_OUT_WINCHI_WINDOW != 0 {
+            "\n"
+        } else {
+            ""
+        };
+        aux_print(out_file, &format!("{nl}{}{lf}", strbuf_str(strbuf)));
+        io.b_tag1 = AL_VERS;
+        io.sz_tag1 = aux_tag(io, io.b_tag1);
+        inchi_strbuf_reset(strbuf);
+        io.tot_len = 0;
+        inchi_strbuf_printf(strbuf, X_CURR_VER);
+        if str_line_end(
+            &io.sz_tag1,
+            &mut io.b_overflow,
+            strbuf,
+            -1,
+            io.b_plain_text_tags,
+        ) != 0
+        {
+            return 1;
+        }
+        aux_print(out_file, &format!("{}{lf}", strbuf_str(strbuf)));
+    } else if basic_or_reconnected == INCHI_REC {
+        io.b_tag1 = AL_REC_;
+        io.sz_tag1 = aux_tag(io, io.b_tag1);
+        aux_print(out_file, &format!("{}{lf}", io.sz_tag1));
+    }
+    if num_components2[0] != 0 || num_components2[1] != 0 {
+        io.b_tag1 = AL_NORM;
+        io.sz_tag1 = aux_tag(io, io.b_tag1);
+        inchi_strbuf_reset(strbuf);
+        io.tot_len = 0;
+        let v = if io.b_tautomeric != 0 && io.b_tautomeric_output_allowed != 0 {
+            io.b_tautomeric
+        } else {
+            0
+        };
+        inchi_strbuf_printf(strbuf, &v.to_string());
+        if str_line_end(
+            &io.sz_tag1,
+            &mut io.b_overflow,
+            strbuf,
+            -1,
+            io.b_plain_text_tags,
+        ) != 0
+        {
+            return 1;
+        }
+        aux_print(out_file, &format!("{}{lf}", strbuf_str(strbuf)));
+    }
+    0
+}
+
+/// `OutputAUXINFO_OriginalNumbersAndEquivalenceClasses`
+pub fn output_auxinfo_original_numbers_and_equivalence_classes(
+    out_file: &mut InchiIostream,
+    strbuf: &mut InchiIosString,
+    num_components2: [i32; 2],
+    io: &mut InchiOutCtl,
+    lf: &str,
+) -> i32 {
+    if num_components2[0] != 0 || num_components2[1] != 0 {
+        io.b_tag1 = (if io.b_second_non_taut_pass != 0 {
+            AL_FIXN
+        } else {
+            AL_ANBR
+        }) | io.b_fh_tag;
+        io.sz_tag1 = aux_tag(io, io.b_tag1);
+        inchi_strbuf_reset(strbuf);
+        io.tot_len = p3::str_aux_numb(
+            &io.p_inchi_sort,
+            strbuf,
+            &mut io.b_overflow,
+            io.b_out_type,
+            io.taut_mode,
+            io.num_components,
+            io.b_second_non_taut_pass != 0,
+            io.b_omit_repetitions != 0,
+        );
+        if str_line_end(
+            &io.sz_tag1,
+            &mut io.b_overflow,
+            strbuf,
+            -1,
+            io.b_plain_text_tags,
+        ) != 0
+        {
+            return 1;
+        }
+        aux_print(out_file, &format!("{}{lf}", strbuf_str(strbuf)));
+    }
+    if io.b_atom_equ[io.i_cur_taut_mode] != 0 {
+        io.b_tag1 = AL_AEQU | io.b_fh_tag;
+        io.sz_tag1 = aux_tag(io, io.b_tag1);
+        inchi_strbuf_reset(strbuf);
+        io.tot_len = p3::str_aux_equ(
+            &io.p_inchi_sort,
+            &io.p_inchi_sort2,
+            strbuf,
+            &mut io.b_overflow,
+            io.b_out_type,
+            io.taut_mode,
+            io.num_components,
+            io.b_second_non_taut_pass != 0,
+            io.b_omit_repetitions != 0,
+            io.b_use_multipliers != 0,
+        );
+        if str_line_end(
+            &io.sz_tag1,
+            &mut io.b_overflow,
+            strbuf,
+            -1,
+            io.b_plain_text_tags,
+        ) != 0
+        {
+            return 1;
+        }
+        aux_print(out_file, &format!("{}{lf}", strbuf_str(strbuf)));
+    } else if io.b_plain_text_tags == 1 {
+        aux_print(out_file, "/");
+    }
+    0
+}
+
+/// `OutputAUXINFO_TautomericGroupsEquivalence`
+pub fn output_auxinfo_tautomeric_groups_equivalence(
+    out_file: &mut InchiIostream,
+    strbuf: &mut InchiIosString,
+    io: &mut InchiOutCtl,
+) -> i32 {
+    if io.b_tautomeric_output_allowed != 0
+        && io.b_tautomeric != 0
+        && io.b_taut_equ[io.i_cur_taut_mode] != 0
+        && io.b_second_non_taut_pass == 0
+    {
+        io.b_tag1 = AL_GEQU | io.b_fh_tag;
+        io.sz_tag1 = aux_tag(io, io.b_tag1);
+        inchi_strbuf_reset(strbuf);
+        io.tot_len = p3::str_aux_tgroup_equ(
+            &io.p_inchi_sort,
+            strbuf,
+            &mut io.b_overflow,
+            io.b_out_type,
+            io.taut_mode,
+            io.num_components,
+            io.b_use_multipliers != 0,
+        );
+        if str_line_end(
+            &io.sz_tag1,
+            &mut io.b_overflow,
+            strbuf,
+            -1,
+            io.b_plain_text_tags,
+        ) != 0
+        {
+            return 1;
+        }
+        aux_print(out_file, &strbuf_str(strbuf));
+    } else if io.b_tautomeric_output_allowed != 0
+        && io.b_tautomeric != 0
+        && io.b_plain_text_tags == 1
+    {
+        aux_print(out_file, "/");
+    }
+    0
+}
+
+/// `OutputAUXINFO_Stereo`
+pub fn output_auxinfo_stereo(
+    out_file: &mut InchiIostream,
+    strbuf: &mut InchiIosString,
+    io: &mut InchiOutCtl,
+    lf: &str,
+) -> i32 {
+    let cur = io.i_cur_taut_mode;
+    if io.b_inv_stereo[cur] != 0 {
+        io.b_tag1 = AL_STER | io.b_fh_tag;
+        io.sz_tag1 = aux_tag(io, io.b_tag1);
+        io.b_tag2 = io.b_tag1 | AL_SP3I;
+        io.sz_tag2 = aux_tag(io, io.b_tag2);
+        inchi_strbuf_reset(strbuf);
+        io.tot_len = p3::str_aux_inv_sp3(
+            &io.p_inchi_sort,
+            &io.p_inchi_sort2,
+            strbuf,
+            &mut io.b_overflow,
+            io.b_out_type,
+            io.taut_mode,
+            io.num_components,
+            io.b_second_non_taut_pass != 0,
+            io.b_omit_repetitions != 0,
+            io.b_use_multipliers != 0,
+        );
+        if str_line_end(
+            &io.sz_tag2,
+            &mut io.b_overflow,
+            strbuf,
+            -1,
+            io.b_plain_text_tags,
+        ) != 0
+        {
+            return 1;
+        }
+        aux_print(out_file, &format!("{}{lf}", strbuf_str(strbuf)));
+        if io.b_inv_stereo_orig_numb[cur] != 0 {
+            io.b_tag2 = io.b_tag1 | AL_SP3N;
+            io.sz_tag2 = aux_tag(io, io.b_tag2);
+            inchi_strbuf_reset(strbuf);
+            io.tot_len = p3::str_aux_inv_sp3_numb(
+                &io.p_inchi_sort,
+                strbuf,
+                &mut io.b_overflow,
+                io.b_out_type,
+                io.taut_mode,
+                io.num_components,
+                io.b_second_non_taut_pass != 0,
+                io.b_omit_repetitions != 0,
+            );
+            if str_line_end(
+                &io.sz_tag2,
+                &mut io.b_overflow,
+                strbuf,
+                -1,
+                io.b_plain_text_tags,
+            ) != 0
+            {
+                return 1;
+            }
+            aux_print(out_file, &format!("{}{lf}", strbuf_str(strbuf)));
+        } else if io.b_plain_text_tags == 1 {
+            aux_print(out_file, "/");
+        }
+    } else if io.b_plain_text_tags == 1 {
+        aux_print(out_file, "//");
+    }
+    0
+}
+
+/// `OutputAUXINFO_IsotopicInfo`
+pub fn output_auxinfo_isotopic_info(
+    out_file: &mut InchiIostream,
+    strbuf: &mut InchiIosString,
+    basic_or_reconnected: i32,
+    io: &mut InchiOutCtl,
+    lf: &str,
+) -> i32 {
+    let cur = io.i_cur_taut_mode;
+    let no_ifix = io.b_second_non_taut_pass != 0
+        && io.sort_print_inchi_flags
+            & (if basic_or_reconnected == INCHI_BAS {
+                FLAG_SORT_PRINT_NO_IFIX_H_BAS
+            } else {
+                FLAG_SORT_PRINT_NO_IFIX_H_REC
+            })
+            != 0;
+    if !(io.b_isotopic != 0
+        && !no_ifix
+        && (io.b_isotopic_orig_numb[cur] != 0
+            || io.b_isotopic_atom_equ[cur] != 0
+            || (io.b_tautomeric_output_allowed != 0
+                && io.b_tautomeric != 0
+                && io.b_isotopic_taut_equ[cur] != 0)
+            || (io.b_inv_isotopic_stereo[cur] != 0 && io.b_ign_uu_sp3_iso[cur] != 0)
+            || io.b_ign_uu_sp2_iso[cur] != 0))
+    {
+        return 0;
+    }
+    io.b_tag1 = AL_ISOT | io.b_fh_tag;
+    io.sz_tag1 = aux_tag(io, io.b_tag1);
+    inchi_strbuf_reset(strbuf);
+    io.b_tag2 = io.b_tag1 | AL_ISON;
+    io.sz_tag2 = aux_tag(io, io.b_tag2);
+    if io.b_isotopic_orig_numb[cur] != 0 {
+        inchi_strbuf_reset(strbuf);
+        io.tot_len = p3::str_aux_iso_numb(
+            &io.p_inchi_sort,
+            strbuf,
+            &mut io.b_overflow,
+            io.b_out_type,
+            io.taut_mode,
+            io.num_components,
+            io.b_second_non_taut_pass != 0,
+            io.b_omit_repetitions != 0,
+        );
+        if str_line_end(
+            &io.sz_tag2,
+            &mut io.b_overflow,
+            strbuf,
+            -1,
+            io.b_plain_text_tags,
+        ) != 0
+        {
+            return 1;
+        }
+        aux_print(out_file, &format!("{}{lf}", strbuf_str(strbuf)));
+    } else {
+        aux_print(out_file, &format!("{}{lf}", io.sz_tag2));
+    }
+
+    if io.b_isotopic_atom_equ[cur] != 0 {
+        io.b_tag2 = io.b_tag1 | AL_AEQU;
+        io.sz_tag2 = aux_tag(io, io.b_tag2);
+        inchi_strbuf_reset(strbuf);
+        io.tot_len = p3::str_aux_iso_equ(
+            &io.p_inchi_sort,
+            &io.p_inchi_sort2,
+            strbuf,
+            &mut io.b_overflow,
+            io.b_out_type,
+            io.taut_mode,
+            io.num_components,
+            io.b_second_non_taut_pass != 0,
+            io.b_omit_repetitions != 0,
+            io.b_use_multipliers != 0,
+        );
+        if str_line_end(
+            &io.sz_tag2,
+            &mut io.b_overflow,
+            strbuf,
+            -2,
+            io.b_plain_text_tags,
+        ) != 0
+        {
+            return 1;
+        }
+        aux_print(out_file, &format!("{}{lf}", strbuf_str(strbuf)));
+    } else if io.b_plain_text_tags == 1 {
+        aux_print(out_file, "/");
+    }
+
+    if io.b_tautomeric_output_allowed != 0
+        && io.b_tautomeric != 0
+        && io.b_isotopic_taut_equ[cur] != 0
+    {
+        io.b_tag2 = io.b_tag1 | AL_GEQU;
+        io.sz_tag2 = aux_tag(io, io.b_tag2);
+        inchi_strbuf_reset(strbuf);
+        io.tot_len = p3::str_aux_iso_tgroup_equ(
+            &io.p_inchi_sort,
+            strbuf,
+            &mut io.b_overflow,
+            io.b_out_type,
+            io.taut_mode,
+            io.num_components,
+            io.b_omit_repetitions != 0,
+            io.b_use_multipliers != 0,
+        );
+        if str_line_end(
+            &io.sz_tag2,
+            &mut io.b_overflow,
+            strbuf,
+            -2,
+            io.b_plain_text_tags,
+        ) != 0
+        {
+            return 1;
+        }
+        aux_print(out_file, &format!("{}{lf}", strbuf_str(strbuf)));
+    } else if io.b_tautomeric_output_allowed != 0
+        && io.b_tautomeric != 0
+        && io.b_plain_text_tags == 1
+    {
+        aux_print(out_file, "/");
+    }
+
+    if io.b_inv_isotopic_stereo[cur] != 0 {
+        io.b_tag2 = io.b_tag1 | AL_STER;
+        io.sz_tag2 = aux_tag(io, io.b_tag2);
+        io.b_tag3 = io.b_tag2 | AL_SP3I;
+        io.sz_tag3 = aux_tag(io, io.b_tag3);
+        inchi_strbuf_reset(strbuf);
+        io.tot_len = p3::str_aux_inv_iso_sp3(
+            &io.p_inchi_sort,
+            &io.p_inchi_sort2,
+            strbuf,
+            &mut io.b_overflow,
+            io.b_out_type,
+            io.taut_mode,
+            io.num_components,
+            io.b_second_non_taut_pass != 0,
+            io.b_omit_repetitions != 0,
+            io.b_use_multipliers != 0,
+        );
+        if str_line_end(
+            &io.sz_tag3,
+            &mut io.b_overflow,
+            strbuf,
+            -1,
+            io.b_plain_text_tags,
+        ) != 0
+        {
+            return 1;
+        }
+        aux_print(out_file, &strbuf_str(strbuf));
+        if io.b_inv_isotopic_stereo_orig_numb[cur] != 0 {
+            io.b_tag3 = io.b_tag2 | AL_SP3N;
+            io.sz_tag3 = aux_tag(io, io.b_tag3);
+            inchi_strbuf_reset(strbuf);
+            io.tot_len = p3::str_aux_inv_iso_sp3_numb(
+                &io.p_inchi_sort,
+                strbuf,
+                &mut io.b_overflow,
+                io.b_out_type,
+                io.taut_mode,
+                io.num_components,
+                io.b_second_non_taut_pass != 0,
+                io.b_omit_repetitions != 0,
+            );
+            if str_line_end(
+                &io.sz_tag3,
+                &mut io.b_overflow,
+                strbuf,
+                -1,
+                io.b_plain_text_tags,
+            ) != 0
+            {
+                return 1;
+            }
+            aux_print(out_file, &format!("{}{lf}", strbuf_str(strbuf)));
+        } else if io.b_plain_text_tags == 1 {
+            aux_print(out_file, "/");
+        }
+    } else if io.b_plain_text_tags == 1 {
+        aux_print(out_file, "//");
+    }
+    0
+}
+
+/// `OutputAUXINFO_ChargesRadicalsAndUnusualValences`
+pub fn output_auxinfo_charges_radicals_and_unusual_valences(
+    out_file: &mut InchiIostream,
+    strbuf: &mut InchiIosString,
+    io: &mut InchiOutCtl,
+    lf: &str,
+) -> i32 {
+    if io.b_second_non_taut_pass == 0 && io.b_charges_rad_val[io.i_cur_taut_mode] != 0 {
+        io.b_tag1 = AL_CRV_ | io.b_fh_tag;
+        io.sz_tag1 = aux_tag(io, io.b_tag1);
+        inchi_strbuf_reset(strbuf);
+        io.tot_len = p3::str_aux_charge_rad_val(
+            &io.p_inchi_sort,
+            strbuf,
+            &mut io.b_overflow,
+            io.b_out_type,
+            io.taut_mode,
+            io.num_components,
+            io.b_use_multipliers != 0,
+        );
+        if str_line_end(
+            &io.sz_tag1,
+            &mut io.b_overflow,
+            strbuf,
+            -1,
+            io.b_plain_text_tags,
+        ) != 0
+        {
+            return 1;
+        }
+        aux_print(out_file, &format!("{}{lf}", strbuf_str(strbuf)));
     }
     0
 }

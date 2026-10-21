@@ -727,3 +727,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-21 — Stage None: I8f ichiprt1 tag helpers and formula/connection/H/charge output layers differential-tested against C (7000 cases)
 * 2026-10-21 — Stage None: I8g OutputINCHI_StereoLayer/IsotopicLayer differential-tested against C (7905 cases)
 * 2026-10-21 — Stage None: I8h OutputINCHI_FixedHLayerWithSublayers differential-tested against C (8000 cases)
+* 2026-10-21 — Stage None: I8i OutputAUXINFO_* layers (except reversibility/polymer) differential-tested against C (7915 cases)

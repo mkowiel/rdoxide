@@ -13852,3 +13852,153 @@ fn ichiprt1_fixed_h_layer_matches_the_c_code() {
         assert_eq!(got, want, "case {ci}: {}", c["in"]);
     }
 }
+
+#[test]
+fn ichiprt1_auxinfo_layers_match_the_c_code() {
+    use rdoxide::external::inchi::ichi::{InChIAux, InChISort, OrigInfo};
+    use rdoxide::external::inchi::ichi_io::{
+        INCHI_IOS_TYPE_STRING, InchiIosString, InchiIostream, IosFile, inchi_ios_init,
+        inchi_strbuf_init,
+    };
+    use rdoxide::external::inchi::ichiprt1::*;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_prt1d.json")).unwrap();
+    fn opt_u16(t: &mut InchiTok) -> Vec<u16> {
+        if t.i() == 0 {
+            return Vec::new();
+        }
+        let l = t.i();
+        (0..l).map(|_| t.i() as u16).collect()
+    }
+    fn aux(t: &mut InchiTok) -> Option<InChIAux> {
+        if t.i() == 0 {
+            return None;
+        }
+        let mut a = InChIAux {
+            n_number_of_atoms: t.i() as i32,
+            n_number_of_t_groups: t.i() as i32,
+            b_deleted: t.i() as i32,
+            b_is_isotopic: t.i() as i32,
+            ..Default::default()
+        };
+        a.n_constit_equ_numbers = opt_u16(t);
+        a.n_constit_equ_t_group_numbers = opt_u16(t);
+        a.n_constit_equ_isotopic_numbers = opt_u16(t);
+        a.n_constit_equ_isotopic_t_group_numbers = opt_u16(t);
+        a.n_orig_at_nos_in_canon_ord = opt_u16(t);
+        a.n_isotopic_orig_at_nos_in_canon_ord = opt_u16(t);
+        a.n_orig_at_nos_in_canon_ord_inv = opt_u16(t);
+        a.n_isotopic_orig_at_nos_in_canon_ord_inv = opt_u16(t);
+        if t.i() != 0 {
+            let l = t.i();
+            a.orig_info = (0..l)
+                .map(|_| OrigInfo {
+                    c_charge: t.i() as i8,
+                    c_radical: t.i() as i8,
+                    c_unusual_valence: t.i() as i8,
+                })
+                .collect();
+        }
+        Some(a)
+    }
+    for (ci, c) in data.as_array().unwrap().iter().enumerate() {
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        let mut t = InchiTok(c["in"].as_str().unwrap().split_whitespace());
+        let cmd = t.s();
+        let n = t.i() as usize;
+        let ot = t.i() as i32;
+        let mult = t.i() as i32;
+        let sorts = |t: &mut InchiTok| -> Vec<InChISort> {
+            (0..n)
+                .map(|i| InChISort {
+                    p_inchi: [t.inchi(), t.inchi()],
+                    p_inchi_aux: [aux(t), aux(t)],
+                    ord_number: i as i16,
+                })
+                .collect()
+        };
+        let a = sorts(&mut t);
+        let b = sorts(&mut t);
+        let mut io = InchiOutCtl {
+            taut_mode: t.i() as i32,
+            n_tag: t.i() as i32,
+            b_fh_tag: t.i() as i32,
+            b_plain_text_tags: t.i() as i32,
+            b_second_non_taut_pass: t.i() as i32,
+            b_omit_repetitions: t.i() as i32,
+            i_cur_taut_mode: t.i() as usize,
+            b_tautomeric: t.i() as i32,
+            b_tautomeric_output_allowed: t.i() as i32,
+            b_isotopic: t.i() as i32,
+            sort_print_inchi_flags: t.i() as i32,
+            ..Default::default()
+        };
+        let nc2 = [t.i() as i32, t.i() as i32];
+        let outopts = t.i() as i32;
+        let rec = t.i() as i32;
+        io.b_overflow = t.i() as i32;
+        for arr in [
+            &mut io.b_atom_equ,
+            &mut io.b_taut_equ,
+            &mut io.b_inv_stereo,
+            &mut io.b_inv_stereo_orig_numb,
+            &mut io.b_isotopic_orig_numb,
+            &mut io.b_isotopic_atom_equ,
+            &mut io.b_isotopic_taut_equ,
+            &mut io.b_inv_isotopic_stereo,
+            &mut io.b_inv_isotopic_stereo_orig_numb,
+            &mut io.b_ign_uu_sp3_iso,
+            &mut io.b_ign_uu_sp2_iso,
+            &mut io.b_charges_rad_val,
+        ] {
+            for k in 0..2 {
+                arr[k] = t.i() as i32;
+            }
+        }
+        io.b_use_multipliers = mult;
+        io.b_out_type = ot;
+        io.num_components = n;
+        io.p_inchi_sort = a;
+        io.p_inchi_sort2 = b;
+        let (lf, _) = set_line_separators(outopts);
+        let mut sb = InchiIosString::default();
+        inchi_strbuf_init(&mut sb, 16, 16);
+        let mut out = InchiIostream::default();
+        inchi_ios_init(&mut out, INCHI_IOS_TYPE_STRING, IosFile::None);
+        let ret = match cmd.as_str() {
+            "head" => output_auxinfo_header_and_normalization_type(
+                &mut out, &mut sb, outopts, rec, nc2, &mut io, lf,
+            ),
+            "orig" => output_auxinfo_original_numbers_and_equivalence_classes(
+                &mut out, &mut sb, nc2, &mut io, lf,
+            ),
+            "tg" => output_auxinfo_tautomeric_groups_equivalence(&mut out, &mut sb, &mut io),
+            "stereo" => output_auxinfo_stereo(&mut out, &mut sb, &mut io, lf),
+            "iso" => output_auxinfo_isotopic_info(&mut out, &mut sb, rec, &mut io, lf),
+            _ => {
+                output_auxinfo_charges_radicals_and_unusual_valences(&mut out, &mut sb, &mut io, lf)
+            }
+        };
+        let got = format!(
+            "{ret} {} {} {} {} {} {} [{}] [{}] [{}] [{}] [{}]",
+            io.b_overflow,
+            io.tot_len,
+            io.b_tag1,
+            io.b_tag2,
+            io.b_tag3,
+            io.b_always,
+            io.sz_tag1,
+            io.sz_tag2,
+            io.sz_tag3,
+            strbuf_str(&out.s),
+            strbuf_str(&sb)
+        );
+        let got: Vec<&str> = got.split('\n').filter(|l| !l.is_empty()).collect();
+        assert_eq!(got, want, "case {ci}: {}", c["in"]);
+    }
+}
