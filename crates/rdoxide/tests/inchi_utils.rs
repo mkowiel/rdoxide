@@ -14555,3 +14555,187 @@ fn ichiprt1_whole_inchi_serialization_matches_the_c_code() {
         assert_eq!(got, want, "case {ci}: {}", c["in"]);
     }
 }
+
+#[test]
+fn runichi4_sort_and_print_inchi_matches_the_c_code() {
+    use rdoxide::external::inchi::ichi::{InChIAux, OrigInfo};
+    use rdoxide::external::inchi::ichi_io::{
+        INCHI_IOS_TYPE_STRING, InchiIosString, InchiIostream, IosFile, inchi_ios_init,
+        inchi_strbuf_init,
+    };
+    use rdoxide::external::inchi::ichiprt1::{OrigStruct, strbuf_str};
+    use rdoxide::external::inchi::runichi4::*;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_prt1j.json")).unwrap();
+    fn opt_u16(t: &mut InchiTok) -> Vec<u16> {
+        if t.i() == 0 {
+            return Vec::new();
+        }
+        let l = t.i();
+        (0..l).map(|_| t.i() as u16).collect()
+    }
+    fn aux(t: &mut InchiTok) -> Option<InChIAux> {
+        if t.i() == 0 {
+            return None;
+        }
+        let mut a = InChIAux {
+            n_number_of_atoms: t.i() as i32,
+            n_number_of_t_groups: t.i() as i32,
+            b_deleted: t.i() as i32,
+            b_is_isotopic: t.i() as i32,
+            ..Default::default()
+        };
+        a.n_constit_equ_numbers = opt_u16(t);
+        a.n_constit_equ_t_group_numbers = opt_u16(t);
+        a.n_constit_equ_isotopic_numbers = opt_u16(t);
+        a.n_constit_equ_isotopic_t_group_numbers = opt_u16(t);
+        a.n_orig_at_nos_in_canon_ord = opt_u16(t);
+        a.n_isotopic_orig_at_nos_in_canon_ord = opt_u16(t);
+        a.n_orig_at_nos_in_canon_ord_inv = opt_u16(t);
+        a.n_isotopic_orig_at_nos_in_canon_ord_inv = opt_u16(t);
+        if t.i() != 0 {
+            let l = t.i();
+            a.orig_info = (0..l)
+                .map(|_| OrigInfo {
+                    c_charge: t.i() as i8,
+                    c_radical: t.i() as i8,
+                    c_unusual_valence: t.i() as i8,
+                })
+                .collect();
+        }
+        Some(a)
+    }
+    for (ci, c) in data.as_array().unwrap().iter().enumerate() {
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        let mut t = InchiTok(c["in"].as_str().unwrap().split_whitespace());
+        let n = t.i() as usize;
+        let mut pinchi: [PInChI2; 2] = Default::default();
+        let mut pinchi_aux: [PInChIAux2; 2] = Default::default();
+        for j in 0..2 {
+            for _ in 0..n {
+                pinchi[j].push([t.inchi(), t.inchi()]);
+                pinchi_aux[j].push([aux(&mut t), aux(&mut t)]);
+            }
+        }
+        let nc = [t.i() as i32, t.i() as i32];
+        let _nnt = [t.i() as i32, t.i() as i32];
+        let _nt = [t.i() as i32, t.i() as i32];
+        let mut tf = [t.i() as u64, t.i() as u64];
+        let mut tfd = [t.i() as u64, t.i() as u64];
+        let mut nctf = [[0u64; 2]; 2];
+        let mut nctfd = [[0u64; 2]; 2];
+        for i in 0..2 {
+            for k in 0..2 {
+                nctf[i][k] = t.i() as u64;
+            }
+        }
+        for i in 0..2 {
+            for k in 0..2 {
+                nctfd[i][k] = t.i() as u64;
+            }
+        }
+        let mut ip = SortPrintParams {
+            inchi_output_options: t.i() as i32,
+            compare_components: t.i() as i32,
+            ..Default::default()
+        };
+        ip.input.abc_numbers = t.i() != 0;
+        ip.input.ct_predecessors = t.i() != 0;
+        ip.input.polymers = t.i() as i32;
+        ip.input.large_molecules = t.i() != 0;
+        if t.i() != 0 {
+            ip.input.sdf_label = "lbl".to_string();
+        }
+        if t.i() != 0 {
+            ip.input.sdf_value = "val".to_string();
+        }
+        let saveopt = t.i() as u8;
+        let alloc = t.i() as i32;
+        let mut flags = t.i() as i32;
+        let use_os = t.i() != 0;
+        let mut os = OrigStruct::default();
+        if use_os {
+            os.num_atoms = t.i() as i32;
+            os.n_zy = t.i() as i32;
+            let a = t.s().replace('_', " ");
+            let b = t.s().replace('_', " ");
+            let c2 = t.s().replace('_', " ");
+            os.sz_atoms = (t.i() != 0).then_some(a);
+            os.sz_bonds = (t.i() != 0).then_some(b);
+            os.sz_coord = (t.i() != 0).then_some(c2);
+        }
+        let use_od = t.i() != 0;
+        let od_zy = t.i() as i32;
+        let use_log = t.i() != 0;
+        ip.input.orig_present = use_od;
+        ip.input.n_zy = od_zy;
+        let mut sb = InchiIosString::default();
+        inchi_strbuf_init(&mut sb, alloc, 16);
+        let mut out = InchiIostream::default();
+        inchi_ios_init(&mut out, INCHI_IOS_TYPE_STRING, IosFile::None);
+        let mut lg = InchiIostream::default();
+        inchi_ios_init(&mut out, INCHI_IOS_TYPE_STRING, IosFile::None);
+        inchi_ios_init(&mut lg, INCHI_IOS_TYPE_STRING, IosFile::None);
+        let chiral = is_struct_chiral(&pinchi, nc);
+        let ret = sort_and_print_inchi(
+            &mut out,
+            &mut sb,
+            use_log.then_some(&mut lg),
+            &ip,
+            use_os.then_some(&os),
+            nc,
+            &mut tf,
+            &mut tfd,
+            nctf,
+            nctfd,
+            7,
+            &mut pinchi,
+            &mut pinchi_aux,
+            &mut flags,
+            saveopt,
+        );
+        let mut got = format!(
+            "{ret} {flags} {} {} {} {} [{}] [{}]\n",
+            tf[0],
+            tf[1],
+            tfd[0],
+            tfd[1],
+            strbuf_str(&out.s),
+            strbuf_str(&lg.s)
+        );
+        got.push_str(&format!("X{}\n", i32::from(chiral)));
+        for j in 0..2 {
+            for i in 0..nc[j] as usize {
+                got.push_str(&format!("C{j}.{i}"));
+                for k in 0..2 {
+                    match &pinchi[j][i][k] {
+                        Some(p) => got.push_str(&format!(
+                            " {}:{}:{}:{}:{}",
+                            p.sz_hill_formula.clone().unwrap_or_default(),
+                            p.n_number_of_atoms,
+                            p.b_deleted,
+                            p.len_tautomer,
+                            p.n_number_of_isotopic_atoms
+                        )),
+                        None => got.push_str(" -"),
+                    }
+                    match &pinchi_aux[j][i][k] {
+                        Some(q) => got.push_str(&format!(
+                            "/{}:{}:{}",
+                            q.n_number_of_atoms, q.b_deleted, q.n_number_of_t_groups
+                        )),
+                        None => got.push_str("/-"),
+                    }
+                }
+                got.push('\n');
+            }
+        }
+        let got: Vec<&str> = got.split('\n').filter(|l| !l.is_empty()).collect();
+        assert_eq!(got, want, "case {ci}: {}", c["in"]);
+    }
+}
