@@ -89,12 +89,12 @@ int main(void) {
         scanf("%d %d %d %d %d %d %d %d %llu", &n, &nH, &maxadd_a, &maxadd_e, &maxaltp, &nops, &ncalls, &tflags, &tgfl);
         inp_ATOM *at = calloc(n + nH + 1, sizeof(inp_ATOM));
         for (int i = 0; i < n; i++) {
-            int v, cbv, el, rad, vt, chg, nh, i0, i1, i2, orig, ep, att, ring, sp[3], so[3], sn[3], sg[3];
-            scanf("%d %d %d %d %d %d %d %d %d %d %d %d %d %d", &v, &cbv, &el, &rad, &vt, &chg, &nh, &i0, &i1, &i2, &orig, &ep, &att, &ring);
+            int v, cbv, el, rad, vt, chg, nh, i0, i1, i2, orig, ep, att, ring, cv, sp[3], so[3], sn[3], sg[3];
+            scanf("%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d", &v, &cbv, &el, &rad, &vt, &chg, &nh, &i0, &i1, &i2, &orig, &ep, &att, &ring, &cv);
             scanf("%d %d %d %d %d %d %d %d %d %d %d %d", sp, sp + 1, sp + 2, so, so + 1, so + 2, sn, sn + 1, sn + 2, sg, sg + 1, sg + 2);
             at[i].valence = v; at[i].chem_bonds_valence = cbv; at[i].el_number = el; strcpy(at[i].elname, elsym(el)); at[i].radical = rad; at[i].c_point = vt;
             at[i].charge = chg; at[i].num_H = nh; at[i].num_iso_H[0] = i0; at[i].num_iso_H[1] = i1; at[i].num_iso_H[2] = i2; at[i].orig_at_number = orig;
-            at[i].endpoint = ep; at[i].at_type = att; at[i].nNumAtInRingSystem = ring; at[i].nRingSystem = i % 2;
+            at[i].endpoint = ep; at[i].at_type = att; at[i].nNumAtInRingSystem = ring; at[i].bCutVertex = cv; at[i].nRingSystem = i % 2;
             for (int k = 0; k < 3; k++) { at[i].sb_parity[k] = sp[k]; at[i].sb_ord[k] = so[k]; at[i].sn_ord[k] = sn[k]; at[i].sn_orig_at_num[k] = sg[k]; }
             for (int j = 0; j < v; j++) { int q, b; scanf("%d %d", &q, &b); at[i].neighbor[j] = q; at[i].bond_type[j] = b; }
         }
@@ -198,6 +198,15 @@ int main(void) {
 
 # functional groups: (element, charge, H count) atoms, the first one binds to
 # the skeleton; bonds as (i, j, order)
+RINGS = [
+    # 4-pyridone with a substituent at C2 (attach atom first); marks: ring size 6, cut vertex on C4
+    ([(6, 0, 0), (7, 0, 1), (6, 0, 1), (6, 0, 0), (8, 0, 0), (6, 0, 1), (6, 0, 1)],
+     [(0, 1, 1), (0, 2, 2), (2, 3, 1), (3, 4, 2), (3, 5, 1), (5, 6, 2), (6, 1, 1)]),
+    # 4-hydroxypyridine
+    ([(6, 0, 0), (7, 0, 0), (6, 0, 1), (6, 0, 0), (8, 0, 1), (6, 0, 1), (6, 0, 1)],
+     [(0, 1, 2), (0, 2, 1), (2, 3, 2), (3, 4, 1), (3, 5, 1), (5, 6, 2), (6, 1, 1)]),
+]
+RING_MARKS = [(0, 0), (1, 0), (2, 0), (3, 1), (4, 0), (5, 0), (6, 0)]
 GROUPS = [
     ([(6, 0, 0), (8, 0, 0), (6, 0, 1), (6, 0, 1), (7, 0, 2)], [(0, 1, 2), (0, 2, 1), (2, 3, 2), (3, 4, 1)]),   # vinylogous amide
     ([(6, 0, 0), (8, 0, 1), (6, 0, 1), (6, 0, 1), (7, 0, 1)], [(0, 1, 1), (0, 2, 2), (2, 3, 1), (3, 4, 2)]),
@@ -260,6 +269,7 @@ LONE = [(17, -1, 0), (17, 0, 1), (35, -1, 0), (7, 1, 4), (8, 0, 2), (8, 1, 3), (
 
 def gen(rng):
     atoms = []  # [el, chg, nh, neighbors]
+    marks = {}
     budget = [1 if rng.random() < 0.35 else 0]
 
     def add(el, chg, nh):
@@ -279,8 +289,12 @@ def gen(rng):
         bond(rng.choice(skel), c, 1)
         skel.append(c)
     for _ in range(rng.randrange(1, 4)):
-        els, bonds = rng.choice(GROUPS + 3 * SGROUPS)
+        ring_group = rng.random() < 0.12
+        els, bonds = rng.choice(RINGS) if ring_group else rng.choice(GROUPS + 3 * SGROUPS)
         ids = [add(*e) for e in els]
+        if ring_group:
+            for k, i in enumerate(ids):
+                marks[i] = (6, RING_MARKS[k][1])
         for i, j, t in bonds:
             bond(ids[i], ids[j], t)
         bond(rng.choice(skel), ids[0], 1)
@@ -292,6 +306,8 @@ def gen(rng):
         if el == 6 and nb and chg == 0:
             nh = max(0, 4 - cbv) if nh == 0 else nh
         out.append({"v": len(nb), "cbv": cbv, "el": el, "rad": 0, "chg": chg, "nh": nh, "nb": nb})
+        if len(out) - 1 in marks:
+            out[-1]["mk"] = marks[len(out) - 1]
     return out
 
 
@@ -312,7 +328,7 @@ def main():
             a["vt"] = 0
             a["ep"] = 0
             a["att"] = 0
-            a["ring"] = rng.choice([0, 1, 5, 6])
+            a["ring"], a["cv"] = a.get("mk") or (rng.choice([0, 1, 5, 6]), 0)
             a["sbp"] = [0, 0, 0]
             a["sbo"] = [0, 0, 0]
             a["sno"] = [0, 0, 0]
@@ -330,7 +346,7 @@ def main():
     def fmt(c):
         t = f"{len(c['atoms'])} {len(c['hs'])} {c['ma']} {c['me']} {c['mp']} {len(c['ops'])} {len(c['calls'])} {c['tf']} {c['tg']}\n"
         for a in c["atoms"]:
-            t += f"{a['v']} {a['cbv']} {a['el']} {a['rad']} {a['vt']} {a['chg']} {a['nh']} {a['iso'][0]} {a['iso'][1]} {a['iso'][2]} {a['orig']} {a['ep']} {a['att']} {a['ring']}\n"
+            t += f"{a['v']} {a['cbv']} {a['el']} {a['rad']} {a['vt']} {a['chg']} {a['nh']} {a['iso'][0]} {a['iso'][1]} {a['iso'][2]} {a['orig']} {a['ep']} {a['att']} {a['ring']} {a.get('cv', 0)}\n"
             t += " ".join(map(str, a["sbp"] + a["sbo"] + a["sno"] + a["sng"])) + "\n"
             t += " ".join(f"{x} {t2}" for x, t2 in a["nb"]) + "\n"
         for h in c["hs"]:
@@ -394,12 +410,12 @@ def main():
     def cutq(start):
         a = qq.rindex(start)
         return qq[a:qq.index("\n}\n", a) + 3]
-    qpre = qq[qq.index("typedef int CHECK_DFS_PATH("):qq.index("#endif /* TAUT_15_NON_RING */")]
-    qfuncs = [qpre + "\n#define REPLACE_THE_BOND(X) ( (X) == BOND_SINGLE || (X) == BOND_DOUBLE || (X) == BOND_ALTERN || (X) == BOND_ALT12NS )\n"] + [cutq(x) for x in ["int bIsCenterPointStrict( inp_ATOM *atom, int iat )\n{", "int AddBondsPos( inp_ATOM *atom,\n", "int AddEndPoints( T_ENDPOINT *EndPointTmp,\n", "int Check15TautPathCenterpoint( inp_ATOM *atom,", "int Check15TautPath( struct tagCANON_GLOBALS *pCG,\n", "int DFS_FindTautAltPath( struct tagCANON_GLOBALS *pCG,\n", "int nGet15TautInAltPath( struct tagCANON_GLOBALS *pCG,\n"]]
+    qpre = qq[qq.index("typedef int CHECK_DFS_RING("):qq.index("#endif /* TAUT_15_NON_RING */") + len("#endif /* TAUT_15_NON_RING */")]
+    qfuncs = [qpre + "\n#define REPLACE_THE_BOND(X) ( (X) == BOND_SINGLE || (X) == BOND_DOUBLE || (X) == BOND_ALTERN || (X) == BOND_ALT12NS )\n"] + [cutq(x) for x in ["int bIsCenterPointStrict( inp_ATOM *atom, int iat )\n{", "int AddBondsPos( inp_ATOM *atom,\n", "int AddEndPoints( T_ENDPOINT *EndPointTmp,\n", "int Check15TautPathCenterpoint( inp_ATOM *atom,", "int Check15TautPath( struct tagCANON_GLOBALS *pCG,\n", "int DFS_FindTautAltPath( struct tagCANON_GLOBALS *pCG,\n", "int nGet15TautInAltPath( struct tagCANON_GLOBALS *pCG,\n", "int are_alt_bonds( U_CHAR *bonds, int len )\n{", "int DFS_FindTautInARing( struct tagCANON_GLOBALS *pCG,\n", "int Check6MembTautRing( struct tagCANON_GLOBALS *pCG,\n", "int nGet15TautIn6MembAltRing( struct tagCANON_GLOBALS *pCG,\n"]]
 
     def cut_mark():
         a = tt.index("int MarkTautomerGroups( CANON_GLOBALS *pCG,\n")
-        b = tt.index("#if ( TAUT_4PYRIDINOL_RINGS == 1 )", a)
+        b = tt.index("#if ( TAUT_PYRAZOLE_RINGS == 1 )", a)
         return tt[a:b] + "\n    free_memory:\n        if (nDfsPathPos) inchi_free( nDfsPathPos );\n    }\n#endif\nexit_function:\n    return nErr < 0 ? nErr : tot_changes;\n}\n"
 
     def cut_first(start):

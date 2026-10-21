@@ -6452,6 +6452,7 @@ fn tautomer_groups_match_the_c_code() {
                 endpoint: a["ep"].as_u64().unwrap() as u16,
                 at_type: a["att"].as_u64().unwrap() as u16,
                 n_num_at_in_ring_system: a["ring"].as_u64().unwrap() as u16,
+                b_cut_vertex: a["cv"].as_i64().unwrap_or(0) as i8,
                 ..Default::default()
             };
             for k in 0..3 {
