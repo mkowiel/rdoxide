@@ -199,6 +199,10 @@ int main(void) {
 # functional groups: (element, charge, H count) atoms, the first one binds to
 # the skeleton; bonds as (i, j, order)
 GROUPS = [
+    ([(6, 0, 0), (8, 0, 0), (6, 0, 3)], [(0, 1, 2), (0, 2, 1)]),           # acetyl
+    ([(6, 0, 0), (8, 0, 0), (6, 0, 2), (6, 0, 0)], [(0, 1, 2), (0, 2, 1), (2, 3, 1)]),
+    ([(6, 0, 0), (8, 0, 1), (6, 0, 2)], [(0, 1, 1), (0, 2, 2)]),             # enol
+    ([(6, 0, 0), (8, 0, 0), (6, 0, 1), (6, 0, 0), (8, 0, 0)], [(0, 1, 2), (0, 2, 1), (2, 3, 1), (3, 4, 2)]),
     ([(6, 0, 0), (8, 0, 0), (8, 0, 1)], [(0, 1, 2), (0, 2, 1)]),           # COOH
     ([(6, 0, 0), (8, 0, 0), (8, -1, 0)], [(0, 1, 2), (0, 2, 1)]),          # COO-
     ([(16, 0, 0), (8, 0, 0), (8, 0, 0), (8, 0, 1)], [(0, 1, 2), (0, 2, 2), (0, 3, 1)]),
@@ -319,7 +323,7 @@ def main():
         fch = rng.randrange(0, 64)
         mcand = rng.choice([2, 3, n, n + 2, 2 * n])
         cases.append({"atoms": atoms, "hs": hs, "ma": ma, "me": me, "mp": rng.randrange(4, 9), "tf": rng.choice([0x10, 0x10, 0x1010]) | (fch << 16) | (min(mcand, 255) << 24),
-                      "ops": [], "calls": calls, "tg": 1 | sum(0x800000 << b for b in range(6) if rng.random() < 0.6)})
+                      "ops": [], "calls": calls, "tg": 1 | (0x80000 if rng.random() < 0.6 else 0) | sum(0x800000 << b for b in range(6) if rng.random() < 0.6)})
     def fmt(c):
         t = f"{len(c['atoms'])} {len(c['hs'])} {c['ma']} {c['me']} {c['mp']} {len(c['ops'])} {len(c['calls'])} {c['tf']} {c['tg']}\n"
         for a in c["atoms"]:
@@ -385,7 +389,7 @@ def main():
     tt = (SRC / "ichitaut.c").read_text(errors="replace")
     def cut_mark():
         a = tt.index("int MarkTautomerGroups( CANON_GLOBALS *pCG,\n")
-        b = tt.index("#if ( KETO_ENOL_TAUT == 1 )", a)
+        b = tt.index("#if ( TAUT_OTHER == 1 )", a)
         return tt[a:b] + "\nexit_function:\n    return nErr < 0 ? nErr : tot_changes;\n}\n"
 
     def cut_first(start):
