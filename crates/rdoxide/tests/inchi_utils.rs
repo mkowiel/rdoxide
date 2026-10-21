@@ -13131,3 +13131,58 @@ fn ichiprt3_first_substrings_match_the_c_code() {
         assert_eq!(vec![got], want, "case {ci}: {}", c["in"]);
     }
 }
+
+#[test]
+fn ichiprt3_stereo_and_isotopic_substrings_match_the_c_code() {
+    use rdoxide::external::inchi::ichi::InChISort;
+    use rdoxide::external::inchi::ichi_io::{InchiIosString, inchi_strbuf_init};
+    use rdoxide::external::inchi::ichiprt3::*;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_prt3b.json")).unwrap();
+    for (ci, c) in data.as_array().unwrap().iter().enumerate() {
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        let mut t = InchiTok(c["in"].as_str().unwrap().split_whitespace());
+        let cmd = t.s();
+        let n = t.i() as usize;
+        let ot = t.i() as i32;
+        let mult = t.i() != 0;
+        let sorts = |t: &mut InchiTok| -> Vec<InChISort> {
+            (0..n)
+                .map(|i| InChISort {
+                    p_inchi: [t.inchi(), t.inchi()],
+                    ord_number: i as i16,
+                })
+                .collect()
+        };
+        let a = sorts(&mut t);
+        let b = sorts(&mut t);
+        let tm = t.i() as i32;
+        let second = t.i() != 0;
+        let omit = t.i() != 0;
+        let abc = t.i() != 0;
+        let mut sb = InchiIosString::default();
+        inchi_strbuf_init(&mut sb, 16, 16);
+        let mut ovf = 0;
+        let ret = match cmd.as_str() {
+            "sp2" => str_sp2(&a, &b, &mut sb, &mut ovf, ot, tm, n, second, omit, mult),
+            "sp3" => str_sp3(&a, &b, &mut sb, &mut ovf, ot, tm, n, second, omit, mult),
+            "abs" => str_stereo_abs_inv(&a, &mut sb, &mut ovf, ot, n),
+            "isoatoms" => str_iso_atoms(
+                &a, &b, &mut sb, &mut ovf, ot, tm, n, abc, second, omit, mult,
+            ),
+            "isosp2" => str_iso_sp2(&a, &b, &mut sb, &mut ovf, ot, tm, n, second, omit, mult),
+            "isosp3" => str_iso_sp3(&a, &b, &mut sb, &mut ovf, ot, tm, n, second, omit, mult),
+            "isoabs" => str_iso_stereo_abs_inv(&a, &mut sb, &mut ovf, ot, n),
+            other => panic!("{other}"),
+        };
+        let p = sb.p_str.as_ref().unwrap();
+        let len = p.iter().position(|&c| c == 0).unwrap_or(p.len());
+        let got = format!("{ret} {ovf} [{}]", String::from_utf8_lossy(&p[..len]));
+        assert_eq!(vec![got], want, "case {ci}: {}", c["in"]);
+    }
+}
