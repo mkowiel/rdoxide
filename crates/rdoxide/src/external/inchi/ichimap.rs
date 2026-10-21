@@ -2513,3 +2513,475 @@ pub fn create_check_symm_paths(
     }
     1
 }
+
+// ---------------------------------------------------------------------------
+// ichimap2.c: comparison of the parities obtained by two parallel traversals
+// ---------------------------------------------------------------------------
+
+use super::ichister::{
+    get_permutation_parity, get_stereo_bond_parity, get_stereo_center_parity,
+    get_stereo_neighbor_pos,
+};
+
+pub const NEIGH_MODE_RING: i32 = 1;
+pub const NEIGH_MODE_CHAIN: i32 = 2;
+const CHECKING_STEREOCENTER: i32 = 1;
+const CHECKING_STEREOBOND: i32 = 2;
+pub const COMP_STEREO_SUCCESS: i32 = 1;
+pub const NOT_WELL_DEF_UNKN: i32 = 2;
+pub const NOT_WELL_DEF_UNDF: i32 = 4;
+const PARITY_IMPOSSIBLE: i32 = 999;
+const MAX_OTHER_NEIGH: usize = 2;
+const MAX_ATOMS_U16: u16 = 32766;
+
+/// `CalculatedPathsParitiesAreIdentical`: after two parallel traversals that
+/// exchanged `next1` and `next2` around `cur`, compares the parities of all
+/// stereo centers and bonds; `nVisited1/2` are converted to canonical ranks.
+/// Returns 0 if the starting element stays stereogenic, a negative value on an
+/// error, otherwise `COMP_STEREO_SUCCESS` plus the `NOT_WELL_DEF_*` bits.
+#[allow(clippy::too_many_arguments)]
+pub fn calculated_paths_parities_are_identical(
+    at: &[SpAtom],
+    num_atoms: usize,
+    n_symm_rank: &[u16],
+    n_canon_rank: &[u16],
+    n_atom_number_canon: &[u16],
+    n_atom_number_canon1: &mut [u16],
+    n_atom_number_canon2: &mut [u16],
+    n_visited1: &mut [u16],
+    n_visited2: &mut [u16],
+    prev_sb_neigh: u16,
+    cur: u16,
+    next1: u16,
+    next2: u16,
+    n_neigh_mode: i32,
+    mut b_parities_inverted: i32,
+    mode: i32,
+    carb: &[AtStereoCarb],
+    dble: &[AtStereoDble],
+    v_ab_parity_unknown: i32,
+) -> i32 {
+    // atoms past the end read as zeroed atoms (the C code reads `at[MAX_ATOMS+1]`)
+    let zero = SpAtom::default();
+    let atom = |i: usize| -> &SpAtom { at.get(i).unwrap_or(&zero) };
+    let cur_u = cur as usize;
+    let prev_u = prev_sb_neigh as usize;
+    let n_checking_mode = if prev_u < num_atoms {
+        CHECKING_STEREOBOND
+    } else {
+        CHECKING_STEREOCENTER
+    };
+    let mut not_well_def_parities = 0;
+    let mut n_num_eq_stereogenic = 0;
+    let b_cur_rotated = false;
+    let (mut n_num_diff, mut n_num_inv) = (0, 0);
+
+    if (n_neigh_mode != NEIGH_MODE_RING && b_parities_inverted != 0)
+        || b_parities_inverted.abs() != 1
+    {
+        b_parities_inverted = 0;
+    }
+    for i in 0..num_atoms {
+        n_atom_number_canon1[i] = MAX_ATOMS_U16 + 1;
+        n_atom_number_canon2[i] = MAX_ATOMS_U16 + 1;
+    }
+    if b_parities_inverted != 0 {
+        let i11 = n_visited1[..num_atoms].iter().filter(|x| **x == 0).count();
+        let i22 = n_visited2[..num_atoms].iter().filter(|x| **x == 0).count();
+        if i11 != 0 || i22 != 0 {
+            if b_parities_inverted == 1 {
+                return 0;
+            }
+            b_parities_inverted = 0;
+        }
+    }
+    if (b_parities_inverted > 0 && !(mode == MAP_MODE_C2V || mode == MAP_MODE_S4))
+        || (b_parities_inverted == 0 && !(mode == MAP_MODE_C2 || mode == MAP_MODE_STD))
+    {
+        return 0;
+    }
+    for i in 0..num_atoms {
+        if n_visited1[i] != 0 {
+            n_visited1[i] = n_canon_rank[n_visited1[i] as usize - 1];
+            n_atom_number_canon1[n_visited1[i] as usize - 1] = i as u16;
+        }
+        if n_visited2[i] != 0 {
+            n_visited2[i] = n_canon_rank[n_visited2[i] as usize - 1];
+            n_atom_number_canon2[n_visited2[i] as usize - 1] = i as u16;
+        }
+    }
+    let mut other_neigh = [0u16; 4];
+    if n_checking_mode == CHECKING_STEREOBOND {
+        if n_visited1[prev_u] != 0 || n_visited2[prev_u] != 0 {
+            if n_visited1[prev_u] != n_visited2[prev_u]
+                || n_canon_rank[prev_u] != n_visited2[prev_u]
+            {
+                return 0;
+            }
+            if i32::from(at[prev_u].valence) + i32::from(at[prev_u].num_h) > 3 {
+                return 0;
+            }
+            let mut found = None;
+            for i in 0..MAX_NUM_STEREO_BONDS {
+                let nb = at[prev_u].stereo_bond_neighbor[i];
+                if nb == 0 {
+                    break;
+                }
+                if nb as usize - 1 == cur_u {
+                    found = Some(i);
+                    break;
+                }
+            }
+            let Some(i) = found else {
+                return -1;
+            };
+            let k = at[prev_u].stereo_bond_ord[i] as usize;
+            let mut num_other = 0usize;
+            let mut i = 0usize;
+            while i < at[prev_u].valence as usize && num_other <= MAX_OTHER_NEIGH {
+                if i != k {
+                    other_neigh[num_other] = at[prev_u].neighbor[i];
+                    num_other += 1;
+                }
+                i += 1;
+            }
+            if num_other as i32 + i32::from(at[prev_u].num_h) > MAX_OTHER_NEIGH as i32 {
+                return CT_STEREOCOUNT_ERR;
+            }
+            for &o in &other_neigh[..num_other] {
+                let k = o as usize;
+                if n_visited1[k] != 0 && n_visited1[k] != n_canon_rank[k] {
+                    return 0;
+                }
+                if n_visited2[k] != 0 && n_visited2[k] != n_canon_rank[k] {
+                    return 0;
+                }
+            }
+        }
+    }
+    if n_checking_mode == CHECKING_STEREOCENTER {
+        let mut num_other = 0usize;
+        let mut i = 0usize;
+        while i < at[cur_u].valence as usize && num_other <= MAX_OTHER_NEIGH {
+            let neigh = at[cur_u].neighbor[i];
+            if neigh != next1 && neigh != next2 {
+                other_neigh[num_other] = neigh;
+                num_other += 1;
+            }
+            i += 1;
+        }
+        if num_other as i32 + i32::from(at[cur_u].num_h) > MAX_OTHER_NEIGH as i32 {
+            return CT_STEREOCOUNT_ERR;
+        }
+        if b_parities_inverted != 0 && at[cur_u].valence as usize == MAX_NUM_STEREO_ATOM_NEIGH {
+            let canon_parity = get_permutation_parity(&at[cur_u], MAX_ATOMS_U16 + 1, n_canon_rank);
+            let parity_vis_1 = get_permutation_parity(&at[cur_u], MAX_ATOMS_U16 + 1, n_visited1);
+            let parity_vis_2 = get_permutation_parity(&at[cur_u], MAX_ATOMS_U16 + 1, n_visited2);
+            if parity_vis_1 != parity_vis_2 {
+                return 0;
+            }
+            if b_parities_inverted == 1 && parity_vis_1 == canon_parity {
+                return 0;
+            } else if b_parities_inverted == -1 {
+                b_parities_inverted = i32::from(parity_vis_1 != canon_parity);
+            }
+        }
+        if b_parities_inverted == 0 && !b_cur_rotated {
+            for &o in &other_neigh[..num_other] {
+                let k = o as usize;
+                if n_visited1[k] != 0 && n_visited1[k] != n_canon_rank[k] {
+                    return 0;
+                }
+                if n_visited2[k] != 0 && n_visited2[k] != n_canon_rank[k] {
+                    return 0;
+                }
+            }
+        }
+    }
+    // other (non-starting) stereo centers
+    for c in carb {
+        let r1 = c.at_num as usize;
+        let i01 = n_atom_number_canon[r1 - 1] as usize;
+        let i11 = n_atom_number_canon1[r1 - 1] as usize;
+        let i12 = n_atom_number_canon2[r1 - 1] as usize;
+        let s1 = i11 < num_atoms;
+        let s2 = i12 < num_atoms;
+        let b_cur_parity_inv1 = b_parities_inverted != 0
+            && atom(cur_u).n_ring_system == atom(i11).n_ring_system
+            && atom(cur_u).n_ring_system == atom(i12).n_ring_system;
+        let mut k = 0;
+        if !s1 && !s2 {
+            continue;
+        }
+        if n_checking_mode == CHECKING_STEREOCENTER {
+            match i32::from(cur_u == i11) + i32::from(cur_u == i12) {
+                2 => continue,
+                1 => return -1,
+                _ => {}
+            }
+            if cur_u == i01 {
+                return -1;
+            }
+        }
+        if n_neigh_mode == NEIGH_MODE_RING {
+            if i11 != i12 && !b_cur_parity_inv1 {
+                return -1;
+            }
+            if atom(i11).parity == 0 || atom(i12).parity == 0 {
+                return 0;
+            }
+        }
+        if n_neigh_mode == NEIGH_MODE_CHAIN {
+            if i32::from(s1) + i32::from(s2) != 1 {
+                return -1;
+            }
+            if (s1 && atom(i11).parity == 0) || (s2 && atom(i12).parity == 0) {
+                return 0;
+            }
+        }
+        let mut parity = i32::from(c.parity);
+        // the C code compares `nNeighMode == (NEIGH_MODE_RING && ...)` (sic): a number with a boolean
+        if n_neigh_mode == i32::from(NEIGH_MODE_RING != 0 && i11 != i01 && i12 != i01)
+            || n_neigh_mode == NEIGH_MODE_CHAIN
+        {
+            let mut parity1 = if s1 {
+                get_stereo_center_parity(at, i11, n_visited1)
+            } else {
+                PARITY_IMPOSSIBLE
+            };
+            let parity2 = if s2 {
+                get_stereo_center_parity(at, i12, n_visited2)
+            } else {
+                PARITY_IMPOSSIBLE
+            };
+            if !parity_known(parity1) && !parity_known(parity2) {
+                return -1;
+            }
+            if s1 && s2 {
+                if b_cur_parity_inv1 {
+                    let parity1orig = get_stereo_center_parity(at, i11, n_canon_rank);
+                    let parity2orig = get_stereo_center_parity(at, i12, n_canon_rank);
+                    if i11 == i12
+                        || ((parity1 == parity1orig
+                            || parity2 == parity2orig
+                            || parity1 != parity2)
+                            && atom_parity_well_def(parity1))
+                        || ((parity1 != parity2 && !atom_parity_well_def(parity1))
+                            || !atom_parity_well_def(parity2))
+                    {
+                        n_num_diff += 1;
+                    }
+                } else if i11 != i12 || parity1 != parity2 {
+                    return -1;
+                }
+            }
+            let parity12 = if s1 { parity1 } else { parity2 };
+            if atom_parity_well_def(parity) && parity == parity12 {
+                k += 1;
+                if n_checking_mode == CHECKING_STEREOCENTER
+                    && n_neigh_mode == NEIGH_MODE_RING
+                    && n_symm_rank[cur_u] == n_symm_rank[i01]
+                {
+                    n_num_eq_stereogenic += 1;
+                }
+            } else if atom_parity_well_def(parity) && atom_parity_well_def(parity12) {
+                if !b_cur_parity_inv1 {
+                    n_num_inv += 1;
+                }
+            } else {
+                parity1 = if parity == v_ab_parity_unknown {
+                    NOT_WELL_DEF_UNKN
+                } else if parity == AB_PARITY_UNDF {
+                    NOT_WELL_DEF_UNDF
+                } else {
+                    0
+                };
+                let p2 = if parity12 == v_ab_parity_unknown {
+                    NOT_WELL_DEF_UNKN
+                } else if parity12 == AB_PARITY_UNDF {
+                    NOT_WELL_DEF_UNDF
+                } else {
+                    0
+                };
+                if parity1 | p2 != 0 {
+                    not_well_def_parities |= parity1 | p2;
+                    k += 1;
+                } else {
+                    return -1;
+                }
+            }
+        } else if i11 == i01 && i12 == i01 {
+            if !s1 || !s2 {
+                return -1;
+            }
+            parity = get_permutation_parity(&at[i01], MAX_ATOMS_U16 + 1, n_canon_rank);
+            let parity1 = get_permutation_parity(&at[i01], MAX_ATOMS_U16 + 1, n_visited1);
+            let parity2 = get_permutation_parity(&at[i01], MAX_ATOMS_U16 + 1, n_visited2);
+            if parity != parity1 || parity != parity2 {
+                return 0;
+            }
+            k += 1;
+        } else {
+            return -1;
+        }
+        let _ = k;
+    }
+    if b_cur_rotated || n_num_diff != 0 || n_num_inv != 0 {
+        return 0;
+    }
+    // other (non-starting) stereo bonds and cumulenes
+    for d in dble {
+        let r1 = d.at_num1 as usize;
+        let r2 = d.at_num2 as usize;
+        let i01 = n_atom_number_canon[r1 - 1] as usize;
+        let i02 = n_atom_number_canon[r2 - 1] as usize;
+        let i11 = n_atom_number_canon1[r1 - 1] as usize;
+        let i12 = n_atom_number_canon1[r2 - 1] as usize;
+        let i21 = n_atom_number_canon2[r1 - 1] as usize;
+        let i22 = n_atom_number_canon2[r2 - 1] as usize;
+        let s1 = i11 < num_atoms && i12 < num_atoms;
+        let s2 = i21 < num_atoms && i22 < num_atoms;
+        if !s1 && !s2 {
+            continue;
+        }
+        if n_checking_mode == CHECKING_STEREOBOND {
+            let a = (i11 == cur_u && i12 == prev_u) || (i12 == cur_u && i11 == prev_u);
+            let b = (i21 == cur_u && i22 == prev_u) || (i22 == cur_u && i21 == prev_u);
+            match i32::from(a) + i32::from(b) {
+                2 => continue,
+                1 => return -1,
+                _ => {}
+            }
+            if (i01 == cur_u && i02 == prev_u) || (i02 == cur_u && i01 == prev_u) {
+                return -1;
+            }
+        }
+        if n_neigh_mode == NEIGH_MODE_RING {
+            if (i11 != i21 || i12 != i22) && (i11 != i22 || i12 != i21) {
+                return -1;
+            }
+            if get_stereo_neighbor_pos_safe(at, i11, i12) < 0 {
+                return 0;
+            }
+        }
+        if n_neigh_mode == NEIGH_MODE_CHAIN {
+            if i32::from(s1) + i32::from(s2) != 1 {
+                return -1;
+            }
+            if (s1 && get_stereo_neighbor_pos(at, i11, i12) < 0)
+                || (s2 && get_stereo_neighbor_pos(at, i21, i22) < 0)
+            {
+                return 0;
+            }
+        }
+        let parity = i32::from(d.parity);
+        if (n_neigh_mode == NEIGH_MODE_RING
+            && (i11 != i01 || i12 != i02)
+            && (i11 != i02 || i12 != i01))
+            || n_neigh_mode == NEIGH_MODE_CHAIN
+        {
+            let mut parity1 = if s1 {
+                get_stereo_bond_parity(at, i11, i12, n_visited1)
+            } else {
+                PARITY_IMPOSSIBLE
+            };
+            let parity2 = if s2 {
+                get_stereo_bond_parity(at, i21, i22, n_visited2)
+            } else {
+                PARITY_IMPOSSIBLE
+            };
+            if !parity_known(parity1) && !parity_known(parity2) {
+                return -1;
+            }
+            if s1
+                && s2
+                && (((i11 != i21 || i12 != i22) && (i11 != i22 || i12 != i21))
+                    || parity1 != parity2)
+            {
+                return -1;
+            }
+            let parity12 = if s1 { parity1 } else { parity2 };
+            if atom_parity_well_def(parity) && parity == parity12 {
+                if n_checking_mode == CHECKING_STEREOBOND
+                    && n_neigh_mode == NEIGH_MODE_RING
+                    && ((n_symm_rank[cur_u] == n_symm_rank[i01]
+                        && n_symm_rank[prev_u] == n_symm_rank[i02])
+                        || (n_symm_rank[cur_u] == n_symm_rank[i02]
+                            && n_symm_rank[prev_u] == n_symm_rank[i01]))
+                {
+                    n_num_eq_stereogenic += 1;
+                }
+            } else if atom_parity_well_def(parity) && atom_parity_well_def(parity12) {
+                return 0;
+            } else {
+                parity1 = if parity == v_ab_parity_unknown {
+                    NOT_WELL_DEF_UNKN
+                } else if parity == AB_PARITY_UNDF {
+                    NOT_WELL_DEF_UNDF
+                } else {
+                    0
+                };
+                let p2 = if parity12 == v_ab_parity_unknown {
+                    NOT_WELL_DEF_UNKN
+                } else if parity12 == AB_PARITY_UNDF {
+                    NOT_WELL_DEF_UNDF
+                } else {
+                    0
+                };
+                if parity1 | p2 != 0 {
+                    not_well_def_parities |= parity1 | p2;
+                } else {
+                    return -1;
+                }
+            }
+        } else {
+            if !s1 || !s2 {
+                return -1;
+            }
+            let mut n1 = MAX_ATOMS_U16 + 1;
+            let mut n2 = MAX_ATOMS_U16 + 1;
+            for j in 0..MAX_NUM_STEREO_BOND_NEIGH as usize {
+                if at[i01].stereo_bond_neighbor[j] == 0 {
+                    break;
+                }
+                if at[i01].stereo_bond_neighbor[j] as usize == i02 + 1 {
+                    n1 = at[i01].neighbor[at[i01].stereo_bond_ord[j] as usize];
+                    break;
+                }
+            }
+            for j in 0..MAX_NUM_STEREO_BOND_NEIGH as usize {
+                if at[i02].stereo_bond_neighbor[j] == 0 {
+                    break;
+                }
+                if at[i02].stereo_bond_neighbor[j] as usize == i01 + 1 {
+                    n2 = at[i02].neighbor[at[i02].stereo_bond_ord[j] as usize];
+                    break;
+                }
+            }
+            if n1 > MAX_ATOMS_U16 || n2 > MAX_ATOMS_U16 {
+                return CT_REMOVE_STEREO_ERR;
+            }
+            let parity = get_permutation_parity(&at[i01], n1, n_canon_rank)
+                + get_permutation_parity(&at[i02], n2, n_canon_rank);
+            let parity1 = get_permutation_parity(&at[i01], n1, n_visited1)
+                + get_permutation_parity(&at[i02], n2, n_visited1);
+            let parity2 = get_permutation_parity(&at[i01], n1, n_visited2)
+                + get_permutation_parity(&at[i02], n2, n_visited2);
+            if parity % 2 != parity1 % 2 || parity1 % 2 != parity2 % 2 {
+                return 0;
+            }
+        }
+    }
+    if n_num_eq_stereogenic > 0 {
+        return 0;
+    }
+    not_well_def_parities | COMP_STEREO_SUCCESS
+}
+
+/// `GetStereoNeighborPos` for an atom number that may be past the end (a zeroed atom: no stereo bond)
+fn get_stereo_neighbor_pos_safe(at: &[SpAtom], i1: usize, i2: usize) -> i32 {
+    if i1 >= at.len() {
+        return -1;
+    }
+    get_stereo_neighbor_pos(at, i1, i2)
+}
