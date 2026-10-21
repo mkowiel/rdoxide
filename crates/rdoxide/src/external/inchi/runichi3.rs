@@ -26,9 +26,12 @@ use super::strutil::{
 };
 use super::util::detect_unusual_el_valence;
 
+pub const IS_OKAY: i32 = 0;
 pub const IS_WARNING: i32 = 1;
 pub const IS_ERROR: i32 = 2;
 pub const IS_FATAL: i32 = 3;
+pub const IS_EOF: i32 = -1;
+pub const IS_SKIP: i32 = -2;
 
 pub const INCHI_BAS: usize = 0;
 pub const INCHI_REC: usize = 1;
@@ -50,6 +53,8 @@ pub struct StructData {
     pub n_error_code: i32,
     pub num_taut: [i32; 3],
     pub num_non_taut: [i32; 3],
+    pub num_components: [i32; 3],
+    pub b_user_quit_component: i32,
 }
 
 /// `OrigAtData_bCheckUnusualValences`: counts atoms with an unusual valence

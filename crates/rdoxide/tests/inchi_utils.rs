@@ -12648,3 +12648,143 @@ fn create_one_component_inchi_matches_the_c_code() {
         assert_eq!(got, want, "case {ci}");
     }
 }
+
+#[test]
+fn create_one_structure_inchi_matches_the_c_code() {
+    use rdoxide::external::inchi::ichiparm::InputParms;
+    use rdoxide::external::inchi::inpdef::InpAtom;
+    use rdoxide::external::inchi::runichi::{
+        NormCanonFlags, StructResults, create_one_structure_inchi,
+    };
+    use rdoxide::external::inchi::runichi3::StructData;
+    use rdoxide::external::inchi::strutil::OrigAtomData;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_onestruct.json")).unwrap();
+    for (ci, c) in data.as_array().unwrap().iter().enumerate() {
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        let mut t = InchiTok(c["in"].as_str().unwrap().split_whitespace());
+        let n = t.i() as usize;
+        let nbonds = t.i() as i32;
+        let tf = t.i() as u64;
+        let fnu = t.i() as i32;
+        let nowarn = t.i() as i32;
+        let mode = t.i() as u64;
+        let cmpc = t.i() as i32;
+        let mut at = vec![InpAtom::default(); n];
+        for (i, a) in at.iter_mut().enumerate() {
+            let v = t.i() as usize;
+            a.valence = v as i8;
+            a.chem_bonds_valence = t.i() as i8;
+            a.el_number = t.i() as u8;
+            a.charge = t.i() as i8;
+            a.radical = t.i() as i8;
+            a.iso_atw_diff = t.i() as i8;
+            a.num_h = t.i() as i8;
+            a.num_iso_h = [t.i() as i8, t.i() as i8, t.i() as i8];
+            a.x = t.0.next().unwrap().parse().unwrap();
+            a.y = t.0.next().unwrap().parse().unwrap();
+            a.z = t.0.next().unwrap().parse().unwrap();
+            for (k, b) in t.s().bytes().enumerate() {
+                a.elname[k] = b;
+            }
+            for j in 0..v {
+                a.neighbor[j] = t.i() as u16;
+                a.bond_type[j] = t.i() as u8;
+                a.bond_stereo[j] = t.i() as i8;
+            }
+            a.orig_at_number = i as u16 + 1;
+        }
+        let ip = InputParms {
+            n_mode: mode,
+            b_taut_flags: tf,
+            b_fix_non_uniform_draw: fnu,
+            b_no_warnings: nowarn,
+            b_compare_components: cmpc,
+            ..Default::default()
+        };
+        let mut sd = StructData::default();
+        let mut orig = OrigAtomData {
+            num_inp_atoms: n,
+            num_inp_bonds: nbonds,
+            at,
+            ..Default::default()
+        };
+        let mut prep = [OrigAtomData::default(), OrigAtomData::default()];
+        let mut res = StructResults::default();
+        let mut nc = NormCanonFlags::default();
+        let mut got: Vec<String> = Vec::new();
+        for ii in 0..2 {
+            let ret = create_one_structure_inchi(
+                &mut sd, &ip, ii, &mut orig, &mut prep, &mut res, &mut nc,
+            );
+            got.push(format!(
+                "S{ii} {ret} {} {} {} [{}] {} {} {} {} {}",
+                sd.n_error_code,
+                sd.n_error_type,
+                sd.n_struct_read_error,
+                sd.str_err_struct,
+                sd.num_non_taut[ii],
+                sd.num_taut[ii],
+                sd.num_components[ii],
+                prep[0].num_components,
+                prep[1].num_components
+            ));
+            for j in 0..sd.num_components[ii] as usize {
+                for k in 0..2 {
+                    let Some(p) = &res.p_inchi[ii][j][k] else {
+                        got.push(format!("I{ii}.{j}.{k} -"));
+                        continue;
+                    };
+                    let a = &res.p_aux[ii][j][k];
+                    let mut l = format!(
+                        "I{ii}.{j}.{k} {} {} {} {} {} {} {} {} |",
+                        p.n_error_code,
+                        p.n_number_of_atoms,
+                        p.n_total_charge,
+                        p.sz_hill_formula.as_deref().unwrap_or("NULL"),
+                        p.len_conn_table,
+                        p.len_tautomer,
+                        p.n_number_of_isotopic_atoms,
+                        p.n_number_of_isotopic_t_groups
+                    );
+                    for q in 0..p.len_conn_table as usize {
+                        l += &format!(" {}", p.n_conn_table[q]);
+                    }
+                    l += " |";
+                    for q in 0..p.len_tautomer as usize {
+                        l += &format!(" {}", p.n_tautomer[q]);
+                    }
+                    l += " |";
+                    for q in 0..p.n_number_of_atoms as usize {
+                        l += &format!(" {}", p.n_num_h[q]);
+                    }
+                    l += &format!(
+                        " | {} {}",
+                        a.as_ref().map_or(-1, |a| a.n_number_of_atoms),
+                        a.as_ref()
+                            .map_or(-1, |a| i32::from(a.n_num_removed_protons))
+                    );
+                    got.push(l);
+                }
+            }
+        }
+        let mut f = String::from("F");
+        for ii in 0..2 {
+            for k in 0..2 {
+                f += &format!(
+                    " {}/{}/{}",
+                    nc.b_taut_flags[ii][k],
+                    nc.b_taut_flags_done[ii][k],
+                    nc.b_normalization_flags[ii][k]
+                );
+            }
+        }
+        got.push(f);
+        assert_eq!(got, want, "case {ci}");
+    }
+}
