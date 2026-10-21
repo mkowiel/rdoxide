@@ -2903,3 +2903,66 @@ fn radical_endpoints_match_the_c_code() {
         assert_eq!(got, want, "{inp}");
     }
 }
+
+#[test]
+fn atom_charge_types_match_the_c_code() {
+    use rdoxide::external::inchi::ichi_bns::*;
+    use rdoxide::external::inchi::inpdef::InpAtom;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_atomtype.json")).unwrap();
+    let mut types = std::collections::HashSet::new();
+    for c in data.as_array().unwrap() {
+        let mut at: Vec<InpAtom> = Vec::new();
+        for a in c["in"].as_array().unwrap() {
+            let mut x = InpAtom {
+                valence: a["v"].as_i64().unwrap() as i8,
+                chem_bonds_valence: a["cbv"].as_i64().unwrap() as i8,
+                el_number: a["el"].as_u64().unwrap() as u8,
+                charge: a["chg"].as_i64().unwrap() as i8,
+                num_h: a["nh"].as_i64().unwrap() as i8,
+                radical: a["rad"].as_i64().unwrap() as i8,
+                ..Default::default()
+            };
+            for (j, e) in a["nb"].as_array().unwrap().iter().enumerate() {
+                x.neighbor[j] = e[0].as_u64().unwrap() as u16;
+                x.bond_type[j] = e[1].as_u64().unwrap() as u8;
+            }
+            at.push(x);
+        }
+        let n = at.len();
+        let mut got: Vec<String> = Vec::new();
+        for sub in [0, 1, 2, -2] {
+            let mut totals = [0i32; attot::ARRAY_LEN];
+            let mut s = String::new();
+            for i in 0..n {
+                let (t, m) = if i & 1 == 1 {
+                    get_atom_charge_type(&at, i, None, sub)
+                } else {
+                    get_atom_charge_type(&at, i, Some(&mut totals), sub)
+                };
+                types.insert(t);
+                s += &format!("{},{} ", t, m.unwrap_or(-12345));
+            }
+            s += "|";
+            for t in totals {
+                s += &format!(" {t}");
+            }
+            got.push(s);
+        }
+        for i in 0..n {
+            let mut s = format!("z{}", i32::from(is_z_atom(at[i].el_number)));
+            if at[i].valence != 0 {
+                s += &format!(" x{}", is_zox(&at, i, 0));
+            }
+            got.push(s);
+        }
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        assert_eq!(got, want, "{}", c["in"]);
+    }
+    assert!(types.len() > 12, "only {} types seen", types.len());
+}
