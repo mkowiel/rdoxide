@@ -689,6 +689,11 @@ pub struct TGroupInfo {
 pub struct CGroupInfo {
     pub c_group: Option<Vec<CGroup>>,
     pub num_c_groups: usize,
+    pub max_num_c_groups: usize,
+    pub c_candidate: Vec<CCandidate>,
+    pub max_num_candidates: i32,
+    /// 0 = uninitialized, -1 = no candidates found
+    pub num_candidates: i32,
 }
 
 /// `C_CANDIDATE`
@@ -1038,4 +1043,133 @@ pub fn comp_candidates(s1: &SCandidate, s2: &SCandidate) -> i32 {
         }
     }
     i32::from(s1.atnumber) - i32::from(s2.atnumber)
+}
+
+/// `MarkChargeGroups`: finds the alternating paths between charged and
+/// neutral charge-group candidates (N, P) and registers the charge groups;
+/// returns the number of changes or an error
+pub fn mark_charge_groups(
+    at: &mut [InpAtom],
+    num_atoms: i32,
+    cgi: &mut CGroupInfo,
+    p: &mut super::ichi_bns::BnStruct,
+    bd: &mut super::ichi_bns::BnData,
+) -> i32 {
+    use super::ichi_bns::{ALT_PATH_MODE_CHARGE, exists_alt_path};
+    use super::ichierr::{BNS_VERT_EDGE_OVFL, is_bns_error};
+    let mut n_changes = 0;
+    if cgi.c_candidate.is_empty() || cgi.max_num_candidates <= 0 {
+        return n_changes;
+    }
+    let max_candidates = cgi.max_num_candidates as usize;
+    let mut n_cand = cgi.num_candidates;
+    if n_cand == -1 {
+        n_cand = 0;
+    }
+    if n_cand == 0 {
+        for i in 0..num_atoms as usize {
+            let mut c_subtype = 0i8;
+            let c_type = get_charge_type(at, i, &mut c_subtype);
+            if c_type >= 0 {
+                if n_cand as usize >= max_candidates {
+                    return BNS_VERT_EDGE_OVFL;
+                }
+                cgi.c_candidate[n_cand as usize] = CCandidate {
+                    atnumber: i as u16,
+                    type_: c_type as i8,
+                    subtype: c_subtype,
+                };
+                n_cand += 1;
+            }
+        }
+        if n_cand <= 1 {
+            cgi.num_candidates = -1;
+            return 0;
+        }
+    }
+    let n_cand = n_cand as usize;
+    cgi.c_candidate[..n_cand].sort_by(|a, b| cmp_c_candidates(a, b).cmp(&0));
+    let cand = cgi.c_candidate.clone();
+    let mut num_tested = 0;
+    let mut i1 = 0usize;
+    'outer: while i1 < n_cand {
+        while i1 < n_cand && cand[i1].subtype & C_SUBTYPE_NEUTRAL != 0 {
+            i1 += 1;
+        }
+        if i1 == n_cand {
+            break;
+        }
+        let mut i2 = i1 + 1;
+        while i2 < n_cand
+            && cand[i2].type_ == cand[i1].type_
+            && cand[i2].subtype & C_SUBTYPE_NEUTRAL == 0
+        {
+            i2 += 1;
+        }
+        if i2 == n_cand {
+            break;
+        }
+        let mut i3 = i2;
+        while i3 < n_cand && cand[i3].type_ == cand[i1].type_ {
+            i3 += 1;
+        }
+        if i3 == i2 {
+            if i2 < n_cand {
+                i1 = i3;
+                continue;
+            }
+            break;
+        }
+        for i in i1..i2 {
+            let iat1 = cand[i].atnumber as usize;
+            for j in i2..i3 {
+                num_tested += 1;
+                let iat2 = cand[j].atnumber as usize;
+                if at[iat1].c_point != 0 && at[iat1].c_point == at[iat2].c_point {
+                    continue;
+                }
+                let ret = exists_alt_path(
+                    p,
+                    bd,
+                    None,
+                    at,
+                    num_atoms,
+                    iat1 as i32,
+                    iat2 as i32,
+                    ALT_PATH_MODE_CHARGE,
+                );
+                if is_bns_error(ret) {
+                    return ret;
+                }
+                if ret & 1 != 0 {
+                    let n_delta = (ret & !3) >> 2;
+                    n_changes += ret & 2;
+                    let max_cg = cgi.max_num_c_groups;
+                    let cg = cgi.c_group.get_or_insert_with(Vec::new);
+                    if cg.len() < max_cg {
+                        cg.resize(max_cg, CGroup::default());
+                    }
+                    let r = register_c_points(
+                        &mut cg[..max_cg],
+                        &mut cgi.num_c_groups,
+                        iat1,
+                        iat2,
+                        cand[i1].type_ as u8,
+                        at,
+                    );
+                    if is_bns_error(r) {
+                        return r;
+                    }
+                    if n_delta != 0 {
+                        break 'outer;
+                    }
+                }
+            }
+        }
+        i1 = i3;
+    }
+    if cgi.num_candidates == 0 {
+        cgi.num_candidates = if num_tested != 0 { n_cand as i32 } else { -1 };
+    }
+    n_changes
 }
