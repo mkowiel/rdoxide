@@ -4163,3 +4163,132 @@ fn hard_proton_moves_match_the_c_code() {
     }
     assert!(seen.keys().any(|&k| k > 0) && seen.len() > 3, "{seen:?}");
 }
+
+#[test]
+fn alternating_bond_marking_matches_the_c_code() {
+    use rdoxide::external::inchi::ichi_bns::*;
+    use rdoxide::external::inchi::inpdef::InpAtom;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_bnaltmark.json")).unwrap();
+    for (ci, c) in data.as_array().unwrap().iter().enumerate() {
+        let inp = &c["in"];
+        let mut at: Vec<InpAtom> = Vec::new();
+        for (i, a) in inp["atoms"].as_array().unwrap().iter().enumerate() {
+            let mut x = InpAtom {
+                valence: a["v"].as_i64().unwrap() as i8,
+                chem_bonds_valence: a["cbv"].as_i64().unwrap() as i8,
+                el_number: a["el"].as_u64().unwrap() as u8,
+                radical: a["rad"].as_i64().unwrap() as i8,
+                c_point: a["vt"].as_u64().unwrap() as u16,
+                n_ring_system: ((i * 7 + ci) % 3) as u16,
+                ..Default::default()
+            };
+            for (j, e) in a["nb"].as_array().unwrap().iter().enumerate() {
+                x.neighbor[j] = e[0].as_u64().unwrap() as u16;
+                x.bond_type[j] = e[1].as_u64().unwrap() as u8;
+            }
+            at.push(x);
+        }
+        let n = at.len();
+        let (mut p, _) = allocate_and_init_bn_struct(
+            &mut at,
+            n,
+            inp["ma"].as_i64().unwrap() as i32,
+            inp["me"].as_i64().unwrap() as i32,
+            inp["mp"].as_i64().unwrap() as i32,
+        );
+        let mode = inp["mode"].as_i64().unwrap();
+        let (bcf, bcf2) = (
+            inp["bcf"].as_i64().unwrap() as i32,
+            inp["bcf2"].as_i64().unwrap() as i32,
+        );
+        let nt = inp["nt"].as_i64().unwrap() as i32;
+        let mut got: Vec<String> = Vec::new();
+        let mut bd = allocate_and_init_bn_data(p.max_vertices);
+        let mut fcd = vec![BnsFlowChanges::default(); 64];
+        let ni = n as i32;
+        let _ = bcf;
+        got.push(format!(
+            "a {}",
+            bns_adjust_flow_bonds_rad(&mut p, &mut bd, &mut at, ni)
+        ));
+        if mode == 1 {
+            for i in 0..p.num_edges {
+                got.push(format!(
+                    "m {} {} {}",
+                    n_min_flow2_check(&p, i),
+                    n_max_flow2_check(&p, i),
+                    n_cur_flow2_check(&p, i)
+                ));
+            }
+            let mut s = String::from("b");
+            for a in &at {
+                for j in 0..a.valence as usize {
+                    for f in 0..3 {
+                        let bt = i32::from(a.bond_type[j]);
+                        s += &format!(
+                            " {}{}",
+                            i32::from(b_need_to_test_the_flow(bt, f, false)),
+                            i32::from(b_need_to_test_the_flow(bt, f, true))
+                        );
+                    }
+                }
+            }
+            got.push(s);
+            let r1 = bns_test_and_mark_alt_bonds(&mut p, &mut bd, &mut at, ni, &mut fcd, bcf2, nt);
+            got.push(format!("r {r1}"));
+        }
+        for a in &at {
+            let (bv, na, nw) = n_bonds_valence_inp_at(a);
+            got.push(format!("v {bv} {na} {nw}"));
+        }
+        for a in &at {
+            let mut s = format!("T {} {} {} |", a.valence, a.chem_bonds_valence, a.radical);
+            for j in 0..a.valence as usize {
+                s += &format!(" {}", a.bond_type[j]);
+            }
+            got.push(s);
+        }
+        for v in p.vert.iter().take(p.num_vertices as usize) {
+            let e = &v.st_edge;
+            got.push(format!(
+                "V {} {} {} {} {} {}",
+                v.type_, e.cap, e.cap0, e.flow, e.flow0, e.pass
+            ));
+        }
+        for e in p.edge.iter().take(p.num_edges as usize) {
+            got.push(format!(
+                "E {} {} {} {} {}",
+                e.cap, e.cap0, e.flow, e.flow0, e.pass
+            ));
+        }
+        got.push(format!(
+            "P {} {} {}",
+            p.num_altp, p.b_change_flow, p.b_not_a_simple_path
+        ));
+        for a in 0..p.num_altp.min(p.max_altp) as usize {
+            let ap = &p.altp[a];
+            let len = ap[I_ALTP_PATH_LEN].number();
+            let mut s = format!(
+                "A {} {} {} {} {}",
+                ap[I_ALTP_START_ATOM].number(),
+                ap[I_ALTP_END_ATOM].number(),
+                len,
+                ap[I_ALTP_FLOW].flow[0],
+                ap[I_ALTP_FLOW].flow[1]
+            );
+            for j in 0..len as usize {
+                let e = &ap[I_ALTP_NEIGHBOR + j];
+                s += &format!(" {},{}", e.ineigh(0), e.ineigh(1));
+            }
+            got.push(s);
+        }
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        assert_eq!(got, want, "{inp}");
+    }
+}

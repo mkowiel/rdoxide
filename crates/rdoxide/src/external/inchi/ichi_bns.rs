@@ -5770,3 +5770,305 @@ pub fn remove_np_protons_and_acid_charges(
     }
     ret
 }
+
+// ---- testing the bonds of a structure for alternation ----
+
+use super::ichierr::{BNS_ALTBOND_ERR, BNS_CANT_SET_BOND};
+
+/// `nMaxFlow2Check`
+pub fn n_max_flow2_check(p: &BnStruct, iedge: i32) -> i32 {
+    (p.edge[iedge as usize].cap & EDGE_FLOW_MASK).min(MAX_BOND_EDGE_CAP)
+}
+
+/// `nCurFlow2Check`
+pub fn n_cur_flow2_check(p: &BnStruct, iedge: i32) -> i32 {
+    p.edge[iedge as usize].flow & EDGE_FLOW_MASK
+}
+
+/// `nMinFlow2Check`: the flow of the edge cannot be smaller than this
+pub fn n_min_flow2_check(p: &BnStruct, iedge: i32) -> i32 {
+    let e = &p.edge[iedge as usize];
+    let v1 = e.neighbor1 as usize;
+    let v2 = v1 ^ e.neighbor12 as usize;
+    let f12 = e.flow & EDGE_FLOW_MASK;
+    if f12 <= 0 {
+        return 0;
+    }
+    let rescap = |v: usize| -> i32 {
+        let vert = &p.vert[v];
+        let mut r = 0;
+        for i in 0..vert.num_adj_edges as usize {
+            let ie = p.iedge[vert.iedge + i];
+            if ie == iedge {
+                continue;
+            }
+            let ed = &p.edge[ie as usize];
+            r += (ed.cap & EDGE_FLOW_MASK) - (ed.flow & EDGE_FLOW_MASK);
+        }
+        r
+    };
+    let rescap12 = rescap(v1).min(rescap(v2)).min(f12);
+    f12 - rescap12
+}
+
+/// `bNeedToTestTheFlow`: false if the bond is already known to have the
+/// bond order `n_test_flow + 1`
+pub fn b_need_to_test_the_flow(
+    bond_type: i32,
+    n_test_flow: i32,
+    b_test_for_non_stereo_bond: bool,
+) -> bool {
+    use super::ichitaut::{BOND_ALT12NS, BOND_ALTERN};
+    let n_bond_type = BOND_TYPE_MASK & bond_type;
+    let n_attrib = BOND_MARK_MASK & bond_type;
+    if n_attrib != 0 || n_bond_type == BOND_ALTERN || n_bond_type == BOND_ALT12NS {
+        let known: &[i32] = match (b_test_for_non_stereo_bond, n_test_flow) {
+            (true, 0) => &[BOND_MARK_ALT12NS, BOND_MARK_ALT123, BOND_MARK_ALT13],
+            (true, 1) => &[BOND_MARK_ALT12NS, BOND_MARK_ALT123, BOND_MARK_ALT23],
+            (false, 0) => &[
+                BOND_MARK_ALT12,
+                BOND_MARK_ALT12NS,
+                BOND_MARK_ALT123,
+                BOND_MARK_ALT13,
+            ],
+            (false, 1) => &[
+                BOND_MARK_ALT12,
+                BOND_MARK_ALT12NS,
+                BOND_MARK_ALT123,
+                BOND_MARK_ALT23,
+            ],
+            (_, 2) => &[BOND_MARK_ALT13, BOND_MARK_ALT123, BOND_MARK_ALT23],
+            _ => &[],
+        };
+        if known.contains(&n_attrib) {
+            return false;
+        }
+    }
+    true
+}
+
+/// `nBondsValenceInpAt`: (sum of the bond orders, number of alternating
+/// bonds, number of wrong bonds)
+pub fn n_bonds_valence_inp_at(at: &InpAtom) -> (i32, i32, i32) {
+    use super::ichitaut::BOND_ALTERN;
+    let (mut valence, mut alt, mut wrong) = (0, 0, 0);
+    for j in 0..at.valence as usize {
+        let bt = i32::from(at.bond_type[j]) & BOND_TYPE_MASK;
+        if bt == 0 || bt == BOND_TYPE_SINGLE || bt == BOND_TYPE_DOUBLE || bt == BOND_TYPE_TRIPLE {
+            valence += bt;
+        } else if bt == BOND_ALTERN {
+            alt += 1;
+        } else {
+            wrong += 1;
+        }
+    }
+    match alt {
+        0 => {}
+        1 => {
+            valence += 1;
+            wrong += 1;
+        }
+        _ => valence += alt + 1,
+    }
+    (valence, alt, wrong)
+}
+
+/// `BnsAdjustFlowBondsRad`: matches the bonds to the valences (aromatic
+/// bonds and radicals are augmented to the lowest multiplicity); returns the
+/// total flow change or an error
+pub fn bns_adjust_flow_bonds_rad(
+    p: &mut BnStruct,
+    bd: &mut BnData,
+    at: &mut [InpAtom],
+    num_atoms: i32,
+) -> i32 {
+    let mut b_error = 0;
+    let mut orig_delta = 0;
+    // atoms that have an extra unsatisfied valence due to aromatic bonds
+    let mut excess_before: Option<Vec<i32>> = None;
+    for i in 0..num_atoms as usize {
+        let (valen, alt, mut ignore) = n_bonds_valence_inp_at(&at[i]);
+        let val_minus = i32::from(at[i].chem_bonds_valence) - valen;
+        ignore += i32::from(alt > 3);
+        if ignore == 0 && val_minus > 0 {
+            let v = excess_before.get_or_insert_with(|| vec![0; num_atoms as usize]);
+            v[i] = val_minus + i32::from(i32::from(at[i].radical) == RADICAL_DOUBLET);
+        }
+    }
+    loop {
+        let mut num_removed = 0;
+        let mut ret = run_balanced_network_search(p, bd, BNS_EF_CHNG_FLOW);
+        if is_bns_error(ret) {
+            b_error = ret;
+        } else {
+            orig_delta += ret;
+            num_removed = p.num_altp;
+            if ret > 0 {
+                ret = set_bonds_from_bn_struct_flow(p, at, num_atoms, BNS_EF_SAVE_ALL);
+                if is_bns_error(ret) {
+                    b_error = ret;
+                }
+                ret = restore_bn_struct_flow(p, BNS_EF_SAVE_ALL);
+                if is_bns_error(ret) {
+                    b_error = ret;
+                }
+            }
+            re_init_bn_struct_alt_paths(p);
+        }
+        if !(num_removed != 0 && num_removed == p.max_altp && b_error == 0) {
+            break;
+        }
+    }
+    if b_error == 0 {
+        if let Some(before) = &excess_before {
+            for i in 0..num_atoms as usize {
+                if before[i] == 0 {
+                    continue;
+                }
+                let (valen, _, ignore) = n_bonds_valence_inp_at(&at[i]);
+                let val_minus = i32::from(at[i].chem_bonds_valence) - valen;
+                let excess = val_minus + i32::from(i32::from(at[i].radical) == RADICAL_DOUBLET);
+                if ignore != 0 || before[i] - excess != 1 {
+                    b_error = BNS_ALTBOND_ERR;
+                    break;
+                }
+            }
+        }
+    }
+    if b_error != 0 { b_error } else { orig_delta }
+}
+
+/// `BnsTestAndMarkAltBonds`: tests every bond (of the given type, or all
+/// if `n_bond_type_to_test` is 0) for the other bond orders it can take and
+/// marks the alternating bonds; returns the number of changes or an error
+pub fn bns_test_and_mark_alt_bonds(
+    p: &mut BnStruct,
+    bd: &mut BnData,
+    at: &mut [InpAtom],
+    num_atoms: i32,
+    fcd: &mut [BnsFlowChanges],
+    b_change_flow: i32,
+    n_bond_type_to_test: i32,
+) -> i32 {
+    let mut b_error = 0;
+    let mut n_changes = 0;
+    let b_test_non_stereo = p.tot_st_cap > p.tot_st_flow;
+    let mut iat = 0usize;
+    while iat < num_atoms as usize && b_error == 0 {
+        let mut ineigh = 0usize;
+        while ineigh < at[iat].valence as usize && b_error == 0 {
+            let neigh = at[iat].neighbor[ineigh] as usize;
+            if neigh < iat {
+                ineigh += 1;
+                continue;
+            }
+            let iedge = p.iedge[p.vert[iat].iedge + ineigh];
+            if p.edge[iedge as usize].forbidden != 0 {
+                ineigh += 1;
+                continue;
+            }
+            if n_bond_type_to_test != 0
+                && (i32::from(at[iat].bond_type[ineigh]) & BOND_TYPE_MASK) != n_bond_type_to_test
+            {
+                ineigh += 1;
+                continue;
+            }
+            let mut n_min = n_min_flow2_check(p, iedge);
+            let n_max = n_max_flow2_check(p, iedge);
+            let n_cur = n_cur_flow2_check(p, iedge);
+            if n_min == n_max {
+                if n_max != 0 && b_test_non_stereo {
+                    n_min = 0.max(n_max - (p.tot_st_cap - p.tot_st_flow));
+                } else {
+                    ineigh += 1;
+                    continue;
+                }
+            }
+            let mut n_test = n_min;
+            while n_test <= n_max && b_error == 0 {
+                let this_test = n_test;
+                n_test += 1;
+                if this_test == n_cur {
+                    continue;
+                }
+                if !b_need_to_test_the_flow(
+                    i32::from(at[iat].bond_type[ineigh]),
+                    this_test,
+                    b_test_non_stereo,
+                ) {
+                    continue;
+                }
+                let n_dots = set_flow_to_check_one_bond(p, iedge, this_test, fcd);
+                if is_bns_error(n_dots) {
+                    if n_dots == BNS_CANT_SET_BOND {
+                        let ret = restore_flow_after_check_one_bond(p, fcd);
+                        if !is_bns_error(ret) {
+                            continue;
+                        }
+                    }
+                    b_error = n_dots;
+                } else {
+                    if n_dots > 0 {
+                        let mut ret = run_balanced_network_search(p, bd, b_change_flow);
+                        if is_bns_error(ret) {
+                            b_error = ret;
+                        } else if ret > 0 {
+                            if 2 * ret == n_dots {
+                                ret = set_bonds_after_check_one_bond(
+                                    p,
+                                    fcd,
+                                    this_test,
+                                    at,
+                                    num_atoms,
+                                    b_change_flow,
+                                );
+                                if is_bns_error(ret) {
+                                    b_error = ret;
+                                } else {
+                                    n_changes += ret & 1;
+                                    ret = set_bonds_from_bn_struct_flow(
+                                        p,
+                                        at,
+                                        num_atoms,
+                                        b_change_flow,
+                                    );
+                                    if is_bns_error(ret) || ret < 0 {
+                                        b_error = ret;
+                                    } else {
+                                        n_changes += ret & 1;
+                                    }
+                                }
+                            }
+                            ret = restore_bn_struct_flow(p, b_change_flow & BNS_EF_CHNG_RSTR);
+                            if is_bns_error(ret) {
+                                b_error = ret;
+                            }
+                        }
+                        re_init_bn_struct_alt_paths(p);
+                    } else if n_dots == 0 {
+                        let ret = set_bonds_after_check_one_bond(
+                            p,
+                            fcd,
+                            this_test,
+                            at,
+                            num_atoms,
+                            b_change_flow,
+                        );
+                        if is_bns_error(ret) {
+                            b_error = ret;
+                        } else {
+                            n_changes += ret & 1;
+                        }
+                    }
+                }
+                let ret = restore_flow_after_check_one_bond(p, fcd);
+                if is_bns_error(ret) {
+                    b_error = ret;
+                }
+            }
+            ineigh += 1;
+        }
+        iat += 1;
+    }
+    if b_error != 0 { b_error } else { n_changes }
+}
