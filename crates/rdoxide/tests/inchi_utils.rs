@@ -8572,3 +8572,173 @@ fn stereo_mapping_helpers_match_the_c_code() {
         assert_eq!(got, want, "case {case}");
     }
 }
+
+#[test]
+fn mapping_of_ties_and_parities_matches_the_c_code() {
+    use rdoxide::external::inchi::ichimap::*;
+    use rdoxide::external::inchi::ichister::SpAtom;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_mapties.json")).unwrap();
+    fn pen(e: &EqNeigh) -> String {
+        format!(
+            " | {} {} {} {} {} {} {} {}",
+            e.num_to,
+            e.to_at[0],
+            e.to_at[1],
+            e.to_at[2],
+            e.to_at[3],
+            e.from_at,
+            e.rank,
+            e.canon_rank
+        )
+    }
+    for (case, c) in data.as_array().unwrap().iter().enumerate() {
+        let inp = &c["in"];
+        let atoms = inp["atoms"].as_array().unwrap();
+        let n = atoms.len();
+        let nmax = n + 2;
+        let mut at = vec![SpAtom::default(); n + 1];
+        let (mut crank, mut r1, mut a1, mut r2, mut a2) = (
+            vec![0u16; nmax + 8],
+            vec![0u16; nmax],
+            vec![0u16; nmax],
+            vec![0u16; nmax],
+            vec![0u16; nmax],
+        );
+        for (i, a) in atoms.iter().enumerate() {
+            let g = |k: &str| a[k].as_i64().unwrap();
+            let nb = a["nb"].as_array().unwrap();
+            at[i].valence = nb.len() as i8;
+            at[i].parity = g("par") as i8;
+            at[i].stereo_atom_parity = g("sap") as i8;
+            at[i].num_h = g("nh") as i8;
+            at[i].b_has_stereo_or_equ_to_stereo = inp["hs"][i].as_i64().unwrap() as i8;
+            r1[i] = g("rank") as u16;
+            a1[i] = g("an") as u16;
+            r2[i] = g("rank2") as u16;
+            a2[i] = g("an2") as u16;
+            crank[i] = g("crank") as u16;
+            for (j, q) in nb.iter().enumerate() {
+                at[i].neighbor[j] = q.as_u64().unwrap() as u16;
+            }
+            for (j, s) in a["sb"].as_array().unwrap().iter().enumerate() {
+                let s: Vec<i64> = s
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|x| x.as_i64().unwrap())
+                    .collect();
+                at[i].stereo_bond_neighbor[j] = s[0] as u16;
+                at[i].stereo_bond_ord[j] = s[1] as i8;
+                at[i].stereo_bond_z_prod[j] = s[2] as i8;
+                at[i].stereo_bond_parity[j] = s[3] as i8;
+            }
+        }
+        let mut got: Vec<String> = Vec::new();
+        for p in inp["pairs"].as_array().unwrap() {
+            let p: Vec<usize> = p
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|x| x.as_u64().unwrap() as usize)
+                .collect();
+            let (f, t, kf, kt, useen) = (p[0], p[1], p[2], p[3], p[4] != 0);
+            let mut e1 = EqNeigh::default();
+            let mut e2 = EqNeigh::default();
+            let ra = parity_of_mapped_atom2(f, t, &at, useen.then_some(&mut e1), &crank, &r1, &r2);
+            got.push(format!(
+                "A {ra}{}",
+                if useen { pen(&e1) } else { String::new() }
+            ));
+            let rh = parity_of_mapped_half_bond(
+                f,
+                t,
+                at[f].neighbor[kf] as usize,
+                at[t].neighbor[kt] as usize,
+                &at,
+                useen.then_some(&mut e2),
+                &crank,
+                &r1,
+                &r2,
+            );
+            got.push(format!(
+                "H {rh}{}",
+                if useen { pen(&e2) } else { String::new() }
+            ));
+            let ra = parity_of_mapped_atom2(f, f, &at, None, &crank, &r1, &r1);
+            let rh = parity_of_mapped_half_bond(
+                f,
+                f,
+                at[f].neighbor[kf] as usize,
+                at[f].neighbor[kf] as usize,
+                &at,
+                None,
+                &crank,
+                &r1,
+                &r1,
+            );
+            got.push(format!("S {ra} {rh}"));
+        }
+        let mut s = String::from("G");
+        for i in 0..n {
+            s += &format!(
+                " {} {}",
+                get_min_new_rank(&r1, &a1, r1[i]),
+                get_min_new_rank(&r2, &a2, r2[i])
+            );
+        }
+        got.push(s);
+        let mut s = String::from("M");
+        for i in 0..n {
+            s += &format!(" {}", might_change_other_atom_parity(&at, n, i, &r2, &r1));
+        }
+        got.push(s);
+        let mut nl = create_neigh_list(n, n, &at, false, None);
+        let mut st1 = vec![r1.clone(), a1.clone()];
+        let mut st2 = vec![r2.clone(), a2.clone()];
+        for _ in 2..6 {
+            st1.push(vec![0u16; nmax]);
+        }
+        for _ in 2..4 {
+            st2.push(vec![0u16; nmax]);
+        }
+        let mut tmp = vec![0u16; nmax + 8];
+        let mut cs = CanonCounters::default();
+        for m in inp["maps"].as_array().unwrap() {
+            let m: Vec<i32> = m
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|x| x.as_i64().unwrap() as i32)
+                .collect();
+            let (x, y, nmr) = (m[0] as usize, m[1] as usize, m[2]);
+            let (mut nr, mut badd, mut bm) = (0u16, 0, 0);
+            let rt = number_of_ties(&mut st1, &mut st2, nmax, x, y, &mut nr, &mut badd, &mut bm);
+            got.push(format!("T {rt} {nr} {badd} {bm}"));
+            let mut newn = -1;
+            let rr = map_an_atom2(
+                n, nmax, x, y, &mut tmp, nmr, &mut newn, &mut cs, &mut nl, &mut st1, &mut st2,
+                &mut badd,
+            );
+            let mut s = format!(
+                "R {rr} {newn} {badd} {} {}",
+                cs.l_num_neigh_list_iter, cs.l_num_break_ties
+            );
+            for v in [&st1[2], &st1[3], &st2[2], &st2[3]] {
+                s += " |";
+                for x in &v[..n] {
+                    s += &format!(" {x}");
+                }
+            }
+            s += &format!(" | {} {}", st1[4][0], st1[5][0]);
+            got.push(s);
+        }
+        let want: Vec<String> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| s.as_str().unwrap().to_string())
+            .collect();
+        assert_eq!(got, want, "case {case}");
+    }
+}
