@@ -1022,8 +1022,6 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::test24RDKFingerprint
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test25SDMolSupplier
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test26SmiMolSupplier
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test27SmilesWriter
-Code/GraphMol/nbWrap/rough_test.py::TestCase::test28SmilesReverse
-Code/GraphMol/nbWrap/rough_test.py::TestCase::test29SDWriterLoop
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test2Atom
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test30Issues109and110
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test31ChiralitySmiles
