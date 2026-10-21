@@ -265,6 +265,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 149 | done |
 | 150 | done |
 | 151 | done |
+| 152 | done |
 
 ## Python package files
 
@@ -586,3 +587,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-19 — Stage 149: InChI port I4d: BNS data model, allocation, edge access, AugmentEdge and rescap ported, differential test on 3000 networks
 * 2026-10-19 — Stage 150: I4e: BalancedNetworkSearch (blossom search), radical endpoints
 * 2026-10-19 — Stage 151: I4f: bAddNewVertex, AddNewEdge, group vertex lookups, st-cap
+* 2026-10-19 — Stage 152: I4g: bSetBnsToCheckAltPath, restore, flow checks
