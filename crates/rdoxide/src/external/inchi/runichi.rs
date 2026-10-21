@@ -17,9 +17,11 @@ use super::ichiparm::{
 };
 use super::inpdef::InpAtom;
 use super::runichi3::{
-    IS_ERROR, IS_FATAL, StructData, TG_FLAG_FOUND_ISOTOPIC_ATOM_DONE, TG_FLAG_FOUND_ISOTOPIC_H_DONE,
+    INCHI_BAS, IS_ERROR, IS_FATAL, StructData, TG_FLAG_FOUND_ISOTOPIC_ATOM_DONE,
+    TG_FLAG_FOUND_ISOTOPIC_H_DONE,
 };
 use super::runichi4::get_processing_warnings_one_component_inchi;
+use super::strutil::OrigAtomData;
 use super::strutil::{alloc_inchi, alloc_inchi_aux, set_connected_component_number};
 
 /// `NORM_CANON_FLAGS` for `INCHI_NUM` = 3 structures and the two tautomer modes
@@ -170,4 +172,140 @@ pub fn create_one_component_inchi(
     } else {
         0
     }
+}
+
+/// The results of `CreateOneStructureINChI`: for each of the three layers
+/// (`INCHI_BAS`, `INCHI_REC`, ...) the `INChI` / `INChI_Aux` pairs of its
+/// components.
+#[derive(Debug, Clone, Default)]
+pub struct StructResults {
+    pub p_inchi: [Vec<[Option<InChI>; 2]>; 3],
+    pub p_aux: [Vec<[Option<InChIAux>; 2]>; 3],
+}
+
+/// `CreateOneStructureINChI`: preprocesses the structure (once), splits it
+/// into components and creates the `INChI` of each. The displays, the
+/// composite-structure data, the logging and the problem-file copies of the C
+/// code are not modelled. `INChI` results shared between layers
+/// (`bREUSE_INCHI`) are copies here.
+pub fn create_one_structure_inchi(
+    sd: &mut StructData,
+    ip: &InputParms,
+    i_inchi: usize,
+    orig: &mut OrigAtomData,
+    prep: &mut [OrigAtomData; 2],
+    res: &mut StructResults,
+    nc_flags: &mut NormCanonFlags,
+) -> i32 {
+    use super::ichierr::add_error_message;
+    use super::ichiparm::CMP_COMPONENTS;
+    use super::runichi2::{get_one_component, treat_errors_in_read_the_structure};
+    use super::runichi3::preprocess_one_structure;
+    use super::runichi4::treat_errors_in_create_one_component_inchi;
+
+    let empty_ok = ip.b_allow_empty_structure != 0 && orig.at.is_empty() && orig.num_inp_atoms == 0;
+    if !empty_ok && (orig.at.is_empty() || orig.num_inp_atoms == 0) {
+        return 0;
+    }
+    if i_inchi == 1 && orig.b_disconnect_coord <= 0 {
+        return 0;
+    }
+    if i_inchi != INCHI_BAS && i_inchi != 1 {
+        add_error_message(&mut sd.str_err_struct, "Fatal undetermined program error");
+        sd.n_struct_read_error = 97;
+        sd.n_error_type = IS_FATAL;
+        return IS_FATAL;
+    }
+    let mut n_ret = 0;
+    'cycle: {
+        if (prep[0].at.is_empty() || prep[0].num_inp_atoms == 0) && orig.num_inp_atoms > 0 {
+            preprocess_one_structure(sd, ip, orig, prep);
+            let f = sd.taut_flags[INCHI_BAS] | ip.b_taut_flags;
+            nc_flags.b_taut_flags[i_inchi] = [f, f];
+            let f = sd.taut_flags_done[INCHI_BAS] | ip.b_taut_flags_done;
+            nc_flags.b_taut_flags_done[i_inchi] = [f, f];
+            if sd.n_error_type == IS_ERROR || sd.n_error_type == IS_FATAL {
+                n_ret = treat_errors_in_read_the_structure(sd, ip, &prep[0], 1);
+                break 'cycle;
+            }
+        }
+        let ncomp = prep[i_inchi].num_components.max(0) as usize;
+        if sd.num_components[i_inchi] as usize <= ncomp {
+            res.p_inchi[i_inchi].resize(ncomp + 1, [None, None]);
+            res.p_aux[i_inchi].resize(ncomp + 1, [None, None]);
+            sd.num_components[i_inchi] = ncomp as i32;
+        }
+        let mut inp_cur_data = InpAtomData::default();
+        let mut inp_norm_data = [InpAtomData::default(), InpAtomData::default()];
+        for i in 0..ncomp {
+            if sd.b_user_quit_component != 0 {
+                break;
+            }
+            if i_inchi == 1 && ip.b_compare_components & CMP_COMPONENTS == 0 {
+                let m = i_inchi - 1;
+                let mut n = 0;
+                let old: Vec<u16> = prep[m].n_old_comp_number.clone().unwrap_or_default();
+                for j in 0..prep[m].num_components.max(0) as usize {
+                    let has = res.p_inchi[m]
+                        .get(j)
+                        .is_some_and(|p| p[0].is_some() || p[1].is_some());
+                    if i + 1 == old[j] as usize && has {
+                        n += 1;
+                        if n == 1 {
+                            let (pi, pa) = (res.p_inchi[m][j].clone(), res.p_aux[m][j].clone());
+                            for k in 0..2 {
+                                if let Some(c) = pi[k].as_ref().filter(|c| c.n_number_of_atoms > 0)
+                                {
+                                    if k == 0 {
+                                        sd.num_non_taut[i_inchi] += 1;
+                                    } else if c.len_tautomer > 0 {
+                                        sd.num_taut[i_inchi] += 1;
+                                    } else if !pi[0]
+                                        .as_ref()
+                                        .is_some_and(|c0| c0.n_number_of_atoms != 0)
+                                    {
+                                        sd.num_non_taut[i_inchi] += 1;
+                                    }
+                                }
+                            }
+                            res.p_inchi[i_inchi][i] = pi;
+                            res.p_aux[i_inchi][i] = pa;
+                        }
+                    }
+                }
+                if n == 1 {
+                    continue;
+                }
+                if n > 1 {
+                    add_error_message(&mut sd.str_err_struct, "Cannot distinguish components");
+                    sd.n_struct_read_error = 99;
+                    sd.n_error_type = IS_ERROR;
+                    return n_ret;
+                }
+            }
+            n_ret = get_one_component(sd, &mut inp_cur_data, &prep[i_inchi], i);
+            if n_ret == IS_ERROR || n_ret == IS_FATAL {
+                break 'cycle;
+            }
+            let (mut pi, mut pa) = ([None, None], [None, None]);
+            n_ret = create_one_component_inchi(
+                sd,
+                ip,
+                &mut inp_cur_data,
+                &mut pi,
+                &mut pa,
+                i_inchi,
+                i,
+                &mut inp_norm_data,
+                nc_flags,
+            );
+            res.p_inchi[i_inchi][i] = pi;
+            res.p_aux[i_inchi][i] = pa;
+            if n_ret != 0 {
+                n_ret = treat_errors_in_create_one_component_inchi(sd);
+                break;
+            }
+        }
+    }
+    n_ret
 }

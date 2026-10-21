@@ -1814,3 +1814,29 @@ fn compare_reversed_inchi2_body(
     let (s1, s2) = (pick(i1), pick(i2));
     ret | compare_reversed_stereo_inchi2(s1.as_ref(), s2.as_ref(), icr)
 }
+
+/// `GetInpStructErrorType`
+pub fn get_inp_struct_error_type(
+    ip: &super::ichiparm::InputParms,
+    err: i32,
+    str_err_struct: &str,
+    num_inp_atoms: usize,
+) -> i32 {
+    use super::runichi3::{IS_ERROR, IS_FATAL, IS_OKAY, IS_WARNING};
+    if err == 9 {
+        return IS_ERROR;
+    }
+    if err != 0 && err < 30 {
+        return IS_FATAL;
+    }
+    if num_inp_atoms == 0 || err != 0 {
+        if err == 98 && num_inp_atoms == 0 && ip.b_allow_empty_structure != 0 {
+            return IS_WARNING;
+        }
+        return IS_ERROR;
+    }
+    if !str_err_struct.is_empty() {
+        return IS_WARNING;
+    }
+    IS_OKAY
+}

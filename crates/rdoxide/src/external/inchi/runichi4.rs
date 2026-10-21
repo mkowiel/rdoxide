@@ -62,3 +62,20 @@ pub fn get_processing_warnings_one_component_inchi(
     }
     ret
 }
+
+/// `TreatErrorsInCreateOneComponentINChI` (without the logging): sets the
+/// error message and `nErrorType`; returns it
+pub fn treat_errors_in_create_one_component_inchi(sd: &mut super::runichi3::StructData) -> i32 {
+    use super::ichierr::{CT_OUT_OF_RAM, CT_USER_QUIT_ERR, err_msg};
+    use super::runichi3::{IS_ERROR, IS_FATAL};
+    if sd.n_error_code != 0 {
+        add_error_message(&mut sd.str_err_struct, &err_msg(sd.n_error_code));
+        sd.n_error_type = if sd.n_error_code == CT_OUT_OF_RAM || sd.n_error_code == CT_USER_QUIT_ERR
+        {
+            IS_FATAL
+        } else {
+            IS_ERROR
+        };
+    }
+    sd.n_error_type
+}
