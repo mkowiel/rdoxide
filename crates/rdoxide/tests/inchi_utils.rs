@@ -9369,3 +9369,314 @@ fn stereo_canonical_mapping_matches_the_c_code() {
         assert_eq!(got, want, "case {case}");
     }
 }
+
+#[test]
+fn canonical_search_helpers_match_the_c_code() {
+    use rdoxide::external::inchi::ichi_bns::node_set_create;
+    use rdoxide::external::inchi::ichican2::*;
+    use rdoxide::external::inchi::ichimap::create_neigh_list;
+    use rdoxide::external::inchi::ichister::SpAtom;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_can2a.json")).unwrap();
+    fn ints(v: &serde_json::Value) -> Vec<i64> {
+        v.as_array()
+            .unwrap()
+            .iter()
+            .map(|x| x.as_i64().unwrap())
+            .collect()
+    }
+    fn pa(t: &str, a: &[u16], n: usize) -> String {
+        let mut s = t.to_string();
+        for x in &a[..n] {
+            s += &format!(" {x}");
+        }
+        s
+    }
+    fn pset(t: &str, s: &rdoxide::external::inchi::ichi_bns::NodeSet, l: usize) -> String {
+        let mut o = t.to_string();
+        for i in 0..s.len_set {
+            o += &format!(" {}", s.bitword[l][i]);
+        }
+        o
+    }
+    for (case, c) in data.as_array().unwrap().iter().enumerate() {
+        let inp = &c["in"];
+        let atoms = inp["atoms"].as_array().unwrap();
+        let n = atoms.len();
+        let nmax = n + 2;
+        let mut at = vec![SpAtom::default(); n + 1];
+        let mut p0 = Partition {
+            rank: vec![0; nmax],
+            at_number: vec![0; nmax],
+        };
+        let mut pb = Partition {
+            rank: vec![0; nmax],
+            at_number: vec![0; nmax],
+        };
+        for (i, a) in atoms.iter().enumerate() {
+            let g = |k: &str| a[k].as_i64().unwrap();
+            let nb = a["nb"].as_array().unwrap();
+            at[i].valence = nb.len() as i8;
+            p0.rank[i] = g("rank") as u16;
+            p0.at_number[i] = g("an") as u16;
+            pb.rank[i] = g("rank2") as u16;
+            pb.at_number[i] = g("an2") as u16;
+            for (j, q) in nb.iter().enumerate() {
+                at[i].neighbor[j] = q.as_u64().unwrap() as u16;
+            }
+        }
+        let marks = ints(&inp["marks"]);
+        let useaux = inp["useaux"].as_i64().unwrap() != 0;
+        let aux: Vec<u16> = ints(&inp["aux"]).iter().map(|x| *x as u16).collect();
+        let v1: Vec<u16> = ints(&inp["v1"]).iter().map(|x| *x as u16).collect();
+        let v2: Vec<u16> = ints(&inp["v2"]).iter().map(|x| *x as u16).collect();
+        let mut ua = UnorderedPartition {
+            equ2: vec![0; nmax],
+        };
+        let mut ub = UnorderedPartition {
+            equ2: vec![0; nmax],
+        };
+        for (i, x) in ints(&inp["ua"]).iter().enumerate() {
+            ua.equ2[i] = *x as u16;
+        }
+        for (i, x) in ints(&inp["ub"]).iter().enumerate() {
+            ub.equ2[i] = *x as u16;
+        }
+        let joins: Vec<Vec<i64>> = inp["joins"].as_array().unwrap().iter().map(ints).collect();
+        let cvs = ints(&inp["cv"]);
+        let digraph = inp["digraph"].as_i64().unwrap() != 0;
+        let ct = ints(&inp["ct"]);
+        let nl = ints(&inp["nl"]);
+        let maxrj = inp["maxrj"].as_i64().unwrap() as u16;
+
+        let mut got: Vec<String> = Vec::new();
+        got.push(format!(
+            "D {} {}",
+            i32::from(partition_is_discrete(&p0, n)),
+            i32::from(partition_is_discrete(&pb, n))
+        ));
+        for p in [&p0, &pb] {
+            let mut w = vec![Cell::default(); 70];
+            for k in 1..66 {
+                let sz = partition_get_first_cell(p, &mut w, k, n);
+                got.push(format!("C {k} {sz} {} {}", w[k - 1].first, w[k - 1].next));
+                if sz == 0 {
+                    cell_make_empty(&mut w, k);
+                    got.push(format!(
+                        "E {} {} {}",
+                        w[k - 1].first,
+                        w[k - 1].next,
+                        w[k - 1].prev
+                    ));
+                    break;
+                }
+            }
+        }
+        {
+            let mut mcr = node_set_create(n, 2);
+            let mut fix = node_set_create(n, 2);
+            partition_get_mcr_and_fix_set(&p0, &mut mcr, &mut fix, n, 1);
+            partition_get_mcr_and_fix_set(&pb, &mut mcr, &mut fix, n, 2);
+            got.push(pset("M1", &mcr, 0));
+            got.push(pset("F1", &fix, 0));
+            got.push(pset("M2", &mcr, 1));
+            got.push(pset("F2", &fix, 1));
+            got.push(format!(
+                "AN {} {} {} {}",
+                i32::from(all_nodes_are_in_set(&mcr, 1, &fix, 1)),
+                i32::from(all_nodes_are_in_set(&fix, 1, &mcr, 1)),
+                i32::from(all_nodes_are_in_set(&mcr, 2, &mcr, 1)),
+                i32::from(all_nodes_are_in_set(&fix, 2, &mcr, 2))
+            ));
+            let mut pw = Partition {
+                rank: vec![0; nmax],
+                at_number: vec![0; nmax],
+            };
+            partition_copy(&mut pw, &p0, n);
+            for i in 0..n {
+                if marks[i] != 0 {
+                    pw.rank[i] |= RANK_MARK_BIT;
+                }
+            }
+            let auxr = if useaux { Some(&aux[..]) } else { None };
+            let mut w = vec![Cell::default(); 70];
+            for k in 1..66 {
+                let sz = partition_get_first_cell(&p0, &mut w, k, n);
+                if sz == 0 {
+                    break;
+                }
+                let nn = cell_get_number_of_nodes(&pw, &w[k - 1]);
+                let ki = cell_intersect_with_set(&mut pw, &w[k - 1], &mcr, 1);
+                let nn2 = cell_get_number_of_nodes(&pw, &w[k - 1]);
+                let mut s = format!("W {k} {nn} {ki} {nn2} |");
+                let mut v = 0u16;
+                for _ in 0..70 {
+                    v = cell_get_min_node(&pw, &w[k - 1], v, auxr);
+                    s += &format!(" {v}");
+                    if v == INCHI_CANON_INFINITY {
+                        break;
+                    }
+                }
+                got.push(s);
+            }
+            got.push(pa("R", &pw.rank, n));
+            let mut wemp = vec![Cell::default(); 1];
+            cell_make_empty(&mut wemp, 1);
+            got.push(format!(
+                "WE {} {}",
+                cell_get_min_node(&pw, &wemp[0], 0, auxr),
+                cell_get_min_node(&pw, &wemp[0], 3, None)
+            ));
+        }
+        {
+            let mut s = node_set_create(n, 2);
+            node_set_from_vertices(&mut s, 1, &v1, v1.len());
+            node_set_from_vertices(&mut s, 2, &v2, v2.len());
+            got.push(pset("S1", &s, 0));
+            got.push(pset("S2", &s, 1));
+            got.push(format!(
+                "SA {} {} {}",
+                i32::from(all_nodes_are_in_set(&s, 1, &s, 2)),
+                i32::from(all_nodes_are_in_set(&s, 2, &s, 1)),
+                i32::from(all_nodes_are_in_set(&s, 1, &s, 1))
+            ));
+        }
+        {
+            let mut g = Transposition {
+                n_at_numb: vec![0; nmax],
+            };
+            partition_get_transposition(&p0, &pb, n, &mut g);
+            got.push(pa("T", &g.n_at_numb, n));
+        }
+        {
+            let mut a2 = ua.clone();
+            let mut b2 = ub.clone();
+            let mut s = String::from("G");
+            for i in 0..n {
+                s += &format!(" {}", n_get_mcr2(&mut a2.equ2, i as u16));
+            }
+            got.push(s);
+            got.push(pa("GA", &a2.equ2, n));
+            let mut s = String::from("GN");
+            for i in 1..=n {
+                s += &format!(" {}", get_unordered_partition_mcr_node(&mut b2, i as u16));
+            }
+            got.push(s);
+            for j in &joins {
+                got.push(format!(
+                    "J {}",
+                    n_join2_mcrs2(&mut b2.equ2, j[0] as u16, j[1] as u16)
+                ));
+            }
+            got.push(pa("JB", &b2.equ2, n));
+            got.push(format!("UJ {}", unordered_partition_join(&ua, &mut b2, n)));
+            got.push(pa("UB", &b2.equ2, n));
+            unordered_partition_make_discrete(&mut a2, n);
+            got.push(pa("MD", &a2.equ2, n));
+        }
+        got.push(format!(
+            "L {} {}",
+            i32::from(partition_satisfies_lemma_2_25(&p0, n)),
+            i32::from(partition_satisfies_lemma_2_25(&pb, n))
+        ));
+        for &cv in &cvs {
+            let mut g = create_neigh_list(n, n, &at, false, None);
+            let mut pp = vec![
+                Partition::default(),
+                Partition::default(),
+                Partition::default(),
+            ];
+            pp[0] = Partition {
+                rank: vec![0; nmax],
+                at_number: vec![0; nmax],
+            };
+            partition_copy(&mut pp[0], &p0, n);
+            let ret = partition_color_vertex(&mut g, &mut pp, cv as u16, n, n, nmax, digraph, 3);
+            let mut s = format!("PV {ret} |");
+            for i in 0..n {
+                s += &format!(" {}", pp[1].rank[i]);
+            }
+            s += " |";
+            for i in 0..n {
+                s += &format!(" {}", pp[1].at_number[i]);
+            }
+            got.push(s);
+        }
+        {
+            let (ctmax, ctat, hasnumh, hasfix, hasiso, hasexc, clear_k, ctfill) = (
+                ct[0] as i32,
+                ct[1] as i32,
+                ct[2],
+                ct[3],
+                ct[4],
+                ct[5],
+                ct[6] as usize,
+                ct[7] as i32,
+            );
+            let mut t = c_table_create(
+                n,
+                ctmax,
+                ctat,
+                (hasnumh != 0).then_some(5),
+                (hasfix != 0).then_some(6),
+                (hasiso != 0).then_some(7),
+                (hasexc != 0).then_some(8),
+            );
+            got.push(format!(
+                "CT 1 {} {} {} {} {} {} {} {} {} {} {}",
+                t.maxlen_ct,
+                t.max_pos,
+                t.max_vert,
+                t.maxlen_num_h,
+                t.maxlen_iso_sort_key,
+                t.maxlen_iso_exchg_atnos,
+                t.len_ct,
+                t.len_pos,
+                t.n_len_ct_at_only,
+                i32::from(!t.num_h.is_empty()),
+                i32::from(!t.num_h_fixed.is_empty())
+            ));
+            for i in 0..ctmax.min(ctfill) {
+                t.ctbl[i as usize] = 100 + i as u16;
+            }
+            for i in 0..=n {
+                t.next_ctbl_pos[i] = if (i as i32) < ctfill {
+                    i as u16
+                } else {
+                    ctfill as u16
+                };
+            }
+            t.len_ct = ctfill.min(ctmax);
+            t.len_pos = n as i32;
+            ct_part_clear(&mut t, clear_k);
+            let mut s = format!("CC {} {} |", t.len_ct, t.len_pos);
+            for i in 0..ctmax as usize {
+                s += &format!(" {}", t.ctbl[i]);
+            }
+            got.push(s);
+        }
+        {
+            let rk: Vec<u16> = (0..n)
+                .map(|i| p0.rank[i] | if marks[i] != 0 { RANK_MARK_BIT } else { 0 })
+                .collect();
+            let mut l = vec![0u16; 10];
+            l[0] = nl.len() as u16;
+            for (i, x) in nl.iter().enumerate() {
+                l[i + 1] = *x as u16;
+            }
+            insertions_sort_neigh_list_at_numbers2(&mut l, &rk, maxrj);
+            let mut s = String::from("IS");
+            for x in &l[..=nl.len()] {
+                s += &format!(" {x}");
+            }
+            got.push(s);
+        }
+        let want: Vec<String> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| s.as_str().unwrap().to_string())
+            .collect();
+        assert_eq!(got, want, "case {case}");
+    }
+}
