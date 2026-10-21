@@ -2141,3 +2141,160 @@ fn mark_salt_charge_groups2_body(
         *tot = 2;
     }
 }
+
+/// `MarkSaltChargeGroups` (`SALT_WITH_PROTONS == 1`): looks for alternating
+/// paths between "salt" candidates (H or (-) donors and acceptors), one
+/// pair at a time, and merges the endpoints into t-groups. Returns the
+/// number of changes or an error.
+pub fn mark_salt_charge_groups(
+    at: &mut [InpAtom],
+    num_atoms: i32,
+    sgi: &mut SGroupInfo,
+    tgi: &mut TGroupInfo,
+    mut cgi: Option<&mut CGroupInfo>,
+    p: &mut super::ichi_bns::BnStruct,
+    bd: &mut super::ichi_bns::BnData,
+) -> i32 {
+    use super::ichi_bns::{ALT_PATH_MODE_4_SALT, exists_alt_path};
+    use super::ichierr::{BNS_PROGRAM_ERR, BNS_RADICAL_ERR, BNS_VERT_EDGE_OVFL, is_bns_error};
+    if sgi.s_candidate.is_empty() || sgi.max_num_candidates <= 0 {
+        return 0;
+    }
+    if sgi.num_candidates <= -1 || tgi.t_group.is_none() {
+        return 0;
+    }
+    let max_cand = sgi.max_num_candidates as usize;
+    let mut n_cand = 0usize;
+    let mut n_other = 0;
+    let mut s_subtype_all = 0;
+    let mut s_subtype = 0i32;
+    let mut num_tested = 0;
+    let mut n_changes = 0;
+    let mut tot = 0;
+    let mut err = 0;
+    'body: {
+        for i in 0..num_atoms as usize {
+            let mut s_type = get_salt_charge_type(at, i, Some(tgi), &mut s_subtype);
+            let mut ok = s_type == 0;
+            if !ok {
+                s_type = get_other_salt_charge_type(at, i, Some(tgi), &mut s_subtype, true);
+                ok = s_type == 1;
+            }
+            if !ok {
+                s_type = get_other_salt_type(at, i, &mut s_subtype);
+                ok = s_type == 2;
+            }
+            if ok {
+                if n_cand >= max_cand {
+                    err = BNS_VERT_EDGE_OVFL;
+                    break 'body;
+                }
+                sgi.s_candidate[n_cand] = SCandidate {
+                    atnumber: i as u16,
+                    type_: s_type as i8,
+                    subtype: s_subtype as i8,
+                    endpoint: at[i].endpoint,
+                };
+                n_cand += 1;
+                n_other += i32::from(s_type == 1);
+                s_subtype_all |= s_subtype;
+            }
+        }
+        let cond1 = s_subtype_all & SALT_ACCEPTOR != 0;
+        let cond2a = tgi.b_taut_flags & super::ichiparm::TG_FLAG_ALLOW_NO_NEGTV_O != 0;
+        let cond2b = tgi.b_taut_flags_done & TG_FLAG_FOUND_SALT_CHARGES_DONE != 0;
+        let cond2c = tgi.tni.b_normalization_flags & FLAG_FORCE_SALT_TAUT != 0;
+        let cond2 = if cond2a || cond2b || cond2c {
+            s_subtype_all & (SALT_DONOR_NEG | SALT_DONOR_H) == 0
+        } else {
+            s_subtype_all & SALT_DONOR_NEG == 0 || n_other as usize == n_cand
+        };
+        if n_cand <= 1 || !cond1 || cond2 {
+            sgi.num_candidates = -1;
+            break 'body;
+        }
+        if s_subtype_all & SALT_DONOR_NEG == 0 {
+            tgi.b_taut_flags_done |= TG_FLAG_ALLOW_NO_NEGTV_O_DONE;
+        }
+        loop {
+            n_changes = 0;
+            for i1 in 0..n_cand {
+                let j1 = sgi.s_candidate[i1].atnumber as usize;
+                for i2 in i1 + 1..n_cand {
+                    let j2 = sgi.s_candidate[i2].atnumber as usize;
+                    if at[j1].endpoint != 0 && at[j1].endpoint == at[j2].endpoint {
+                        continue;
+                    }
+                    for j in 0..2 {
+                        let (ii1, ii2, jj1, jj2) = if j != 0 {
+                            (i2, i1, j2, j1)
+                        } else {
+                            (i1, i2, j1, j2)
+                        };
+                        if i32::from(sgi.s_candidate[ii1].subtype) & (SALT_DONOR_NEG | SALT_DONOR_H)
+                            != 0
+                            && i32::from(sgi.s_candidate[ii2].subtype) & SALT_ACCEPTOR != 0
+                        {
+                            let ret = exists_alt_path(
+                                p,
+                                bd,
+                                None,
+                                at,
+                                num_atoms,
+                                jj2 as i32,
+                                jj1 as i32,
+                                ALT_PATH_MODE_4_SALT,
+                            );
+                            num_tested += 1;
+                            if is_bns_error(ret) {
+                                err = ret;
+                                break 'body;
+                            }
+                            if ret & 1 != 0 {
+                                let n_delta = (ret & !3) >> 2;
+                                n_changes += ret & 2;
+                                let mut end_points = [TEndpoint::default(); 2];
+                                add_end_point(&mut end_points[0], at, jj1);
+                                add_end_point(&mut end_points[1], at, jj2);
+                                let mut ret = register_end_points(
+                                    tgi,
+                                    &mut end_points,
+                                    at,
+                                    num_atoms,
+                                    cgi.as_deref_mut(),
+                                    Some(p),
+                                );
+                                if ret == -1 {
+                                    ret = BNS_PROGRAM_ERR;
+                                }
+                                if ret < 0 {
+                                    err = ret;
+                                    break 'body;
+                                }
+                                if n_delta != 0 {
+                                    err = BNS_RADICAL_ERR;
+                                    break 'body;
+                                }
+                                n_changes += i32::from(ret > 0);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            tot += n_changes;
+            if !(num_tested != 0 && n_changes != 0) {
+                break;
+            }
+        }
+    }
+    if err == 0 {
+        tot += n_changes;
+        if sgi.num_candidates == 0 {
+            sgi.num_candidates = if num_tested != 0 { n_cand as i32 } else { -1 };
+        }
+    } else {
+        tot = err;
+    }
+    tot
+}
