@@ -5,7 +5,7 @@
 //! Copyright (c) 2024 IUPAC and InChI Trust.
 //! Licensed under the MIT license (see LICENSES/InChI-MIT.txt).
 
-use super::ichi::{InChI, InChISort, compare_taut_non_iso_part_of_inchi};
+use super::ichi::{InChI, InChIAux, InChISort, compare_taut_non_iso_part_of_inchi};
 use super::ichi_io::{InchiIosString, inchi_strbuf_printf};
 use super::ichiprt1::{II_EQU, IIT_NONTAUT, S_COMP_DELIM, equ_string};
 use super::ichiprt2::{make_delim, make_eq_str, make_h_string, make_mult, make_taut_string};
@@ -531,8 +531,23 @@ struct Layer<'a> {
     print: &'a PrintOne<'a>,
 }
 
+type PrintEqFn<'a, T> = dyn Fn(&T, i32, &mut InchiIosString, &mut i32) + 'a;
+
+/// The generic skeleton over the item type (`INChI` or `INChI_Aux`)
+struct LayerG<'a, T> {
+    eq2taut: &'a dyn Fn(Option<&T>, Option<&T>) -> i32,
+    eq2prev: &'a dyn Fn(&T, &T) -> bool,
+    /// output of a component in the regular branch
+    print: &'a dyn Fn(&T, i32, &mut InchiIosString, &mut i32),
+    /// output in the "same as the tautomeric layer" branch (default: `print`)
+    print_eq: Option<&'a PrintEqFn<'a, T>>,
+    has_atoms: fn(&T) -> bool,
+    /// the regular branch also updates the previous tautomeric item
+    update_taut_prev: bool,
+}
+
 #[allow(clippy::too_many_arguments)]
-fn run_layer(
+fn run_layer_g<T>(
     is0: &[InChISort],
     is20_in: &[InChISort],
     strbuf: &mut InchiIosString,
@@ -541,31 +556,41 @@ fn run_layer(
     num_components: usize,
     second_non_taut_pass: bool,
     use_multipliers: bool,
-    layer: &Layer,
+    get: for<'b> fn(&'b InChISort, usize) -> Option<&'b T>,
+    layer: &LayerG<T>,
 ) -> i32 {
     let is20: &[InChISort] = if second_non_taut_pass { is20_in } else { &[] };
-    let mut taut: Option<&InChI> = None;
-    let mut prev: Option<&InChI> = None;
-    let mut taut_prev: Option<&InChI> = None;
+    let mut taut: Option<&T> = None;
+    let mut prev: Option<&T> = None;
+    let mut taut_prev: Option<&T> = None;
     let (mut mult, mut next) = (0, 0);
     let mut eq2taut_prev = true;
     let mut prev_equ: Option<&str> = None;
     let mut mult_prev_equ = 0;
     let u0 = used(strbuf);
+    let sel = |arr: &'_ [InChISort], i: usize, mode: i32| -> Option<usize> {
+        if i < num_components {
+            let ii = get_ii(mode, &arr[i]);
+            (ii >= 0).then_some(ii as usize)
+        } else {
+            None
+        }
+    };
+    let print_eq = layer.print_eq.unwrap_or(layer.print);
     for i in 0..=num_components {
-        let cur = pick(is0, i, num_components, out_type);
+        let cur = sel(is0, i, out_type).and_then(|ii| get(&is0[i], ii));
         if second_non_taut_pass {
-            taut = pick(is20, i, num_components, OUT_T1);
+            taut = sel(is20, i, OUT_T1).and_then(|ii| get(&is20[i], ii));
         }
         let eq2taut = (layer.eq2taut)(cur, taut);
         if eq2taut != 0 {
-            if let Some(p) = prev.filter(|p| p.n_number_of_atoms != 0) {
+            if let Some(p) = prev.filter(|p| (layer.has_atoms)(p)) {
                 if next != 0 {
                     make_delim(Some(S_COMP_DELIM), strbuf, overflow);
                 }
                 next += 1;
-                (layer.print)(p, mult, strbuf, overflow);
-            } else if taut_prev.is_some_and(|t| t.n_number_of_atoms != 0) {
+                print_eq(p, mult, strbuf, overflow);
+            } else if taut_prev.is_some_and(|t| (layer.has_atoms)(t)) {
                 if next != 0 {
                     make_delim(Some(S_COMP_DELIM), strbuf, overflow);
                 }
@@ -617,15 +642,86 @@ fn run_layer(
                 make_delim(Some(S_COMP_DELIM), strbuf, overflow);
             }
             next += 1;
-            if let Some(p) = prev.filter(|p| p.n_number_of_atoms != 0) {
+            if let Some(p) = prev.filter(|p| (layer.has_atoms)(p)) {
                 (layer.print)(p, mult, strbuf, overflow);
             }
             prev = cur;
-            taut_prev = taut;
+            if layer.update_taut_prev {
+                taut_prev = taut;
+            }
             mult = 0;
         }
     }
     used(strbuf) - u0
+}
+
+fn inchi_get(s: &InChISort, ii: usize) -> Option<&InChI> {
+    s.p_inchi[ii].as_ref()
+}
+fn aux_get(s: &InChISort, ii: usize) -> Option<&InChIAux> {
+    s.p_inchi_aux[ii].as_ref()
+}
+
+#[allow(clippy::too_many_arguments)]
+fn run_layer(
+    is0: &[InChISort],
+    is20: &[InChISort],
+    strbuf: &mut InchiIosString,
+    overflow: &mut i32,
+    out_type: i32,
+    num_components: usize,
+    second_non_taut_pass: bool,
+    use_multipliers: bool,
+    layer: &Layer,
+) -> i32 {
+    run_layer_ex(
+        is0,
+        is20,
+        strbuf,
+        overflow,
+        out_type,
+        num_components,
+        second_non_taut_pass,
+        use_multipliers,
+        layer,
+        true,
+        None,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn run_layer_ex(
+    is0: &[InChISort],
+    is20: &[InChISort],
+    strbuf: &mut InchiIosString,
+    overflow: &mut i32,
+    out_type: i32,
+    num_components: usize,
+    second_non_taut_pass: bool,
+    use_multipliers: bool,
+    layer: &Layer,
+    update_taut_prev: bool,
+    print_eq: Option<&PrintOne>,
+) -> i32 {
+    run_layer_g(
+        is0,
+        is20,
+        strbuf,
+        overflow,
+        out_type,
+        num_components,
+        second_non_taut_pass,
+        use_multipliers,
+        inchi_get,
+        &LayerG {
+            eq2taut: layer.eq2taut,
+            eq2prev: layer.eq2prev,
+            print: layer.print,
+            print_eq,
+            has_atoms: |c: &InChI| c.n_number_of_atoms != 0,
+            update_taut_prev,
+        },
+    )
 }
 
 use super::ichi::{EQL_EXISTS, EQL_SP2, EQL_SP3, InChIStereo, eql_inchi_stereo};
@@ -970,4 +1066,480 @@ pub fn str_iso_stereo_abs_inv(
     num_components: usize,
 ) -> i32 {
     abs_inv(is0, strbuf, overflow, out_type, num_components, iso_of)
+}
+
+// ---------------------------------------------------------------------------
+// AuxInfo equivalence and inversion layers
+
+use super::ichi::{EQL_SP3 as EQL_SP3_, EQL_SP3_INV};
+use super::ichiprt1::{II_EQ2_INV, II_STEREO_INV};
+use super::ichiprt2::{
+    EQL_EQU, EQL_EQU_ISO, EQL_EQU_TG, eql_inchi_aux_equ, has_equ_string, make_equ_string,
+};
+
+fn eql2(a: Option<&InChIStereo>, e1: i32, b: Option<&InChIStereo>, e2: i32) -> bool {
+    a.is_some() && b.is_some() && eql_inchi_stereo(a, e1, b, e2)
+}
+
+fn aux_has_atoms(a: &InChIAux) -> bool {
+    a.n_number_of_atoms != 0
+}
+
+/// `str_AuxEqu`: equivalence of the atoms
+#[allow(clippy::too_many_arguments)]
+pub fn str_aux_equ(
+    is0: &[InChISort],
+    is20: &[InChISort],
+    strbuf: &mut InchiIosString,
+    overflow: &mut i32,
+    out_type: i32,
+    taut_mode: i32,
+    num_components: usize,
+    second_non_taut_pass: bool,
+    omit_repetitions: bool,
+    use_multipliers: bool,
+) -> i32 {
+    run_layer_g(
+        is0,
+        is20,
+        strbuf,
+        overflow,
+        out_type,
+        num_components,
+        second_non_taut_pass,
+        use_multipliers,
+        aux_get,
+        &LayerG {
+            eq2taut: &|c, t| {
+                if second_non_taut_pass
+                    && omit_repetitions
+                    && eql_inchi_aux_equ(c, EQL_EQU, t, EQL_EQU)
+                {
+                    II_EQU | IIT_NONTAUT
+                } else {
+                    0
+                }
+            },
+            eq2prev: &|c, p| eql_inchi_aux_equ(Some(c), EQL_EQU, Some(p), EQL_EQU),
+            print: &|p, m, sb, ovf| {
+                if has_equ_string(&p.n_constit_equ_numbers, p.n_number_of_atoms) {
+                    make_mult(m + 1, "*", sb, 0, ovf);
+                    make_equ_string(
+                        &p.n_constit_equ_numbers,
+                        p.n_number_of_atoms,
+                        false,
+                        sb,
+                        taut_mode,
+                        ovf,
+                    );
+                }
+            },
+            print_eq: None,
+            has_atoms: aux_has_atoms,
+            update_taut_prev: true,
+        },
+    )
+}
+
+/// `str_AuxIsoEqu`: equivalence of the isotopic atoms
+#[allow(clippy::too_many_arguments)]
+pub fn str_aux_iso_equ(
+    is0: &[InChISort],
+    is20: &[InChISort],
+    strbuf: &mut InchiIosString,
+    overflow: &mut i32,
+    out_type: i32,
+    taut_mode: i32,
+    num_components: usize,
+    second_non_taut_pass: bool,
+    omit_repetitions: bool,
+    use_multipliers: bool,
+) -> i32 {
+    run_layer_g(
+        is0,
+        is20,
+        strbuf,
+        overflow,
+        out_type,
+        num_components,
+        second_non_taut_pass,
+        use_multipliers,
+        aux_get,
+        &LayerG {
+            eq2taut: &|c, t| {
+                let Some(ca) = c.filter(|a| a.b_is_isotopic != 0) else {
+                    return 0;
+                };
+                let _ = ca;
+                if second_non_taut_pass && omit_repetitions {
+                    if eql_inchi_aux_equ(c, EQL_EQU_ISO, t, EQL_EQU) {
+                        return II_EQU | IIT_NONTAUT | IIT_ISO;
+                    }
+                    if eql_inchi_aux_equ(c, EQL_EQU_ISO, c, EQL_EQU) {
+                        return II_EQU | IIT_NONTAUT | IIT_ISO | II_EQ2_NONTAUT;
+                    }
+                    if eql_inchi_aux_equ(c, EQL_EQU_ISO, t, EQL_EQU_ISO) {
+                        return II_EQU | IIT_NONTAUT | IIT_ISO | II_EQ2_ISO;
+                    }
+                } else if !second_non_taut_pass
+                    && omit_repetitions
+                    && eql_inchi_aux_equ(c, EQL_EQU_ISO, c, EQL_EQU)
+                {
+                    return II_EQU | IIT_ISO;
+                }
+                0
+            },
+            eq2prev: &|c, p| eql_inchi_aux_equ(Some(c), EQL_EQU_ISO, Some(p), EQL_EQU_ISO),
+            print: &|p, m, sb, ovf| {
+                if has_equ_string(&p.n_constit_equ_isotopic_numbers, p.n_number_of_atoms) {
+                    make_mult(m + 1, "*", sb, 0, ovf);
+                    make_equ_string(
+                        &p.n_constit_equ_isotopic_numbers,
+                        p.n_number_of_atoms,
+                        false,
+                        sb,
+                        taut_mode,
+                        ovf,
+                    );
+                }
+            },
+            print_eq: None,
+            has_atoms: aux_has_atoms,
+            update_taut_prev: true,
+        },
+    )
+}
+
+/// `str_AuxIsoTgroupEqu`: equivalence of the isotopic t-groups
+#[allow(clippy::too_many_arguments)]
+pub fn str_aux_iso_tgroup_equ(
+    is0: &[InChISort],
+    strbuf: &mut InchiIosString,
+    overflow: &mut i32,
+    out_type: i32,
+    taut_mode: i32,
+    num_components: usize,
+    omit_repetitions: bool,
+    use_multipliers: bool,
+) -> i32 {
+    run_layer_g(
+        is0,
+        &[],
+        strbuf,
+        overflow,
+        out_type,
+        num_components,
+        false,
+        use_multipliers,
+        aux_get,
+        &LayerG {
+            eq2taut: &|c, _t| {
+                if omit_repetitions
+                    && c.is_some_and(|a| a.b_is_isotopic != 0)
+                    && eql_inchi_aux_equ(c, EQL_EQU_TG | EQL_EQU_ISO, c, EQL_EQU_TG)
+                {
+                    II_EQU | IIT_ISO
+                } else {
+                    0
+                }
+            },
+            eq2prev: &|c, p| {
+                eql_inchi_aux_equ(
+                    Some(c),
+                    EQL_EQU_TG | EQL_EQU_ISO,
+                    Some(p),
+                    EQL_EQU_TG | EQL_EQU_ISO,
+                )
+            },
+            print: &|p, m, sb, ovf| {
+                if has_equ_string(
+                    &p.n_constit_equ_isotopic_t_group_numbers,
+                    p.n_number_of_t_groups,
+                ) {
+                    make_mult(m + 1, "*", sb, 0, ovf);
+                    make_equ_string(
+                        &p.n_constit_equ_isotopic_t_group_numbers,
+                        p.n_number_of_t_groups,
+                        false,
+                        sb,
+                        taut_mode,
+                        ovf,
+                    );
+                }
+            },
+            print_eq: None,
+            has_atoms: aux_has_atoms,
+            update_taut_prev: true,
+        },
+    )
+}
+
+/// `str_AuxTgroupEqu`: equivalence of the t-groups
+pub fn str_aux_tgroup_equ(
+    is0: &[InChISort],
+    strbuf: &mut InchiIosString,
+    overflow: &mut i32,
+    out_type: i32,
+    taut_mode: i32,
+    num_components: usize,
+    use_multipliers: bool,
+) -> i32 {
+    let u0 = used(strbuf);
+    let aux_at = |i: usize| -> Option<&InChIAux> {
+        if i < num_components {
+            let ii = get_ii(out_type, &is0[i]);
+            if ii >= 0 {
+                return is0[i].p_inchi_aux[ii as usize].as_ref();
+            }
+        }
+        None
+    };
+    let mut prev = {
+        let ii = get_ii(out_type, &is0[0]);
+        if ii >= 0 {
+            is0[0].p_inchi_aux[ii as usize].as_ref()
+        } else {
+            None
+        }
+    };
+    let (mut mult, mut next) = (0, 0);
+    for i in 1..=num_components {
+        let cur = aux_at(i);
+        if use_multipliers && eql_inchi_aux_equ(cur, EQL_EQU_TG, prev, EQL_EQU_TG) {
+            mult += 1;
+            continue;
+        }
+        if next != 0 {
+            make_delim(Some(S_COMP_DELIM), strbuf, overflow);
+        }
+        next += 1;
+        if let Some(p) = prev.filter(|p| {
+            p.n_number_of_t_groups != 0
+                && has_equ_string(&p.n_constit_equ_t_group_numbers, p.n_number_of_t_groups)
+        }) {
+            make_mult(mult + 1, "*", strbuf, 0, overflow);
+            make_equ_string(
+                &p.n_constit_equ_t_group_numbers,
+                p.n_number_of_t_groups,
+                false,
+                strbuf,
+                taut_mode,
+                overflow,
+            );
+        }
+        prev = cur;
+        mult = 0;
+    }
+    used(strbuf) - u0
+}
+
+/// `str_AuxInvSp3`: inversion of the tetrahedral stereo
+#[allow(clippy::too_many_arguments)]
+pub fn str_aux_inv_sp3(
+    is0: &[InChISort],
+    is20: &[InChISort],
+    strbuf: &mut InchiIosString,
+    overflow: &mut i32,
+    out_type: i32,
+    taut_mode: i32,
+    num_components: usize,
+    second_non_taut_pass: bool,
+    omit_repetitions: bool,
+    use_multipliers: bool,
+) -> i32 {
+    let _ = EQL_SP3_;
+    run_layer_ex(
+        is0,
+        is20,
+        strbuf,
+        overflow,
+        out_type,
+        num_components,
+        second_non_taut_pass,
+        use_multipliers,
+        &Layer {
+            eq2taut: &|c, t| {
+                if second_non_taut_pass && omit_repetitions {
+                    if let (Some(c), Some(t)) = (c, t) {
+                        if eql2(sp2_of(c), EQL_SP3_INV, sp2_of(t), EQL_SP3_INV) {
+                            return II_STEREO_INV | IIT_NONTAUT;
+                        }
+                        if eql2(sp2_of(c), EQL_SP3_INV, sp2_of(t), EQL_SP3) {
+                            return II_STEREO_INV | IIT_NONTAUT | II_EQ2_INV;
+                        }
+                    }
+                    if let Some(c) = c
+                        && eql2(sp2_of(c), EQL_SP3_INV, sp2_of(c), EQL_SP3)
+                    {
+                        return II_STEREO_INV | IIT_NONTAUT | II_EQ2_INV | II_EQ2_NONTAUT;
+                    }
+                } else if !second_non_taut_pass
+                    && omit_repetitions
+                    && let Some(c) = c
+                    && eql2(sp2_of(c), EQL_SP3_INV, sp2_of(c), EQL_SP3)
+                {
+                    return II_STEREO_INV | II_EQ2_INV;
+                }
+                0
+            },
+            eq2prev: &|c, p| eql2(sp2_of(c), EQL_SP3_INV, sp2_of(p), EQL_SP3_INV),
+            print: &|p, m, sb, ovf| {
+                if let Some(s) =
+                    sp2_of(p).filter(|s| s.n_number_of_stereo_centers > 0 && s.n_comp_inv2_abs != 0)
+                {
+                    make_mult(m + 1, "*", sb, 0, ovf);
+                    make_stereo_string(
+                        opt(&s.n_number_inv),
+                        None,
+                        opt(&s.t_parity_inv),
+                        s.n_number_of_stereo_centers,
+                        sb,
+                        taut_mode,
+                        ovf,
+                    );
+                }
+            },
+        },
+        false,
+        Some(&|p, m, sb, ovf| {
+            if let Some(s) = sp2_of(p).filter(|s| s.n_number_of_stereo_centers > 0) {
+                make_mult(m + 1, "*", sb, 0, ovf);
+                make_stereo_string(
+                    Some(&s.n_number),
+                    None,
+                    opt(&s.t_parity_inv),
+                    s.n_number_of_stereo_centers,
+                    sb,
+                    taut_mode,
+                    ovf,
+                );
+            }
+        }),
+    )
+}
+
+/// a C pointer that is `NULL` when the array is not allocated
+fn opt<T>(v: &[T]) -> Option<&[T]> {
+    (!v.is_empty()).then_some(v)
+}
+
+fn iso_count(c: &InChI) -> i32 {
+    c.n_number_of_isotopic_atoms + c.n_number_of_isotopic_t_groups
+}
+
+/// `str_AuxInvIsoSp3`: inversion of the isotopic tetrahedral stereo
+#[allow(clippy::too_many_arguments)]
+pub fn str_aux_inv_iso_sp3(
+    is0: &[InChISort],
+    is20: &[InChISort],
+    strbuf: &mut InchiIosString,
+    overflow: &mut i32,
+    out_type: i32,
+    taut_mode: i32,
+    num_components: usize,
+    second_non_taut_pass: bool,
+    omit_repetitions: bool,
+    use_multipliers: bool,
+) -> i32 {
+    const INV: i32 = EQL_SP3_INV;
+    run_layer_ex(
+        is0,
+        is20,
+        strbuf,
+        overflow,
+        out_type,
+        num_components,
+        second_non_taut_pass,
+        use_multipliers,
+        &Layer {
+            eq2taut: &|c, t| {
+                let Some(cc) = c else {
+                    return 0;
+                };
+                let base = II_STEREO_INV | IIT_ISO;
+                if second_non_taut_pass && omit_repetitions && iso_count(cc) > 0 {
+                    let nt = base | IIT_NONTAUT;
+                    if let Some(t) = t {
+                        if eql2(iso_of(cc), INV, sp2_of(t), INV) {
+                            return nt;
+                        }
+                    }
+                    if eql2(iso_of(cc), INV, sp2_of(cc), INV) {
+                        return nt | II_EQ2_NONTAUT;
+                    }
+                    if let Some(t) = t {
+                        if eql2(iso_of(cc), INV, iso_of(t), INV) {
+                            return nt | II_EQ2_ISO;
+                        }
+                        if eql2(iso_of(cc), INV, sp2_of(t), INV) {
+                            return nt | II_EQ2_INV;
+                        }
+                        if eql2(iso_of(cc), INV, iso_of(t), EQL_SP3) {
+                            return nt | II_EQ2_INV | II_EQ2_ISO;
+                        }
+                    }
+                    if eql2(iso_of(cc), INV, sp2_of(cc), EQL_SP3) {
+                        return nt | II_EQ2_INV | II_EQ2_NONTAUT;
+                    }
+                    if eql2(iso_of(cc), INV, iso_of(cc), EQL_SP3) {
+                        return nt | II_EQ2_INV | II_EQ2_ISO | II_EQ2_NONTAUT;
+                    }
+                } else if !second_non_taut_pass
+                    && omit_repetitions
+                    && (cc.n_number_of_isotopic_atoms > 0
+                        || cc.n_number_of_isotopic_t_groups > 0
+                        || cc
+                            .n_possible_locations_of_isotopic_h
+                            .first()
+                            .is_some_and(|&x| x > 1))
+                {
+                    if eql2(iso_of(cc), INV, sp2_of(cc), INV) {
+                        return base;
+                    }
+                    if eql2(iso_of(cc), INV, sp2_of(cc), EQL_SP3) {
+                        return base | II_EQ2_INV;
+                    }
+                    if eql2(iso_of(cc), INV, iso_of(cc), EQL_SP3) {
+                        return base | II_EQ2_INV | II_EQ2_ISO;
+                    }
+                }
+                0
+            },
+            eq2prev: &|c, p| {
+                iso_count(c) > 0 && iso_count(p) > 0 && eql2(iso_of(c), INV, iso_of(p), INV)
+            },
+            print: &|p, m, sb, ovf| {
+                if iso_count(p) > 0
+                    && let Some(s) = iso_of(p)
+                        .filter(|s| s.n_number_of_stereo_centers > 0 && s.n_comp_inv2_abs != 0)
+                {
+                    make_mult(m + 1, "*", sb, 0, ovf);
+                    make_stereo_string(
+                        opt(&s.n_number_inv),
+                        None,
+                        opt(&s.t_parity_inv),
+                        s.n_number_of_stereo_centers,
+                        sb,
+                        taut_mode,
+                        ovf,
+                    );
+                }
+            },
+        },
+        false,
+        Some(&|p, m, sb, ovf| {
+            if let Some(s) = iso_of(p).filter(|s| s.n_number_of_stereo_centers > 0) {
+                make_mult(m + 1, "*", sb, 0, ovf);
+                make_stereo_string(
+                    Some(&s.n_number),
+                    None,
+                    opt(&s.t_parity_inv),
+                    s.n_number_of_stereo_centers,
+                    sb,
+                    taut_mode,
+                    ovf,
+                );
+            }
+        }),
+    )
 }
