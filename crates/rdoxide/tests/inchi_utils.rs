@@ -11347,91 +11347,93 @@ fn atom_copy_isotopic_keys_and_hill_formulas_match_the_c_code() {
     }
 }
 
-#[test]
+use rdoxide::external::inchi::ichi::{InChI, InChIIsotopicAtom, InChIIsotopicTGroup, InChIStereo};
+
+struct InchiTok<'a>(std::str::SplitWhitespace<'a>);
 #[allow(clippy::field_reassign_with_default)]
+impl InchiTok<'_> {
+    fn i(&mut self) -> i64 {
+        self.0.next().unwrap().parse().unwrap()
+    }
+    fn s(&mut self) -> String {
+        self.0.next().unwrap().to_string()
+    }
+    fn stereo(&mut self) -> Option<InChIStereo> {
+        if self.i() == 0 {
+            return None;
+        }
+        let mut s = InChIStereo::default();
+        let n = self.i();
+        s.n_number_of_stereo_centers = n as i32;
+        for _ in 0..n {
+            s.n_number.push(self.i() as u16);
+            s.t_parity.push(self.i() as i8);
+        }
+        let n = self.i();
+        s.n_number_of_stereo_bonds = n as i32;
+        for _ in 0..n {
+            s.n_bond_atom1.push(self.i() as u16);
+            s.n_bond_atom2.push(self.i() as u16);
+            s.b_parity.push(self.i() as i8);
+        }
+        s.n_comp_inv2_abs = self.i() as i32;
+        Some(s)
+    }
+    fn inchi(&mut self) -> Option<InChI> {
+        if self.i() == 0 {
+            return None;
+        }
+        let mut c = InChI::default();
+        c.n_flags = self.i() as u64;
+        c.n_total_charge = self.i() as i32;
+        let n = self.i();
+        c.n_number_of_atoms = n as i32;
+        c.sz_hill_formula = Some(self.s());
+        c.n_atom = (0..n).map(|_| self.i() as u8).collect();
+        let l = self.i();
+        c.len_conn_table = l as i32;
+        c.n_conn_table = (0..l).map(|_| self.i() as u16).collect();
+        let l = self.i();
+        c.len_tautomer = l as i32;
+        c.n_tautomer = (0..l).map(|_| self.i() as u16).collect();
+        c.n_num_h = (0..n).map(|_| self.i() as i8).collect();
+        if self.i() != 0 {
+            c.n_num_h_fixed = Some((0..n).map(|_| self.i() as i8).collect());
+        }
+        let l = self.i();
+        c.n_number_of_isotopic_atoms = l as i32;
+        for _ in 0..l {
+            c.isotopic_atom.push(InChIIsotopicAtom {
+                n_atom_number: self.i() as u16,
+                n_iso_difference: self.i() as i16,
+                n_num_h: self.i() as i16,
+                n_num_d: self.i() as i16,
+                n_num_t: self.i() as i16,
+            });
+        }
+        let l = self.i();
+        c.n_number_of_isotopic_t_groups = l as i32;
+        for _ in 0..l {
+            c.isotopic_t_group.push(InChIIsotopicTGroup {
+                n_t_group_number: self.i() as u16,
+                n_num_h: self.i() as u16,
+                n_num_d: self.i() as u16,
+                n_num_t: self.i() as u16,
+            });
+        }
+        c.stereo = self.stereo();
+        c.stereo_isotopic = self.stereo();
+        c.b_deleted = self.i() as i32;
+        Some(c)
+    }
+}
+
+#[test]
 fn inchi_component_comparison_matches_the_c_code() {
     use rdoxide::external::inchi::ichi::{
-        InChI, InChIIsotopicAtom, InChIIsotopicTGroup, InChISort, InChIStereo,
-        comp_inchi_non_taut2, comp_inchi_taut_vs_non_taut, comp_inchi_taut2, comp_inchi2,
-        compare_inchi_stereo, compare_taut_non_iso_part_of_inchi, get_sp3_rel_rac_abs,
+        InChISort, comp_inchi_non_taut2, comp_inchi_taut_vs_non_taut, comp_inchi_taut2,
+        comp_inchi2, compare_inchi_stereo, compare_taut_non_iso_part_of_inchi, get_sp3_rel_rac_abs,
     };
-    struct Tok<'a>(std::str::SplitWhitespace<'a>);
-    impl Tok<'_> {
-        fn i(&mut self) -> i64 {
-            self.0.next().unwrap().parse().unwrap()
-        }
-        fn s(&mut self) -> String {
-            self.0.next().unwrap().to_string()
-        }
-        fn stereo(&mut self) -> Option<InChIStereo> {
-            if self.i() == 0 {
-                return None;
-            }
-            let mut s = InChIStereo::default();
-            let n = self.i();
-            s.n_number_of_stereo_centers = n as i32;
-            for _ in 0..n {
-                s.n_number.push(self.i() as u16);
-                s.t_parity.push(self.i() as i8);
-            }
-            let n = self.i();
-            s.n_number_of_stereo_bonds = n as i32;
-            for _ in 0..n {
-                s.n_bond_atom1.push(self.i() as u16);
-                s.n_bond_atom2.push(self.i() as u16);
-                s.b_parity.push(self.i() as i8);
-            }
-            s.n_comp_inv2_abs = self.i() as i32;
-            Some(s)
-        }
-        fn inchi(&mut self) -> Option<InChI> {
-            if self.i() == 0 {
-                return None;
-            }
-            let mut c = InChI::default();
-            c.n_flags = self.i() as u64;
-            c.n_total_charge = self.i() as i32;
-            let n = self.i();
-            c.n_number_of_atoms = n as i32;
-            c.sz_hill_formula = Some(self.s());
-            c.n_atom = (0..n).map(|_| self.i() as u8).collect();
-            let l = self.i();
-            c.len_conn_table = l as i32;
-            c.n_conn_table = (0..l).map(|_| self.i() as u16).collect();
-            let l = self.i();
-            c.len_tautomer = l as i32;
-            c.n_tautomer = (0..l).map(|_| self.i() as u16).collect();
-            c.n_num_h = (0..n).map(|_| self.i() as i8).collect();
-            if self.i() != 0 {
-                c.n_num_h_fixed = Some((0..n).map(|_| self.i() as i8).collect());
-            }
-            let l = self.i();
-            c.n_number_of_isotopic_atoms = l as i32;
-            for _ in 0..l {
-                c.isotopic_atom.push(InChIIsotopicAtom {
-                    n_atom_number: self.i() as u16,
-                    n_iso_difference: self.i() as i16,
-                    n_num_h: self.i() as i16,
-                    n_num_d: self.i() as i16,
-                    n_num_t: self.i() as i16,
-                });
-            }
-            let l = self.i();
-            c.n_number_of_isotopic_t_groups = l as i32;
-            for _ in 0..l {
-                c.isotopic_t_group.push(InChIIsotopicTGroup {
-                    n_t_group_number: self.i() as u16,
-                    n_num_h: self.i() as u16,
-                    n_num_d: self.i() as u16,
-                    n_num_t: self.i() as u16,
-                });
-            }
-            c.stereo = self.stereo();
-            c.stereo_isotopic = self.stereo();
-            c.b_deleted = self.i() as i32;
-            Some(c)
-        }
-    }
     let data: serde_json::Value =
         serde_json::from_str(include_str!("../../../tests/data/inchi_make2.json")).unwrap();
     for (ci, c) in data.as_array().unwrap().iter().enumerate() {
@@ -11442,7 +11444,7 @@ fn inchi_component_comparison_matches_the_c_code() {
             .iter()
             .map(|v| v.as_str().unwrap())
             .collect();
-        let mut t = Tok(inp.split_whitespace());
+        let mut t = InchiTok(inp.split_whitespace());
         let mut p = [InChISort::default(), InChISort::default()];
         for (q, ps) in p.iter_mut().enumerate() {
             ps.p_inchi = [t.inchi(), t.inchi()];
@@ -11499,6 +11501,72 @@ fn inchi_component_comparison_matches_the_c_code() {
             sg(comp_inchi_non_taut2(&p[0], &p[1])),
             sg(comp_inchi_taut2(&p[0], &p[1]))
         ));
+        assert_eq!(got, want, "case {ci}: {inp}");
+    }
+}
+
+#[test]
+fn inchi_layer_difference_marking_matches_the_c_code() {
+    use rdoxide::external::inchi::ichi::{
+        DIFL_LENGTH, DIFS_LENGTH, DifSegs, InChISort, comp_inchi_layers, eql_inchi_stereo,
+        inchi_segment_action, mark_unused_and_empty_layers,
+    };
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_make3.json")).unwrap();
+    for (ci, c) in data.as_array().unwrap().iter().enumerate() {
+        let inp = c["in"].as_str().unwrap();
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        let mut t = InchiTok(inp.split_whitespace());
+        let (ord1, ord2, fix) = (t.i(), t.i(), t.i());
+        let mut p = [InChISort::default(), InChISort::default()];
+        for ps in p.iter_mut() {
+            ps.p_inchi = [t.inchi(), t.inchi()];
+        }
+        p[0].ord_number = ord1 as i16;
+        p[1].ord_number = ord2 as i16;
+        let a = p[0].p_inchi[1].as_ref().or(p[0].p_inchi[0].as_ref());
+        let b = p[1].p_inchi[1].as_ref().or(p[1].p_inchi[0].as_ref());
+        let mut got = Vec::new();
+        got.push(match (a, b) {
+            (Some(a), Some(b)) => {
+                let e = [8, 2, 4, 1];
+                let mut s = String::new();
+                for x in e {
+                    for y in e {
+                        s += &i32::from(eql_inchi_stereo(
+                            a.stereo.as_ref(),
+                            x,
+                            b.stereo_isotopic.as_ref(),
+                            y,
+                        ))
+                        .to_string();
+                    }
+                }
+                s
+            }
+            _ => "-".to_string(),
+        });
+        let mut s: DifSegs = [[0; DIFS_LENGTH]; DIFL_LENGTH];
+        let ret = comp_inchi_layers(&p[0], &p[1], &mut s, fix as i32);
+        let flat = |s: &DifSegs| -> String {
+            s.iter()
+                .flatten()
+                .map(|v| format!(" {v}"))
+                .collect::<String>()
+        };
+        got.push(format!("{ret}{}", flat(&s)));
+        mark_unused_and_empty_layers(&mut s);
+        got.push(flat(&s));
+        got.push(
+            (0..16)
+                .map(|v| format!(" {}", inchi_segment_action(v)))
+                .collect(),
+        );
         assert_eq!(got, want, "case {ci}: {inp}");
     }
 }
