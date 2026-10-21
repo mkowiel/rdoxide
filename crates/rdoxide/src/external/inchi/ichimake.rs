@@ -5,6 +5,7 @@
 //! Copyright (c) 2024 IUPAC and InChI Trust.
 //! Licensed under the MIT license (see LICENSES/InChI-MIT.txt).
 
+use super::ichi::{InChI, InChIAux, InChIStereo};
 use super::ichister::SpAtom;
 use super::inpdef::InpAtom;
 use super::util::get_periodic_table_number;
@@ -1047,4 +1048,441 @@ pub fn create_inchi(
         *t = tgi;
     }
     ret
+}
+
+// ---------------------------------------------------------------------------
+// Comparison of the InChI of a reversed structure with the input InChI
+
+pub const IDIF_SC_INV: i32 = 0x0010_0000;
+pub const IDIF_SC_PARITY: i32 = 0x0020_0000;
+pub const IDIF_SC_EXTRA_UNDF: i32 = 0x0040_0000;
+pub const IDIF_SC_EXTRA: i32 = 0x0080_0000;
+pub const IDIF_SC_MISS_UNDF: i32 = 0x0100_0000;
+pub const IDIF_SC_MISS: i32 = 0x0200_0000;
+pub const IDIF_SB_PARITY: i32 = 0x0400_0000;
+pub const IDIF_SB_EXTRA_UNDF: i32 = 0x0800_0000;
+pub const IDIF_SB_EXTRA: i32 = 0x1000_0000;
+pub const IDIF_SB_MISS_UNDF: i32 = 0x2000_0000;
+pub const IDIF_SB_MISS: i32 = 0x4000_0000;
+
+pub const ICR_MAX_SB_IN1_ONLY: usize = 32;
+pub const ICR_MAX_SB_IN2_ONLY: usize = 32;
+pub const ICR_MAX_SC_IN1_ONLY: usize = 32;
+pub const ICR_MAX_SC_IN2_ONLY: usize = 32;
+pub const ICR_MAX_SB_UNDF: usize = 32;
+pub const ICR_MAX_SC_UNDF: usize = 32;
+
+/// The stereo part of `ICR` (`tagInChICompareResults`).
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Icr {
+    pub sc_in1_only: Vec<u16>,
+    pub sc_in2_only: Vec<u16>,
+    pub sb_in1_only: Vec<u16>,
+    pub sb_in2_only: Vec<u16>,
+    pub sb_undef_in1_only: Vec<u16>,
+    pub sb_undef_in2_only: Vec<u16>,
+    pub sc_undef_in1_only: Vec<u16>,
+    pub sc_undef_in2_only: Vec<u16>,
+}
+
+/// `CompareReversedStereoINChI`
+pub fn compare_reversed_stereo_inchi(s1: Option<&InChIStereo>, s2: Option<&InChIStereo>) -> i32 {
+    let (s1, s2) = match (s1, s2) {
+        (None, None) => return 0,
+        (Some(s), None) | (None, Some(s)) => {
+            return if s.n_number_of_stereo_centers != 0 || s.n_number_of_stereo_bonds != 0 {
+                20
+            } else {
+                0
+            };
+        }
+        (Some(a), Some(b)) => (a, b),
+    };
+    if s1.n_number_of_stereo_centers != s2.n_number_of_stereo_centers {
+        return 21;
+    }
+    let nc = s1.n_number_of_stereo_centers.max(0) as usize;
+    if nc > 0 {
+        if s1.n_number[..nc] != s2.n_number[..nc] {
+            return 22;
+        }
+        if s1.t_parity[..nc] != s2.t_parity[..nc] {
+            return 23;
+        }
+        if s1.n_comp_inv2_abs != s2.n_comp_inv2_abs
+            && s1.n_comp_inv2_abs != 0
+            && s2.n_comp_inv2_abs != 0
+        {
+            return 24;
+        }
+    }
+    if s1.n_number_of_stereo_bonds != s2.n_number_of_stereo_bonds {
+        return 25;
+    }
+    let nb = s1.n_number_of_stereo_bonds.max(0) as usize;
+    if nb > 0 {
+        if s1.n_bond_atom1[..nb] != s2.n_bond_atom1[..nb] {
+            return 26;
+        }
+        if s1.n_bond_atom2[..nb] != s2.n_bond_atom2[..nb] {
+            return 27;
+        }
+        if s1.b_parity[..nb] != s2.b_parity[..nb] {
+            return 28;
+        }
+    }
+    0
+}
+
+fn push_max(v: &mut Vec<u16>, max: usize, x: usize) {
+    if v.len() < max {
+        v.push(x as u16);
+    }
+}
+
+/// `CompareReversedStereoINChI2`
+pub fn compare_reversed_stereo_inchi2(
+    s1: Option<&InChIStereo>,
+    s2: Option<&InChIStereo>,
+    icr: &mut Icr,
+) -> i32 {
+    use super::ichister::AB_PARITY_UNDF;
+    let undf = AB_PARITY_UNDF as i8;
+    let mut ret = 0;
+    let add_sb = icr.sb_undef_in1_only.len() + icr.sb_in1_only.len() + icr.sb_in2_only.len() == 0;
+    let add_sc = icr.sc_undef_in1_only.len() + icr.sc_in1_only.len() + icr.sc_in2_only.len() == 0;
+    let nsc1 = s1.map_or(0, |s| s.n_number_of_stereo_centers.max(0) as usize);
+    let nsc2 = s2.map_or(0, |s| s.n_number_of_stereo_centers.max(0) as usize);
+    let nsb1 = s1.map_or(0, |s| s.n_number_of_stereo_bonds.max(0) as usize);
+    let nsb2 = s2.map_or(0, |s| s.n_number_of_stereo_bonds.max(0) as usize);
+
+    if let (Some(s1), Some(s2)) = (s1, s2) {
+        if (nsc1 != 0 || nsc2 != 0)
+            && (nsc1 != nsc2
+                || s1.n_number[..nsc1] != s2.n_number[..nsc1]
+                || s1.t_parity[..nsc1] != s2.t_parity[..nsc1])
+        {
+            let (mut num_dif, mut extra_undf, mut miss_undf, mut in1_only, mut in2_only) =
+                (0, 0, 0, 0, 0);
+            let (mut j1, mut j2) = (0, 0);
+            while j1 < nsc1 && j2 < nsc2 {
+                if s1.n_number[j1] == s2.n_number[j2] {
+                    if s1.t_parity[j1] != s2.t_parity[j2] {
+                        num_dif += 1;
+                    }
+                    j1 += 1;
+                    j2 += 1;
+                } else if s1.n_number[j1] < s2.n_number[j2] {
+                    in1_only += 1;
+                    if s1.t_parity[j1] == undf {
+                        extra_undf += 1;
+                    }
+                    if add_sc {
+                        push_max(&mut icr.sc_in1_only, ICR_MAX_SC_IN1_ONLY, j1);
+                        if s1.t_parity[j1] == undf {
+                            push_max(&mut icr.sc_undef_in1_only, ICR_MAX_SC_UNDF, j1);
+                        }
+                    }
+                    j1 += 1;
+                } else {
+                    in2_only += 1;
+                    if s2.t_parity[j2] == undf {
+                        miss_undf += 1;
+                    }
+                    if add_sc {
+                        push_max(&mut icr.sc_in2_only, ICR_MAX_SC_IN2_ONLY, j2);
+                        if s2.t_parity[j2] == undf {
+                            // as in the C code: records `j1`
+                            push_max(&mut icr.sc_undef_in2_only, ICR_MAX_SC_UNDF, j1);
+                        }
+                    }
+                    j2 += 1;
+                }
+            }
+            while j1 < nsc1 {
+                if s1.t_parity[j1] == undf {
+                    extra_undf += 1;
+                }
+                in1_only += 1;
+                if add_sc {
+                    push_max(&mut icr.sc_in1_only, ICR_MAX_SC_IN1_ONLY, j1);
+                    if s1.t_parity[j1] == undf {
+                        push_max(&mut icr.sc_undef_in1_only, ICR_MAX_SC_UNDF, j1);
+                    }
+                }
+                j1 += 1;
+            }
+            while j2 < nsc2 {
+                if s2.t_parity[j2] == undf {
+                    miss_undf += 1;
+                }
+                in2_only += 1;
+                if add_sc {
+                    push_max(&mut icr.sc_in2_only, ICR_MAX_SC_IN2_ONLY, j2);
+                }
+                j2 += 1;
+            }
+            if num_dif != 0 {
+                ret |= IDIF_SC_PARITY;
+            }
+            if in1_only != 0 {
+                if extra_undf != 0 {
+                    ret |= IDIF_SC_EXTRA_UNDF;
+                }
+                if in1_only != extra_undf {
+                    ret |= IDIF_SC_EXTRA;
+                }
+            }
+            if in2_only != 0 {
+                if miss_undf != 0 {
+                    ret |= IDIF_SC_MISS_UNDF;
+                }
+                if in2_only != miss_undf {
+                    ret |= IDIF_SC_MISS;
+                }
+            }
+        }
+        if s1.n_comp_inv2_abs != s2.n_comp_inv2_abs
+            && s1.n_comp_inv2_abs != 0
+            && s2.n_comp_inv2_abs != 0
+        {
+            ret |= IDIF_SC_INV;
+        }
+    }
+
+    let differs = nsb1 != nsb2
+        || match (s1, s2) {
+            (Some(s1), Some(s2)) => {
+                s1.n_bond_atom1[..nsb1] != s2.n_bond_atom1[..nsb1]
+                    || s1.n_bond_atom2[..nsb1] != s2.n_bond_atom2[..nsb1]
+                    || s1.b_parity[..nsb1] != s2.b_parity[..nsb1]
+            }
+            _ => false,
+        };
+    if (nsb1 != 0 || nsb2 != 0) && differs {
+        let (mut num_dif, mut extra_undf, mut miss_undf, mut in1_only, mut in2_only) =
+            (0, 0, 0, 0, 0);
+        let (mut j1, mut j2) = (0, 0);
+        let (a1, a2, p1, p2): (&[u16], &[u16], &[i8], &[i8]) = (
+            s1.map_or(&[], |s| &s.n_bond_atom1),
+            s2.map_or(&[], |s| &s.n_bond_atom1),
+            s1.map_or(&[], |s| &s.b_parity),
+            s2.map_or(&[], |s| &s.b_parity),
+        );
+        let (c1, c2): (&[u16], &[u16]) = (
+            s1.map_or(&[], |s| &s.n_bond_atom2),
+            s2.map_or(&[], |s| &s.n_bond_atom2),
+        );
+        while j1 < nsb1 && j2 < nsb2 {
+            if a1[j1] == a2[j2] && c1[j1] == c2[j2] {
+                if p1[j1] != p2[j2] {
+                    num_dif += 1;
+                }
+                j1 += 1;
+                j2 += 1;
+            } else if a1[j1] < a2[j2] || (a1[j1] == a2[j2] && c1[j1] < c2[j2]) {
+                in1_only += 1;
+                if p1[j1] == undf {
+                    extra_undf += 1;
+                }
+                if add_sb {
+                    push_max(&mut icr.sb_in1_only, ICR_MAX_SB_IN1_ONLY, j1);
+                    if p1[j1] == undf {
+                        push_max(&mut icr.sb_undef_in1_only, ICR_MAX_SB_UNDF, j1);
+                    }
+                }
+                j1 += 1;
+            } else {
+                in2_only += 1;
+                if p2[j2] == undf {
+                    miss_undf += 1;
+                }
+                if add_sb {
+                    push_max(&mut icr.sb_in2_only, ICR_MAX_SB_IN2_ONLY, j2);
+                    if p2[j2] == undf {
+                        // as in the C code: records `j1`
+                        push_max(&mut icr.sb_undef_in2_only, ICR_MAX_SB_UNDF, j1);
+                    }
+                }
+                j2 += 1;
+            }
+        }
+        while j1 < nsb1 {
+            in1_only += 1;
+            if p1[j1] == undf {
+                extra_undf += 1;
+            }
+            if add_sb {
+                push_max(&mut icr.sb_in1_only, ICR_MAX_SB_IN1_ONLY, j1);
+                if p1[j1] == undf {
+                    push_max(&mut icr.sb_undef_in1_only, ICR_MAX_SB_UNDF, j1);
+                }
+            }
+            j1 += 1;
+        }
+        while j2 < nsb2 {
+            in2_only += 1;
+            if p2[j2] == undf {
+                miss_undf += 1;
+            }
+            if add_sb {
+                push_max(&mut icr.sb_in2_only, ICR_MAX_SB_IN2_ONLY, j2);
+                if p2[j2] == undf {
+                    push_max(&mut icr.sb_undef_in2_only, ICR_MAX_SB_UNDF, j1);
+                }
+            }
+            j2 += 1;
+        }
+        if num_dif != 0 {
+            ret |= IDIF_SB_PARITY;
+        }
+        if in1_only != 0 {
+            if extra_undf != 0 {
+                ret |= IDIF_SB_EXTRA_UNDF;
+            }
+            if in1_only != extra_undf {
+                ret |= IDIF_SB_EXTRA;
+            }
+        }
+        if in2_only != 0 {
+            if miss_undf != 0 {
+                ret |= IDIF_SB_MISS_UNDF;
+            }
+            if in2_only != miss_undf {
+                ret |= IDIF_SB_MISS;
+            }
+        }
+    }
+    ret
+}
+
+/// `CompareReversedINChI`
+pub fn compare_reversed_inchi(
+    i1: Option<&InChI>,
+    i2: Option<&InChI>,
+    a1: Option<&InChIAux>,
+    a2: Option<&InChIAux>,
+) -> i32 {
+    let (i1, i2) = match (i1, i2) {
+        (None, None) => return 0,
+        (Some(_), None) | (None, Some(_)) => return 1,
+        (Some(a), Some(b)) => (a, b),
+    };
+    if i1.n_error_code == i2.n_error_code {
+        if i1.n_error_code != 0 {
+            return 0;
+        }
+    } else {
+        return 2;
+    }
+    if i1.b_deleted != i2.b_deleted {
+        return 1;
+    }
+    if i1.n_number_of_atoms != i2.n_number_of_atoms {
+        return 3;
+    }
+    let n = i1.n_number_of_atoms.max(0) as usize;
+    if n > 0 {
+        if i1.n_atom[..n] != i2.n_atom[..n] {
+            return 4;
+        }
+        if i1.sz_hill_formula != i2.sz_hill_formula {
+            return 7;
+        }
+        if i1.n_num_h[..n] != i2.n_num_h[..n] {
+            return if i1.len_conn_table > 1 || i2.len_conn_table > 1 {
+                5
+            } else {
+                6
+            };
+        }
+        if i1.n_num_h_fixed.is_some() || i2.n_num_h_fixed.is_some() {
+            let has =
+                |f: &Option<Vec<i8>>| f.as_ref().is_some_and(|v| v[..n].iter().any(|&x| x != 0));
+            let (h1, h2) = (has(&i1.n_num_h_fixed), has(&i2.n_num_h_fixed));
+            let (mut j1, mut j2) = (0, 0);
+            if h1 && !h2 {
+                return 18;
+            } else if !h1 && h2 {
+                return 19;
+            } else if h1 && h2 {
+                let (f1, f2) = (
+                    i1.n_num_h_fixed.as_ref().unwrap(),
+                    i2.n_num_h_fixed.as_ref().unwrap(),
+                );
+                if f1[..n] != f2[..n] {
+                    for i in 0..n {
+                        if f1[i] > f2[i] {
+                            j1 += 1;
+                        } else if f1[i] < f2[i] {
+                            j2 += 1;
+                        }
+                    }
+                }
+            }
+            let ret = if j1 != 0 && j2 != 0 {
+                20
+            } else if j1 != 0 {
+                18
+            } else if j2 != 0 {
+                19
+            } else {
+                0
+            };
+            if ret != 0 {
+                return ret;
+            }
+        }
+    }
+    if i1.len_conn_table != i2.len_conn_table {
+        return 8;
+    }
+    let lc = i1.len_conn_table.max(0) as usize;
+    if lc > 0 && i1.n_conn_table[..lc] != i2.n_conn_table[..lc] {
+        return 9;
+    }
+    if i1.len_tautomer != i2.len_tautomer && (i1.len_tautomer > 1 || i2.len_tautomer > 1) {
+        return 10;
+    }
+    let lt = i1.len_tautomer.max(0) as usize;
+    if i1.len_tautomer > 1 && i2.len_tautomer > 1 && i1.n_tautomer[..lt] != i2.n_tautomer[..lt] {
+        return 11;
+    }
+    if i1.n_number_of_isotopic_atoms != i2.n_number_of_isotopic_atoms {
+        return 12;
+    }
+    let ni = i1.n_number_of_isotopic_atoms.max(0) as usize;
+    if ni > 0 && i1.isotopic_atom[..ni] != i2.isotopic_atom[..ni] {
+        return 13;
+    }
+    if i1.n_total_charge != i2.n_total_charge {
+        return 14;
+    }
+    if let (Some(a1), Some(a2)) = (a1, a2) {
+        if a1.n_num_removed_protons != a2.n_num_removed_protons {
+            return 16;
+        }
+        if a1.n_num_removed_isotopic_h != a2.n_num_removed_isotopic_h {
+            return 17;
+        }
+    }
+    let ret = compare_reversed_stereo_inchi(i1.stereo.as_ref(), i2.stereo.as_ref());
+    if ret != 0 {
+        return ret + 20;
+    }
+    let dup = i2.stereo_isotopic.is_none()
+        && i2.stereo.is_some()
+        && i1
+            .stereo_isotopic
+            .as_ref()
+            .is_some_and(|s| s.n_number_of_stereo_bonds + s.n_number_of_stereo_centers > 0)
+        && compare_reversed_stereo_inchi(i1.stereo_isotopic.as_ref(), i2.stereo.as_ref()) == 0;
+    if !dup {
+        let ret =
+            compare_reversed_stereo_inchi(i1.stereo_isotopic.as_ref(), i2.stereo_isotopic.as_ref());
+        if ret != 0 {
+            return ret + 40;
+        }
+    }
+    0
 }

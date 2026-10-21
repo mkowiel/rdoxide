@@ -326,6 +326,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 210 | FillOutINChI: canonicalization result to INChI/INChI_Aux |
 | 211 | CheckCanonNumberingCorrectness (ichimake) |
 | 212 | InChI port I7h: `Create_INChI` orchestrator (ichimake), differential-tested on 3000 inputs vs the C library; fixes map_stereo length write-back |
+| 213 | InChI port I7i: `CompareReversedINChI`, `CompareReversedStereoINChI(2)` + ICR lists, differential-tested on 4000 pairs vs the C library |
 
 ## Python package files
 
@@ -708,3 +709,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-21 — Stage 210: I7f: FillOutINChI, 1955 differential canonicalization results
 * 2026-10-21 — Stage 211: I7g: CheckCanonNumberingCorrectness, 1955 differential results
 * 2026-10-21 — Stage 212: InChI port I7h: Create_INChI; 3000 differential cases match
+* 2026-10-21 — Stage 213: InChI port I7i: reversed-structure INChI comparisons; 4000 differential cases match
