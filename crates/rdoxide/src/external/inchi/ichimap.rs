@@ -721,3 +721,811 @@ pub fn break_all_ties(
     rank_stack[3] = n_new_atom_number;
     n_ret
 }
+
+// ---------------------------------------------------------------------------
+// ichimap1.c: mapping of stereo atoms and bonds, stereo CT comparison, CUR_TREE
+// ---------------------------------------------------------------------------
+
+use super::ichierr::CT_STEREOCOUNT_ERR;
+use super::ichister::{
+    AB_PARITY_UNDF, AB_PARITY_UNKN, AtStereoCarb, AtStereoDble, bond_chain_len, parity_known,
+    parity_val,
+};
+use super::inpdef::MAX_NUM_STEREO_BONDS;
+
+pub const STEREO_AT_MARK: i8 = 8;
+/// `BEST_PARITY` / `WORSE_PARITY` (`CT_SMALLEST`)
+pub const BEST_PARITY: i32 = 1;
+pub const WORSE_PARITY: i32 = 2;
+
+/// `All_SC_Same`: do all possibly stereogenic atoms that `canon_rank1` can be
+/// mapped on have the same KNOWN parity? Returns how many such atoms there are, or 0.
+pub fn all_sc_same(
+    canon_rank1: u16,
+    stack1: &[Vec<u16>],
+    stack2: &[Vec<u16>],
+    n_atom_number_canon_from: &[u16],
+    at: &[SpAtom],
+) -> i32 {
+    let n1 = n_atom_number_canon_from[canon_rank1 as usize - 1] as usize;
+    let r1 = stack1[0][n1];
+    let i_max1 = r1 as usize;
+    let mut b_found = 0;
+    let mut stereo_atom_parity = -1;
+    let mut i1 = 1;
+    while i1 <= i_max1 {
+        let s1 = stack2[1][i_max1 - i1] as usize;
+        if r1 != stack2[0][s1] {
+            break;
+        }
+        if at[s1].stereo_bond_neighbor[0] != 0 {
+            b_found = 0;
+            break;
+        } else if i1 == 1 {
+            stereo_atom_parity = parity_val(i32::from(at[s1].stereo_atom_parity));
+            if !(1..=4).contains(&stereo_atom_parity) {
+                b_found = 0;
+                break;
+            }
+        } else if stereo_atom_parity != parity_val(i32::from(at[s1].stereo_atom_parity)) {
+            b_found = 0;
+            break;
+        }
+        b_found += 1;
+        i1 += 1;
+    }
+    b_found
+}
+
+/// `Next_SC_At_CanonRank2`: the next canonical rank that can be mapped on a
+/// not yet mapped stereocenter
+pub fn next_sc_at_canon_rank2(
+    canon_rank1: &mut u16,
+    canon_rank1_min: &mut u16,
+    b_first_time: &mut bool,
+    b_atom_used_for_stereo: &[i8],
+    stack1: &[Vec<u16>],
+    stack2: &[Vec<u16>],
+    n_atom_number_canon_from: &[u16],
+    num_atoms: i32,
+) -> bool {
+    let mut canon_rank1_inp = *canon_rank1;
+    if canon_rank1_inp < *canon_rank1_min {
+        canon_rank1_inp = *canon_rank1_min;
+    } else if canon_rank1_inp < 1 {
+        canon_rank1_inp = 1;
+    } else {
+        canon_rank1_inp += 1;
+    }
+    let mut cr1 = canon_rank1_inp;
+    let mut b_found = false;
+    while i32::from(cr1) <= num_atoms {
+        let n1 = n_atom_number_canon_from[cr1 as usize - 1] as usize;
+        let r1 = stack1[0][n1];
+        let i_max1 = r1 as usize;
+        let mut i1 = 1;
+        while i1 <= i_max1 {
+            let s1 = stack2[1][i_max1 - i1] as usize;
+            if r1 != stack2[0][s1] {
+                break;
+            }
+            if b_atom_used_for_stereo[s1] == STEREO_AT_MARK {
+                b_found = true;
+                break;
+            }
+            i1 += 1;
+        }
+        if b_found {
+            if *b_first_time {
+                *canon_rank1_min = cr1;
+                *b_first_time = false;
+            }
+            break;
+        }
+        cr1 += 1;
+    }
+    if b_found {
+        *canon_rank1 = cr1;
+        return true;
+    }
+    false
+}
+
+/// `CompareLinCtStereoDble`
+pub fn compare_lin_ct_stereo_dble(
+    d1: Option<&[AtStereoDble]>,
+    len1: i32,
+    d2: Option<&[AtStereoDble]>,
+    len2: i32,
+) -> i32 {
+    if let (Some(a), Some(b)) = (d1, d2) {
+        let num = len1.min(len2) as usize;
+        let mut ret = 0;
+        for i in 0..num {
+            ret = i32::from(a[i].at_num1) - i32::from(b[i].at_num1);
+            if ret != 0 {
+                break;
+            }
+            ret = i32::from(a[i].at_num2) - i32::from(b[i].at_num2);
+            if ret != 0 {
+                break;
+            }
+            ret = i32::from(a[i].parity) - i32::from(b[i].parity);
+            if ret != 0 {
+                break;
+            }
+        }
+        if ret == 0 {
+            ret = len1 - len2;
+        }
+        ret
+    } else if d1.is_some() && len1 > 0 {
+        1
+    } else if d2.is_some() && len2 > 0 {
+        -1
+    } else {
+        0
+    }
+}
+
+/// `CompareLinCtStereoCarb`
+pub fn compare_lin_ct_stereo_carb(
+    c1: Option<&[AtStereoCarb]>,
+    len1: i32,
+    c2: Option<&[AtStereoCarb]>,
+    len2: i32,
+) -> i32 {
+    if let (Some(a), Some(b)) = (c1, c2) {
+        let num = len1.min(len2) as usize;
+        let mut ret = 0;
+        for i in 0..num {
+            ret = i32::from(a[i].at_num) - i32::from(b[i].at_num);
+            if ret != 0 {
+                break;
+            }
+            ret = i32::from(a[i].parity) - i32::from(b[i].parity);
+            if ret != 0 {
+                break;
+            }
+        }
+        if ret == 0 {
+            ret = len1 - len2;
+        }
+        ret
+    } else if c1.is_some() && len1 > 0 {
+        1
+    } else if c2.is_some() && len2 > 0 {
+        -1
+    } else {
+        0
+    }
+}
+
+/// `CompareLinCtStereo`
+#[allow(clippy::too_many_arguments)]
+pub fn compare_lin_ct_stereo(
+    d1: Option<&[AtStereoDble]>,
+    dlen1: i32,
+    c1: Option<&[AtStereoCarb]>,
+    clen1: i32,
+    d2: Option<&[AtStereoDble]>,
+    dlen2: i32,
+    c2: Option<&[AtStereoCarb]>,
+    clen2: i32,
+) -> i32 {
+    let ret = compare_lin_ct_stereo_dble(d1, dlen1, d2, dlen2);
+    if ret == 0 {
+        compare_lin_ct_stereo_carb(c1, clen1, c2, clen2)
+    } else {
+        ret
+    }
+}
+
+/// `CompareLinCtStereoAtomToValues` (`CT_SMALLEST`: greater than is `>`)
+pub fn compare_lin_ct_stereo_atom_to_values(
+    c: &AtStereoCarb,
+    at_rank_canon1: u16,
+    parity: u8,
+) -> i32 {
+    if c.at_num > at_rank_canon1 {
+        return 1;
+    }
+    if c.at_num != at_rank_canon1 {
+        return -1;
+    }
+    if c.parity > parity {
+        return 1;
+    }
+    if c.parity != parity {
+        return -1;
+    }
+    0
+}
+
+/// `CompareLinCtStereoDoubleToValues`
+pub fn compare_lin_ct_stereo_double_to_values(
+    d: &AtStereoDble,
+    at_rank_canon1: u16,
+    at_rank_canon2: u16,
+    bond_parity: u8,
+) -> i32 {
+    if d.at_num1 > at_rank_canon1 {
+        return 1;
+    }
+    if d.at_num1 != at_rank_canon1 {
+        return -1;
+    }
+    if d.at_num2 > at_rank_canon2 {
+        return 1;
+    }
+    if d.at_num2 != at_rank_canon2 {
+        return -1;
+    }
+    if d.parity > bond_parity {
+        return 1;
+    }
+    if d.parity != bond_parity {
+        return -1;
+    }
+    0
+}
+
+/// `bUniqueAtNbrFromMappingRank`: the atom with mapping rank `n_at_rank` if it is unique
+pub fn b_unique_at_nbr_from_mapping_rank(rank_stack: &[Vec<u16>], n_at_rank: u16) -> Option<u16> {
+    let r = n_at_rank as usize - 1;
+    let i = rank_stack[1][r];
+    if n_at_rank == rank_stack[0][i as usize]
+        && (r == 0 || n_at_rank != rank_stack[0][rank_stack[1][r - 1] as usize])
+    {
+        Some(i)
+    } else {
+        None
+    }
+}
+
+/// `nGetMcr`: minimal class representative, compressing the path
+pub fn n_get_mcr(n_eq_array: &mut [u16], n: u16) -> u16 {
+    let mut n1 = n_eq_array[n as usize];
+    if n == n1 {
+        return n;
+    }
+    loop {
+        let n2 = n_eq_array[n1 as usize];
+        if n1 == n2 {
+            break;
+        }
+        n1 = n2;
+    }
+    let mcr = n1;
+    n1 = n;
+    loop {
+        let n2 = n_eq_array[n1 as usize];
+        if mcr == n2 {
+            break;
+        }
+        n_eq_array[n1 as usize] = mcr;
+        n1 = n2;
+    }
+    mcr
+}
+
+/// `nJoin2Mcrs`: 1 if the classes were joined
+pub fn n_join2_mcrs(n_eq_array: &mut [u16], n1: u16, n2: u16) -> i32 {
+    let n1 = n_get_mcr(n_eq_array, n1);
+    let n2 = n_get_mcr(n_eq_array, n2);
+    if n1 < n2 {
+        n_eq_array[n2 as usize] = n1;
+        return 1;
+    }
+    if n2 < n1 {
+        n_eq_array[n1 as usize] = n2;
+        return 1;
+    }
+    0
+}
+
+fn find_sb_pos(at: &[SpAtom], a: usize, partner: usize) -> Option<usize> {
+    for k in 0..MAX_NUM_STEREO_BONDS {
+        let m = at[a].stereo_bond_neighbor[k] as usize;
+        if m == 0 {
+            return None;
+        }
+        if m - 1 == partner {
+            return Some(k);
+        }
+    }
+    None
+}
+
+/// `All_SB_Same`: the number of stereo bonds `canon_rank1`-`canon_rank2` can
+/// be mapped on if all have the same known parity; 0 if not; -1 on an error
+pub fn all_sb_same(
+    canon_rank1: u16,
+    canon_rank2: u16,
+    stack1: &[Vec<u16>],
+    stack2: &[Vec<u16>],
+    n_atom_number_canon_from: &[u16],
+    at: &[SpAtom],
+) -> i32 {
+    let n1 = n_atom_number_canon_from[canon_rank1 as usize - 1] as usize;
+    let n2 = n_atom_number_canon_from[canon_rank2 as usize - 1] as usize;
+    let r1 = stack1[0][n1];
+    let r2 = stack1[0][n2];
+    let i_max1 = r1 as usize;
+    let (mut s1, mut s2, mut k1) = (0usize, 0usize, 0usize);
+    let mut b_not_found = true;
+    let mut i1 = 1;
+    while i1 <= i_max1 {
+        s1 = stack2[1][i_max1 - i1] as usize;
+        if r1 != stack2[0][s1] {
+            break;
+        }
+        k1 = 0;
+        s2 = 0;
+        b_not_found = true;
+        while k1 < MAX_NUM_STEREO_BONDS {
+            let t = at[s1].stereo_bond_neighbor[k1] as usize;
+            if t == 0 {
+                s2 = 0;
+                break;
+            }
+            s2 = t - 1;
+            b_not_found = r2 != stack2[0][s2];
+            if !b_not_found {
+                break;
+            }
+            k1 += 1;
+        }
+        if !b_not_found {
+            break;
+        }
+        i1 += 1;
+    }
+    if b_not_found {
+        return -1;
+    }
+    let Some(k2) = find_sb_pos(at, s2, s1) else {
+        return -1;
+    };
+    let stereo_bond_parity = i32::from(at[s1].stereo_bond_parity[k1]);
+    if !parity_known(stereo_bond_parity) {
+        return 0;
+    }
+    let cumulene_len = bond_chain_len(stereo_bond_parity);
+    let r_neigh1 = stack2[0][at[s1].neighbor[at[s1].stereo_bond_ord[k1] as usize] as usize];
+    let r_neigh2 = stack2[0][at[s2].neighbor[at[s2].stereo_bond_ord[k2] as usize] as usize];
+    let mut num_equal = 0;
+    let mut sc = 1;
+    while sc <= i_max1 {
+        let i1 = stack2[1][i_max1 - sc] as usize;
+        if r1 != stack2[0][i1] {
+            break;
+        }
+        for k in 0..at[i1].valence as usize {
+            let n1 = at[i1].neighbor[k] as usize;
+            if r_neigh1 != stack2[0][n1] {
+                continue;
+            }
+            let i2 = if cumulene_len != 0 {
+                let (mut prev, mut len, mut next) = (i1, 0, n1);
+                while len < cumulene_len {
+                    if at[next].valence == 2 && at[next].num_h == 0 {
+                        let j = usize::from(at[next].neighbor[0] as usize == prev);
+                        prev = next;
+                        next = at[next].neighbor[j] as usize;
+                    } else {
+                        break;
+                    }
+                    len += 1;
+                }
+                if len != cumulene_len || r2 != stack2[0][next] || r_neigh2 != stack2[0][prev] {
+                    continue;
+                }
+                next
+            } else {
+                n1
+            };
+            let Some(kk1) = find_sb_pos(at, i1, i2) else {
+                return 0;
+            };
+            let Some(kk2) = find_sb_pos(at, i2, i1) else {
+                return 0;
+            };
+            if at[i1].stereo_bond_parity[kk1] != at[i2].stereo_bond_parity[kk2] {
+                return -1;
+            }
+            if stereo_bond_parity != i32::from(at[i1].stereo_bond_parity[kk1]) {
+                return 0;
+            }
+            num_equal += 1;
+        }
+        sc += 1;
+    }
+    num_equal
+}
+
+/// `Next_SB_At_CanonRanks2`: the next pair of canonical ranks that can be
+/// mapped on a not yet mapped stereo bond
+#[allow(clippy::too_many_arguments)]
+pub fn next_sb_at_canon_ranks2(
+    canon_rank1: &mut u16,
+    canon_rank2: &mut u16,
+    canon_rank1_min: &mut u16,
+    canon_rank2_min: &mut u16,
+    b_first_time: &mut bool,
+    b_atom_used_for_stereo: &[i8],
+    stack1: &[Vec<u16>],
+    stack2: &[Vec<u16>],
+    n_canon_rank_from: &[u16],
+    n_atom_number_canon_from: &[u16],
+    at: &[SpAtom],
+    num_atoms: i32,
+    b_allene: bool,
+) -> bool {
+    let mut canon_rank1_inp = *canon_rank1;
+    let mut canon_rank2_inp = *canon_rank2;
+    if canon_rank1_inp < *canon_rank1_min
+        || (canon_rank1_inp == *canon_rank1_min && canon_rank2_inp < *canon_rank2_min)
+    {
+        canon_rank1_inp = *canon_rank1_min;
+        canon_rank2_inp = *canon_rank2_min;
+    } else if canon_rank1_inp < 2 {
+        canon_rank1_inp = 2;
+        canon_rank2_inp = 0;
+    }
+    let mut cr1 = canon_rank1_inp;
+    let mut cr2 = num_atoms as u16;
+    while i32::from(cr1) <= num_atoms {
+        cr2 = cr1;
+        let n1 = n_atom_number_canon_from[cr1 as usize - 1] as usize;
+        let r1 = stack1[0][n1];
+        let i_max1 = r1 as usize;
+        let mut i1 = 1;
+        while i1 <= i_max1 {
+            let s1 = stack2[1][i_max1 - i1] as usize;
+            if r1 != stack2[0][s1] {
+                break;
+            }
+            if b_atom_used_for_stereo[s1] != 0 && b_atom_used_for_stereo[s1] < STEREO_AT_MARK {
+                let mut k = 0;
+                while k < MAX_NUM_STEREO_BONDS && at[s1].stereo_bond_neighbor[k] != 0 {
+                    let s2 = at[s1].stereo_bond_neighbor[k] as usize - 1;
+                    if b_atom_used_for_stereo[s2] != 0 {
+                        let cumulene_len = bond_chain_len(i32::from(at[s1].stereo_bond_parity[k]));
+                        if (cumulene_len % 2 != 0 && !b_allene)
+                            || (cumulene_len % 2 == 0 && b_allene)
+                        {
+                            k += 1;
+                            continue;
+                        }
+                        let r2 = stack2[0][s2];
+                        let i_max2 = r2 as usize;
+                        let mut i2 = 1;
+                        while i2 <= i_max2 {
+                            let n2 = stack1[1][i_max2 - i2] as usize;
+                            if r2 != stack1[0][n2] {
+                                break;
+                            }
+                            let mut m;
+                            if cumulene_len != 0 {
+                                m = 0;
+                                while m < at[n1].valence as usize {
+                                    let (mut prev, mut len, mut next) =
+                                        (n1, 0, at[n1].neighbor[m] as usize);
+                                    while len < cumulene_len {
+                                        if at[next].valence == 2 && at[next].num_h == 0 {
+                                            let j =
+                                                usize::from(at[next].neighbor[0] as usize == prev);
+                                            prev = next;
+                                            next = at[next].neighbor[j] as usize;
+                                        } else {
+                                            break;
+                                        }
+                                        len += 1;
+                                    }
+                                    if len == cumulene_len && n2 == next {
+                                        break;
+                                    }
+                                    m += 1;
+                                }
+                            } else {
+                                m = 0;
+                                while m < at[n1].valence as usize
+                                    && n2 != at[n1].neighbor[m] as usize
+                                {
+                                    m += 1;
+                                }
+                            }
+                            if m < at[n1].valence as usize
+                                && n_canon_rank_from[n2] < cr2
+                                && n_canon_rank_from[n2] > canon_rank2_inp
+                            {
+                                cr2 = n_canon_rank_from[n2];
+                            }
+                            i2 += 1;
+                        }
+                    }
+                    k += 1;
+                }
+            }
+            i1 += 1;
+        }
+        if cr2 >= cr1 {
+            cr1 += 1;
+            canon_rank2_inp = 0;
+        } else {
+            if *b_first_time {
+                *canon_rank1_min = cr1;
+                *canon_rank2_min = cr2;
+                *b_first_time = false;
+            }
+            break;
+        }
+    }
+    if cr1 > cr2 && i32::from(cr1) <= num_atoms {
+        *canon_rank1 = cr1;
+        *canon_rank2 = cr2;
+        return true;
+    }
+    false
+}
+
+/// `NextStereoParity2Test`: steps through the (parity, calculated parity) pairs;
+/// 1 means "go to the next pair of canonical ranks"
+#[allow(clippy::too_many_arguments)]
+pub fn next_stereo_parity2_test(
+    stereo_bond_parity: &mut i32,
+    sb_parity_calc: &mut i32,
+    n_num_best: i32,
+    n_num_worse: i32,
+    n_num_unkn: i32,
+    n_num_undf: i32,
+    n_num_calc: i32,
+    v_ab_parity_unknown: i32,
+) -> i32 {
+    loop {
+        match *stereo_bond_parity {
+            BEST_PARITY => match *sb_parity_calc {
+                0 => {
+                    *stereo_bond_parity = WORSE_PARITY;
+                    if n_num_worse == 0 {
+                        continue;
+                    }
+                }
+                BEST_PARITY => {
+                    *sb_parity_calc = WORSE_PARITY;
+                    if n_num_best == 0 {
+                        continue;
+                    }
+                }
+                WORSE_PARITY => {
+                    *stereo_bond_parity = WORSE_PARITY;
+                    if n_num_calc == 0 {
+                        continue;
+                    }
+                }
+                _ => {}
+            },
+            WORSE_PARITY => match *sb_parity_calc {
+                0 => {
+                    *stereo_bond_parity = v_ab_parity_unknown;
+                    if n_num_unkn == 0 {
+                        continue;
+                    }
+                }
+                BEST_PARITY => return CT_STEREOCOUNT_ERR,
+                WORSE_PARITY => {
+                    *sb_parity_calc = 0;
+                    if n_num_worse == 0 {
+                        continue;
+                    }
+                }
+                _ => {}
+            },
+            AB_PARITY_UNKN => {
+                if *sb_parity_calc != 0 {
+                    return CT_STEREOCOUNT_ERR;
+                }
+                *stereo_bond_parity = AB_PARITY_UNDF;
+                if n_num_undf == 0 {
+                    return 1;
+                }
+            }
+            AB_PARITY_UNDF => {
+                if *sb_parity_calc != 0 {
+                    return CT_STEREOCOUNT_ERR;
+                }
+                return 1;
+            }
+            _ => {}
+        }
+        return 0;
+    }
+}
+
+/// `SetUseAtomForStereo`: 0 for atoms without parity, `STEREO_AT_MARK` for
+/// stereocenters, otherwise the number of adjacent stereo bonds
+pub fn set_use_atom_for_stereo(b_atom_used_for_stereo: &mut [i8], at: &[SpAtom], num_atoms: usize) {
+    b_atom_used_for_stereo[..num_atoms].fill(0);
+    for i in 0..num_atoms {
+        if at[i].parity != 0 {
+            let mut k = 0;
+            while k < MAX_NUM_STEREO_BONDS && at[i].stereo_bond_neighbor[k] != 0 {
+                k += 1;
+            }
+            b_atom_used_for_stereo[i] = if k != 0 { k as i8 } else { STEREO_AT_MARK };
+        }
+    }
+}
+
+/// `CUR_TREE`: a stack of (rank, atoms..., count) segments
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct CurTree {
+    pub tree: Vec<u16>,
+    pub cur_len: i32,
+    pub max_len: i32,
+    pub incr_len: i32,
+}
+
+impl CurTree {
+    /// `CurTreeAlloc`
+    pub fn alloc(&mut self, num_atoms: i32) -> i32 {
+        if !self.tree.is_empty() && self.max_len > 0 && self.max_len % num_atoms == 0 {
+            self.cur_len = 0;
+            self.incr_len = num_atoms;
+            let n = self.max_len as usize;
+            self.tree[..n].fill(0);
+            return 0;
+        }
+        *self = CurTree::default();
+        if num_atoms > 0 {
+            self.tree = vec![0; num_atoms as usize];
+            self.incr_len = num_atoms;
+            self.max_len = num_atoms;
+            return 0;
+        }
+        -1
+    }
+
+    /// `CurTreeReAlloc`
+    pub fn realloc(&mut self) -> i32 {
+        if !self.tree.is_empty() && self.max_len > 0 && self.incr_len > 0 {
+            self.tree.resize((self.max_len + self.incr_len) as usize, 0);
+            self.max_len += self.incr_len;
+            return 0;
+        }
+        -1
+    }
+
+    /// `CurTreeFree`
+    pub fn free(&mut self) {
+        *self = CurTree::default();
+    }
+
+    /// `CurTreeAddRank`
+    pub fn add_rank(&mut self, rank: u16) -> i32 {
+        if self.cur_len + 2 > self.max_len && self.realloc() != 0 {
+            return -1;
+        }
+        self.tree[self.cur_len as usize] = rank;
+        self.tree[self.cur_len as usize + 1] = 1;
+        self.cur_len += 2;
+        0
+    }
+
+    /// `CurTreeIsLastRank`
+    pub fn is_last_rank(&self, rank: u16) -> i32 {
+        if self.cur_len > 0 {
+            let mut rank_pos = self.cur_len - 1;
+            rank_pos -= i32::from(self.tree[rank_pos as usize]);
+            if rank_pos >= 0 {
+                return i32::from(rank == self.tree[rank_pos as usize]);
+            }
+        }
+        0
+    }
+
+    /// `CurTreeRemoveLastRankIfNoAtoms`
+    pub fn remove_last_rank_if_no_atoms(&mut self) -> i32 {
+        if !self.tree.is_empty() && self.cur_len >= 2 {
+            if self.tree[self.cur_len as usize - 1] == 1 {
+                return self.remove_last_rank();
+            }
+            return 1;
+        }
+        -1
+    }
+
+    /// `CurTreeAddAtom`
+    pub fn add_atom(&mut self, at_no: i32) -> i32 {
+        if self.cur_len + 1 > self.max_len && self.realloc() != 0 {
+            return -1;
+        }
+        if self.cur_len > 0 {
+            self.cur_len -= 1;
+            let new_len = self.tree[self.cur_len as usize] + 1;
+            self.tree[self.cur_len as usize] = at_no as u16;
+            self.cur_len += 1;
+            self.tree[self.cur_len as usize] = new_len;
+            self.cur_len += 1;
+            return 0;
+        }
+        -1
+    }
+
+    /// `CurTreeKeepLastAtomsOnly`
+    pub fn keep_last_atoms_only(&mut self, tpos: i32, mut shift: i32) {
+        if self.tree.is_empty() {
+            return;
+        }
+        let cur_length_pos = self.cur_len - shift;
+        if cur_length_pos > tpos {
+            let seg = i32::from(self.tree[cur_length_pos as usize]);
+            if seg > 2 {
+                self.cur_len -= seg - 2;
+                let dst = (cur_length_pos - seg + 1) as usize;
+                let src = (cur_length_pos - 1) as usize;
+                let count = (shift + 1) as usize;
+                self.tree.copy_within(src..src + count, dst);
+                self.tree[(self.cur_len - shift) as usize] = 2;
+                shift += 3;
+            } else {
+                shift += seg + 1;
+            }
+            self.keep_last_atoms_only(tpos, shift);
+        }
+    }
+
+    /// `CurTreeRemoveIfLastAtom`
+    pub fn remove_if_last_atom(&mut self, at_no: i32) -> i32 {
+        if !self.tree.is_empty() && self.cur_len > 2 {
+            let len = self.tree[self.cur_len as usize - 1];
+            if len >= 2 && i32::from(self.tree[self.cur_len as usize - 2]) == at_no {
+                self.cur_len -= 1;
+                self.tree[self.cur_len as usize - 1] = len - 1;
+                return 0;
+            }
+            return 1;
+        }
+        -1
+    }
+
+    /// `CurTreeGetPos`
+    pub fn get_pos(&self) -> i32 {
+        self.cur_len
+    }
+
+    /// `CurTreeSetPos`
+    pub fn set_pos(&mut self, len: i32) -> i32 {
+        self.cur_len = len;
+        0
+    }
+
+    /// `CurTreeRemoveLastRank`
+    pub fn remove_last_rank(&mut self) -> i32 {
+        if self.cur_len > 0 {
+            self.cur_len -= i32::from(self.tree[self.cur_len as usize - 1]) + 1;
+            if self.cur_len >= 0 {
+                return 0;
+            }
+        }
+        -1
+    }
+
+    /// `CurTreeIsLastAtomEqu`
+    pub fn is_last_atom_equ(&self, at_no: i32, n_symm_stereo: &[u16]) -> i32 {
+        if !self.tree.is_empty() && self.cur_len > 1 {
+            let n_eq = n_symm_stereo[at_no as usize];
+            let end = self.cur_len - 1;
+            let mut len = i32::from(self.tree[end as usize]) - 1;
+            while len > 0 {
+                if n_symm_stereo[self.tree[(end - len) as usize] as usize] == n_eq {
+                    return 1;
+                }
+                len -= 1;
+            }
+            return 0;
+        }
+        -1
+    }
+}

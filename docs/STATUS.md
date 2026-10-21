@@ -304,6 +304,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 188 | InChI I6e: ichicans SetKnown/MarkKnownEqual/RemoveKnownNonStereo bond parities verified on 6000 random molecules vs the C code |
 | 189 | InChI I6f: ichicans SetKnown/MarkKnownEqual/RemoveKnownNonStereo center parities and FillOutStereoParities verified on 6000 random molecules vs the C code |
 | 190 | InChI I6g: ichimap rank refinement (CreateNeighList, SetNewRanksFromNeighLists*, DifferentiateRanks*, BreakAllTies, CompAtomInvariants2) verified on 3000 random graphs vs the C code |
+| 191 | InChI port I6h: ichimap1 stereo mapping helpers (All_SC_Same, Next_SB_At_CanonRanks2, CompareLinCtStereo*, nGetMcr, CUR_TREE) with differential test against the C code |
 
 ## Python package files
 
@@ -664,3 +665,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-21 — Stage 188: InChI I6e: known-in-advance stereo bond parities ported and differentially tested
 * 2026-10-21 — Stage 189: InChI I6f: known-in-advance stereo center parities and FillOutStereoParities ported and differentially tested
 * 2026-10-21 — Stage 190: InChI I6g: neighbor lists and rank refinement ported and differentially tested
+* 2026-10-21 — Stage 191: ported ichimap1.c and tested it against the real InChI C on 3000 random cases.
