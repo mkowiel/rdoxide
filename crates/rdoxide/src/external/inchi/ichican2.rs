@@ -11,8 +11,8 @@
 //! Copyright (c) 2024 IUPAC and InChI Trust.
 //! Licensed under the MIT license (see LICENSES/InChI-MIT.txt).
 
-use super::ichi_bns::NodeSet;
-use super::ichierr::{CT_CANON_ERR, CT_OUT_OF_RAM};
+use super::ichi_bns::{NodeSet, node_set_create};
+use super::ichierr::{CT_CANON_ERR, CT_OUT_OF_RAM, CT_TIMEOUT_ERR};
 use super::ichimap::{NeighList, differentiate_ranks3, differentiate_ranks4};
 
 pub const INCHI_CANON_INFINITY: u16 = 0x7FFF;
@@ -573,6 +573,8 @@ pub const MAX_LAYERS: usize = 100;
 /// array is present when the C pointer is not NULL.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct CanonData {
+    /// `LinearCT`
+    pub linear_ct: Vec<u16>,
     pub n_max_len_linear_ct: i32,
     pub n_len_linear_ct: i32,
     pub n_len_ct_at_only: i32,
@@ -1608,4 +1610,698 @@ pub fn clean_iso_sort_keys(isk: &mut [i64], len: usize) {
             *k = 0;
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// CanonGraph
+// ---------------------------------------------------------------------------
+
+pub const MAX_SET_SIZE: usize = 32766;
+pub const NORMALLY_ALLOWED_MAX_SET_SIZE: usize = 2048;
+
+/// `CANON_COUNTS`
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct CanonCounts {
+    pub l_num_break_ties: i64,
+    pub l_num_decreased_ct: i64,
+    pub l_num_rejected_ct: i64,
+    pub l_num_equal_ct: i64,
+    pub l_num_tot_ct: i64,
+    pub d_group_size: f64,
+    pub l_num_generators: i64,
+    pub l_num_stored_isomorphisms: i64,
+}
+
+/// `QZFIX_OK`
+fn qzfix_ok(x: i32) -> bool {
+    x <= 0
+}
+
+/// the labels of the `goto` structure of `CanonGraph`
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Lb {
+    L2,
+    L6,
+    L7,
+    L8,
+    L9,
+    L10,
+    L11,
+    L12,
+    L13,
+    L14,
+    L15,
+    L16,
+    L17,
+}
+
+/// `CanonGraph`: the canonical numbering search (McKay's algorithm).
+/// `pzb_rho_inp` is `*pp_zb_rho_inp`; `pzb_rho_out` is `pp_zb_rho_out`.
+/// `time_is_over` replaces `bInchiTimeIsOver`. Returns 0 or the last number
+/// of ranks (as the C code) or a negative error code.
+#[allow(clippy::too_many_arguments, unused_assignments, unused_variables)]
+pub fn canon_graph(
+    time_is_over: &mut dyn FnMut() -> bool,
+    n: usize,
+    n_tg: usize,
+    n_max: usize,
+    b_digraph: bool,
+    g: &mut NeighList,
+    pi: &mut [Partition],
+    n_symm_rank: &mut [u16],
+    n_canon_rank: &mut [u16],
+    n_atom_number_canon: &mut [u16],
+    cd: &mut CanonData,
+    cc: &mut CanonCounts,
+    pzb_rho_inp: Option<&ConTable>,
+    pzb_rho_out: Option<&mut Option<ConTable>>,
+    large_molecules: bool,
+) -> i32 {
+    let n_num_layers = i32::from(cd.num_h.is_some())
+        + i32::from(cd.num_h_fixed.is_some())
+        + i32::from(cd.iso_sort_key.is_some());
+    let dig = b_digraph || n_num_layers != 0;
+    let b_split_taut_compare = dig;
+    let lab = true;
+    let l_curr_max_set_size = if large_molecules {
+        MAX_SET_SIZE
+    } else {
+        NORMALLY_ALLOWED_MAX_SET_SIZE
+    } as i32;
+    let pzb_rho_fix = pzb_rho_inp;
+
+    let n_one_additional_layer = get_one_additional_layer(Some(cd), pzb_rho_fix);
+    if let Some(z) = pzb_rho_fix
+        && z.n_len_ct_at_only != cd.n_len_ct_at_only
+    {
+        return -2;
+    }
+    let create = |cd: &CanonData| {
+        c_table_create(
+            n,
+            cd.n_max_len_linear_ct,
+            cd.n_len_ct_at_only,
+            cd.num_h.as_ref().map(|_| cd.maxlen_num_h),
+            cd.num_h_fixed.as_ref().map(|_| cd.maxlen_num_h_fixed),
+            cd.iso_sort_key.as_ref().map(|_| cd.maxlen_iso_sort_key),
+            cd.iso_exchg_atnos
+                .as_ref()
+                .map(|_| cd.maxlen_iso_exchg_atnos),
+        )
+    };
+    let mut theta = UnorderedPartition {
+        equ2: vec![0; n_tg],
+    };
+    let mut theta_from_gamma = UnorderedPartition {
+        equ2: vec![0; n_tg],
+    };
+    let mut w = vec![Cell::default(); n_tg];
+    let mut v: Vec<Node> = vec![0; n_tg];
+    let mut e: Vec<i8> = vec![0; n_tg];
+    let mut lambda = create(cd);
+    let mut zf_zeta = create(cd);
+    let mut pzb_rho = create(cd);
+    let mut omega = node_set_create(n_tg, l_curr_max_set_size as usize);
+    let mut phi = node_set_create(n_tg, l_curr_max_set_size as usize);
+    let mut cur_nodes = node_set_create(n_tg, 1);
+    let mut zeta = Partition {
+        rank: vec![0; n_tg],
+        at_number: vec![0; n_tg],
+    };
+    let mut rho = zeta.clone();
+    let mut gamma = Transposition {
+        n_at_numb: vec![0; n_tg],
+    };
+
+    let mut ret = 0i32;
+    let mut k: i32 = 1;
+    let mut size = 1.0f64;
+    let mut hz_rho = 0i32;
+    let mut index = 0i32;
+    let mut l = 0i32;
+    unordered_partition_make_discrete(&mut theta, n_tg);
+    let mut t_lemma = 2i32;
+    cc.l_num_break_ties = 0;
+    cc.l_num_decreased_ct = 0;
+    cc.l_num_rejected_ct = 0;
+    cc.l_num_equal_ct = 1;
+    cc.l_num_tot_ct = 0;
+
+    let mut hzb_rho_fix = 1i32;
+    let mut k_least_rho = vec![KLeast::default(); MAX_LAYERS];
+    let mut k_least_rho_fix = vec![KLeast::default(); MAX_LAYERS];
+    let mut qzb_rho_fix = 0i32;
+    let mut qzb_rho = 0i32;
+    let mut b_rho_is_discrete = true;
+    let mut pzb_rho_fix_reached = false;
+    let (mut l_rho_fix_prev, mut i_rho_fix_prev, mut k_rho_fix_prev) = (0i32, -1i32, 0i32);
+    let mut n_num_found_generators = 0i64;
+    let mut b_zeta_eq_rho = lab;
+    let mut b_zeta_isomorph = false;
+    let (mut h_zeta, mut t_eq_zeta, mut hz_zeta, mut h_rho, mut r) = (0i32, 0i32, 0i32, 0i32, 0i32);
+    let (mut tvc, mut tvh): (Node, Node) = (0, 0);
+
+    macro_rules! ku {
+        () => {
+            (k - 1) as usize
+        };
+    }
+    macro_rules! aux {
+        () => {
+            cd.n_aux_rank.as_deref()
+        };
+    }
+
+    let mut skip_search = false;
+    if partition_is_discrete(&pi[ku!()], n_tg) {
+        partition_copy(&mut rho, &pi[ku!()], n_tg);
+        ct_part_fill(g, cd, &pi[ku!()], &mut pzb_rho, 1, n, n_tg, n_max);
+        ct_part_inchi_canon_infinity(&mut pzb_rho, None, 2);
+        cc.l_num_tot_ct += 1;
+        skip_search = true;
+    }
+    if !skip_search {
+        if !dig && partition_satisfies_lemma_2_25(&pi[0], n) {
+            t_lemma = 1;
+        }
+        ct_part_clear(&mut lambda, 1);
+        // L2: reach the first leaf and save it in zeta and rho
+        while k != 0 {
+            partition_get_first_cell(&pi[ku!()], &mut w, k as usize, n);
+            v[ku!()] = cell_get_min_node(&pi[ku!()], &w[ku!()], 0, aux!());
+            e[ku!()] = 0;
+            if dig || !partition_satisfies_lemma_2_25(&pi[ku!()], n) {
+                t_lemma = k + 1;
+            }
+            ret =
+                partition_color_vertex(g, &mut pi[ku!()..], v[ku!()], n, n_tg, n_max, b_digraph, 0);
+            if ret < 0 {
+                return ret;
+            }
+            cc.l_num_break_ties += 1;
+            k += 1;
+            ct_part_fill(
+                g,
+                cd,
+                &pi[ku!()],
+                &mut lambda,
+                (k - 1) as usize,
+                n,
+                n_tg,
+                n_max,
+            );
+            if let Some(z) = pzb_rho_fix
+                && qzfix_ok(qzb_rho_fix)
+            {
+                qzb_rho_fix = ct_part_compare(
+                    &lambda,
+                    z,
+                    None,
+                    Some(&mut k_least_rho_fix),
+                    (k - 1) as usize,
+                    true,
+                    b_split_taut_compare,
+                );
+                if qzfix_ok(qzb_rho_fix) {
+                    hzb_rho_fix = k;
+                }
+            }
+            if lab && qzfix_ok(qzb_rho_fix) {
+                ct_part_copy(&mut pzb_rho, &lambda, (k - 1) as usize);
+            }
+            ct_part_copy(&mut zf_zeta, &lambda, (k - 1) as usize);
+            if partition_is_discrete(&pi[ku!()], n) {
+                break;
+            }
+        }
+        cc.l_num_tot_ct += 1;
+        h_zeta = k;
+        t_eq_zeta = k;
+        hz_zeta = k;
+        ct_part_inchi_canon_infinity(&mut zf_zeta, None, k as usize);
+        partition_copy(&mut zeta, &pi[ku!()], n_tg);
+        if let Some(z) = pzb_rho_fix {
+            if qzb_rho_fix == 0 {
+                qzb_rho_fix = ct_full_compare(&lambda, z, true, b_split_taut_compare);
+                if qzb_rho_fix > 0 {
+                    hzb_rho_fix = 1;
+                }
+            }
+            if hzb_rho_fix > 1 {
+                partition_copy(&mut rho, &pi[(hzb_rho_fix - 1) as usize], n_tg);
+            }
+            hz_rho = hzb_rho_fix;
+            h_rho = hzb_rho_fix;
+            b_rho_is_discrete = hzb_rho_fix == k;
+            if b_rho_is_discrete {
+                ct_part_inchi_canon_infinity(&mut pzb_rho, None, k as usize);
+                pzb_rho_fix_reached = qzb_rho_fix == 0;
+                ct_compare_layers_get_first_diff(
+                    Some(&k_least_rho_fix),
+                    n_one_additional_layer,
+                    &mut l_rho_fix_prev,
+                    &mut i_rho_fix_prev,
+                    &mut k_rho_fix_prev,
+                );
+            }
+        } else {
+            partition_copy(&mut rho, &pi[ku!()], n_tg);
+            hz_rho = k;
+            h_rho = k;
+            ct_part_inchi_canon_infinity(&mut pzb_rho, None, k as usize);
+        }
+        qzb_rho = 0;
+        r = k;
+        v[ku!()] = INCHI_CANON_INFINITY;
+        cell_make_empty(&mut w, k as usize);
+        k -= 1;
+
+        let mut lb = Lb::L13;
+        'sm: loop {
+            match lb {
+                Lb::L2 => {
+                    ret = partition_color_vertex(
+                        g,
+                        &mut pi[ku!()..],
+                        v[ku!()],
+                        n,
+                        n_tg,
+                        n_max,
+                        b_digraph,
+                        0,
+                    );
+                    if ret < 0 {
+                        return ret;
+                    }
+                    cc.l_num_break_ties += 1;
+                    k += 1;
+                    ct_part_fill(
+                        g,
+                        cd,
+                        &pi[ku!()],
+                        &mut lambda,
+                        (k - 1) as usize,
+                        n,
+                        n_tg,
+                        n_max,
+                    );
+                    e[ku!()] = 0;
+                    v[ku!()] = INCHI_CANON_INFINITY;
+                    cell_make_empty(&mut w, k as usize);
+                    if hz_zeta == k - 1
+                        && ct_part_compare(
+                            &lambda,
+                            &zf_zeta,
+                            None,
+                            None,
+                            (k - 1) as usize,
+                            false,
+                            b_split_taut_compare,
+                        ) == 0
+                    {
+                        hz_zeta = k;
+                    }
+                    if let Some(z) = pzb_rho_fix
+                        && qzb_rho_fix == 0
+                    {
+                        qzb_rho_fix = ct_part_compare(
+                            &lambda,
+                            z,
+                            None,
+                            Some(&mut k_least_rho_fix),
+                            (k - 1) as usize,
+                            true,
+                            b_split_taut_compare,
+                        );
+                        if qzb_rho_fix == 0 && b_rho_is_discrete {
+                            qzb_rho_fix = ct_part_compare_layers(
+                                Some(&k_least_rho_fix),
+                                l_rho_fix_prev,
+                                n_one_additional_layer,
+                            );
+                            if qzb_rho_fix != 0 {
+                                let d = qzb_rho_fix.abs() - 1;
+                                // (sic) C compares with the result of `&&`
+                                if d < l_rho_fix_prev
+                                    || d == i32::from(
+                                        l_rho_fix_prev != 0
+                                            && k_least_rho_fix[d as usize].i < i_rho_fix_prev,
+                                    )
+                                {
+                                    qzb_rho_fix = d + 1;
+                                }
+                            }
+                        }
+                        if !qzfix_ok(qzb_rho_fix) {
+                            cc.l_num_rejected_ct += 1;
+                        }
+                    }
+                    if pzb_rho_fix.is_some() && qzfix_ok(qzb_rho_fix) {
+                        hzb_rho_fix = k;
+                    }
+                    if lab && qzfix_ok(qzb_rho_fix) {
+                        if hz_rho == k - 1 && qzb_rho == 0 && b_rho_is_discrete {
+                            qzb_rho = ct_part_compare(
+                                &lambda,
+                                &pzb_rho,
+                                None,
+                                Some(&mut k_least_rho),
+                                (k - 1) as usize,
+                                false,
+                                b_split_taut_compare,
+                            );
+                            if qzb_rho == 0 && b_rho_is_discrete {
+                                qzb_rho =
+                                    ct_part_compare_layers(Some(&k_least_rho), l_rho_fix_prev, 0);
+                                if qzb_rho != 0 {
+                                    let d = qzb_rho.abs() - 1;
+                                    if d < l_rho_fix_prev
+                                        || d == i32::from(
+                                            l_rho_fix_prev != 0
+                                                && k_least_rho[d as usize].i < i_rho_fix_prev,
+                                        )
+                                    {
+                                        qzb_rho = -(d + 1);
+                                    }
+                                }
+                            }
+                            if qzb_rho == 0 {
+                                hz_rho = k;
+                            } else if qzb_rho < 0 {
+                                cc.l_num_rejected_ct += 1;
+                            }
+                        }
+                        if (qzb_rho > 0 || (qzb_rho == 0 && !b_rho_is_discrete))
+                            && n_num_layers == 0
+                        {
+                            ct_part_copy(&mut pzb_rho, &lambda, (k - 1) as usize);
+                        }
+                    }
+                    // L3
+                    if hz_zeta == k || hz_rho == k || (lab && qzb_rho >= 0 && qzfix_ok(qzb_rho_fix))
+                    {
+                        // L4
+                        if partition_is_discrete(&pi[ku!()], n) {
+                            cc.l_num_tot_ct += 1;
+                            lb = Lb::L7;
+                            continue 'sm;
+                        }
+                        partition_get_first_cell(&pi[ku!()], &mut w, k as usize, n);
+                        v[ku!()] = cell_get_min_node(&pi[ku!()], &w[ku!()], 0, aux!());
+                        if dig || !partition_satisfies_lemma_2_25(&pi[ku!()], n) {
+                            t_lemma = k + 1;
+                        }
+                        e[ku!()] = 0;
+                        lb = Lb::L2;
+                        continue 'sm;
+                    }
+                    lb = Lb::L6;
+                }
+                Lb::L6 => {
+                    let k2 = k;
+                    k = (t_lemma - 1).min((t_eq_zeta - 1).max(hz_rho));
+                    if k2 == t_lemma {
+                        lb = Lb::L13;
+                        continue 'sm;
+                    }
+                    if dig {
+                        lb = Lb::L13;
+                        continue 'sm;
+                    }
+                    l = (l + 1).min(l_curr_max_set_size);
+                    partition_get_mcr_and_fix_set(
+                        &pi[(t_lemma - 1) as usize],
+                        &mut omega,
+                        &mut phi,
+                        n_tg,
+                        l as usize,
+                    );
+                    lb = Lb::L12;
+                }
+                Lb::L7 => {
+                    if h_zeta == 0 {
+                        return CT_CANON_ERR;
+                    }
+                    if k != hz_zeta {
+                        lb = Lb::L8;
+                        continue 'sm;
+                    }
+                    if ct_full_compare(&lambda, &zf_zeta, false, b_split_taut_compare) == 0 {
+                        partition_get_transposition(&zeta, &pi[ku!()], n_tg, &mut gamma);
+                        b_zeta_isomorph = true;
+                        lb = Lb::L10;
+                        continue 'sm;
+                    } else if n_num_layers == 0 {
+                        return -2;
+                    }
+                    lb = Lb::L8;
+                }
+                Lb::L8 => {
+                    if !lab || (qzb_rho < 0 && (pzb_rho_fix.is_none() || qzb_rho_fix > 0)) {
+                        lb = Lb::L6;
+                        continue 'sm;
+                    }
+                    if let Some(z) = pzb_rho_fix
+                        && qzb_rho_fix == 0
+                    {
+                        qzb_rho_fix = ct_full_compare(&lambda, z, true, b_split_taut_compare);
+                        if !pzb_rho_fix_reached {
+                            pzb_rho_fix_reached = qzb_rho_fix == 0;
+                        }
+                        if 0 < qzb_rho_fix {
+                            qzb_rho_fix = 0;
+                            lb = Lb::L6;
+                            continue 'sm;
+                        }
+                        qzb_rho_fix = 0;
+                    }
+                    if qzb_rho < 0 {
+                        lb = Lb::L6;
+                        continue 'sm;
+                    }
+                    if qzb_rho > 0 || !b_rho_is_discrete {
+                        lb = Lb::L9;
+                        continue 'sm;
+                    }
+                    if k < r {
+                        lb = Lb::L9;
+                        continue 'sm;
+                    }
+                    qzb_rho = ct_full_compare(&lambda, &pzb_rho, false, b_split_taut_compare);
+                    if 0 < qzb_rho {
+                        lb = Lb::L9;
+                        continue 'sm;
+                    }
+                    if 0 > qzb_rho {
+                        qzb_rho = 0;
+                        lb = Lb::L6;
+                        continue 'sm;
+                    }
+                    if r != k {
+                        r = k;
+                    }
+                    partition_get_transposition(&pi[ku!()], &rho, n_tg, &mut gamma);
+                    b_zeta_isomorph = false;
+                    cc.l_num_equal_ct += 1;
+                    lb = Lb::L10;
+                }
+                Lb::L9 => {
+                    partition_copy(&mut rho, &pi[ku!()], n_tg);
+                    if n_num_layers != 0 {
+                        ct_full_copy(&mut pzb_rho, &lambda);
+                    }
+                    b_zeta_eq_rho = false;
+                    qzb_rho = 0;
+                    ct_compare_layers_get_first_diff(
+                        Some(&k_least_rho_fix),
+                        n_one_additional_layer,
+                        &mut l_rho_fix_prev,
+                        &mut i_rho_fix_prev,
+                        &mut k_rho_fix_prev,
+                    );
+                    k_least_rho.iter_mut().for_each(|x| *x = KLeast::default());
+                    h_rho = k;
+                    hz_rho = k;
+                    ct_part_inchi_canon_infinity(&mut pzb_rho, None, k as usize);
+                    cc.l_num_decreased_ct += 1;
+                    cc.l_num_equal_ct = 1;
+                    b_rho_is_discrete = true;
+                    lb = Lb::L6;
+                }
+                Lb::L10 => {
+                    cc.l_num_equal_ct +=
+                        i64::from(b_zeta_eq_rho || !(b_zeta_isomorph || qzb_rho != 0));
+                    l = (l + 1).min(l_curr_max_set_size);
+                    transposition_get_mcr_and_fix_set_and_unordered_partition(
+                        &mut gamma,
+                        &mut omega,
+                        &mut phi,
+                        n_tg,
+                        l as usize,
+                        &mut theta_from_gamma,
+                    );
+                    if unordered_partition_join(&theta_from_gamma, &mut theta, n_tg) == 0 {
+                        lb = Lb::L11;
+                        continue 'sm;
+                    }
+                    n_num_found_generators += 1;
+                    if tvc == get_unordered_partition_mcr_node(&mut theta, tvc) {
+                        lb = Lb::L11;
+                        continue 'sm;
+                    }
+                    k = h_zeta;
+                    lb = Lb::L13;
+                }
+                Lb::L11 => {
+                    k = if lab { h_rho } else { h_zeta };
+                    lb = Lb::L12;
+                }
+                Lb::L12 => {
+                    if e[ku!()] == 1 && v[ku!()] != INCHI_CANON_INFINITY {
+                        let wk = w[ku!()];
+                        cell_intersect_with_set(&mut pi[ku!()], &wk, &omega, l as usize);
+                    }
+                    lb = Lb::L13;
+                }
+                Lb::L13 => {
+                    if time_is_over() {
+                        return CT_TIMEOUT_ERR;
+                    }
+                    if k == 0 {
+                        break 'sm;
+                    }
+                    if lab && k < h_rho {
+                        h_rho = k;
+                    }
+                    if k > h_zeta {
+                        if v[ku!()] == INCHI_CANON_INFINITY {
+                            k -= 1;
+                            continue 'sm;
+                        }
+                        lb = Lb::L17;
+                        continue 'sm;
+                    }
+                    if k == h_zeta {
+                        lb = Lb::L14;
+                        continue 'sm;
+                    }
+                    h_zeta = k;
+                    tvh = cell_get_min_node(&pi[ku!()], &w[ku!()], 0, aux!());
+                    tvc = tvh;
+                    lb = Lb::L14;
+                }
+                Lb::L14 => {
+                    if get_unordered_partition_mcr_node(&mut theta, v[ku!()])
+                        == get_unordered_partition_mcr_node(&mut theta, tvh)
+                    {
+                        index += 1;
+                    }
+                    v[ku!()] = cell_get_min_node(&pi[ku!()], &w[ku!()], v[ku!()], aux!());
+                    if v[ku!()] == INCHI_CANON_INFINITY {
+                        lb = Lb::L16;
+                        continue 'sm;
+                    }
+                    if v[ku!()] != get_unordered_partition_mcr_node(&mut theta, v[ku!()]) {
+                        continue 'sm;
+                    }
+                    lb = Lb::L15;
+                }
+                Lb::L15 => {
+                    t_lemma = t_lemma.min(k + 1);
+                    hz_zeta = hz_zeta.min(k);
+                    if lab {
+                        if hz_rho >= k {
+                            qzb_rho = 0;
+                        }
+                        if hz_rho > k {
+                            hz_rho = k;
+                        }
+                        update_compare_layers(Some(&mut k_least_rho), hz_rho);
+                    }
+                    if pzb_rho_fix.is_some() {
+                        if hzb_rho_fix >= k {
+                            qzb_rho_fix = 0;
+                        }
+                        if hzb_rho_fix > k {
+                            hzb_rho_fix = k;
+                        }
+                        update_compare_layers(Some(&mut k_least_rho_fix), hzb_rho_fix);
+                    }
+                    lb = Lb::L2;
+                }
+                Lb::L16 => {
+                    if t_eq_zeta == k + 1
+                        && index == cell_get_number_of_nodes(&pi[ku!()], &w[ku!()])
+                    {
+                        t_eq_zeta = k;
+                    }
+                    size *= f64::from(index);
+                    index = 0;
+                    k -= 1;
+                    lb = Lb::L13;
+                }
+                Lb::L17 => {
+                    if e[ku!()] == 0 && v[ku!()] != INCHI_CANON_INFINITY {
+                        node_set_from_vertices(&mut cur_nodes, 1, &v, (k - 1) as usize);
+                        for i in 1..=l {
+                            if all_nodes_are_in_set(&cur_nodes, 1, &phi, i as usize) {
+                                let wk = w[ku!()];
+                                cell_intersect_with_set(&mut pi[ku!()], &wk, &omega, i as usize);
+                            }
+                        }
+                    }
+                    e[ku!()] = 1;
+                    v[ku!()] = cell_get_min_node(&pi[ku!()], &w[ku!()], v[ku!()], aux!());
+                    if v[ku!()] != INCHI_CANON_INFINITY {
+                        lb = Lb::L15;
+                        continue 'sm;
+                    }
+                    k -= 1;
+                    lb = Lb::L13;
+                }
+            }
+        }
+    }
+
+    // exit_function
+    if !b_rho_is_discrete {
+        return CT_CANON_ERR;
+    }
+    if let Some(z) = pzb_rho_fix {
+        qzb_rho_fix = ct_full_compare(z, &pzb_rho, true, b_split_taut_compare);
+        if qzb_rho_fix != 0 {
+            return CT_CANON_ERR;
+        }
+    }
+    n_symm_rank[..n_tg].iter_mut().for_each(|x| *x = 0);
+    for i in 0..n_tg {
+        let k = rho.at_number[i] as usize;
+        let k2 = get_unordered_partition_mcr_node(&mut theta, (k + 1) as u16) as usize - 1;
+        if n_symm_rank[k2] == 0 || n_symm_rank[k2] > rho.rank[k] {
+            n_symm_rank[k2] = rho.rank[k];
+        }
+    }
+    for i in 0..n_tg {
+        let k = rho.at_number[i] as usize;
+        let k2 = get_unordered_partition_mcr_node(&mut theta, (k + 1) as u16) as usize - 1;
+        n_symm_rank[k] = n_symm_rank[k2];
+    }
+    n_canon_rank[..n_tg].copy_from_slice(&rho.rank[..n_tg]);
+    n_atom_number_canon[..n_tg].copy_from_slice(&rho.at_number[..n_tg]);
+    cd.n_len_linear_ct = pzb_rho.len_ct - 1;
+    let len = cd.n_len_linear_ct.max(0) as usize;
+    if cd.linear_ct.len() < len {
+        cd.linear_ct.resize(len, 0);
+    }
+    cd.linear_ct[..len].copy_from_slice(&pzb_rho.ctbl[..len]);
+    cc.l_num_tot_ct = cc.l_num_decreased_ct + cc.l_num_rejected_ct + cc.l_num_equal_ct;
+    cc.d_group_size = size;
+    cc.l_num_generators = n_num_found_generators;
+    cc.l_num_stored_isomorphisms = i64::from(l);
+    if let Some(out) = pzb_rho_out
+        && out.is_none()
+    {
+        *out = Some(pzb_rho);
+    }
+    ret
 }

@@ -9768,6 +9768,7 @@ fn connection_table_parts_match_the_c_code() {
         let vals: Vec<Vec<i64>> = inp["vals"].as_array().unwrap().iter().map(ints).collect();
         let perm = ints(&inp["perm"]);
         let cd = CanonData {
+            linear_ct: Vec::new(),
             n_max_len_linear_ct: 8 * n as i32 + 8,
             n_len_linear_ct: fl[3] as i32,
             n_len_ct_at_only: at_only,
@@ -10047,6 +10048,220 @@ fn canonical_ranking_setup_matches_the_c_code() {
             "CIK{}",
             k.iter().map(|x| format!(" {x}")).collect::<String>()
         ));
+        let want: Vec<String> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| s.as_str().unwrap().to_string())
+            .collect();
+        assert_eq!(got, want, "case {case}");
+    }
+}
+
+#[test]
+fn canonical_graph_search_matches_the_c_code() {
+    use rdoxide::external::inchi::ichican2::*;
+    use rdoxide::external::inchi::ichimap::{create_neigh_list, differentiate_ranks_basic};
+    use rdoxide::external::inchi::ichister::SpAtom;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_can2d.json")).unwrap();
+    fn ints(v: &serde_json::Value) -> Vec<i64> {
+        v.as_array()
+            .unwrap()
+            .iter()
+            .map(|x| x.as_i64().unwrap())
+            .collect()
+    }
+    fn join<T: std::fmt::Display>(t: &str, v: &[T]) -> String {
+        let mut s = t.to_string();
+        for x in v {
+            s += &format!(" {x}");
+        }
+        s
+    }
+    fn dump(t: &str, c: &ConTable, n: usize) -> String {
+        let mut s = format!(
+            "{t} {} {} {} {} {} |",
+            c.len_ct, c.len_pos, c.len_num_h, c.len_iso_sort_key, c.len_iso_exchg_atnos
+        );
+        let mut i = 0;
+        while i <= c.len_ct && i < c.maxlen_ct {
+            s += &format!(" {}", c.ctbl[i as usize]);
+            i += 1;
+        }
+        s += " |";
+        for i in 0..c.len_pos as usize {
+            s += &format!(" {}", c.next_ctbl_pos[i]);
+        }
+        s += " |";
+        for i in 0..c.len_pos as usize {
+            s += &format!(" {}", c.next_at_rank[i]);
+        }
+        s += " |";
+        if !c.num_h.is_empty() {
+            for i in 0..c.len_num_h as usize {
+                s += &format!(" {}", c.num_h[i]);
+            }
+        }
+        s += " |";
+        if !c.num_h_fixed.is_empty() {
+            for i in 0..n {
+                s += &format!(" {}", c.num_h_fixed[i]);
+            }
+        }
+        s += " |";
+        if !c.iso_sort_key.is_empty() {
+            for i in 0..c.len_iso_sort_key as usize {
+                s += &format!(" {}", c.iso_sort_key[i]);
+            }
+        }
+        s += " |";
+        if !c.iso_exchg_atnos.is_empty() {
+            for i in 0..c.len_iso_exchg_atnos as usize {
+                s += &format!(" {}", c.iso_exchg_atnos[i]);
+            }
+        }
+        s
+    }
+    for (case, c) in data.as_array().unwrap().iter().enumerate() {
+        let inp = &c["in"];
+        let n = inp["n"].as_u64().unwrap() as usize;
+        let dig = inp["dig"].as_i64().unwrap() != 0;
+        let large = inp["large"].as_i64().unwrap() != 0;
+        let use_aux = inp["aux"].as_i64().unwrap() != 0;
+        let masks = ints(&inp["masks"]);
+        let col = ints(&inp["col"]);
+        let edges: Vec<(usize, usize)> = inp["edges"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|e| {
+                (
+                    e[0].as_u64().unwrap() as usize,
+                    e[1].as_u64().unwrap() as usize,
+                )
+            })
+            .collect();
+        let m = edges.len();
+        let mut at = vec![SpAtom::default(); n + 1];
+        for &(a, b) in &edges {
+            let va = at[a].valence as usize;
+            at[a].neighbor[va] = b as u16;
+            at[a].valence += 1;
+            let vb = at[b].valence as usize;
+            at[b].neighbor[vb] = a as u16;
+            at[b].valence += 1;
+        }
+        let nh: Vec<i16> = ints(&inp["nh"]).iter().map(|&x| x as i16).collect();
+        let nhf: Vec<i16> = ints(&inp["nhf"]).iter().map(|&x| x as i16).collect();
+        let isk = ints(&inp["isk"]);
+        let aux: Vec<u16> = ints(&inp["auxr"]).iter().map(|&x| x as u16).collect();
+        let mut got: Vec<String> = Vec::new();
+        let mut fix: Option<ConTable> = None;
+        for (st, &mask) in masks.iter().enumerate() {
+            let mut g = create_neigh_list(n, n, &at, false, None);
+            let mut pi: Vec<Partition> = (0..n + 4)
+                .map(|_| Partition {
+                    rank: vec![0; n + 2],
+                    at_number: vec![0; n + 2],
+                })
+                .collect();
+            let mut prev = vec![0u16; n + 4];
+            for i in 0..n {
+                pi[0].rank[i] = col.iter().filter(|&&cj| cj <= col[i]).count() as u16;
+                pi[0].at_number[i] = i as u16;
+            }
+            let mut seen = std::collections::HashSet::new();
+            let nd = (0..n).filter(|&i| seen.insert(pi[0].rank[i])).count() as i32;
+            let mut it = 0i64;
+            {
+                let p0 = &mut pi[0];
+                differentiate_ranks_basic(
+                    n,
+                    &mut g,
+                    nd,
+                    &mut p0.rank,
+                    &mut prev,
+                    &mut p0.at_number,
+                    &mut it,
+                    1,
+                );
+            }
+            let mut cd = CanonData {
+                n_max_len_linear_ct: 4 * (n + m) as i32 + 8,
+                n_len_ct_at_only: (n + m) as i32,
+                ..Default::default()
+            };
+            cd.linear_ct = vec![0; cd.n_max_len_linear_ct as usize + 2];
+            if mask & 1 != 0 {
+                cd.num_h = Some(nh.clone());
+                cd.maxlen_num_h = n as i32 + 2;
+            }
+            if mask & 2 != 0 {
+                cd.num_h_fixed = Some(nhf.clone());
+                cd.maxlen_num_h_fixed = n as i32 + 2;
+            }
+            if mask & 4 != 0 {
+                cd.iso_sort_key = Some(isk.clone());
+                cd.maxlen_iso_sort_key = n as i32 + 2;
+            }
+            if use_aux {
+                cd.n_aux_rank = Some(aux.clone());
+            }
+            let mut sym = vec![0u16; 70];
+            let mut can = vec![0u16; 70];
+            let mut atn = vec![0u16; 70];
+            let mut cc = CanonCounts::default();
+            let mut out: Option<ConTable> = None;
+            let ret = canon_graph(
+                &mut || false,
+                n,
+                n,
+                n + 2,
+                dig,
+                &mut g,
+                &mut pi,
+                &mut sym,
+                &mut can,
+                &mut atn,
+                &mut cd,
+                &mut cc,
+                fix.as_ref(),
+                Some(&mut out),
+                large,
+            );
+            got.push(format!(
+                "S {st} {ret} {} {} {} {} {} {} {:.0} {} {}",
+                cd.n_len_linear_ct,
+                cc.l_num_break_ties,
+                cc.l_num_decreased_ct,
+                cc.l_num_rejected_ct,
+                cc.l_num_equal_ct,
+                cc.l_num_tot_ct,
+                cc.d_group_size,
+                cc.l_num_generators,
+                cc.l_num_stored_isomorphisms
+            ));
+            if ret >= 0 {
+                got.push(join("sym", &sym[..n]));
+                got.push(join("can", &can[..n]));
+                got.push(join("atn", &atn[..n]));
+                got.push(join("ct", &cd.linear_ct[..cd.n_len_linear_ct as usize]));
+                match &out {
+                    Some(o) => got.push(dump("out", o, n)),
+                    None => got.push("out none".to_string()),
+                }
+            }
+            let mut s = String::from("nl");
+            for l in g.iter().take(n) {
+                s += " |";
+                for j in 1..=l[0] as usize {
+                    s += &format!(" {}", l[j]);
+                }
+            }
+            got.push(s);
+            fix = if ret >= 0 { out } else { None };
+        }
         let want: Vec<String> = c["out"]
             .as_array()
             .unwrap()
