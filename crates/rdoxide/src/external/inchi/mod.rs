@@ -20,6 +20,7 @@
 //! [`crate::external::inchi_api`].
 
 pub mod el_data;
+pub mod ichi;
 pub mod ichi_bns;
 pub mod ichi_io;
 pub mod ichican2;
