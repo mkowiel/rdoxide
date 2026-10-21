@@ -263,6 +263,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 147 | done |
 | 148 | done |
 | 149 | done |
+| 150 | done |
 
 ## Python package files
 
@@ -582,3 +583,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-19 — Stage 147: InChI port I4b: ichitaut endpoint helpers and nGetEndpointInfo variants ported, differential test on 12000 arrays
 * 2026-10-19 — Stage 148: InChI port I4c: RegisterCPoints and salt charge type helpers ported, differential test on 12000 cases
 * 2026-10-19 — Stage 149: InChI port I4d: BNS data model, allocation, edge access, AugmentEdge and rescap ported, differential test on 3000 networks
+* 2026-10-19 — Stage 150: I4e: BalancedNetworkSearch (blossom search), radical endpoints

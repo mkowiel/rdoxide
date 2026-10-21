@@ -900,3 +900,539 @@ pub fn ignore_vertex_non_tacn_group(
     }
     false
 }
+
+// ---- the balanced network search (Kocay & Stone) ----
+
+use super::ichierr::BNS_VERT_EDGE_OVFL;
+
+pub const TREE_IN_1: i8 = 3;
+pub const RAD_SRCH_NORM: i32 = 0;
+pub const RAD_SRCH_FROM_FICT: i32 = 1;
+
+fn tree_mark(tree: &mut [i8], x: Vertex, mark: i8) {
+    if tree[x as usize] < mark {
+        tree[x as usize] = mark;
+    }
+}
+
+fn tree_is_s_reachable(tree: &[i8], x: Vertex) -> bool {
+    tree[x as usize] >= TREE_IN_2BLOSS
+}
+
+/// `FindBase`: the base of the blossom of `u` (with path compression)
+pub fn find_base(u: Vertex, base_ptr: &mut [Vertex]) -> Vertex {
+    let bp = base_ptr[u as usize];
+    if bp == NO_VERTEX {
+        NO_VERTEX
+    } else if bp == BLOSSOM_BASE {
+        u
+    } else {
+        let b = find_base(bp, base_ptr);
+        base_ptr[u as usize] = b;
+        b
+    }
+}
+
+/// `FindPathToVertex_s`: the path of blossom bases from `x` to s; returns the
+/// index of the last element
+pub fn find_path_to_vertex_s(
+    mut x: Vertex,
+    switch_edge: &[Edge],
+    base_ptr: &mut [Vertex],
+    path: &mut [Vertex],
+    max_path_len: i32,
+) -> i32 {
+    let mut i = 0i32;
+    path[0] = x;
+    while x != VERTEX_S {
+        x = find_base(switch_edge[x as usize][0], base_ptr);
+        i += 1;
+        if i < max_path_len {
+            path[i as usize] = x;
+        } else {
+            return BNS_WRONG_PARMS;
+        }
+    }
+    i
+}
+
+/// `MakeBlossom`: merges the blossoms of `u` and `v`; returns the base `w` of
+/// the new blossom or an error code
+#[allow(clippy::too_many_arguments)]
+pub fn make_blossom(
+    p: &BnStruct,
+    scan_q: &mut [Vertex],
+    p_q_size: &mut i32,
+    pu: &mut [Vertex],
+    pv: &mut [Vertex],
+    max_len_pu_pv: i32,
+    switch_edge: &mut [Edge],
+    base_ptr: &mut [Vertex],
+    u: Vertex,
+    v: Vertex,
+    iuv: EdgeIndex,
+    b_u: Vertex,
+    b_v: Vertex,
+    tree: &mut [i8],
+) -> Vertex {
+    let len_pu = find_path_to_vertex_s(b_u, switch_edge, base_ptr, pu, max_len_pu_pv);
+    if is_bns_error(len_pu) {
+        return len_pu;
+    }
+    let len_pv = find_path_to_vertex_s(b_v, switch_edge, base_ptr, pv, max_len_pu_pv);
+    if is_bns_error(len_pv) {
+        return len_pv;
+    }
+    let mut i = len_pu;
+    let mut j = len_pv;
+    while i >= 0 && j >= 0 && pu[i as usize] == pv[j as usize] {
+        i -= 1;
+        j -= 1;
+    }
+    i += 1;
+    let mut w = pu[i as usize];
+    let mut z = switch_edge[w as usize][0];
+    let mut izw = switch_edge[w as usize][1];
+    while w != VERTEX_S && rescap(p, z, w, izw) >= 2 {
+        i += 1;
+        w = pu[i as usize];
+        z = switch_edge[w as usize][0];
+        izw = switch_edge[w as usize][1];
+    }
+    let mut absorb = |z: Vertex, other: Vertex, switch_edge: &mut [Edge]| {
+        base_ptr[z as usize] = w;
+        base_ptr[prim(z) as usize] = w;
+        if !tree_is_s_reachable(tree, prim(z)) {
+            switch_edge[prim(z) as usize][0] = other;
+            switch_edge[prim(z) as usize][1] = iuv;
+            *p_q_size += 1;
+            scan_q[*p_q_size as usize] = prim(z);
+            tree_mark(tree, prim(z), TREE_IN_2BLOSS);
+        }
+    };
+    let mut k = i - 1;
+    while k >= 0 {
+        absorb(pu[k as usize], prim(v), switch_edge);
+        k -= 1;
+    }
+    let mut k = j;
+    while k >= 0 {
+        absorb(pv[k as usize], u, switch_edge);
+        k -= 1;
+    }
+    if !tree_is_s_reachable(tree, prim(w)) {
+        switch_edge[prim(w) as usize][0] = u;
+        switch_edge[prim(w) as usize][1] = iuv;
+        *p_q_size += 1;
+        scan_q[*p_q_size as usize] = prim(w);
+        tree_mark(tree, prim(w), TREE_IN_2BLOSS);
+    }
+    w
+}
+
+/// `PullFlow`: augments the flow by `delta` along the path between `x` and `y`
+pub fn pull_flow(
+    p: &mut BnStruct,
+    switch_edge: &[Edge],
+    x: Vertex,
+    y: Vertex,
+    delta: i32,
+    b_reverse: bool,
+    b_change_flow: i32,
+) -> i32 {
+    let w = switch_edge[y as usize][0];
+    let z = get_2nd_edge_vertex(p, switch_edge[y as usize]);
+    let iwz = switch_edge[y as usize][1];
+    let mut ret = 0;
+    if b_reverse {
+        if z != y {
+            ret = pull_flow(
+                p,
+                switch_edge,
+                prim(y),
+                prim(z),
+                delta,
+                !b_reverse,
+                b_change_flow,
+            );
+        }
+        if !is_bns_error(ret) {
+            ret = augment_edge(p, w, z, iwz, delta, b_reverse, b_change_flow);
+        }
+        if w != x && !is_bns_error(ret) {
+            ret = pull_flow(p, switch_edge, x, w, delta, b_reverse, b_change_flow);
+        }
+    } else {
+        if w != x && !is_bns_error(ret) {
+            ret = pull_flow(p, switch_edge, x, w, delta, b_reverse, b_change_flow);
+        }
+        if !is_bns_error(ret) {
+            ret = augment_edge(p, w, z, iwz, delta, b_reverse, b_change_flow);
+        }
+        if z != y && !is_bns_error(ret) {
+            ret = pull_flow(
+                p,
+                switch_edge,
+                prim(y),
+                prim(z),
+                delta,
+                !b_reverse,
+                b_change_flow,
+            );
+        }
+    }
+    ret
+}
+
+/// `FindPathCap`: the minimum residual capacity along the path between x and y
+pub fn find_path_cap(
+    p: &mut BnStruct,
+    switch_edge: &[Edge],
+    x: Vertex,
+    y: Vertex,
+    mut delta: i32,
+) -> i32 {
+    let w = switch_edge[y as usize][0];
+    let z = get_2nd_edge_vertex(p, switch_edge[y as usize]);
+    let iwz = switch_edge[y as usize][1];
+    let cap = rescap_mark(p, w, z, iwz);
+    if is_bns_error(cap) {
+        return cap;
+    }
+    if cap < delta {
+        delta = cap;
+    }
+    if w != x {
+        let delta2 = find_path_cap(p, switch_edge, x, w, delta);
+        delta = delta2.min(delta);
+    }
+    if z != y {
+        let delta2 = find_path_cap(p, switch_edge, prim(y), prim(z), delta);
+        delta = delta2.min(delta);
+    }
+    delta
+}
+
+/// `bRadChangesAtomType`
+pub fn rad_changes_atom_type(
+    p: &BnStruct,
+    bd: &BnData,
+    v: Vertex,
+    mut v_1: Vertex,
+    mut v_2: Vertex,
+) -> bool {
+    let mut iuv = 0;
+    if v_1 == NO_VERTEX {
+        v_1 = get_prev_vertex(p, v, &bd.switch_edge, &mut iuv);
+    }
+    let v_o = v_1 / 2 - 1;
+    if v_o < 0 || v_o >= p.num_atoms {
+        return false;
+    }
+    let second = p.iedge[p.vert[v_o as usize].iedge + 1] as usize;
+    let nb = (i32::from(p.edge[second].neighbor12) ^ v_o) as usize;
+    if p.vert[nb].type_ & BNS_VERT_TYPE_ATOM != 0 {
+        return false;
+    }
+    if v_2 == NO_VERTEX {
+        v_2 = get_prev_vertex(p, v_1, &bd.switch_edge, &mut iuv);
+    }
+    let v_chg_or_h = v_2 / 2 - 1;
+    if v_chg_or_h < p.num_atoms {
+        return false;
+    }
+    p.vert[v_chg_or_h as usize].type_ & (BNS_VERT_TYPE_TGROUP | BNS_VERT_TYPE_C_GROUP) != 0
+}
+
+/// `RegisterRadEndpoint`: registers a (radical, endpoint) pair found by the search
+pub fn register_rad_endpoint(p: &BnStruct, bd: &mut BnData, mut u: Vertex) -> i32 {
+    let mut iuv = 0;
+    match bd.b_rad_srch_mode {
+        RAD_SRCH_NORM => {
+            let mut num_found = 0;
+            while u > VERTEX_T && (u % 2 != 0 || u / 2 > p.num_atoms) {
+                u = get_prev_vertex(p, u, &bd.switch_edge, &mut iuv);
+            }
+            let w = u / 2 - 1;
+            if VERTEX_T < u
+                && w < p.num_atoms
+                && p.vert[w as usize].st_edge.cap
+                    == (p.vert[w as usize].st_edge.flow & EDGE_FLOW_ST_MASK)
+            {
+                let mut v = u;
+                let u_last = u;
+                while v > VERTEX_T {
+                    u = v;
+                    v = get_prev_vertex(p, u, &bd.switch_edge, &mut iuv);
+                }
+                if u % 2 == 0 && VERTEX_T < u {
+                    u = u / 2 - 1;
+                    if u < p.num_atoms
+                        && p.vert[u as usize].st_edge.cap
+                            > (p.vert[u as usize].st_edge.flow & EDGE_FLOW_ST_MASK)
+                    {
+                        let mut v = u_last;
+                        while v > VERTEX_T {
+                            let v2 = v / 2 - 1;
+                            if v % 2 == 0
+                                && v2 < p.num_atoms
+                                && p.vert[v2 as usize].st_edge.cap
+                                    == (p.vert[v2 as usize].st_edge.flow & EDGE_FLOW_ST_MASK)
+                            {
+                                if p.type_tacn != 0
+                                    && rad_changes_atom_type(p, bd, v, NO_VERTEX, NO_VERTEX)
+                                {
+                                    v = get_prev_vertex(p, v, &bd.switch_edge, &mut iuv);
+                                    continue;
+                                }
+                                let mut i = 0;
+                                while i < bd.n_num_rad_endpoints {
+                                    if u == bd.rad_endpoints[i as usize]
+                                        && v2 == bd.rad_endpoints[i as usize + 1]
+                                    {
+                                        break;
+                                    }
+                                    i += 2;
+                                }
+                                if i >= bd.n_num_rad_endpoints {
+                                    if bd.n_num_rad_endpoints + 2 <= bd.max_num_vertices {
+                                        bd.rad_endpoints[bd.n_num_rad_endpoints as usize] = u;
+                                        bd.n_num_rad_endpoints += 1;
+                                        bd.rad_endpoints[bd.n_num_rad_endpoints as usize] = v2;
+                                        bd.n_num_rad_endpoints += 1;
+                                        num_found += 1;
+                                    } else {
+                                        return BNS_VERT_EDGE_OVFL;
+                                    }
+                                }
+                            }
+                            v = get_prev_vertex(p, v, &bd.switch_edge, &mut iuv);
+                        }
+                        if num_found != 0 {
+                            return 1;
+                        }
+                    }
+                }
+            }
+        }
+        RAD_SRCH_FROM_FICT => {
+            let mut v = u;
+            let mut w = NO_VERTEX;
+            u = NO_VERTEX;
+            while v > VERTEX_T {
+                u = v;
+                if v % 2 == 0 && v / 2 <= p.num_atoms {
+                    let st = p.vert[(v / 2 - 1) as usize].st_edge;
+                    if st.cap - st.flow < 2 {
+                        w = v;
+                    }
+                }
+                v = get_prev_vertex(p, u, &bd.switch_edge, &mut iuv);
+            }
+            v = u / 2 - 1;
+            if w == NO_VERTEX
+                || u == NO_VERTEX
+                || w % 2 != 0
+                || u == w
+                || v < p.num_atoms
+                || p.vert[v as usize].st_edge.cap == p.vert[v as usize].st_edge.flow
+            {
+                return 0;
+            }
+            w = w / 2 - 1;
+            if w >= p.num_atoms {
+                return 0;
+            }
+            u = v;
+            let mut i = 0;
+            while i < bd.n_num_rad_endpoints {
+                if u == bd.rad_endpoints[i as usize] && w == bd.rad_endpoints[i as usize + 1] {
+                    return 0;
+                }
+                i += 2;
+            }
+            if bd.n_num_rad_endpoints + 2 <= bd.max_num_vertices {
+                bd.rad_endpoints[bd.n_num_rad_endpoints as usize] = u;
+                bd.n_num_rad_endpoints += 1;
+                bd.rad_endpoints[bd.n_num_rad_endpoints as usize] = w;
+                bd.n_num_rad_endpoints += 1;
+                return 1;
+            }
+            return BNS_VERT_EDGE_OVFL;
+        }
+        _ => {}
+    }
+    0
+}
+
+/// `BalancedNetworkSearch`: searches for an augmenting path and, if one is
+/// found, augments the flow along it. Returns the augmentation (>0), 0 or a
+/// negative error code.
+pub fn balanced_network_search(p: &mut BnStruct, bd: &mut BnData, b_change_flow: i32) -> i32 {
+    let mut q_size;
+    let mut k: i32 = 0;
+    let mut ret = 0;
+    let b_rad_search = (BNS_EF_RAD_SRCH & b_change_flow) != 0 && !bd.rad_endpoints.is_empty();
+    let mut b_rad_srch_mode = RAD_SRCH_NORM;
+    let mut b_rad_search_prelim = false;
+    if b_rad_search {
+        bd.n_num_rad_endpoints = 0;
+        b_rad_srch_mode = bd.b_rad_srch_mode;
+        b_rad_search_prelim = p.type_tacn != 0 && b_rad_srch_mode == RAD_SRCH_NORM;
+    }
+
+    q_size = 0;
+    bd.scan_q[0] = VERTEX_S;
+    bd.base_ptr[VERTEX_T as usize] = VERTEX_S;
+    bd.base_ptr[VERTEX_S as usize] = BLOSSOM_BASE;
+    bd.tree[VERTEX_S as usize] = TREE_IN_1;
+
+    loop {
+        let u = bd.scan_q[k as usize];
+        let mut b_u = find_base(u, &mut bd.base_ptr);
+        let degree = get_vertex_degree(p, u);
+        let mut n = 0;
+        for i in 0..degree {
+            let mut iuv: EdgeIndex = 0;
+            let v = get_vertex_neighbor(p, u, i, &mut iuv);
+            if v == NO_VERTEX {
+                continue;
+            }
+            if k == 0 && b_rad_srch_mode == RAD_SRCH_FROM_FICT && v / 2 <= p.num_atoms {
+                continue;
+            }
+            if b_rad_search_prelim && v / 2 > p.num_atoms {
+                continue;
+            }
+            let sw_u = bd.switch_edge[u as usize];
+            if (sw_u[0] != v || get_2nd_edge_vertex(p, sw_u) != u) && {
+                ret = rescap(p, u, v, iuv);
+                ret > 0
+            } {
+                if p.type_tacn != 0 {
+                    if ignore_vertex_non_tacn_atom(p, u, v) {
+                        continue;
+                    }
+                    if ignore_vertex_non_tacn_group(p, u, v, &bd.switch_edge) {
+                        continue;
+                    }
+                }
+                let b_v = find_base(v, &mut bd.base_ptr);
+                if b_v == NO_VERTEX {
+                    q_size += 1;
+                    bd.scan_q[q_size as usize] = v;
+                    tree_mark(&mut bd.tree, v, TREE_IN_1);
+                    tree_mark(&mut bd.tree, prim(v), TREE_IN_2);
+                    bd.switch_edge[v as usize][0] = u;
+                    bd.switch_edge[v as usize][1] = iuv;
+                    bd.base_ptr[prim(v) as usize] = v;
+                    bd.base_ptr[v as usize] = BLOSSOM_BASE;
+                    n += 1;
+                } else {
+                    let sw_pu = bd.switch_edge[prim(u) as usize];
+                    if tree_is_s_reachable(&bd.tree, prim(v))
+                        && (sw_pu[0] != prim(v) || get_2nd_edge_vertex(p, sw_pu) != prim(u))
+                        && b_u != b_v
+                        && !(p.type_tacn != 0
+                            && ignore_vertex_non_tacn_group(p, prim(v), u, &bd.switch_edge))
+                    {
+                        n += 1;
+                        let w = make_blossom(
+                            p,
+                            &mut bd.scan_q,
+                            &mut q_size,
+                            &mut bd.pu,
+                            &mut bd.pv,
+                            bd.max_len_pu_pv,
+                            &mut bd.switch_edge,
+                            &mut bd.base_ptr,
+                            u,
+                            v,
+                            iuv,
+                            b_u,
+                            b_v,
+                            &mut bd.tree,
+                        );
+                        if is_bns_error(w) {
+                            bd.q_size = q_size;
+                            return w;
+                        }
+                        b_u = w;
+                        if prim(w) == VERTEX_T {
+                            let sw = bd.switch_edge.clone();
+                            let delta = find_path_cap(p, &sw, VERTEX_S, VERTEX_T, 10000);
+                            if is_bns_error(delta) {
+                                bd.q_size = q_size;
+                                return delta;
+                            }
+                            if delta != 0 {
+                                p.b_change_flow |= b_change_flow & BNS_EF_CHNG_FLOW;
+                            }
+                            let r =
+                                pull_flow(p, &sw, VERTEX_S, VERTEX_T, delta, false, b_change_flow);
+                            bd.q_size = q_size;
+                            return if is_bns_error(r) { r } else { delta };
+                        }
+                    }
+                }
+            } else if is_bns_error(ret) {
+                bd.q_size = q_size;
+                return ret;
+            }
+        }
+        if b_rad_search && n == 0 {
+            let r = register_rad_endpoint(p, bd, u);
+            if is_bns_error(r) {
+                bd.q_size = q_size;
+                return r;
+            }
+        }
+        k += 1;
+        if k > q_size {
+            break;
+        }
+    }
+    bd.q_size = q_size;
+    0
+}
+
+/// `RunBalancedNetworkSearch`: runs the search until no augmenting path is
+/// found (the timeout check of the C code is not ported: no time limit is set)
+pub fn run_balanced_network_search(p: &mut BnStruct, bd: &mut BnData, b_change_flow: i32) -> i32 {
+    let mut delta = 0;
+    let mut n_sum_delta = 0;
+    let mut pass = 0;
+    while pass < p.max_altp {
+        p.alt_path = Some(pass as usize);
+        p.b_change_flow = 0;
+        delta = balanced_network_search(p, bd, b_change_flow);
+        re_init_bn_data(bd);
+        if delta > 0 {
+            p.num_altp += 1;
+            n_sum_delta += delta.abs();
+        } else {
+            break;
+        }
+        pass += 1;
+    }
+    if is_bns_error(delta) {
+        return delta;
+    }
+    n_sum_delta
+}
+
+/// `bIsBnsEndpoint`: is atom `v` an endpoint connected to a t-group by an edge
+/// that is not forbidden?
+pub fn is_bns_endpoint(p: &BnStruct, v: i32) -> bool {
+    if v >= 0 && v < p.num_atoms && p.vert[v as usize].type_ & BNS_VERT_TYPE_ENDPOINT != 0 {
+        let vert = &p.vert[v as usize];
+        for i in (0..vert.num_adj_edges as usize).rev() {
+            let e = &p.edge[p.iedge[vert.iedge + i] as usize];
+            let vt = (i32::from(e.neighbor12) ^ v) as usize;
+            if p.vert[vt].type_ & BNS_VERT_TYPE_TGROUP != 0 {
+                return e.forbidden == 0;
+            }
+        }
+    }
+    false
+}
