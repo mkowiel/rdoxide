@@ -1,9 +1,8 @@
 //! `rdoxide.Chem.rdinchi`: InChI support (upstream
 //! `External/INCHI-API/Wrap/pyInchi.cpp`).
 //!
-//! `InchiToInchiKey` and `GetInchiVersion` work; the conversions that need
-//! the InChI generation / restoration pipelines raise `NotImplementedError`
-//! until those are ported (see docs/INCHI_PORT.md).
+//! The full upstream surface works (the `/z` polymer layer excepted, see
+//! docs/INCHI_PORT.md).
 
 use pyo3::prelude::*;
 use rdoxide::external::inchi_api::{
