@@ -416,6 +416,13 @@ Code/GraphMol/GaussianShape/Wrap/test_rdgaussian_shape.py::TestCase::test6_Fixed
 Code/GraphMol/GaussianShape/Wrap/test_rdgaussian_shape.py::TestCase::test7_customAtomRadii
 Code/GraphMol/GaussianShape/Wrap/test_rdgaussian_shape.py::TestCase::test8_atomSubset
 Code/GraphMol/GaussianShape/Wrap/test_rdgaussian_shape.py::TestCase::test9_tversky
+Code/GraphMol/GeneralizedSubstruct/Wrap/testGeneralizedSubstruct.py::TestCase::test1CreationAndSubstruct
+Code/GraphMol/GeneralizedSubstruct/Wrap/testGeneralizedSubstruct.py::TestCase::test2Params
+Code/GraphMol/GeneralizedSubstruct/Wrap/testGeneralizedSubstruct.py::TestCase::test3MultipleResults
+Code/GraphMol/GeneralizedSubstruct/Wrap/testGeneralizedSubstruct.py::TestCase::test4AdjustQueryProperties
+Code/GraphMol/GeneralizedSubstruct/Wrap/testGeneralizedSubstruct.py::TestCase::test5ControlSteps
+Code/GraphMol/GeneralizedSubstruct/Wrap/testGeneralizedSubstruct.py::TestCase::test6Serialization
+Code/GraphMol/GeneralizedSubstruct/Wrap/testGeneralizedSubstruct.py::TestCase::test7GenericMatchers
 Code/GraphMol/MMPA/Wrap/testMMPA.py::TestCase::test1
 Code/GraphMol/MMPA/Wrap/testMMPA.py::TestCase::test2
 Code/GraphMol/MMPA/Wrap/testMMPA.py::TestCase::test3
@@ -638,6 +645,8 @@ Code/GraphMol/SubstructLibrary/Wrap/rough_test.py::TestCase::test_PatternHolder
 Code/GraphMol/SubstructLibrary/Wrap/rough_test.py::TestCase::test_addpatterns
 Code/GraphMol/SubstructLibrary/Wrap/rough_test.py::TestCase::test_bad_smiles
 Code/GraphMol/SubstructLibrary/Wrap/rough_test.py::TestCase::test_basic_addpatterns
+Code/GraphMol/SubstructLibrary/Wrap/rough_test.py::TestCase::test_init_from_and_to_stream
+Code/GraphMol/SubstructLibrary/Wrap/rough_test.py::TestCase::test_using_xqms
 Code/GraphMol/SynthonSpaceSearch/Wrap/testSynthonSpaceSearch.py::TestCase::testBestHit
 Code/GraphMol/SynthonSpaceSearch/Wrap/testSynthonSpaceSearch.py::TestCase::testChiralAtomtCutoffs
 Code/GraphMol/SynthonSpaceSearch/Wrap/testSynthonSpaceSearch.py::TestCase::testEnumerate
@@ -657,6 +666,7 @@ Code/GraphMol/SynthonSpaceSearch/Wrap/testSynthonSpaceSearch.py::TestCase::testT
 Code/GraphMol/SynthonSpaceSearch/Wrap/testSynthonSpaceSearch.py::TestCase::testUserConfGen
 Code/GraphMol/TautomerQuery/Wrap/rough_test.py::TautomerQueryTestCase::test_basic
 Code/GraphMol/TautomerQuery/Wrap/rough_test.py::TautomerQueryTestCase::test_parameter_searches
+Code/GraphMol/TautomerQuery/Wrap/rough_test.py::TautomerQueryTestCase::test_serialization
 Code/GraphMol/TautomerQuery/Wrap/rough_test.py::TautomerQueryTestCase::test_simple
 Code/GraphMol/TautomerQuery/Wrap/rough_test.py::TautomerQueryTestCase::test_types
 Code/GraphMol/Wrap/rough_test.py::TestCase::test0Except
@@ -1077,6 +1087,7 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::test25SDMolSupplier
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test26SmiMolSupplier
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test27SmilesWriter
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test28SmilesReverse
+Code/GraphMol/nbWrap/rough_test.py::TestCase::test29SDWriterLoop
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test2Atom
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test30Issues109and110
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test31ChiralitySmiles

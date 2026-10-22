@@ -34,13 +34,20 @@ def test_fingerprints():
     assert rdTautomerQuery.PatternFingerprintTautomerTarget(Chem.MolFromSmiles("OC1=CCCCC1")).GetNumBits() == 2048
 
 
-def test_serialization_is_unavailable():
-    q = rdTautomerQuery.TautomerQuery(Chem.MolFromSmiles("CC=O"))
-    assert not rdTautomerQuery.TautomerQueryCanSerialize()
-    with pytest.raises(RuntimeError):
-        q.ToBinary()
-    with pytest.raises(RuntimeError):
-        rdTautomerQuery.TautomerQuery("pickle")
+def test_serialization_round_trip():
+    import pickle
+
+    q = rdTautomerQuery.TautomerQuery(Chem.MolFromSmiles("O=C1CCCCC1"))
+    assert rdTautomerQuery.TautomerQueryCanSerialize()
+    pkl = q.ToBinary()
+    assert isinstance(pkl, bytes)
+    for q2 in (rdTautomerQuery.TautomerQuery(pkl), pickle.loads(pickle.dumps(q))):
+        assert len(q2.GetTautomers()) == 2
+        assert tuple(q2.GetModifiedAtoms()) == tuple(q.GetModifiedAtoms())
+        assert tuple(q2.GetModifiedBonds()) == tuple(q.GetModifiedBonds())
+        assert q2.IsSubstructOf(Chem.MolFromSmiles("OC1=CCCC(CC)C1"))
+    with pytest.raises(Exception):
+        rdTautomerQuery.TautomerQuery(b"not a pickle")
 
 
 def _library(holder_cls):

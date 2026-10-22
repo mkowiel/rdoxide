@@ -112,6 +112,23 @@ impl Reader<'_> {
     }
 }
 
+const TQ_MAGIC: &[u8; 4] = b"RDXT";
+
+/// `TautomerQuery::toBinary` (the pickle of a `TautomerQuery`)
+pub fn tautomer_query_to_binary(tq: &TautomerQuery) -> Result<Vec<u8>> {
+    let mut w = Writer(TQ_MAGIC.to_vec());
+    w.tautomer_query(tq)?;
+    Ok(w.0)
+}
+
+/// `TautomerQuery(pickle)`
+pub fn tautomer_query_from_binary(data: &[u8]) -> Result<TautomerQuery> {
+    if data.len() < 4 || &data[..4] != TQ_MAGIC {
+        return Err(RDKitError::Value("invalid TautomerQuery data".into()));
+    }
+    Reader { data, pos: 4 }.tautomer_query()
+}
+
 fn bundle_of(mols: Vec<ROMol>) -> Result<MolBundle> {
     let mut b = MolBundle::new();
     for m in mols {

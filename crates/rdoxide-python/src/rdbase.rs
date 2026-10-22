@@ -289,7 +289,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // functions do not bind as methods), so upstream Python code must take
     // its nanobind code paths.
     m.add("_wrapperType", "nanobind")?;
-    m.add("_serializationEnabled", false)?;
+    m.add("_serializationEnabled", true)?;
     m.add("_iostreamsEnabled", false)?;
     m.add("_multithreadedEnabled", true)?;
     m.add_function(wrap_pyfunction!(version, m)?)?;
