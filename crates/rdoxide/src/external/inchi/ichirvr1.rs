@@ -8,11 +8,12 @@
 
 use super::ichi::InChI;
 use super::ichi_bns::{
-    BN_MAX_ALTP, BNS_ADD_EDGES, BNS_ADD_SUPER_TGROUP, BNS_EDGE_FORBIDDEN_MASK,
-    BNS_VERT_TYPE_C_NEGATIVE, BNS_VERT_TYPE_ENDPOINT, BnStruct, BnsAltPath, BnsEdge, BnsVertex,
-    EDGE_FLOW_MASK, EDGE_FLOW_ST_MASK, I_ALTP_END_ATOM, I_ALTP_FLOW, I_ALTP_HDR_LEN,
-    I_ALTP_MAX_LEN, I_ALTP_PATH_LEN, I_ALTP_START_ATOM, MAX_BOND_EDGE_CAP, NO_VERTEX,
-    NUM_KINDS_OF_GROUPS,
+    BN_MAX_ALTP, BNS_ADD_EDGES, BNS_ADD_SUPER_TGROUP, BNS_EDGE_FORBIDDEN_MASK, BNS_EF_CHNG_FLOW,
+    BNS_VERT_TYPE_C_NEGATIVE, BNS_VERT_TYPE_ENDPOINT, BNS_VERT_TYPE_SUPER_TGROUP, BnData, BnStruct,
+    BnsAltPath, BnsEdge, BnsVertex, EDGE_FLOW_MASK, EDGE_FLOW_ST_MASK, I_ALTP_END_ATOM,
+    I_ALTP_FLOW, I_ALTP_HDR_LEN, I_ALTP_MAX_LEN, I_ALTP_NEIGHBOR, I_ALTP_PATH_LEN,
+    I_ALTP_START_ATOM, MAX_BOND_EDGE_CAP, NO_VERTEX, NUM_KINDS_OF_GROUPS, balanced_network_search,
+    re_init_bn_data, re_init_bn_struct_alt_paths, run_balanced_network_search,
 };
 use super::ichi_bns::{
     BNS_VERT_TYPE_ATOM, BNS_VERT_TYPE_AUX, BNS_VERT_TYPE_C_GROUP, BNS_VERT_TYPE_METAL_GR,
@@ -4343,4 +4344,410 @@ pub fn allocate_and_init_tcg_bn_struct(
     p.tot_st_cap = tot_st_cap;
     p.tot_st_flow = tot_st_flow;
     Some((p, num_changed_bonds / 2))
+}
+
+// ---------------------------------------------------------------------------
+// Charge changes of the BNS paths, BNS runs, forbidden edge masks
+
+/// `IncrZeroBondsAndClearEndpts`
+pub fn incr_zero_bonds_and_clear_endpts(at: &mut [InpAtom], num_at: usize, i_component: i32) {
+    for a in &mut at[..num_at] {
+        a.endpoint = 0;
+        a.component = i_component as _;
+        for j in 0..a.valence as usize {
+            if a.bond_type[j] == 0 {
+                a.bond_type[j] = BOND_TYPE_SINGLE as u8;
+                a.chem_bonds_valence += BOND_TYPE_SINGLE as i8;
+            }
+        }
+    }
+}
+
+/// `IncrZeroBonds`
+pub fn incr_zero_bonds(at: &mut [InpAtom], num_at: usize, i_component: i32) {
+    for a in &mut at[..num_at] {
+        a.component = i_component as _;
+        for j in 0..a.valence as usize {
+            if a.bond_type[j] == 0 {
+                a.bond_type[j] = BOND_TYPE_SINGLE as u8;
+                a.chem_bonds_valence += BOND_TYPE_SINGLE as i8;
+            }
+        }
+    }
+}
+
+/// `ClearEndpts`
+pub fn clear_endpts(at: &mut [InpAtom], num_at: usize) {
+    for a in &mut at[..num_at] {
+        a.endpoint = 0;
+    }
+}
+
+fn any_vert_type(x: u16) -> bool {
+    x & (BNS_VERT_TYPE_ATOM | BNS_VERT_TYPE_TGROUP | BNS_VERT_TYPE_C_GROUP) != 0
+        && x & BNS_VERT_TYPE_SUPER_TGROUP == 0
+}
+
+const VF_USED_IN: i32 = 1;
+const VF_USED_OUT: i32 = 2;
+const VF_USED_ALL: i32 = VF_USED_IN | VF_USED_OUT;
+
+/// `VF`: a vertex on an alternating path with its in/out edges
+#[derive(Debug, Clone, Copy)]
+pub struct Vf {
+    pub type_: u16,
+    pub v: i32,
+    pub e_in: i32,
+    pub e_out: i32,
+    pub delta_in: i32,
+    pub delta_out: i32,
+    pub b_used: i32,
+}
+
+impl Default for Vf {
+    fn default() -> Self {
+        Vf {
+            type_: 0,
+            v: NO_VERTEX,
+            e_in: NO_VERTEX,
+            e_out: NO_VERTEX,
+            delta_in: 0,
+            delta_out: 0,
+            b_used: 0,
+        }
+    }
+}
+
+/// `GetDeltaChargeFromVF`
+pub fn get_delta_charge_from_vf(bns: &BnStruct, p_va: &[ValAt], vf: &mut Vf) -> i32 {
+    let ie_in1 = if vf.b_used & VF_USED_IN == 0 && vf.e_in >= 0 && vf.delta_in != 0 {
+        vf.e_in + 1
+    } else {
+        NO_VERTEX
+    };
+    let ie_out1 = if vf.b_used & VF_USED_OUT == 0 && vf.e_out >= 0 && vf.delta_out != 0 {
+        vf.e_out + 1
+    } else {
+        NO_VERTEX
+    };
+    if vf.type_ & BNS_VERT_TYPE_C_GROUP == 0
+        || vf.type_ & BNS_VERT_TYPE_SUPER_TGROUP != 0
+        || (ie_in1 == NO_VERTEX && ie_out1 == NO_VERTEX)
+    {
+        return 0;
+    }
+    let mut v = NO_VERTEX;
+    for i in 0..bns.num_atoms as usize {
+        let hit = if vf.type_ & BNS_VERT_TYPE_C_NEGATIVE != 0 {
+            p_va[i].n_c_minus_group_edge
+        } else {
+            p_va[i].n_c_plus_group_edge
+        };
+        if hit == ie_in1 || hit == ie_out1 {
+            v = i as i32;
+            break;
+        }
+    }
+    if v == NO_VERTEX {
+        return 0;
+    }
+    let va = &p_va[v as usize];
+    let mut n_init_charge = i32::from(va.c_init_charge);
+    let (mut plus_flow, mut minus_flow) = (0, 0);
+    let e_cplus = va.n_c_plus_group_edge - 1;
+    if e_cplus >= 0 {
+        let e = &bns.edge[e_cplus as usize];
+        plus_flow = e.cap - e.flow;
+    }
+    let e_cminus = va.n_c_minus_group_edge - 1;
+    if e_cminus >= 0 {
+        minus_flow = -bns.edge[e_cminus as usize].flow;
+    }
+    n_init_charge += plus_flow + minus_flow;
+    let mut n_delta_charge = 0;
+    if vf.b_used & VF_USED_OUT == 0 && (vf.e_out == e_cplus || vf.e_out == e_cminus) {
+        n_delta_charge -= vf.delta_out;
+        vf.b_used |= VF_USED_OUT;
+    }
+    if vf.b_used & VF_USED_IN == 0 && (vf.e_in == e_cplus || vf.e_in == e_cminus) {
+        n_delta_charge -= vf.delta_in;
+        vf.b_used |= VF_USED_IN;
+    }
+    if n_init_charge == 0 && n_delta_charge != 0 {
+        1
+    } else if n_init_charge != 0 && n_init_charge + n_delta_charge == 0 {
+        -1
+    } else {
+        0
+    }
+}
+
+/// `EvaluateChargeChanges`: `(ret, delta_h, delta_charge, num_visited_atoms)`
+pub fn evaluate_charge_changes(bns: &mut BnStruct, p_va: &[ValAt]) -> (i32, i32, i32, i32) {
+    let (mut pn_delta_h, mut pn_delta_charge, mut pn_visited) = (0, 0, 0);
+    let mut err = 0;
+    let mut pass = bns.num_altp - 1;
+    while pass >= 0 {
+        bns.alt_path = Some(pass as usize);
+        let ap = &bns.altp[pass as usize];
+        let mut v1 = ap[I_ALTP_START_ATOM].number();
+        let n = ap[I_ALTP_PATH_LEN].number();
+        let mut delta = ap[I_ALTP_FLOW].flow[0];
+        let v_last = ap[I_ALTP_END_ATOM].number();
+        let mut v2 = NO_VERTEX;
+        let mut vf = [Vf::default(); 4];
+        let mut i_prev = 0;
+        if any_vert_type(bns.vert[v1 as usize].type_) {
+            vf[2].type_ = bns.vert[v1 as usize].type_;
+            vf[2].v = v1;
+            i_prev = 2;
+        }
+        let mut n_num_delta_h = 0;
+        let mut n_num_delta_charge = 0;
+        // (C counts the first atom and resets the counter right away)
+        let mut n_num_visited = 0;
+        for i in 0..n {
+            let ineigh1 = bns.altp[pass as usize][I_ALTP_NEIGHBOR + i as usize].ineigh(0) as usize;
+            let ie = bns.iedge[bns.vert[v1 as usize].iedge + ineigh1];
+            let nb12 = i32::from(bns.edge[ie as usize].neighbor12);
+            if i_prev != 0 {
+                vf[2].e_out = ie;
+                vf[2].delta_out = delta;
+            }
+            v2 = nb12 ^ v1;
+            let t2 = bns.vert[v2 as usize].type_;
+            if t2 & BNS_VERT_TYPE_ATOM != 0 {
+                n_num_visited += 1;
+            }
+            if (any_vert_type(t2) || i == n - 1)
+                && vf[0].type_ & BNS_VERT_TYPE_C_GROUP != 0
+                && vf[0].b_used != VF_USED_ALL
+            {
+                n_num_delta_charge += get_delta_charge_from_vf(bns, p_va, &mut vf[0]);
+            }
+            if any_vert_type(t2) {
+                vf[0] = vf[1];
+                vf[1] = vf[2];
+                vf[2] = vf[3];
+                vf[2].v = v2;
+                vf[2].type_ = t2;
+                vf[2].e_in = ie;
+                vf[2].delta_in = delta;
+                i_prev = 2;
+            } else if i == n - 1 {
+                vf[0] = vf[1];
+                vf[1] = vf[2];
+                vf[2] = vf[3];
+                i_prev = 1;
+            } else {
+                i_prev = 0;
+            }
+            if i_prev != 0 && vf[1].type_ & BNS_VERT_TYPE_ATOM != 0 {
+                let v = vf[1].v as usize;
+                let mut n_init_charge = i32::from(p_va[v].c_init_charge);
+                let (mut plus_flow, mut minus_flow) = (0, 0);
+                let e_cplus = p_va[v].n_c_plus_group_edge - 1;
+                if e_cplus >= 0 {
+                    let e = &bns.edge[e_cplus as usize];
+                    plus_flow = e.cap - e.flow;
+                }
+                let e_cminus = p_va[v].n_c_minus_group_edge - 1;
+                if e_cminus >= 0 {
+                    minus_flow = -bns.edge[e_cminus as usize].flow;
+                }
+                n_init_charge += plus_flow + minus_flow;
+                let (mut n_delta_h, mut n_delta_charge) = (0, 0);
+                if vf[0].type_ & BNS_VERT_TYPE_TGROUP != 0 {
+                    n_delta_h -= delta;
+                } else if vf[0].type_ & BNS_VERT_TYPE_C_GROUP != 0
+                    && vf[0].b_used & VF_USED_OUT == 0
+                    && (vf[0].e_out == e_cplus || vf[0].e_out == e_cminus)
+                {
+                    n_delta_charge -= vf[0].delta_out;
+                    vf[0].b_used |= VF_USED_OUT;
+                }
+                if vf[2].type_ & BNS_VERT_TYPE_TGROUP != 0 {
+                    n_delta_h += delta;
+                } else if vf[2].type_ & BNS_VERT_TYPE_C_GROUP != 0
+                    && vf[2].b_used & VF_USED_IN == 0
+                    && (vf[2].e_in == e_cplus || vf[2].e_in == e_cminus)
+                {
+                    n_delta_charge -= vf[2].delta_in;
+                    vf[2].b_used |= VF_USED_IN;
+                }
+                if n_init_charge == 0 && n_delta_charge != 0 {
+                    n_num_delta_charge += 1;
+                } else if n_init_charge != 0 && n_init_charge + n_delta_charge == 0 {
+                    n_num_delta_charge -= 1;
+                }
+                n_num_delta_h += n_delta_h.abs();
+                vf[1].b_used = VF_USED_ALL;
+            }
+            delta = -delta;
+            v1 = v2;
+        }
+        for j in 0..3 {
+            n_num_delta_charge += get_delta_charge_from_vf(bns, p_va, &mut vf[j]);
+        }
+        pn_delta_h += n_num_delta_h;
+        pn_delta_charge += n_num_delta_charge;
+        pn_visited += n_num_visited;
+        if v2 != v_last {
+            err = BNS_PROGRAM_ERR;
+        }
+        pass -= 1;
+    }
+    (err, pn_delta_h, pn_delta_charge, pn_visited)
+}
+
+/// result of [`run_bns_test_once`]
+#[derive(Debug, Clone, Copy, Default)]
+pub struct BnsTestResult {
+    pub ret: i32,
+    pub v_first: i32,
+    pub v_last: i32,
+    pub path_len: i32,
+    pub delta_h: i32,
+    pub delta_charge: i32,
+    pub num_visited_atoms: i32,
+}
+
+/// `RunBnsTestOnce`: the `delta_h`, `delta_charge` and `num_visited_atoms`
+/// of `res` keep their values when no path is found
+pub fn run_bns_test_once(
+    bns: &mut BnStruct,
+    bd: &mut BnData,
+    p_va: &[ValAt],
+    res: &mut BnsTestResult,
+) -> i32 {
+    re_init_bn_struct_alt_paths(bns);
+    bns.alt_path = Some(0);
+    bns.num_altp = 0;
+    bns.b_change_flow = 0;
+    let delta = balanced_network_search(bns, bd, 0);
+    if delta > 0 {
+        bns.alt_path = Some(0);
+        let ap = &bns.altp[0];
+        res.v_first = ap[I_ALTP_START_ATOM].number();
+        res.path_len = ap[I_ALTP_PATH_LEN].number();
+        res.v_last = ap[I_ALTP_END_ATOM].number();
+        bns.num_altp += 1;
+        let (_, dh, dc, nv) = evaluate_charge_changes(bns, p_va);
+        res.delta_h = dh;
+        res.delta_charge = dc;
+        res.num_visited_atoms = nv;
+    } else {
+        res.v_first = NO_VERTEX;
+        res.path_len = 0;
+        res.v_last = NO_VERTEX;
+    }
+    re_init_bn_struct_alt_paths(bns);
+    let ret = re_init_bn_data(bd);
+    res.ret = delta;
+    if delta >= 0 && ret > 0 { -ret } else { delta }
+}
+
+/// `RunBnsRestoreOnce`
+pub fn run_bns_restore_once(bns: &mut BnStruct, bd: &mut BnData) -> i32 {
+    let mut total = 0;
+    re_init_bn_struct_alt_paths(bns);
+    loop {
+        let delta = run_balanced_network_search(bns, bd, BNS_EF_CHNG_FLOW);
+        if is_bns_error(delta) {
+            return delta;
+        }
+        total += delta;
+        re_init_bn_struct_alt_paths(bns);
+        let ret = re_init_bn_data(bd);
+        if ret > 0 {
+            return -ret;
+        }
+        if !(delta > 0 && ret == 0) {
+            break;
+        }
+    }
+    bns.tot_st_flow += 2 * total;
+    total
+}
+
+/// `RemoveForbiddenEdgeMask`
+pub fn remove_forbidden_edge_mask(bns: &mut BnStruct, edges: &EdgeList, mask: i32) {
+    for &ie in &edges.pn_edges[..edges.num_edges as usize] {
+        bns.edge[ie as usize].forbidden &= !mask as i8;
+    }
+}
+
+/// `SetForbiddenEdgeMask`
+pub fn set_forbidden_edge_mask(bns: &mut BnStruct, edges: &EdgeList, mask: i32) {
+    for &ie in &edges.pn_edges[..edges.num_edges as usize] {
+        bns.edge[ie as usize].forbidden |= mask as i8;
+    }
+}
+
+/// `RemoveForbiddenBondFlowBits`
+pub fn remove_forbidden_bond_flow_bits(bns: &mut BnStruct, mask: i32) {
+    let n = bns.num_bonds as usize;
+    for e in &mut bns.edge[..n] {
+        e.forbidden &= !mask as i8;
+    }
+}
+
+/// `GetChargeFlowerUpperEdge`: the index of the upper edge of the charge
+/// flower of the charge edge, or `NO_VERTEX`
+pub fn get_charge_flower_upper_edge(bns: &BnStruct, charge_edge: i32) -> i32 {
+    if charge_edge < 0 {
+        return NO_VERTEX;
+    }
+    let pe = &bns.edge[charge_edge as usize];
+    let mut vc = i32::from(pe.neighbor1);
+    if !is_bns_vt_c_gr(bns.vert[vc as usize].type_) {
+        vc ^= i32::from(pe.neighbor12);
+    }
+    let v0 = vc ^ i32::from(pe.neighbor12);
+    let pv0 = &bns.vert[v0 as usize];
+    if pv0.type_ & BNS_VERT_TYPE_ATOM != 0 {
+        return NO_VERTEX;
+    }
+    let mut pe1 = [0usize; 3];
+    let mut v1 = [0i32; 3];
+    let (mut i, mut j) = (0usize, 0usize);
+    while i < pv0.num_adj_edges as usize && j < 3 {
+        pe1[j] = bns.iedge[pv0.iedge + i] as usize;
+        v1[j] = i32::from(bns.edge[pe1[j]].neighbor12) ^ v0;
+        let t = bns.vert[v1[j] as usize].type_;
+        if vc != v1[j] && t & BNS_VERT_TYPE_ATOM == 0 && !is_bns_vt_c_gr(t) {
+            j += 1;
+        }
+        i += 1;
+    }
+    if j != 2 || i != pv0.num_adj_edges as usize {
+        return NO_VERTEX;
+    }
+    let n = |k: usize| bns.vert[v1[k] as usize].num_adj_edges;
+    let (i0, i1) = if n(1) == 2 && n(0) == 3 {
+        (1, 0)
+    } else if n(0) == 2 && n(1) == 3 {
+        (0, 1)
+    } else {
+        return NO_VERTEX;
+    };
+    let pv_t = &bns.vert[v1[i1] as usize];
+    let mut k = 0;
+    for i in 0..pv_t.num_adj_edges as usize {
+        let pe_t = &bns.edge[bns.iedge[pv_t.iedge + i] as usize];
+        let v = i32::from(pe_t.neighbor12) ^ v1[i1];
+        if v == v0 {
+            k += 1;
+        }
+        if v == v1[i0] {
+            k += 2;
+        }
+        if bns.vert[v as usize].type_ & BNS_VERT_TYPE_ATOM != 0 {
+            k += 4;
+        }
+    }
+    if k != 7 {
+        return NO_VERTEX;
+    }
+    pe1[i0] as i32
 }

@@ -2,6 +2,7 @@
 //! against the C library, with fixtures from `tools/inchi_rvr*_reference.py`.
 
 use rdoxide::external::inchi::ichi::InChI;
+use rdoxide::external::inchi::ichi_bns::{BnStruct, allocate_and_init_bn_data};
 use rdoxide::external::inchi::ichi_io::{
     INCHI_IOS_TYPE_STRING, InchiIostream, IosFile, inchi_ios_init,
 };
@@ -566,6 +567,75 @@ fn restoration_helpers_match_c() {
                                     "Y {} {} {} {}",
                                     g.n_edge_plus, g.n_edge_minus, g.n_edge4charge, g.added_charge
                                 ));
+                                if r4 >= 0 {
+                                    for i in 0..b.num_edges {
+                                        got.push(format!(
+                                            "U{i} {}",
+                                            get_charge_flower_upper_edge(&b, i)
+                                        ));
+                                    }
+                                    let mut el = EdgeList::default();
+                                    for i in (0..b.num_edges).step_by(2) {
+                                        add_to_edge_list(&mut el, i, 4);
+                                    }
+                                    let forb = |b: &BnStruct| {
+                                        let mut l = String::from("F");
+                                        for i in 0..b.num_edges as usize {
+                                            l.push_str(&format!(" {}", b.edge[i].forbidden));
+                                        }
+                                        l
+                                    };
+                                    set_forbidden_edge_mask(&mut b, &el, 2);
+                                    got.push(forb(&b));
+                                    remove_forbidden_edge_mask(&mut b, &el, 1);
+                                    got.push(forb(&b));
+                                    remove_forbidden_bond_flow_bits(&mut b, 2);
+                                    got.push(forb(&b));
+                                    let mut bd = allocate_and_init_bn_data(b.max_vertices);
+                                    let mut res = BnsTestResult {
+                                        delta_h: -7,
+                                        delta_charge: -7,
+                                        num_visited_atoms: -7,
+                                        ..Default::default()
+                                    };
+                                    let rt = run_bns_test_once(&mut b, &mut bd, &va, &mut res);
+                                    got.push(format!(
+                                        "R {rt} {} {} {} {} {} {}",
+                                        res.v_first,
+                                        res.v_last,
+                                        res.path_len,
+                                        res.delta_h,
+                                        res.delta_charge,
+                                        res.num_visited_atoms
+                                    ));
+                                    let rr = run_bns_restore_once(&mut b, &mut bd);
+                                    got.push(format!("S {rr} {} {}", b.tot_st_cap, b.tot_st_flow));
+                                    for i in 0..b.num_edges as usize {
+                                        got.push(format!(
+                                            "e{i} {} {}",
+                                            b.edge[i].flow, b.edge[i].cap
+                                        ));
+                                    }
+                                    for i in 0..b.num_vertices as usize {
+                                        got.push(format!(
+                                            "v{i} {} {}",
+                                            b.vert[i].st_edge.flow, b.vert[i].st_edge.cap
+                                        ));
+                                    }
+                                    for a in at.iter_mut().take(n) {
+                                        a.bond_type[0] = 0;
+                                    }
+                                    incr_zero_bonds_and_clear_endpts(&mut at, n, 5);
+                                    for i in 0..n {
+                                        got.push(format!(
+                                            "z{i} {} {} {} {}",
+                                            at[i].endpoint,
+                                            at[i].component,
+                                            at[i].chem_bonds_valence,
+                                            at[i].bond_type[0]
+                                        ));
+                                    }
+                                }
                             }
                         }
                     }
