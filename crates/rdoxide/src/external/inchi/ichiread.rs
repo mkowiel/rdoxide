@@ -13,6 +13,7 @@
 
 use super::ichi::InChI;
 use super::ichi_io::{INCHI_IOS_TYPE_STRING, InchiIostream};
+use super::inpdef::MAXVAL;
 use super::util::strtol10;
 
 pub const RI_ERR_ALLOC: i32 = -1;
@@ -769,4 +770,533 @@ pub fn parse_segment_formula(
         }
     }
     n_num_components + 1
+}
+
+const ALPHA_BASE: i64 = 27;
+
+/// `abctol`: `strtol` for the compressed InChI numbers (`Abc@` digits; the
+/// sign is skipped, not applied)
+fn abctol(s: &[u8], from: usize) -> (i64, usize) {
+    let treshold = (i64::MAX - 1) / ALPHA_BASE;
+    let mut val: i64 = 0;
+    let mut p = from;
+    if at(s, p) == b'-' {
+        p += 1;
+    }
+    if at(s, p) == b'@' {
+        return (0, p + 1);
+    }
+    if !upper(s, p) {
+        return (0, from);
+    }
+    val += i64::from(at(s, p).to_ascii_lowercase() - b'a') + 1;
+    p += 1;
+    while at(s, p) != 0 {
+        if lower(s, p) {
+            val = val.wrapping_mul(ALPHA_BASE);
+            val = val.wrapping_add(i64::from(at(s, p) - b'a') + 1);
+        } else if at(s, p) == b'@' {
+            if val > treshold {
+                return (0, from);
+            }
+            val *= ALPHA_BASE;
+        } else {
+            break;
+        }
+        p += 1;
+    }
+    (val, p)
+}
+
+/// `inchi_strtol`: base 10 or the compressed base (27)
+fn inchi_strtol(s: &[u8], from: usize, base: i64) -> (i64, usize) {
+    if base == ALPHA_BASE {
+        abctol(s, from)
+    } else {
+        strtol(s, from)
+    }
+}
+
+/// `ONE_LINKED_BOND`
+#[derive(Debug, Clone, Copy, Default)]
+struct OneLinkedBond {
+    neigh: u16,
+    prev: u16,
+}
+
+/// `LINKED_BONDS`
+#[derive(Debug, Default)]
+struct LinkedBonds {
+    p_bond: Option<Vec<OneLinkedBond>>,
+    len: usize,
+    len_alloc: usize,
+}
+
+const LINKED_BOND_ADD: usize = 128;
+
+/// `AddLinkedBond`
+fn add_linked_bond(at1: u16, at2: u16, num_at: u16, lb: &mut LinkedBonds) -> i32 {
+    let req_len = (2 * usize::from(num_at) + 2).max(lb.len + 2);
+    if i32::from(at2) > i32::from(num_at)
+        || i32::from(at1) > i32::from(num_at)
+        || i32::from(num_at) > MAX_ATOMS
+    {
+        return RI_ERR_SYNTAX;
+    }
+    if lb.len_alloc <= req_len {
+        let new_len = req_len - req_len % LINKED_BOND_ADD + 2 * LINKED_BOND_ADD;
+        let mut p = vec![OneLinkedBond::default(); new_len];
+        if let (Some(old), true) = (&lb.p_bond, lb.len > 0) {
+            p[..lb.len].copy_from_slice(&old[..lb.len]);
+        }
+        lb.p_bond = Some(p);
+        lb.len_alloc = new_len;
+    }
+    let pb = lb.p_bond.as_mut().expect("allocated above");
+    if lb.len == 0 {
+        lb.len = usize::from(num_at) + 1;
+        for b in &mut pb[..=usize::from(num_at)] {
+            *b = OneLinkedBond::default();
+        }
+    }
+    let (a1, a2) = (usize::from(at1), usize::from(at2));
+    let prev = pb[a1].prev;
+    if prev == 0 {
+        pb[a1].neigh = at2;
+        pb[a1].prev = at1;
+    } else {
+        pb[lb.len] = OneLinkedBond { neigh: at2, prev };
+        pb[a1].prev = lb.len as u16;
+        lb.len += 1;
+    }
+    let prev = pb[a2].prev;
+    if prev == 0 {
+        pb[a2].neigh = at1;
+        pb[a2].prev = at2;
+    } else {
+        pb[lb.len] = OneLinkedBond { neigh: at1, prev };
+        pb[a2].prev = lb.len as u16;
+        lb.len += 1;
+    }
+    0
+}
+
+/// `ParseSegmentConnections`: the `/c` layer (`s` starts at the `c`, or at
+/// whatever follows when the layer is missing). `p_inp_inchi` is empty for
+/// the C NULL; `pb_abc` is -1 until the format (compressed or not) is known.
+pub fn parse_segment_connections(
+    s: &[u8],
+    p_inp_inchi: &mut Vec<InChI>,
+    pn_num_components: &mut i32,
+    pb_abc: &mut i32,
+    nb_total: &mut i32,
+) -> i32 {
+    const LAST_AT_LEN: usize = 256;
+    *nb_total = 0;
+    let mut i_component: i32 = 0;
+    let mut lb = LinkedBonds::default();
+    let mut b_prev_version: i32 = -1;
+
+    if at(s, 0) != b'c' {
+        if p_inp_inchi.is_empty() && *pn_num_components == 0 {
+            let c = InChI {
+                sz_hill_formula: Some(String::new()),
+                n_conn_table: vec![0],
+                len_conn_table: 0,
+                ..Default::default()
+            };
+            *p_inp_inchi = vec![c];
+            *pn_num_components = 1;
+        } else {
+            let n = *pn_num_components;
+            for i in 0..n as usize {
+                if let Some(c) = p_inp_inchi.get_mut(i) {
+                    c.n_conn_table = vec![1, 0];
+                    c.len_conn_table = 1;
+                }
+            }
+        }
+        return 0;
+    }
+
+    // Pass 1. Re-Count atoms, count bonds
+    let mut p_start = 1usize;
+    let n_num_components = *pn_num_components;
+    if n_num_components > MAX_ATOMS {
+        return RI_ERR_SYNTAX;
+    }
+    let ret: i32 = 'main: loop {
+        let p_end = strchr(s, p_start, b';').unwrap_or(p_start + strlen(s, p_start));
+        let mpy_component: i32;
+        let mut p: usize;
+        if let Some(star) = strchr(s, p_start, b'*').filter(|&x| x < p_end) {
+            let (v, q) = strtol(s, p_start);
+            mpy_component = v as i32;
+            if !(0..=MAX_ATOMS).contains(&mpy_component) {
+                break 'main RI_ERR_SYNTAX;
+            }
+            if star != q || !is_digit(at(s, p_start)) {
+                break 'main RI_ERR_SYNTAX;
+            }
+            p = star + 1;
+        } else {
+            mpy_component = 1;
+            p = p_start;
+        }
+        if i_component + mpy_component > MAX_ATOMS {
+            break 'main RI_ERR_SYNTAX;
+        }
+        p_start = p;
+        // Pass 1.1 parse a component
+        let mut num_open: i32 = 0;
+        let mut state: u8 = 0;
+        let mut max_atom: u16 = 0;
+        let mut n_num_bonds: i32 = 0;
+        if p < p_end && *pb_abc == -1 {
+            *pb_abc = i32::from(upper(s, p));
+        }
+        let base: i64 = if *pb_abc != 0 { ALPHA_BASE } else { 10 };
+        if *pb_abc == 1 {
+            let mut n_num_atoms: i32 = 1;
+            while p < p_end {
+                if at(s, p) == b'-' {
+                    if b_prev_version == -1 {
+                        b_prev_version = 1;
+                    } else if b_prev_version != 1 {
+                        break 'main RI_ERR_SYNTAX;
+                    }
+                    n_num_atoms = n_num_atoms.wrapping_sub(1);
+                    p += 1;
+                }
+                if is_digit(at(s, p)) {
+                    if b_prev_version == -1 {
+                        b_prev_version = 0;
+                    } else if b_prev_version != 0 {
+                        break 'main RI_ERR_SYNTAX;
+                    }
+                    let (v, q) = strtol(s, p);
+                    p = q;
+                    n_num_atoms = (i64::from(n_num_atoms).wrapping_sub(v)) as i32;
+                }
+                let (v, q) = inchi_strtol(s, p, base);
+                let cur_atom = v as u16;
+                if at(s, p) != b'-' && cur_atom != 0 {
+                    n_num_atoms = n_num_atoms.wrapping_add(1);
+                    n_num_bonds += 1;
+                    p = q;
+                    if max_atom < cur_atom {
+                        max_atom = cur_atom;
+                    }
+                } else {
+                    break 'main RI_ERR_SYNTAX;
+                }
+            }
+            if i32::from(max_atom) < n_num_atoms && n_num_bonds != 0 {
+                max_atom = n_num_atoms as u16;
+            }
+        } else {
+            while p < p_end {
+                let c = at(s, p);
+                p += 1;
+                match c {
+                    b'(' | b')' | b',' | b'-' => {
+                        if state != b'N' {
+                            break 'main RI_ERR_SYNTAX;
+                        }
+                        state = c;
+                        num_open += i32::from(c == b'(') - i32::from(c == b')');
+                        if num_open < 0 {
+                            break 'main RI_ERR_SYNTAX;
+                        }
+                    }
+                    _ => {
+                        let (v, q) = strtol(s, p - 1);
+                        let cur_atom = v as u16;
+                        if is_digit(c) && cur_atom != 0 {
+                            p = q;
+                            match state {
+                                b'(' | b')' | b',' | b'-' | 0 => {
+                                    if state != 0 {
+                                        n_num_bonds += 1;
+                                    }
+                                    if max_atom < cur_atom {
+                                        max_atom = cur_atom;
+                                    }
+                                    state = b'N';
+                                }
+                                _ => break 'main RI_ERR_SYNTAX,
+                            }
+                        } else {
+                            break 'main RI_ERR_SYNTAX;
+                        }
+                    }
+                }
+            }
+            if num_open != 0 {
+                break 'main RI_ERR_SYNTAX;
+            }
+        }
+        *nb_total += n_num_bonds;
+
+        // Save the results and allocate memory
+        let n_num_atoms = i32::from(max_atom);
+        let mut len_conn_table = n_num_atoms + n_num_bonds;
+        for i in 0..mpy_component {
+            let ici = i_component + i;
+            if ici > n_num_components - 1 || ici < 0 {
+                break 'main RI_ERR_SYNTAX;
+            }
+            let ici = ici as usize;
+            let Some(c) = p_inp_inchi.get_mut(ici) else {
+                break 'main RI_ERR_SYNTAX;
+            };
+            if c.n_number_of_atoms <= 0 || c.n_number_of_atoms > MAX_ATOMS {
+                break 'main RI_ERR_SYNTAX;
+            }
+            let mut j = c.n_number_of_atoms;
+            if j < n_num_atoms {
+                let mut tmp: Vec<u8> = (0..j as usize)
+                    .map(|k| c.n_atom.get(k).copied().unwrap_or(0))
+                    .collect();
+                while j < n_num_atoms {
+                    tmp.push(1);
+                    j += 1;
+                }
+                tmp.push(0);
+                c.n_atom = tmp;
+                c.n_number_of_atoms = n_num_atoms;
+            } else if j > n_num_atoms && (len_conn_table != 0 || j != 1) {
+                break 'main RI_ERR_SYNTAX;
+            }
+            if n_num_atoms == 0 && n_num_bonds == 0 && len_conn_table == 0 {
+                len_conn_table = 1;
+            }
+            c.n_conn_table = vec![0; len_conn_table as usize + 1];
+            c.len_conn_table = len_conn_table;
+        }
+
+        // Pass 1.2 parse a component and extract the bonds
+        let mut num_open: usize = 0;
+        let mut last_atom = [0u16; LAST_AT_LEN];
+        let mut state: u8 = 0;
+        p = p_start;
+        lb.len = 0;
+        let n_at = n_num_atoms as u16;
+        if *pb_abc == 1 {
+            last_atom[num_open] = 2;
+            while p < p_end {
+                if i32::from(last_atom[num_open]) > i32::from(max_atom) {
+                    break 'main RI_ERR_SYNTAX;
+                }
+                if upper(s, p) {
+                    let (v, q) = inchi_strtol(s, p, base);
+                    let cur_atom = v as u16;
+                    let r = add_linked_bond(last_atom[num_open], cur_atom, n_at, &mut lb);
+                    if r != 0 {
+                        break 'main r;
+                    }
+                    p = q;
+                    if b_prev_version == 1 {
+                        while p < p_end && at(s, p) == b'-' {
+                            p += 1;
+                            let (v, q) = inchi_strtol(s, p, base);
+                            let cur_atom = v as u16;
+                            if cur_atom != 0 {
+                                let r =
+                                    add_linked_bond(last_atom[num_open], cur_atom, n_at, &mut lb);
+                                if r != 0 {
+                                    break 'main r;
+                                }
+                                p = q;
+                            } else {
+                                break 'main RI_ERR_SYNTAX;
+                            }
+                        }
+                    } else if b_prev_version == 0 && is_digit(at(s, p)) {
+                        let (v, q) = strtol(s, p);
+                        let mut num_neigh = v as i32;
+                        p = q;
+                        loop {
+                            let cont = num_neigh != 0;
+                            num_neigh = num_neigh.wrapping_sub(1);
+                            if !(cont && p < p_end) {
+                                break;
+                            }
+                            let (v, q) = inchi_strtol(s, p, base);
+                            let cur_atom = v as u16;
+                            if cur_atom != 0 {
+                                let r =
+                                    add_linked_bond(last_atom[num_open], cur_atom, n_at, &mut lb);
+                                if r != 0 {
+                                    break 'main r;
+                                }
+                                p = q;
+                            } else {
+                                break 'main RI_ERR_SYNTAX;
+                            }
+                        }
+                    }
+                    last_atom[num_open] = last_atom[num_open].wrapping_add(1);
+                } else {
+                    break 'main RI_ERR_SYNTAX;
+                }
+            }
+        } else {
+            while p < p_end {
+                let c = at(s, p);
+                p += 1;
+                match c {
+                    b'(' | b')' | b',' | b'-' => {
+                        if state == b'N' {
+                            state = c;
+                        } else {
+                            break 'main RI_ERR_SYNTAX;
+                        }
+                    }
+                    _ => {
+                        let (v, q) = strtol(s, p - 1);
+                        let cur_atom = v as u16;
+                        if !(is_digit(c) && cur_atom != 0) {
+                            break 'main RI_ERR_SYNTAX;
+                        }
+                        p = q;
+                        match state {
+                            0 => {
+                                last_atom[num_open] = cur_atom;
+                                state = b'N';
+                            }
+                            b'(' => {
+                                let r =
+                                    add_linked_bond(last_atom[num_open], cur_atom, n_at, &mut lb);
+                                if r != 0 {
+                                    break 'main r;
+                                }
+                                num_open += 1;
+                                if num_open >= LAST_AT_LEN {
+                                    break 'main RI_ERR_PROGR;
+                                }
+                                last_atom[num_open] = cur_atom;
+                                state = b'N';
+                            }
+                            b')' => {
+                                if num_open == 0 {
+                                    break 'main RI_ERR_SYNTAX;
+                                }
+                                num_open -= 1;
+                                let r =
+                                    add_linked_bond(last_atom[num_open], cur_atom, n_at, &mut lb);
+                                if r != 0 {
+                                    break 'main r;
+                                }
+                                last_atom[num_open] = cur_atom;
+                                state = b'N';
+                            }
+                            b',' => {
+                                if num_open == 0 {
+                                    break 'main RI_ERR_SYNTAX;
+                                }
+                                let r = add_linked_bond(
+                                    last_atom[num_open - 1],
+                                    cur_atom,
+                                    n_at,
+                                    &mut lb,
+                                );
+                                if r != 0 {
+                                    break 'main r;
+                                }
+                                last_atom[num_open] = cur_atom;
+                                state = b'N';
+                            }
+                            b'-' => {
+                                let r =
+                                    add_linked_bond(last_atom[num_open], cur_atom, n_at, &mut lb);
+                                if r != 0 {
+                                    break 'main r;
+                                }
+                                last_atom[num_open] = cur_atom;
+                                state = b'N';
+                            }
+                            _ => break 'main RI_ERR_SYNTAX,
+                        }
+                    }
+                }
+            }
+        }
+
+        // Store the bonds in connection table
+        let ic = i_component as usize;
+        if len_conn_table > 1 {
+            let mut m: usize = 0;
+            for i in 0..n_num_atoms as usize {
+                let Some(pb) = lb.p_bond.as_ref() else {
+                    break 'main RI_ERR_SYNTAX;
+                };
+                let mut neighbor = [0u16; MAXVAL];
+                let mut k = 0usize;
+                let mut j = usize::from(pb[i + 1].prev);
+                if j != 0 {
+                    while k < MAXVAL {
+                        neighbor[k] = pb[j].neigh;
+                        k += 1;
+                        if j == i + 1 {
+                            break;
+                        }
+                        j = usize::from(pb[j].prev);
+                    }
+                }
+                if j != i + 1 {
+                    break 'main RI_ERR_SYNTAX;
+                }
+                insertions_sort_at_numb(&mut neighbor, k);
+                let ct_len = p_inp_inchi[ic].len_conn_table as usize;
+                if m == ct_len {
+                    break 'main RI_ERR_SYNTAX;
+                }
+                for j in 1..k {
+                    if neighbor[j] == neighbor[j - 1] {
+                        break 'main RI_ERR_SYNTAX;
+                    }
+                }
+                p_inp_inchi[ic].n_conn_table[m] = (i + 1) as u16;
+                m += 1;
+                let mut j = 0;
+                while j < k && usize::from(neighbor[j]) <= i {
+                    if m == ct_len {
+                        break 'main RI_ERR_SYNTAX;
+                    }
+                    p_inp_inchi[ic].n_conn_table[m] = neighbor[j];
+                    m += 1;
+                    j += 1;
+                }
+            }
+            if m as i32 != len_conn_table {
+                break 'main RI_ERR_PROGR;
+            }
+        } else {
+            p_inp_inchi[ic].n_conn_table[0] = 1;
+        }
+
+        // Duplicate if needed
+        let mut i = 1;
+        while i < mpy_component {
+            let (first, rest) = p_inp_inchi.split_at_mut(ic + 1);
+            let dst = &mut rest[(i - 1) as usize];
+            if dst.n_conn_table.is_empty() || dst.len_conn_table != len_conn_table {
+                break 'main RI_ERR_PROGR;
+            }
+            let n = len_conn_table as usize;
+            dst.n_conn_table[..n].copy_from_slice(&first[ic].n_conn_table[..n]);
+            i += 1;
+        }
+        i_component += i.max(1);
+        if at(s, p_end) != 0 {
+            p_start = p_end + 1;
+        } else {
+            break 'main i_component;
+        }
+        if i_component == n_num_components {
+            break 'main i_component;
+        }
+    };
+    ret
 }

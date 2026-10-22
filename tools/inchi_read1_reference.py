@@ -124,6 +124,27 @@ int main(void) {
                 }
                 if (r < 0 && r != RI_ERR_SYNTAX && r != RI_ERR_PROGR) break;
             }
+        } else if (t == 9) {
+            char h1[4096], h2[4096], b1[2048], b2[2048];
+            int abc, nullfirst;
+            scanf("%s %s %d %d", h1, h2, &abc, &nullfirst);
+            unhex(h1, b1); unhex(h2, b2);
+            INChI *pp[2] = { NULL, NULL }; int pn[2] = { 0, 0 };
+            int na = 0, r = 0;
+            if (!nullfirst) { r = ParseSegmentFormula(b1, 1, pp, pn, &na); printf("F %d %d\n", r, pn[1]); }
+            if (nullfirst || r > 0 || r == 0) {
+                int nb = -5;
+                r = ParseSegmentConnections(b2, 1, &pp[1], &pn[1], &abc, &nb);
+                printf("R %d %d %d %d\n", r, pn[1], abc, nb);
+                for (int i = 0; i < pn[1] && pp[1]; i++) {
+                    INChI *c = &pp[1][i];
+                    printf("C %d %d ", i, c->nNumberOfAtoms);
+                    if (c->nAtom) for (int j = 0; j <= c->nNumberOfAtoms; j++) printf("%d,", c->nAtom[j]); else printf("NULL");
+                    printf(" %d |", c->lenConnTable);
+                    if (c->nConnTable) for (int j = 0; j <= c->lenConnTable; j++) printf(" %d", c->nConnTable[j]); else printf(" NULL");
+                    printf("\n");
+                }
+            }
         } else if (t == 7) {
             INChI c; memset(&c, 0, sizeof(c));
             int r = nFillOutProtonMobileH(&c);
@@ -212,6 +233,41 @@ def main():
         if R.random() < 0.5:
             b = a if R.random() < 0.5 else b
         cases.append(f"8 {hx(a.encode())} {hx(b.encode())} {R.choice([0, 0, 17, 1, 0])} {R.choice([0, 1])}")
+    import re
+    corpus = [json.loads(l) for l in open(ROOT / "tests/data/inchi_corpus.jsonl")]
+    inchis = sorted({c["inchi"] for c in corpus if c.get("inchi", "").startswith("InChI=1")})
+    pairs = []
+    for ic in inchis:
+        ly = ic.split("/")
+        if len(ly) >= 3 and ly[2].startswith("c"):
+            pairs.append((ly[1], ly[2]))
+        elif len(ly) >= 2:
+            pairs.append((ly[1], "h"))
+    alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz@-0123456789"
+
+    def mutate(c):
+        c = list(c)
+        for _ in range(R.choice([0, 0, 0, 1, 2, 3])):
+            k = R.randrange(0, len(c) + 1)
+            op = R.choice(["del", "ins", "rep"])
+            ch = R.choice(list("0123456789(),-;*") + list(alpha))
+            if op == "del" and c:
+                c.pop(min(k, len(c) - 1))
+            elif op == "ins":
+                c.insert(k, ch)
+            elif c:
+                c[min(k, len(c) - 1)] = ch
+        return "".join(c)
+
+    for _ in range(5000):
+        f, c = R.choice(pairs)
+        cases.append(f"9 {hx(mutate(f).encode())} {hx(mutate(c).encode())} {R.choice([-1, -1, 0, 0, 1])} 0")
+    for _ in range(1500):
+        f, _c = R.choice(pairs)
+        c = "c" + "".join(R.choice(alpha + "(),-;*") for _ in range(R.randrange(0, 14)))
+        cases.append(f"9 {hx(f.encode())} {hx(c.encode())} {R.choice([-1, 1, 1, 0])} 0")
+    for _ in range(100):
+        cases.append(f"9 {hx(b'C')} {hx(R.choice(['c1-2', 'h', 'c', '']).encode())} {R.choice([-1, 0, 1])} 1")
     cases.append("7")
     objs = ma.build_lib()
     with tempfile.TemporaryDirectory() as d:

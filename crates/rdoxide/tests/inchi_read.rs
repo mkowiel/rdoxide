@@ -160,6 +160,48 @@ fn read_helpers_match_c() {
                     }
                 }
             }
+            "9" => {
+                let (a, b) = (unhex(t[1]), unhex(t[2]));
+                let mut abc = p(3);
+                let nullfirst = p(4) == 1;
+                let mut pp: [Vec<InChI>; 2] = [Vec::new(), Vec::new()];
+                let mut pn = [0i32; 2];
+                let mut na = 0;
+                let mut r = 0;
+                if !nullfirst {
+                    r = parse_segment_formula(&a, 1, &mut pp, &mut pn, &mut na);
+                    got.push(format!("F {r} {}", pn[1]));
+                }
+                if nullfirst || r >= 0 {
+                    let mut nb = -5;
+                    let mut v = std::mem::take(&mut pp[1]);
+                    r = parse_segment_connections(&b, &mut v, &mut pn[1], &mut abc, &mut nb);
+                    got.push(format!("R {r} {} {abc} {nb}", pn[1]));
+                    for i in 0..pn[1] as usize {
+                        let Some(c) = v.get(i) else { break };
+                        let atoms: String = if c.n_atom.is_empty() {
+                            "NULL".to_string()
+                        } else {
+                            (0..=c.n_number_of_atoms as usize)
+                                .map(|j| format!("{},", c.n_atom.get(j).copied().unwrap_or(0)))
+                                .collect()
+                        };
+                        let ct: String = if c.n_conn_table.is_empty() {
+                            " NULL".to_string()
+                        } else {
+                            (0..=c.len_conn_table as usize)
+                                .map(|j| {
+                                    format!(" {}", c.n_conn_table.get(j).copied().unwrap_or(0))
+                                })
+                                .collect()
+                        };
+                        got.push(format!(
+                            "C {i} {} {atoms} {} |{ct}",
+                            c.n_number_of_atoms, c.len_conn_table
+                        ));
+                    }
+                }
+            }
             "7" => {
                 let mut c = InChI::default();
                 let r = n_fill_out_proton_mobile_h(&mut c);
