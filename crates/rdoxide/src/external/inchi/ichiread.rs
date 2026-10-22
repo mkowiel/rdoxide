@@ -3413,6 +3413,9 @@ pub struct InpInChI {
     pub n_num_components: [[i32; 2]; 2],
     pub n_num_protons: [[RemProtons; 2]; 2],
     pub s: [[[i32; 2]; 2]; 2],
+    /// `CompareInchiFlags[INCHI_NUM][TAUT_NUM]`: `INCHIDIFF` bits of the
+    /// comparison with the restored structures
+    pub compare_inchi_flags: [[u64; 2]; 2],
 }
 
 /// `ReadInChILine`: reads the InChI string of the stream into `inp_inchi`;

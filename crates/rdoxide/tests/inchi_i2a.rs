@@ -11,6 +11,7 @@ use rdoxide::external::inchi::ichiread::*;
 use rdoxide::external::inchi::ichirvr2::StrFromInChI;
 use rdoxide::external::inchi::ichirvr7::{
     add_proton_and_iso_h_balance_to_mob_h_struct, all_inchi_to_structure,
+    compare_all_orig_inchi_to_rev_inchi,
 };
 use rdoxide::external::inchi::ichirvrs::set_up_srm;
 use rdoxide::external::inchi::runichi3::StructData;
@@ -141,6 +142,11 @@ fn restore_simple_inchi() {
             &d,
         );
         assert!(rb >= 0, "{s}: balance {rb}");
+        let rc = compare_all_orig_inchi_to_rev_inchi(&ps, &mut d, false);
+        assert!(rc >= 0, "{s}: compare {rc}");
+        if d.compare_inchi_flags[0] != [0, 0] {
+            bad.push(format!("{s}: compare flags {:?}", d.compare_inchi_flags[0]));
+        }
         let comp = &ps[0][1][0];
         eprintln!(
             "{s}: errors {ne}, n_error {}, atoms {}, at2 {}, rev {}",
@@ -165,4 +171,20 @@ fn restore_simple_inchi() {
     }
     assert!(bad.is_empty(), "restored InChI differs");
     assert_eq!(n_restored, cases.len());
+}
+
+#[test]
+fn compare_reports_differences() {
+    use rdoxide::external::inchi::ichirvr7::diff;
+    let ip = default_parms();
+    let mut d = parse("InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3").unwrap();
+    let mut ps: [[Vec<StrFromInChI>; 2]; 2] = Default::default();
+    assert_eq!(
+        all_inchi_to_structure(&ip, 1, &set_up_srm(), false, &mut ps, &mut d, 1, None),
+        0
+    );
+    // the original InChI claims one more H on the first atom
+    d.p_inp_inchi[0][1][0].n_num_h[0] += 1;
+    assert!(compare_all_orig_inchi_to_rev_inchi(&ps, &mut d, false) >= 0);
+    assert_ne!(d.compare_inchi_flags[0][1] & diff::POSITION_H, 0);
 }
