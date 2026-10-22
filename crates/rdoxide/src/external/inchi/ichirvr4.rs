@@ -2844,7 +2844,12 @@ pub fn one_inchi2_atom(
     if ret < 0 {
         return ret;
     }
-    if num_inp >= ip.first_struct_number {
+    let n_inp = if ps.num_inp_actual != 0 {
+        ps.num_inp_actual
+    } else {
+        num_inp
+    };
+    if n_inp >= ip.first_struct_number {
         if b_has_some_fixed_h
             && ps.i_inchi_rec as usize == INCHI_REC
             && ps.i_mobile_h == TAUT_YES as i32
