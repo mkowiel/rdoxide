@@ -83,9 +83,10 @@ int main(void) {
                 printf("r%d %d %d %d\n", i, r, g.num_tc_groups, g.max_tc_groups);
             }
             for (int i = 0; i < g.num_tc_groups; i++) printf("g%d %d %d %d %d %d %d %d\n", i, g.pTCG[i].type, g.pTCG[i].ord_num, g.pTCG[i].num_edges, g.pTCG[i].st_cap, g.pTCG[i].st_flow, g.pTCG[i].edges_cap, g.pTCG[i].edges_flow);
-        } else if (t == 34 || t == 40) {
-            int xa = 0, xe = 0, coa = 0;
-            if (t == 40) scanf("%d %d %d", &xa, &xe, &coa);
+        } else if (t == 34 || t == 40 || t == 41) {
+            int xa = 0, xe = 0, coa = 0, fsel = 0;
+            if (t >= 40) scanf("%d %d %d", &xa, &xe, &coa);
+            if (t == 41) scanf("%d", &fsel);
             SRM s; memset(&s, 0, sizeof(s));
             scanf("%d %d %d %d %d %d %d %d %d", &s.bMetalAddFlower, &s.nMetalMinBondOrder, &s.nMetalInitEdgeFlow, &s.nMetalInitBondOrder,
                   &s.nMetal2EndpointMinBondOrder, &s.nMetal2EndpointInitBondOrder, &s.nMetal2EndpointInitEdgeFlow, &s.nMetalMaxCharge_D, &s.bFixStereoBonds);
@@ -107,7 +108,7 @@ int main(void) {
                 for (int k = 0; k < nb; k++) { int nn, bt; scanf("%d %d", &nn, &bt); at[i].neighbor[k] = nn; at[i].bond_type[k] = bt; }
                 for (int k = 0; k < 7; k++) scanf("%d", &v[k]);
                 va[i].cMetal = v[0]; va[i].cNumBondsToMetal = v[1]; va[i].cInitValenceToMetal = v[2]; va[i].cInitOrigValenceToMetal = v[3];
-                va[i].cInitFreeValences = v[4]; va[i].cnListIndex = v[5]; va[i].cPeriodicNumber = el;
+                va[i].cInitFreeValences = v[4]; va[i].cnListIndex = v[5]; va[i].cPeriodicNumber = el; if (t == 41) { int row; va[i].cNumValenceElectrons = get_sp_element_type(el, &row); va[i].cPeriodicRowNumber = row; va[i].cNumValenceElectrons--; }
             }
             ALL_TC_GROUPS g; memset(&g, 0, sizeof(g));
             for (int k = 0; k < NUM_TCGROUP_TYPES; k++) g.nGroup[k] = -1;
@@ -123,7 +124,7 @@ int main(void) {
                 for (int k = 0; k < NUM_TCGROUP_TYPES; k++) printf(" %d", g.nGroup[k]);
                 printf("\n");
                 for (int i = 0; i < g.num_tc_groups; i++) printf("u%d %d %d %d\n", i, g.pTCG[i].type, g.pTCG[i].ord_num, g.pTCG[i].num_edges);
-                if (t == 40 && r2 >= 0) {
+                if (t >= 40 && r2 >= 0) {
                     StrFromINChI st; memset(&st, 0, sizeof(st)); st.at = at; st.num_atoms = n; st.pSrm = &s;
                     int nch = -1;
                     BN_STRUCT *b = AllocateAndInitTCGBnStruct(&st, va, &g, xa, xe, 1, &nch);
@@ -148,6 +149,13 @@ int main(void) {
                         for (int i = 0; i < n; i++) printf("W%d %d %d %d %d | %d %d\n", i, va[i].nCMinusGroupEdge, va[i].nCPlusGroupEdge, va[i].nMetalGroupEdge, va[i].nTautGroupEdge, at[i].bond_type[0], at[i].valence ? at[i].bond_type[at[i].valence - 1] : 0);
                         for (int i = 0; i < g.num_tc_groups; i++) printf("X%d %d %d %d %d %d %d %d %d\n", i, g.pTCG[i].nVertexNumber, g.pTCG[i].nForwardEdge, g.pTCG[i].nBackwardEdge, g.pTCG[i].st_cap, g.pTCG[i].st_flow, g.pTCG[i].edges_cap, g.pTCG[i].edges_flow, g.pTCG[i].num_edges);
                         printf("Y %d %d %d %d\n", g.nEdgePlus, g.nEdgeMinus, g.nEdge4charge, g.added_charge);
+                        if (r4 >= 0 && t == 41) {
+                            for (int j = 0; j < at[0].valence && j < 4; j++) if (fsel >> j & 1) b->edge[b->vert[0].iedge[j]].forbidden |= 4;
+                            int nc = AdjustTgroupsToForbiddenEdges2(b, at, va, n, 4);
+                            printf("A %d %d %d\n", nc, b->tot_st_cap, b->tot_st_flow);
+                            for (int i = 0; i < b->num_edges; i++) printf("p%d %d %d\n", i, b->edge[i].flow, b->edge[i].forbidden);
+                            for (int i = 0; i < b->num_vertices; i++) printf("q%d %d\n", i, b->vert[i].st_edge.flow);
+                        }
                         if (r4 >= 0) {
                             for (int i = 0; i < b->num_edges; i++) printf("U%d %d\n", i, GetChargeFlowerUpperEdge(b, va, i));
                             EDGE_LIST el; memset(&el, 0, sizeof(el));
@@ -378,10 +386,60 @@ def h_case():
     return f"{51 if conn else 50} {n} {nd} " + " ".join(atoms)
 
 
+def star_case():
+    k = R.choice([3, 3, 4])
+    n = 1 + k
+    ng = R.choice([1, 2])
+    center = R.choice([16, 16, 16, 7, 15, 6])
+    nels = [R.choice([7, 7, 8, 8, 16]) for _ in range(k)]
+    bonds = [R.choice([1, 1, 2]) for _ in range(k)]
+    eps = [R.choice([0, 1, 1, 2][:2 + ng]) for _ in range(k)]
+    cnt = [sum(1 for e in eps if e == g) for g in range(1, ng + 1)]
+    tgs = [(R.randrange(0, 4), R.randrange(0, 2), cnt[g]) for g in range(ng)]
+    srm = [1, 0, 1, 1, 1, 1, 0, 16, 0]
+    cbv_c = sum(bonds)
+    parts = ["41 " + f"{R.choice([0, 2])} {R.choice([0, 1])} 0 {R.randrange(0, 16)} " + " ".join(map(str, srm)) + f" {n} {ng} 0"]
+    for a, b, ne in tgs:
+        parts.append(f"{a} {b} {ne}")
+    parts.append(f"{center} 0 {cbv_c} 0 {k} " + " ".join(f"{j + 1} {bonds[j]}" for j in range(k)) + " 0 0 0 0 0 0 0")
+    for j in range(k):
+        nh = R.choice([0, 1, 1, 2]) if bonds[j] == 1 else R.choice([0, 1])
+        parts.append(f"{nels[j]} {nh} {bonds[j]} {eps[j]} 1 0 {bonds[j]} 0 0 0 0 0 0 0")
+    return " ".join(parts)
+
+
+def tmpl_case():
+    """centre with 3 mobile-H neighbours as in the Table 5 cases 2, 7 and 4"""
+    kind = R.choice(["5.2", "5.7", "5.4"])
+    if kind == "5.2":
+        center, nb, forb = 7, [(7, 1, 2), (8, 2, 0), (8, 2, 0)], 0
+    elif kind == "5.7":
+        center, nb, forb = 16, [(7, 1, 2), (8, 2, 0), (8, 1, 1)], 0
+    else:
+        center, nb, forb = 7, [(8, 2, 0), (7, 1, 2), (7, 2, 1)], 0
+    order = list(range(3))
+    R.shuffle(order)
+    nb = [nb[o] for o in order]
+    forb = order.index(forb)
+    fsel = 1 << forb
+    if R.random() < 0.2:
+        fsel |= 1 << R.randrange(3)
+    k = 3
+    n = 4
+    bonds = [b for _, b, _ in nb]
+    srm = [1, 0, 1, 1, 1, 1, 0, 16, 0]
+    parts = ["41 " + f"{R.choice([0, 2])} {R.choice([0, 1])} 0 {fsel} " + " ".join(map(str, srm)) + f" {n} 1 0"]
+    parts.append(f"{R.randrange(0, 4)} {R.randrange(0, 2)} 3")
+    parts.append(f"{center} 0 {sum(bonds)} 0 {k} " + " ".join(f"{j + 1} {bonds[j]}" for j in range(k)) + " 0 0 0 0 0 0 0")
+    for j, (el, b, nh) in enumerate(nb):
+        parts.append(f"{el} {nh} {b} 1 1 0 {b} 0 0 0 0 0 0 0")
+    return " ".join(parts)
+
+
 def main():
     cases = []
-    for _ in range(5000):
-        cases += [atom_case(), cc_case(), tcg_case(), el_case(), bns_case(), bns_case(), pipe_case(), pipe_case(), pipe_case(), h_case(), h_case()]
+    for _ in range(3500):
+        cases += [atom_case(), cc_case(), tcg_case(), el_case(), bns_case(), bns_case(), pipe_case(), pipe_case(), pipe_case(), h_case(), h_case(), star_case(), tmpl_case(), tmpl_case()]
     objs = ma.build_lib()
     with tempfile.TemporaryDirectory() as d:
         (Path(d) / "h.c").write_text(HARNESS)
