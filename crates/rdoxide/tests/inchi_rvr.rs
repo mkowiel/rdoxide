@@ -641,6 +641,66 @@ fn restoration_helpers_match_c() {
                     }
                 }
             }
+            50 | 51 => {
+                let n = next() as usize;
+                let nd = next() as usize;
+                let mut at = vec![InpAtom::default(); n + nd + 1];
+                for a in at.iter_mut().take(n + nd) {
+                    a.orig_at_number = next() as u16;
+                    a.num_h = next() as i8;
+                    let nb = next() as usize;
+                    a.valence = nb as i8;
+                    for q in 0..nb {
+                        a.neighbor[q] = next() as u16;
+                        a.bond_type[q] = next() as u8;
+                        a.bond_stereo[q] = next() as i8;
+                    }
+                    a.chem_bonds_valence = next() as i8;
+                    for q in 0..3 {
+                        a.num_iso_h[q] = next() as i8;
+                    }
+                    a.iso_atw_diff = next() as i8;
+                    let nsb = next() as usize;
+                    for q in 0..nsb {
+                        a.sb_parity[q] = next() as i8;
+                        a.sb_ord[q] = next() as i8;
+                        a.sn_ord[q] = next() as i8;
+                        a.sn_orig_at_num[q] = next() as u16;
+                    }
+                }
+                let r = if t[0] == 50 {
+                    connect_disconnected_h(&mut at, n, nd)
+                } else {
+                    disconnected_connected_h(&mut at, n, nd)
+                };
+                got.push(format!("H {r}"));
+                for (i, a) in at.iter().enumerate().take(n + nd) {
+                    let mut l = format!(
+                        "a{i} {} {} {} {} {} {} {} |",
+                        a.valence,
+                        a.chem_bonds_valence,
+                        a.num_h,
+                        a.num_iso_h[0],
+                        a.num_iso_h[1],
+                        a.num_iso_h[2],
+                        a.iso_atw_diff
+                    );
+                    for q in 0..20 {
+                        l.push_str(&format!(
+                            " {},{},{}",
+                            a.neighbor[q], a.bond_type[q], a.bond_stereo[q]
+                        ));
+                    }
+                    l.push_str(" |");
+                    for q in 0..3 {
+                        l.push_str(&format!(
+                            " {},{},{},{}",
+                            a.sb_parity[q], a.sb_ord[q], a.sn_ord[q], a.sn_orig_at_num[q]
+                        ));
+                    }
+                    got.push(l);
+                }
+            }
             33 => {
                 let mut e = EdgeList::default();
                 let m = next();
