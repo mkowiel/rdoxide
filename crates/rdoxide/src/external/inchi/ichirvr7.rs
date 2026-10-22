@@ -5,8 +5,10 @@
 //! Copyright (c) 2024 IUPAC and InChI Trust.
 //! Licensed under the MIT license (see LICENSES/InChI-MIT.txt).
 
-use super::ichimake::compare_reversed_inchi;
+use super::ichi::{InChI, InChIAux, InChIStereo};
+use super::ichimake::{compare_hill_formulas_no_h, compare_reversed_inchi};
 use super::ichiread::{INCHI_BAS, INCHI_REC, InpInChI, TAUT_NON, TAUT_YES};
+use super::ichister::AB_PARITY_UNDF;
 
 /// `INCHIDIFF` bits of the comparison of two InChI
 pub mod diff {
@@ -314,4 +316,339 @@ pub fn mark_disconnected_identical_to_reconnected(inp: &mut InpInChI) -> i32 {
         }
     }
     num_marked
+}
+
+/// the merge-compare of two sorted index lists of `CompareReversedStereoINChI3`:
+/// returns (different parity, only in the first, undefined only in the first,
+/// only in the second, undefined only in the second)
+fn merge_stereo<K: PartialOrd + Copy>(
+    k1: &[K],
+    p1: &[i8],
+    k2: &[K],
+    p2: &[i8],
+) -> (i32, i32, i32, i32, i32) {
+    let undf = AB_PARITY_UNDF as i8;
+    let (mut dif, mut in1, mut undf1, mut in2, mut undf2) = (0, 0, 0, 0, 0);
+    let (mut j1, mut j2) = (0, 0);
+    while j1 < k1.len() && j2 < k2.len() {
+        if k1[j1] == k2[j2] {
+            dif += i32::from(p1[j1] != p2[j2]);
+            j1 += 1;
+            j2 += 1;
+        } else if k1[j1] < k2[j2] {
+            in1 += 1;
+            undf1 += i32::from(p1[j1] == undf);
+            j1 += 1;
+        } else {
+            in2 += 1;
+            undf2 += i32::from(p2[j2] == undf);
+            j2 += 1;
+        }
+    }
+    for &p in &p1[j1..k1.len()] {
+        in1 += 1;
+        undf1 += i32::from(p == undf);
+    }
+    for &p in &p2[j2..k2.len()] {
+        in2 += 1;
+        undf2 += i32::from(p == undf);
+    }
+    (dif, in1, undf1, in2, undf2)
+}
+
+/// `CompareReversedStereoINChI3` (the lists of the differing centres and
+/// bonds collected in the `ICR` are not kept)
+pub fn compare_reversed_stereo_inchi3(s1: Option<&InChIStereo>, s2: Option<&InChIStereo>) -> u64 {
+    let mut ret = 0;
+    let nsc =
+        |s: Option<&InChIStereo>| s.map_or(0, |s| s.n_number_of_stereo_centers.max(0) as usize);
+    let nsb = |s: Option<&InChIStereo>| s.map_or(0, |s| s.n_number_of_stereo_bonds.max(0) as usize);
+    let (c1, c2, b1, b2) = (nsc(s1), nsc(s2), nsb(s1), nsb(s2));
+    if c1 != 0 || c2 != 0 {
+        let differs = c1 != c2 || {
+            let (a, b) = (s1.unwrap(), s2.unwrap());
+            a.n_number[..c1] != b.n_number[..c1] || a.t_parity[..c1] != b.t_parity[..c1]
+        };
+        if differs {
+            let (a, b) = (
+                s1.map(|s| (&s.n_number[..c1], &s.t_parity[..c1])),
+                s2.map(|s| (&s.n_number[..c2], &s.t_parity[..c2])),
+            );
+            let (k1, p1) = a.unwrap_or((&[], &[]));
+            let (k2, p2) = b.unwrap_or((&[], &[]));
+            let (dif, in1, undf1, in2, undf2) = merge_stereo(k1, p1, k2, p2);
+            if dif != 0 {
+                ret |= diff::SC_PARITY;
+            }
+            if in1 != 0 {
+                if undf1 != 0 {
+                    ret |= diff::SC_EXTRA_UNDF;
+                }
+                if in1 != undf1 {
+                    ret |= diff::SC_EXTRA;
+                }
+            }
+            if in2 != 0 {
+                if undf2 != 0 {
+                    ret |= diff::SC_MISS_UNDF;
+                }
+                if in2 != undf2 {
+                    ret |= diff::SC_MISS;
+                }
+            }
+        }
+    }
+    if let (Some(a), Some(b)) = (s1, s2) {
+        if b.n_comp_inv2_abs != 2
+            && a.n_comp_inv2_abs != b.n_comp_inv2_abs
+            && a.n_comp_inv2_abs != 0
+            && b.n_comp_inv2_abs != 0
+        {
+            ret |= diff::SC_INV;
+        }
+    }
+    if b1 != 0 || b2 != 0 {
+        let differs = b1 != b2 || {
+            let (a, b) = (s1.unwrap(), s2.unwrap());
+            a.n_bond_atom1[..b1] != b.n_bond_atom1[..b1]
+                || a.n_bond_atom2[..b1] != b.n_bond_atom2[..b1]
+                || a.b_parity[..b1] != b.b_parity[..b1]
+        };
+        if differs {
+            let keys = |s: Option<&InChIStereo>, n: usize| -> Vec<(u16, u16)> {
+                s.map_or(Vec::new(), |s| {
+                    (0..n)
+                        .map(|j| (s.n_bond_atom1[j], s.n_bond_atom2[j]))
+                        .collect()
+                })
+            };
+            let (k1, k2) = (keys(s1, b1), keys(s2, b2));
+            let p1: &[i8] = s1.map_or(&[], |s| &s.b_parity[..b1]);
+            let p2: &[i8] = s2.map_or(&[], |s| &s.b_parity[..b2]);
+            // lexicographic order of the pairs, as in C
+            let (dif, in1, undf1, in2, undf2) = merge_stereo(&k1, p1, &k2, p2);
+            if dif != 0 {
+                ret |= diff::SB_PARITY;
+            }
+            if in1 != 0 {
+                if undf1 != 0 {
+                    ret |= diff::SB_EXTRA_UNDF;
+                }
+                if in1 != undf1 {
+                    ret |= diff::SB_EXTRA;
+                }
+            }
+            if in2 != 0 {
+                if undf2 != 0 {
+                    ret |= diff::SB_MISS_UNDF;
+                }
+                if in2 != undf2 {
+                    ret |= diff::SB_MISS;
+                }
+            }
+        }
+    }
+    ret
+}
+
+/// `CompareReversedINChI3`: the bits of `diff` that describe how the InChI
+/// `i1` (from the reversed structure) differs from the input InChI `i2`
+pub fn compare_reversed_inchi3(
+    i1: Option<&InChI>,
+    i2: Option<&InChI>,
+    a1: Option<&InChIAux>,
+    a2: Option<&InChIAux>,
+) -> u64 {
+    let (i1, i2) = match (i1, i2) {
+        (None, None) => return 0,
+        (Some(a), Some(b)) => (a, b),
+        _ => return diff::PROBLEM,
+    };
+    if i1.n_error_code != i2.n_error_code || i1.n_error_code != 0 {
+        return diff::PROBLEM;
+    }
+    let mut ret = 0;
+    if i1.n_number_of_atoms != i2.n_number_of_atoms {
+        return diff::PROBLEM; // INCHIDIFF_NUM_AT
+    }
+    let n = i1.n_number_of_atoms.max(0) as usize;
+    if n > 0 {
+        if i1.n_atom[..n] != i2.n_atom[..n] {
+            return diff::PROBLEM; // INCHIDIFF_ATOMS
+        }
+        if i1.n_num_h[..n] != i2.n_num_h[..n] {
+            ret |= diff::POSITION_H;
+        }
+        if i1.n_num_h_fixed.is_some() || i2.n_num_h_fixed.is_some() {
+            let has =
+                |f: &Option<Vec<i8>>| f.as_ref().is_some_and(|v| v[..n].iter().any(|&x| x != 0));
+            let (h1, h2) = (has(&i1.n_num_h_fixed), has(&i2.n_num_h_fixed));
+            if h1 && !h2 {
+                ret |= diff::MORE_FH;
+            } else if !h1 && h2 {
+                ret |= diff::LESS_FH;
+            } else if h1 && h2 {
+                let (f1, f2) = (
+                    i1.n_num_h_fixed.as_ref().unwrap(),
+                    i2.n_num_h_fixed.as_ref().unwrap(),
+                );
+                if f1[..n] != f2[..n] {
+                    let more1 = (0..n).any(|i| f1[i] > f2[i]);
+                    let more2 = (0..n).any(|i| f1[i] < f2[i]);
+                    ret |= (if more1 { diff::MORE_FH } else { 0 })
+                        | (if more2 { diff::LESS_FH } else { 0 });
+                }
+            }
+        }
+    }
+    let (mut num_h1, mut num_h2) = (0, 0);
+    let ret2 = compare_hill_formulas_no_h(
+        i1.sz_hill_formula.as_deref().unwrap_or(""),
+        i2.sz_hill_formula.as_deref().unwrap_or(""),
+        &mut num_h1,
+        &mut num_h2,
+    );
+    if ret2 != 0 {
+        return ret | diff::PROBLEM; // INCHIDIFF_NUM_EL
+    }
+    if num_h1 > num_h2 {
+        ret |= diff::MORE_H;
+    }
+    if num_h1 < num_h2 {
+        ret |= diff::LESS_H;
+    }
+    if i1.len_conn_table != i2.len_conn_table {
+        return ret | diff::PROBLEM; // INCHIDIFF_CON_LEN
+    }
+    let lc = i1.len_conn_table.max(0) as usize;
+    if lc > 0 && i1.n_conn_table[..lc] != i2.n_conn_table[..lc] {
+        return ret | diff::PROBLEM; // INCHIDIFF_CON_TBL
+    }
+    let n1 = if i1.len_tautomer != 0 {
+        i32::from(i1.n_tautomer[0])
+    } else {
+        0
+    };
+    let n2 = if i2.len_tautomer != 0 {
+        i32::from(i2.n_tautomer[0])
+    } else {
+        0
+    };
+    if n1 == 0 && n2 != 0 {
+        ret |= diff::NO_TAUT;
+    } else if n1 != 0 && n2 == 0 {
+        ret |= diff::WRONG_TAUT;
+    } else if n1 == 1 && n2 > 1 {
+        ret |= diff::SINGLE_TG;
+    } else if n1 > 1 && n2 == 1 {
+        ret |= diff::MULTIPLE_TG;
+    } else if n1 != n2 {
+        ret |= diff::NUM_TG;
+    }
+    if n1 != 0 || n2 != 0 {
+        let collect = |t: &[u16], len: i32| {
+            let g = |k: usize| t.get(k).copied().unwrap_or(0);
+            let mut pe = Vec::new();
+            let mut m = 1usize;
+            while (m as i32) < len {
+                let l = g(m) as usize;
+                m += 1;
+                for j in 2..l {
+                    pe.push(g(m + j));
+                }
+                m += l;
+            }
+            pe.sort_unstable();
+            pe
+        };
+        let (pe1, pe2) = (
+            collect(&i1.n_tautomer, i1.len_tautomer),
+            collect(&i2.n_tautomer, i2.len_tautomer),
+        );
+        let (mut j1, mut j2) = (0, 0);
+        let (mut num_eq, mut only1, mut only2) = (0, 0, 0);
+        while j1 < pe1.len() && j2 < pe2.len() {
+            if pe1[j1] == pe2[j2] {
+                j1 += 1;
+                j2 += 1;
+                num_eq += 1;
+            } else if pe1[j1] < pe2.get(j1).copied().unwrap_or(0) {
+                // as in C the index j1 is used for the second list
+                j1 += 1;
+                only1 += 1;
+            } else {
+                j2 += 1;
+                only2 += 1;
+            }
+        }
+        only1 += pe1.len() - j1;
+        only2 += pe2.len() - j2;
+        if only1 != 0 {
+            ret |= diff::EXTRA_TG_ENDP;
+        }
+        if only2 != 0 {
+            ret |= diff::MISS_TG_ENDP;
+        }
+        if !(only1 == 0 && only2 == 0 && num_eq != 0) {
+            ret |= diff::DIFF_TG_ENDP;
+        }
+    }
+    let (lt1, lt2) = (i1.len_tautomer, i2.len_tautomer);
+    if lt1 > 1
+        && lt2 > 1
+        && (lt1 != lt2 || i1.n_tautomer[..lt1 as usize] != i2.n_tautomer[..lt1 as usize])
+    {
+        ret |= diff::TG;
+    }
+    if i1.n_number_of_isotopic_atoms != i2.n_number_of_isotopic_atoms {
+        ret |= diff::NUM_ISO_AT;
+    } else {
+        let ni = i1.n_number_of_isotopic_atoms.max(0) as usize;
+        if ni > 0 && i1.isotopic_atom[..ni] != i2.isotopic_atom[..ni] {
+            ret |= diff::ISO_AT;
+        }
+    }
+    if i1.n_total_charge != i2.n_total_charge {
+        ret |= diff::CHARGE;
+    }
+    if let Some(a1) = a1 {
+        if a1.n_num_removed_protons != 0
+            && a2.is_none_or(|a2| a2.n_num_removed_protons != a1.n_num_removed_protons)
+        {
+            ret |= diff::REM_PROT;
+        }
+        if a2.is_none_or(|a2| a2.n_num_removed_isotopic_h != a1.n_num_removed_isotopic_h) {
+            ret |= diff::REM_ISO_H;
+        }
+    }
+    let pick = |i: &InChI| match i.stereo_isotopic.as_ref() {
+        Some(s) if s.n_number_of_stereo_bonds + s.n_number_of_stereo_centers != 0 => {
+            Some(s.clone())
+        }
+        _ => i.stereo.clone(),
+    };
+    ret | compare_reversed_stereo_inchi3(pick(i1).as_ref(), pick(i2).as_ref())
+}
+
+/// `CompareTwoPairsOfInChI`: ORs the difference bits of the Mobile-H and
+/// Fixed-H InChI of two structures into `flags`
+pub fn compare_two_pairs_of_inchi(
+    p1: [Option<&InChI>; 2],
+    p2: [Option<&InChI>; 2],
+    flags: &mut [u64; 2],
+) {
+    for i_mobile_h in 0..2 {
+        if p1[i_mobile_h].is_some() != p2[i_mobile_h].is_some() {
+            if i_mobile_h == TAUT_NON && p1[TAUT_YES].is_some() && p2[TAUT_YES].is_some() {
+                flags[i_mobile_h] |= diff::COMP_HLAYER;
+            } else {
+                flags[i_mobile_h] |= diff::COMP_NUMBER;
+            }
+            continue;
+        }
+        if p1[i_mobile_h].is_some() && p2[i_mobile_h].is_some() {
+            flags[i_mobile_h] |=
+                compare_reversed_inchi3(p1[i_mobile_h], p2[i_mobile_h], None, None);
+        }
+    }
 }
