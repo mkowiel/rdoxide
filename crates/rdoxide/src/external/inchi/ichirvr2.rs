@@ -14,16 +14,19 @@ use super::ichi_bns::{
     remove_rad_endpoints, set_rad_endpoints,
 };
 use super::ichiread::{RI_ERR_PROGR, RI_ERR_SYNTAX};
+use super::ichiring::is_bond_in_nmax_memb_ring;
+use super::ichirvr1::BfsQ;
 use super::ichirvr1::CN_LIST;
 use super::ichirvr1::{
     BnsTestResult, EL_TYPE_C, EL_TYPE_MASK, EL_TYPE_N, EL_TYPE_O, EL_TYPE_OST, EL_TYPE_P,
     EL_TYPE_PT, EL_TYPE_S, EdgeList, add_to_edge_list, alloc_edge_list, bond_flow_maxcap_minorder,
     comp_cc_cand, get_pva_atom_type, get_tgroup_info_from_inchi, remove_forbidden_edge_mask,
-    run_bns_restore_once, run_bns_test_once,
+    run_bns_restore_once, run_bns_test_once, set_forbidden_edge_mask,
 };
 use super::ichirvr4::forbid_carbon_charge_edges;
 use super::ichirvrs::{
-    AllTcGroups, BNS_VT_C_POS, CN_BITS_SHIFT, CcCand, Srm, TCG_ME_FLOWER0, TGRF_MINUS_FIRST, ValAt,
+    AllTcGroups, BNS_VT_C_POS, CN_BITS_SHIFT, CcCand, Srm, TCG_ME_FLOWER0, TCG_PLUS,
+    TGRF_MINUS_FIRST, ValAt,
 };
 use super::ichisort::insertions_sort;
 use super::ichister::{
@@ -73,6 +76,10 @@ pub struct StrFromInChI {
     pub num_deleted_h: i32,
     pub charge: i8,
     pub b_isotopic: i8,
+    /// `endpoint`: the endpoints of the original Fixed-H InChI
+    pub endpoint: Option<Vec<u16>>,
+    /// `pbfsq`: work arrays of the ring search
+    pub pbfsq: BfsQ,
 }
 
 /// `CopyAt2St`
@@ -2576,4 +2583,356 @@ pub fn increment_zero_order_bonds_to_heteroat(
     remove_forbidden_edge_mask(bns, &carbon_edges, forbidden_edge_mask);
     remove_forbidden_edge_mask(bns, &fixed, forbidden_edge_mask);
     ret
+}
+
+/// `MovePlusFromS2DiaminoCarbon`: C=S(+) with two non-tautomeric NH2 on C
+/// becomes C(+)-S
+#[allow(clippy::too_many_arguments)]
+pub fn move_plus_from_s2_diamino_carbon(
+    bns: &mut BnStruct,
+    bd: &mut BnData,
+    ps: &mut StrFromInChI,
+    at2: &mut Vec<InpAtom>,
+    p_va: &[ValAt],
+    tcg: &AllTcGroups,
+    num_run_bns: &mut i32,
+    _total_delta: &mut i32,
+    forbidden_edge_mask: i32,
+) -> i32 {
+    let num_at = ps.num_atoms as usize;
+    let len_at = (ps.num_atoms + ps.num_deleted_h) as usize;
+    let mut all_charge_edges = EdgeList::default();
+    let mut res = BnsTestResult::default();
+    let mut ret;
+    at2.clear();
+    at2.extend_from_slice(&ps.at[..len_at]);
+    std::mem::swap(&mut ps.at, at2);
+    let ret2 = copy_bns_to_atom(ps, bns, p_va, tcg, true);
+    std::mem::swap(&mut ps.at, at2);
+    if ret2 < 0 {
+        return ret2;
+    }
+    ret = 0;
+    for i in 0..num_at {
+        let pv_s = bns.vert[i];
+        if p_va[i].c_metal != 0
+            || p_va[i].c_num_valence_electrons != 6
+            || at2[i].valence != 2
+            || pv_s.st_edge.cap != pv_s.st_edge.flow
+        {
+            continue;
+        }
+        let e_plus_s = p_va[i].n_c_plus_group_edge - 1;
+        if e_plus_s < 0 || bns.edge[e_plus_s as usize].flow != 0 {
+            continue;
+        }
+        let pe1 = bns.iedge[pv_s.iedge] as usize;
+        let pe2 = bns.iedge[pv_s.iedge + 1] as usize;
+        if bns.edge[pe1].flow + bns.edge[pe2].flow != 1 {
+            continue;
+        }
+        let pe_sc = if bns.edge[pe1].flow != 0 { pe1 } else { pe2 };
+        let vc = bns.edge[pe_sc].neighbor12 as usize ^ i;
+        if p_va[vc].c_num_valence_electrons != 4 || at2[vc].valence != 3 {
+            continue;
+        }
+        let e_plus_c = p_va[vc].n_c_plus_group_edge - 1;
+        if e_plus_c < 0 || bns.edge[e_plus_c as usize].flow == 0 {
+            continue;
+        }
+        let e_minus_c = p_va[vc].n_c_minus_group_edge - 1;
+        if e_minus_c >= 0 && bns.edge[e_minus_c as usize].flow != 0 {
+            continue;
+        }
+        let pv_c = bns.vert[vc];
+        let mut pe_cn: Vec<usize> = Vec::new();
+        for j in 0..ps.at[vc].valence as usize {
+            let e = bns.iedge[pv_c.iedge + j] as usize;
+            if e != pe_sc && bns.edge[e].flow == 0 {
+                pe_cn.push(e);
+            }
+        }
+        if pe_cn.len() != 2 {
+            continue;
+        }
+        let mut j = 0;
+        while j < 2 {
+            let vn = bns.edge[pe_cn[j]].neighbor12 as usize ^ vc;
+            if p_va[vn].c_num_valence_electrons != 5
+                || bns.vert[vn].st_edge.cap != bns.vert[vn].st_edge.flow
+                || at2[vn].num_h != 2
+                || at2[vn].endpoint != 0
+                || ps.endpoint.as_ref().is_some_and(|e| e[vn] != 0)
+            {
+                break;
+            }
+            j += 1;
+        }
+        if j != 2 {
+            continue;
+        }
+        if all_charge_edges.num_edges == 0 {
+            for jj in 0..num_at {
+                let e = p_va[jj].n_c_plus_group_edge - 1;
+                if e >= 0 && bns.edge[e as usize].forbidden == 0 {
+                    ret = add_to_edge_list(&mut all_charge_edges, e, 2 * num_at as i32);
+                    if ret != 0 {
+                        return ret;
+                    }
+                }
+                let e = p_va[jj].n_c_minus_group_edge - 1;
+                if e >= 0 && bns.edge[e as usize].forbidden == 0 {
+                    ret = add_to_edge_list(&mut all_charge_edges, e, 2 * num_at as i32);
+                    if ret != 0 {
+                        return ret;
+                    }
+                }
+            }
+        }
+        set_forbidden_edge_mask(bns, &all_charge_edges, forbidden_edge_mask);
+        bns.edge[e_plus_s as usize].forbidden &= !forbidden_edge_mask as i8;
+        let pe = e_plus_c as usize;
+        if bns.edge[pe].flow == 0 {
+            continue;
+        }
+        let delta = 1;
+        let v1 = bns.edge[pe].neighbor1 as usize;
+        let v2 = bns.edge[pe].neighbor12 as usize ^ v1;
+        bns.edge[pe].flow -= delta;
+        bns.vert[v1].st_edge.flow -= delta;
+        bns.vert[v2].st_edge.flow -= delta;
+        bns.tot_st_flow -= 2 * delta;
+        ret = run_bns_test_once(bns, bd, p_va, &mut res);
+        if ret == 1
+            && ((res.v_last == v1 as i32 && res.v_first == v2 as i32)
+                || (res.v_last == v2 as i32 && res.v_first == v1 as i32))
+            && res.delta_charge == -1
+        {
+            ret = run_bns_restore_once(bns, bd);
+            if ret > 0 {
+                *num_run_bns += 1;
+            }
+        } else {
+            bns.edge[pe].flow += delta;
+            bns.vert[v1].st_edge.flow += delta;
+            bns.vert[v2].st_edge.flow += delta;
+            bns.tot_st_flow += 2 * delta;
+        }
+        remove_forbidden_edge_mask(bns, &all_charge_edges, forbidden_edge_mask);
+    }
+    ret
+}
+
+/// `EliminateChargeSeparationOnHeteroatoms`: cancels pairs of opposite
+/// charges; returns the number of pairs left or an error
+#[allow(clippy::too_many_arguments)]
+pub fn eliminate_charge_separation_on_heteroatoms(
+    bns: &mut BnStruct,
+    bd: &mut BnData,
+    ps: &mut StrFromInChI,
+    at2: &mut Vec<InpAtom>,
+    p_va: &[ValAt],
+    tcg: &AllTcGroups,
+    num_run_bns: &mut i32,
+    total_delta: &mut i32,
+    forbidden_edge_mask: i32,
+    forbidden_stereo_edge_mask: i32,
+) -> i32 {
+    let num_at = ps.num_atoms as usize;
+    let len_at = (ps.num_atoms + ps.num_deleted_h) as usize;
+    let mask = forbidden_edge_mask as i8;
+    let mut ring_edges = EdgeList::default();
+    let mut carbon_edges = EdgeList::default();
+    let mut fixed_carbon = false;
+    let mut num_min = 0;
+    let mut res = BnsTestResult::default();
+
+    let mut ret = (|| -> i32 {
+        if forbidden_stereo_edge_mask != 0 {
+            for i in 0..num_at {
+                for j in 0..at2[i].valence as usize {
+                    let k = bns.iedge[bns.vert[i].iedge + j];
+                    if i32::from(bns.edge[k as usize].forbidden) == forbidden_stereo_edge_mask {
+                        let q = ps.pbfsq.q.as_mut().expect("BFS queue");
+                        let min_ring = is_bond_in_nmax_memb_ring(
+                            at2,
+                            i,
+                            j,
+                            q,
+                            &mut ps.pbfsq.n_atom_level,
+                            &mut ps.pbfsq.c_source,
+                            99,
+                        );
+                        if 0 < min_ring {
+                            let r = add_to_edge_list(&mut ring_edges, k, 64);
+                            if r != 0 {
+                                return r;
+                            }
+                        }
+                    }
+                }
+            }
+            if ring_edges.num_edges == 0 {
+                return 0;
+            }
+            remove_forbidden_edge_mask(bns, &ring_edges, forbidden_stereo_edge_mask);
+        }
+        at2.clear();
+        at2.extend_from_slice(&ps.at[..len_at]);
+        std::mem::swap(&mut ps.at, at2);
+        let ret2 = copy_bns_to_atom(ps, bns, p_va, tcg, true);
+        std::mem::swap(&mut ps.at, at2);
+        if ret2 < 0 {
+            return ret2;
+        }
+        let (mut num_pos, mut num_neg) = (0, 0);
+        for i in 0..num_at {
+            if p_va[i].c_metal == 0 && at2[i].radical == 0 {
+                num_pos += i32::from(at2[i].charge > 0);
+                num_neg += i32::from(at2[i].charge < 0);
+            }
+        }
+        num_min = num_pos.min(num_neg);
+        let k = tcg.n_group[TCG_PLUS as usize];
+        if num_min == 0 || k < 0 {
+            return finish_keep(ps, at2, len_at);
+        }
+        let e_plus_super = tcg.p_tcg[k as usize].n_forward_edge;
+        let v_plus_super = tcg.p_tcg[k as usize].n_vertex_number;
+        if e_plus_super <= 0
+            || v_plus_super < num_at as i32
+            || bns.edge[e_plus_super as usize].forbidden != 0
+        {
+            return finish_keep(ps, at2, len_at);
+        }
+        let e = e_plus_super as usize;
+        let vps = v_plus_super as usize;
+        let vpm = bns.edge[e].neighbor12 as usize ^ vps;
+        num_min = num_min.min(bns.edge[e].flow);
+        let mut d_plus = bns.vert[vps].st_edge.cap - bns.vert[vps].st_edge.flow;
+        let mut d_minus = bns.vert[vpm].st_edge.cap - bns.vert[vpm].st_edge.flow;
+        if num_min != 0 && d_plus == 0 && d_minus == 0 {
+            if !fixed_carbon {
+                let r =
+                    forbid_carbon_charge_edges(bns, tcg, &mut carbon_edges, forbidden_edge_mask);
+                if r < 0 {
+                    return r;
+                }
+                fixed_carbon = true;
+            }
+            let delta = 1;
+            bns.edge[e].forbidden |= mask;
+            bns.edge_forbidden_mask |= mask;
+            let mut i = 0;
+            while i < num_min {
+                bns.edge[e].flow -= delta;
+                bns.vert[vps].st_edge.flow -= delta;
+                bns.vert[vpm].st_edge.flow -= delta;
+                bns.tot_st_flow -= 2 * delta;
+                let r = run_bns_test_once(bns, bd, p_va, &mut res);
+                if r < 0 {
+                    return r;
+                }
+                if r == 1
+                    && ((res.v_last == vps as i32 && res.v_first == vpm as i32)
+                        || (res.v_last == vpm as i32 && res.v_first == vps as i32))
+                    && res.delta_charge < 0
+                {
+                    let r = run_bns_restore_once(bns, bd);
+                    *num_run_bns += 1;
+                    if r < 0 {
+                        return r;
+                    } else if r == 1 {
+                        *total_delta += r;
+                    } else {
+                        return RI_ERR_PROGR;
+                    }
+                } else {
+                    bns.edge[e].flow += delta;
+                    bns.vert[vps].st_edge.flow += delta;
+                    bns.vert[vpm].st_edge.flow += delta;
+                    bns.tot_st_flow += 2 * delta;
+                    break;
+                }
+                i += delta;
+            }
+            num_min -= i;
+            bns.edge[e].forbidden &= !mask;
+        }
+        d_plus = bns.vert[vps].st_edge.cap - bns.vert[vps].st_edge.flow;
+        d_minus = bns.vert[vpm].st_edge.cap - bns.vert[vpm].st_edge.flow;
+        if num_min > 1 && d_plus == 0 && d_minus == 0 {
+            let delta = 2;
+            bns.edge[e].forbidden |= mask;
+            bns.edge_forbidden_mask |= mask;
+            let mut i = 0;
+            while i < num_min {
+                bns.vert[vps].st_edge.cap += delta;
+                bns.tot_st_cap += delta;
+                let r = run_bns_test_once(bns, bd, p_va, &mut res);
+                if r < 0 {
+                    return r;
+                }
+                bns.vert[vps].st_edge.cap -= delta;
+                bns.tot_st_cap -= delta;
+                if r != 1
+                    || res.v_last != vps as i32
+                    || res.v_first != vps as i32
+                    || res.delta_charge >= 0
+                {
+                    break;
+                }
+                bns.vert[vpm].st_edge.cap += delta;
+                bns.tot_st_cap += delta;
+                let r = run_bns_test_once(bns, bd, p_va, &mut res);
+                if r < 0 {
+                    return r;
+                }
+                bns.vert[vpm].st_edge.cap -= delta;
+                bns.tot_st_cap -= delta;
+                if r != 1
+                    || res.v_last != vpm as i32
+                    || res.v_first != vpm as i32
+                    || res.delta_charge >= 0
+                {
+                    break;
+                }
+                bns.edge[e].flow -= delta;
+                bns.vert[vps].st_edge.flow -= delta;
+                bns.vert[vpm].st_edge.flow -= delta;
+                bns.tot_st_flow -= 2 * delta;
+                let r = run_bns_restore_once(bns, bd);
+                *num_run_bns += 1;
+                if r < 0 {
+                    return r;
+                } else if r == 2 {
+                    *total_delta += r;
+                } else {
+                    return RI_ERR_PROGR;
+                }
+                i += delta;
+            }
+            num_min -= i;
+            bns.edge[e].forbidden &= !mask;
+        }
+        finish_keep(ps, at2, len_at)
+    })();
+    if fixed_carbon {
+        remove_forbidden_edge_mask(bns, &carbon_edges, forbidden_edge_mask);
+    }
+    if forbidden_stereo_edge_mask != 0 && ring_edges.num_edges != 0 {
+        set_forbidden_edge_mask(bns, &ring_edges, forbidden_stereo_edge_mask);
+    }
+    if ret >= 0 {
+        ret = num_min;
+    }
+    ret
+}
+
+/// the C code copies `at` over `at2` at the end of
+/// `EliminateChargeSeparationOnHeteroatoms`
+fn finish_keep(ps: &StrFromInChI, at2: &mut Vec<InpAtom>, len_at: usize) -> i32 {
+    at2.clear();
+    at2.extend_from_slice(&ps.at[..len_at]);
+    0
 }

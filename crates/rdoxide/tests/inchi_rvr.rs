@@ -754,6 +754,40 @@ fn restoration_helpers_match_c() {
                                                 b.edge[i].flow, b.edge[i].forbidden
                                             ));
                                         }
+                                        {
+                                            use rdoxide::external::inchi::ichirvr1::{
+                                                BfsQ, alloc_bfs_queue,
+                                            };
+                                            let mut bq = BfsQ::default();
+                                            alloc_bfs_queue(&mut bq, n as i32, 0);
+                                            ps.pbfsq = bq;
+                                        }
+                                        let (mut nr, mut td) = (0, 0);
+                                        let rmp = rdoxide::external::inchi::ichirvr2::move_plus_from_s2_diamino_carbon(&mut b, &mut bd, &mut ps, &mut a2, &va, &g, &mut nr, &mut td, 4);
+                                        got.push(format!(
+                                            "MP {rmp} {nr} {} {}",
+                                            b.tot_st_cap, b.tot_st_flow
+                                        ));
+                                        for i in 0..b.num_edges as usize {
+                                            got.push(format!(
+                                                "i{i} {} {}",
+                                                b.edge[i].flow, b.edge[i].forbidden
+                                            ));
+                                        }
+                                        if n & 1 != 0 && b.num_edges > 0 {
+                                            b.edge[0].forbidden = 8;
+                                        }
+                                        let rec = rdoxide::external::inchi::ichirvr2::eliminate_charge_separation_on_heteroatoms(&mut b, &mut bd, &mut ps, &mut a2, &va, &g, &mut nr, &mut td, 4, if n & 1 != 0 { 8 } else { 0 });
+                                        got.push(format!(
+                                            "EC {rec} {nr} {td} {} {}",
+                                            b.tot_st_cap, b.tot_st_flow
+                                        ));
+                                        for i in 0..b.num_edges as usize {
+                                            got.push(format!(
+                                                "j{i} {} {}",
+                                                b.edge[i].flow, b.edge[i].forbidden
+                                            ));
+                                        }
                                     }
                                     for a in at.iter_mut().take(n) {
                                         a.bond_type[0] = 0;
