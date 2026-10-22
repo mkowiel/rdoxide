@@ -1,6 +1,6 @@
 //! `rdchem.Bond` — port of upstream `Code/GraphMol/Wrap/Bond.cpp`.
 
-use pyo3::exceptions::{PyRuntimeError, PyValueError};
+use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use rdoxide::graphmol::queries::BondQuery;
 use rdoxide::graphmol::query_ops::bond_expand_query;
@@ -427,9 +427,9 @@ impl PyBond {
 
     /// Sets the query on this bond (plain bonds have no query).
     #[pyo3(name = "SetQuery")]
-    fn set_query(&mut self, other: Option<PyRef<'_, PyBond>>) -> PyResult<()> {
+    fn set_query(&mut self, py: Python<'_>, other: Option<PyRef<'_, PyBond>>) -> PyResult<()> {
         if other.is_none() {
-            return Err(PyValueError::new_err("other Bond is null"));
+            return Err(crate::compat::value_type_error(py, "other Bond is null"));
         }
         Err(crate::errors::to_py(rdoxide::RDKitError::precondition(
             "plain bonds have no Query",
@@ -456,7 +456,7 @@ fn other_query(
 ) -> PyResult<Option<BondQuery>> {
     let py = slf.py();
     if other.is_none() {
-        return Err(PyValueError::new_err("other Bond is null"));
+        return Err(crate::compat::value_type_error(py, "other Bond is null"));
     }
     let Ok(other) = other.cast::<PyQueryBond>() else {
         let mut got = vec![

@@ -93,7 +93,7 @@ impl<'a, 'py> pyo3::FromPyObject<'a, 'py> for PropKey {
         match obj.extract::<String>() {
             Ok(s) => Ok(Self(s)),
             Err(_) => Err(pyo3::exceptions::PyTypeError::new_err(format!(
-                "Python argument types did not match C++ signature: property name must be str, got {}",
+                "Python argument types did not match C++ signature (incompatible function arguments): property name must be str, got {}",
                 crate::errors::boost_type_name(&obj)
             ))),
         }
@@ -367,7 +367,8 @@ macro_rules! impl_props {
             }
             /// Sets an unsigned integer valued property.
             #[pyo3(name = "SetUnsignedProp", signature = (key, val, computed = false))]
-            fn py_set_unsigned_prop(&mut self, py: pyo3::Python<'_>, key: $crate::props::PropKey, val: u32, #[pyo3(from_py_with = crate::pyconv::truthy)] computed: bool) -> pyo3::PyResult<()> {
+            fn py_set_unsigned_prop(&mut self, py: pyo3::Python<'_>, key: $crate::props::PropKey, val: i64, #[pyo3(from_py_with = crate::pyconv::truthy)] computed: bool) -> pyo3::PyResult<()> {
+                let val = $crate::props::unsigned_value(py, val)?;
                 self.with_dict_mut(py, |d| $crate::props::set_prop(d, &key.0, val.into(), computed))?
             }
             /// Sets a boolean valued property.
@@ -397,7 +398,8 @@ macro_rules! impl_props {
             }
             /// Sets an unsigned integer valued property.
             #[pyo3(name = "SetUnsignedProp")]
-            fn py_set_unsigned_prop(&mut self, py: pyo3::Python<'_>, key: $crate::props::PropKey, val: u32) -> pyo3::PyResult<()> {
+            fn py_set_unsigned_prop(&mut self, py: pyo3::Python<'_>, key: $crate::props::PropKey, val: i64) -> pyo3::PyResult<()> {
+                let val = $crate::props::unsigned_value(py, val)?;
                 self.with_dict_mut(py, |d| $crate::props::set_prop(d, &key.0, val.into(), false))?
             }
             /// Sets a boolean valued property.
@@ -409,3 +411,12 @@ macro_rules! impl_props {
     };
 }
 pub(crate) use impl_props;
+
+/// The value of `SetUnsignedProp`: negative or too large numbers raise an
+/// error that is both an `OverflowError` (Boost.Python) and a `TypeError`
+/// (nanobind).
+pub(crate) fn unsigned_value(py: pyo3::Python<'_>, val: i64) -> pyo3::PyResult<u32> {
+    u32::try_from(val).map_err(|_| {
+        crate::compat::overflow_type_error(py, "number does not fit in an unsigned 32 bit integer")
+    })
+}

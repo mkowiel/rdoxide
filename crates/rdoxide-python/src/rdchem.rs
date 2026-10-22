@@ -199,7 +199,7 @@ impl SanitizeCause {
     }
     #[pyo3(name = "GetAtomIndices")]
     fn get_atom_indices<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, pyo3::types::PyTuple>> {
-        pyo3::types::PyTuple::new(py, &self.atom_indices)
+        crate::compat::tuple_list(py, pyo3::types::PyTuple::new(py, &self.atom_indices)?)
     }
 }
 

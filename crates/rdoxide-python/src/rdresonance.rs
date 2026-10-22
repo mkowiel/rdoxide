@@ -366,7 +366,7 @@ impl PyResonanceMolSupplier {
             .first()
             .map(|m| m.iter().map(|&(_, a)| a).collect())
             .unwrap_or_default();
-        PyTuple::new(py, first)
+        crate::compat::tuple_list(py, PyTuple::new(py, first)?)
     }
 
     /// Returns tuples of the indices of the molecule's atoms that match a
@@ -431,13 +431,11 @@ impl PyResonanceMolSupplier {
             ..SubstructMatchParameters::default()
         };
         let matches = self.matches(py, query, params)?;
-        PyTuple::new(
-            py,
-            matches
-                .iter()
-                .map(|m| PyTuple::new(py, m.iter().map(|&(_, a)| a)))
-                .collect::<PyResult<Vec<_>>>()?,
-        )
+        let items = matches
+            .iter()
+            .map(|m| crate::compat::tuple_list(py, PyTuple::new(py, m.iter().map(|&(_, a)| a))?))
+            .collect::<PyResult<Vec<_>>>()?;
+        crate::compat::tuple_list(py, PyTuple::new(py, items)?)
     }
 }
 

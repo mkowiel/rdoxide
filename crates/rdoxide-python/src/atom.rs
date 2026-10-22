@@ -679,9 +679,9 @@ impl PyAtom {
 
     /// Sets the query on this atom (plain atoms have no query).
     #[pyo3(name = "SetQuery")]
-    fn set_query(&mut self, other: Option<PyRef<'_, PyAtom>>) -> PyResult<()> {
+    fn set_query(&mut self, py: Python<'_>, other: Option<PyRef<'_, PyAtom>>) -> PyResult<()> {
         if other.is_none() {
-            return Err(PyValueError::new_err("other Atom is null"));
+            return Err(crate::compat::value_type_error(py, "other Atom is null"));
         }
         Err(crate::errors::to_py(rdoxide::RDKitError::precondition(
             "plain atoms have no Query",
@@ -721,7 +721,7 @@ fn other_query(
 ) -> PyResult<Option<AtomQuery>> {
     let py = slf.py();
     if other.is_none() {
-        return Err(PyValueError::new_err("other Atom is null"));
+        return Err(crate::compat::value_type_error(py, "other Atom is null"));
     }
     let Ok(other) = other.cast::<PyQueryAtom>() else {
         let mut got = vec![

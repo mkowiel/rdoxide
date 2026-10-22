@@ -9,6 +9,7 @@ use pyo3::types::PyDict;
 
 mod atom;
 mod bond;
+mod compat;
 mod conformer;
 mod datastructs;
 mod datastructs_fpb;

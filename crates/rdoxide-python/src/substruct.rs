@@ -531,7 +531,7 @@ fn run_any_has(
 }
 
 fn match_tuple<'py>(py: Python<'py>, m: &MatchVect) -> PyResult<Bound<'py, PyTuple>> {
-    PyTuple::new(py, m.iter().map(|&(_, a)| a))
+    crate::compat::tuple_list(py, PyTuple::new(py, m.iter().map(|&(_, a)| a))?)
 }
 
 pub(crate) fn has_substruct_match_impl<'py>(
@@ -583,7 +583,7 @@ pub(crate) fn get_substruct_match_impl<'py>(
     let res = run_any(py, subject, &query, ps)?;
     match res.first() {
         Some(m) => match_tuple(py, m),
-        None => Ok(PyTuple::empty(py)),
+        None => crate::compat::tuple_list(py, PyTuple::empty(py)),
     }
 }
 
@@ -617,7 +617,7 @@ pub(crate) fn get_substruct_matches_impl<'py>(
         .iter()
         .map(|m| match_tuple(py, m))
         .collect::<PyResult<Vec<_>>>()?;
-    PyTuple::new(py, items)
+    crate::compat::tuple_list(py, PyTuple::new(py, items)?)
 }
 
 #[pymethods]
