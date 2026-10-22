@@ -224,6 +224,15 @@ int main(void) {
                                 int rnn = RestoreNNNgroup(b, bd, &s3, at, a2, va, &g, &nr, &td, 4);
                                 printf("NN %d %d %d %d %d\n", rnn, nr, td, b->tot_st_cap, b->tot_st_flow);
                                 for (int i = 0; i < b->num_edges; i++) printf("o%d %d %d\n", i, b->edge[i].flow, b->edge[i].forbidden);
+                                int rp = EliminateNitrogen5Val3Bonds(b, bd, &s3, at, a2, va, &g, &nr, &td, 4);
+                                printf("E5 %d %d %d %d %d\n", rp, nr, td, b->tot_st_cap, b->tot_st_flow);
+                                for (int i = 0; i < b->num_edges; i++) printf("q%d %d %d\n", i, b->edge[i].flow, b->edge[i].forbidden);
+                                int rr = Convert_SIV_to_SVI(b, bd, &s3, at, a2, va, &g, &nr, &td, 4);
+                                printf("SV %d %d %d %d %d\n", rr, nr, td, b->tot_st_cap, b->tot_st_flow);
+                                for (int i = 0; i < b->num_edges; i++) printf("s%d %d %d\n", i, b->edge[i].flow, b->edge[i].forbidden);
+                                int rt = PlusFromDB_N_DB_O_to_Metal(b, bd, &s3, at, a2, va, &g, &nr, &td, 4);
+                                printf("PM %d %d %d %d %d\n", rt, nr, td, b->tot_st_cap, b->tot_st_flow);
+                                for (int i = 0; i < b->num_edges; i++) printf("u%d %d %d\n", i, b->edge[i].flow, b->edge[i].forbidden);
                             }
                             for (int i = 0; i < n; i++) at[i].bond_type[0] = 0;
                             IncrZeroBondsAndClearEndpts(at, n, 5);

@@ -842,6 +842,43 @@ fn restoration_helpers_match_c() {
                                                 b.edge[i].flow, b.edge[i].forbidden
                                             ));
                                         }
+                                        let rp = rdoxide::external::inchi::ichirvr2::eliminate_nitrogen5_val3_bonds(&mut b, &mut bd, &mut ps, &mut a2, &va, &g, &mut nr, &mut td, 4);
+                                        got.push(format!(
+                                            "E5 {rp} {nr} {td} {} {}",
+                                            b.tot_st_cap, b.tot_st_flow
+                                        ));
+                                        for i in 0..b.num_edges as usize {
+                                            got.push(format!(
+                                                "q{i} {} {}",
+                                                b.edge[i].flow, b.edge[i].forbidden
+                                            ));
+                                        }
+                                        let rr =
+                                            rdoxide::external::inchi::ichirvr2::convert_siv_to_svi(
+                                                &mut b, &mut bd, &mut ps, &mut a2, &va, &g,
+                                                &mut nr, &mut td, 4,
+                                            );
+                                        got.push(format!(
+                                            "SV {rr} {nr} {td} {} {}",
+                                            b.tot_st_cap, b.tot_st_flow
+                                        ));
+                                        for i in 0..b.num_edges as usize {
+                                            got.push(format!(
+                                                "s{i} {} {}",
+                                                b.edge[i].flow, b.edge[i].forbidden
+                                            ));
+                                        }
+                                        let rt = rdoxide::external::inchi::ichirvr2::plus_from_db_n_db_o_to_metal(&mut b, &mut bd, &mut ps, &mut a2, &va, &g, &mut nr, &mut td, 4);
+                                        got.push(format!(
+                                            "PM {rt} {nr} {td} {} {}",
+                                            b.tot_st_cap, b.tot_st_flow
+                                        ));
+                                        for i in 0..b.num_edges as usize {
+                                            got.push(format!(
+                                                "u{i} {} {}",
+                                                b.edge[i].flow, b.edge[i].forbidden
+                                            ));
+                                        }
                                     }
                                     for a in at.iter_mut().take(n) {
                                         a.bond_type[0] = 0;

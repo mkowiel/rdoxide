@@ -3051,7 +3051,7 @@ pub fn remove_from_edge_list_by_value(e: &mut EdgeList, iedge: i32) -> i32 {
 
 const MAX_CN_VAL: usize = 3;
 
-fn is_bns_vt_c_gr(x: u16) -> bool {
+pub fn is_bns_vt_c_gr(x: u16) -> bool {
     x & BNS_VT_C_POS_ALL == BNS_VERT_TYPE_C_GROUP
 }
 fn is_bns_vt_m_gr(x: u16) -> bool {
