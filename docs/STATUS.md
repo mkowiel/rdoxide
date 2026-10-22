@@ -1,19 +1,19 @@
 # Port status
 
-Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
+Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not done. Every row is `| stage | component | status | notes |`; the InChI port has its own summary section below and a detailed plan in [INCHI_PORT.md](INCHI_PORT.md).
 
 | Stage | Component | Status | Notes |
 |-------|-----------|--------|-------|
-| 0 | Workspace, packaging (maturin, abi3-py310), CI, licenses, NOTICE | ✅ | |
-| 0 | `tools/sync_upstream.py` (fetch/regen/diff/stamp), `porting/manifest.toml` | ✅ | |
+| 0 | Workspace, packaging (maturin, abi3-py310), CI, licenses, NOTICE | ✅ |  |
+| 0 | `tools/sync_upstream.py` (fetch/regen/diff/stamp), `porting/manifest.toml` | ✅ |  |
 | 0 | Multi-core: `rdgeneral::threads` (`getNumThreadsToUse`, order-preserving `par_map` on scoped threads, no dependency); `rdFingerprintGenerator.Get*Fingerprints(mols, numThreads)` run in parallel with the GIL released | ✅ | results independent of the thread count; 20k molecules RDKit-FP 2.4s -> 0.4s on 14 cores. Other batch APIs adopt `par_map` as they are ported |
 | 0 | Dependency license audit (`tools/check_licenses.py`, `LICENSES/CRATES.md`, CI step) | ✅ | permissive-only allow-list; 53 crates |
 | 0 | Upstream test ratchet (`tools/run_upstream_tests.py`) | ✅ | 298 upstream tests passing |
-| 1 | RDGeneral: Dict/RDValue/RDProps | ✅ | |
+| 1 | RDGeneral: Dict/RDValue/RDProps | ✅ |  |
 | 1 | RDGeneral: RDLog + `rdBase` logging API | ✅ | upstream `UnitTestLogging.py` 32/32 |
-| 1 | RDGeneral: RNG (`boost::minstd_rand`, glibc `rand`) | ✅ | |
+| 1 | RDGeneral: RNG (`boost::minstd_rand`, glibc `rand`) | ✅ |  |
 | 1 | `rdBase` vector types `_vecti`, `_vectj`, `_vectd`, list of int vectors (mutable sequences without value equality, like Boost.Python's indexing suites) | 🟡 | used by DataStructs and Subgraphs; string/nested-vector variants later |
-| 2 | PeriodicTable (+ data extraction from upstream) | ✅ | |
+| 2 | PeriodicTable (+ data extraction from upstream) | ✅ |  |
 | 2 | Atom, Bond, Conformer, ROMol/RWMol, RingInfo, StereoGroup (core) | ✅ | boost adjacency ordering, RWMol edits, batch edits, valence calc |
 | 2 | `rdchem` Python: Atom, Bond, Mol, RWMol, EditableMol, Conformer, RingInfo, StereoGroup, enums, props API, sanitize exceptions | ✅ | `_wrapperType = 'nanobind'` (PyO3 semantics match nanobind's) |
 | 2 | `rdGeometry` Point3D / Point2D | 🟡 | PointND, UniformGrid3D later |
@@ -31,21 +31,21 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 4 | Query model (Query/*, QueryOps, QueryAtom/QueryBond expandQuery, null-query algebra), SMARTS parser (`MolFromSmarts`, `AtomFromSmarts`, `BondFromSmarts`, `SmartsParserParams`), `DescribeQuery` | ✅ | differential `smarts` (atoms, bonds, query descriptions) 1275 library SMARTS + 151 edge cases identical |
 | 4 | SMARTS writer: `MolToSmarts` (both overloads), `MolFragmentToSmarts`, `Atom/Bond.GetSmarts` | ✅ | differential `smarts` (+ writer: default, non-isomeric, rooted, fragment, per-atom/bond, roundtrip) 1426/1426; `smiles` mode also checks `MolToSmarts` of plain molecules |
 | 4 | Python `QueryAtom`/`QueryBond` classes, `rdqueries` | ✅ | stage 13c; `HasBitVectPropWithValueQueryAtom` not ported (no bit-vector property queries yet) |
-| 4 | CXSMILES (read/write) | ⬜ | |
+| 4 | CXSMILES (read/write) | ✅ | done in stages 5 and 13a (`MolToCXSmiles`, CXSMILES reading) |
 | 5 | Substructure matching: VF2, `SubstructMatch`/`SubstructMatchCount`, recursive queries, chirality + double-bond stereo, enhanced stereo, query-query matches, aromaticMatchesConjugated/SingleOrDouble, atom/bond properties; `Mol.HasSubstructMatch/GetSubstructMatch/GetSubstructMatches` (both overloads), `SubstructMatchParameters` | ✅ | differential `substruct` (55 queries x 4 variants per molecule + chirality self/mirror) 10312 + 2418 identical |
-| 5 | `extraFinalCheck`/`extraAtomCheck`/`extraBondCheck` callbacks, generic matchers, MolBundle, ResonanceMolSupplier | ⬜ | |
+| 5 | `extraFinalCheck`/`extraAtomCheck`/`extraBondCheck` callbacks, generic matchers, MolBundle, ResonanceMolSupplier | ✅ | MolBundle (stage 48), ResonanceMolSupplier (stage 21a), generalized substructure search (stage 37) |
 | 6 | MolPickler (byte-identical pickles; reads versions >= 2 incl. queries, rings, stereo groups, conformers, props): `Mol.ToBinary`, `Mol(pkl[, flags])`, Python `pickle`, `Get/SetDefaultPickleProperties`, `PropertyPickleOptions` | ✅ | differential `pickle`/`picklesmarts` byte-identical on 10312 + 1101 + 1426 + edge cases; upstream canonSmiles.v2.pkl stream reads |
-| 6 | Pickles with SubstanceGroups / monomer info, v1 pickles, ExplicitBitVect property handler | ⬜ | raise RuntimeError for now |
+| 6 | Pickles with SubstanceGroups / monomer info, v1 pickles, ExplicitBitVect property handler | 🟡 | SubstanceGroup and PDB residue pickles round-trip (checked 2026-10-22); v1 pickles and the ExplicitBitVect property handler were not re-checked |
 | 6 | MolBlock reader, V2000 + V3000 (atom lists, NOT lists, query props HCOUNT/UNSAT/RBCNT/SUBST, RGROUPS, enhanced stereo collections, LINKNODE, OBJ3D skipping, continuation lines): atoms/bonds incl. query atoms (A/Q/X/M/R/*, generic groups, H count), query bonds (5-8, topology), M CHG/RAD/ISO/RGP/ALS/RBC/SUB/UNS/PXA, old atom lists, aliases/values, S SKP, 2D/3D stereo; `MolFromMolBlock`, `MolFromMolFile` | ✅ | differential `molblock` (4 parse variants, byte-identical pickles with all props): 2D 4991/4991, V3000 1876/1876 (116 with stereo groups), 3D 490/490, upstream test_data 349/364 (remaining diffs need SGroups) |
 | 6 | SDMolSupplier (lazy + random access, `$$$$` indexing, data fields, atom/bond property lists, error recovery; Python iteration/indexing/len/SetData/GetItemText/context manager) | ✅ | differential `sdf` (4 parse variants + len/getitem/GetItemText/SetData) on all 389 upstream SD files: identical except 43 files that need SGroups |
 | 6 | MolBlock writer: `MolToMolBlock` (both overloads), `MolToV3KMolBlock`, `MolToV2KMolBlock`, `MolToMolFile`, `MolToV3KMolFile`, `MolWriterParams`; wedging (`pickBondsToWedge`, libc++ `std::sort` tie order), crossed double bonds, parity, query atoms/bonds, atom lists, R groups, enhanced stereo collections | ✅ | differential `molwrite` (5 writer variants x 3 reader variants + roundtrip): 2D 4991/4991, V3000 1876/1876, 3D 490/490, upstream test_data 327/364 (rest need SGroups) |
 | 6 | SDWriter (file name, stdout, Python file objects; SetProps, kekulize, V3000, GetText) | ✅ | differential `sdwrite`: identical on all upstream SD files except those needing SGroups |
 | 6 | Atropisomer wedging (`wedgeBondsFromAtropisomers`: no conformer, 2D, 3D) | ✅ | covered by `sdwrite` (all upstream atropisomer SD files identical) |
-| 6 | SGroups (V2000/V3000; also needed for M ZBO/ZCH/HYD/MRV and for writing SMARTS-query / generic-group / zero-order-bond molecules), M APO/LIN, ATTCHORD templates, ForwardSDMolSupplier | ⬜ | reader returns None, writer raises RuntimeError for now |
+| 6 | SGroups (V2000/V3000; also needed for M ZBO/ZCH/HYD/MRV and for writing SMARTS-query / generic-group / zero-order-bond molecules), M APO/LIN, ATTCHORD templates, ForwardSDMolSupplier | ✅ | done in later stages (SubstanceGroup stage 13e, `ForwardSDMolSupplier` stage 12d) |
 | 7 | 2D coordinates: RDDepict::compute2DCoords (EmbeddedFrag, DepictUtils, fused rings, cis/trans and non-tetrahedral fragments, collision removal: bond/spiro flips, open angles, shorten bonds, path angle expansion, canonical orientation, coordMap, bondLength); `rdDepictor.Compute2DCoords`; `MolToMolBlock` of molecules without conformers | ✅ | differential `depict` (canonOrient on/off coordinates to 6 decimals + MolBlock): NCI 4999/4999, canonSmiles.long + stereo/pickle edge cases 5400/5400 identical to the arm64 build |
-| 7 | Random flip sampling (nSample/nFlipsPerSample), Compute2DCoordsMimicDistmat, generateDepictionMatching2D/3DStructure, straighten/normalizeDepiction, CoordGen | ⬜ | raise RuntimeError |
+| 7 | Random flip sampling (nSample/nFlipsPerSample), Compute2DCoordsMimicDistmat, generateDepictionMatching2D/3DStructure, straighten/normalizeDepiction, CoordGen | 🟡 | everything but CoordGen done in stages 77–80; CoordGen needs the coordgenlibs sources (not ported) |
 | 8 | DataStructs: ExplicitBitVect, SparseBitVect (bit ops, pickles byte-identical, base64, indexing), all similarity metrics + Bulk*/\*Neighbors, Tversky, on/off-bit projections, FoldFingerprint, AllProbeBitsMatch, text/FPS/binary conversions, ConvertToNumpyArray; `rdoxide.DataStructs` Python package (verbatim upstream pure-Python modules) | ✅ | 3000 random pairs identical to the arm64 build (x86 differs in last bits through FMA, as upstream does); upstream `testBV.py` and `UnitTestcBitVect.py` pass. Lists of ints/doubles are `rdBase._vecti`/`_vectd` like upstream |
-| 8 | SparseIntVect (Int/Long/UInt/ULong): fuzzy &/|, arithmetic, scalar ops (incl. upstream's stored zeros and missing `/=`), pickles, Dice/Tanimoto/Tversky (+ bounds, Bulk*), ConvertToNumpyArray | ✅ | 3000 random pairs identical to the arm64 build; upstream `testSparseIntVect.py` 10/10 incl. legacy pickles |
+| 8 | SparseIntVect (Int/Long/UInt/ULong): fuzzy &/\|, arithmetic, scalar ops (incl. upstream's stored zeros and missing `/=`), pickles, Dice/Tanimoto/Tversky (+ bounds, Bulk*), ConvertToNumpyArray | ✅ | 3000 random pairs identical to the arm64 build; upstream `testSparseIntVect.py` 10/10 incl. legacy pickles |
 | 8 | DiscreteValueVect (+ `DiscreteValueType`), RealValueVect, ComputeL1Norm, ConvertToNumpyArray for all vector types | ✅ | 2000 random pairs identical (incl. error cases); upstream tests 12/12 |
 | 8 | `InitFromDaylightString` (explicit and sparse bit vectors; upstream's alphabet fallback and pad-marker handling) | ✅ | identical to the reference on 805 random strings incl. error cases |
 | 8 | `FPBReader` (in-memory and lazy modes, ids, popcount-screened Tanimoto/Tversky/containing searches) and `MultiFPBReader` (searches the readers in parallel, `numThreads`, `initOnSearch`); `CalcBitmap*` byte-array similarities | ✅ | upstream `testFPB.py` 9/9; identical to the reference on all six upstream FPB files, memory and lazy (ids, bytes, bits, neighbor lists). Deliberate differences: ties in similarity are ordered by index (upstream's `std::sort` is unstable) and popcount bounds beyond the offsets table are clamped (upstream reads out of bounds, giving `bad index` errors or wrong results) |
@@ -96,10 +96,10 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 11b | `Chem.GetDistanceMatrix` (bond orders, atom weights; Floyd-Warshall with upstream's operation order), `GetAdjacencyMatrix`, `Get3DDistanceMatrix` with upstream's computed-property caching (`DistanceMatrix`, `_Paths`, `force`, `prefix`); `DeleteSubstructs`; `FindPotentialStereoBonds`; `Get/SetUseLegacyStereoPerception`, `Get/SetAllowNontetrahedralChirality`; `_vect<string>` for string-vector props; pure-Python tail of `Chem/__init__.py` (`FindMolChiralCenters`, `CanonSmiles`, ...) | ✅ | differential `matrices`, `transforms` and `descriptors` (all 200+ `Descriptors._descList` values on 10312 molecules) identical. `SPS` waits for the new stereo perception (`FindPotentialStereo`), `BCUT2D_*` for BCUT2D |
 | 11c | BCUT2D (`rdMolDescriptors.BCUT2D` with all overloads, `_BCUT2D_version`, `Descriptors.BCUT2D_*`); `numerics::symmetric_eigenvalues` (Householder + implicit QL replaces Eigen's solver; agrees to ~1e-14, not bit-identical); `removeAllHs` in core | ✅ | differential `descriptors` (BCUT values to 9 decimals) 10312/10312; `Descriptors._descList` now has all 217 entries of RDKit |
 | 12a | `SmilesMolSupplier` (lazy + random access over delimited text: title line, name/SMILES columns, delimiter set, property columns, comment/blank lines, CRLF, `std::istream` state emulation incl. upstream's quirks), `SmilesMolSupplierFromText`; Python iteration/indexing/len/SetData/GetItemText/context manager | ✅ | 22 scenario transcripts (basic, no title, tabs, name column -1, columns swapped, unsanitized, CRLF, no final newline, empty, comment-only, extra columns, short lines, files, bad/empty files, `GetItemText` before `next`) identical to RDKit incl. error messages |
-| 10a | rest of `rdMolDescriptors` (MQNs, BCUT, AUTOCORR2D, ...) and the `Descriptors` module (needs EState, QED, SpacialScore, GraphDescriptors) | ⬜ | next |
+| 10a | rest of `rdMolDescriptors` (MQNs, BCUT, AUTOCORR2D, ...) and the `Descriptors` module (needs EState, QED, SpacialScore, GraphDescriptors) | ✅ | done in stages 11a and later (217 descriptors in `Descriptors._descList`) |
 | 9 | `PatternFingerprint` (`Chem.PatternFingerprint`, tautomer mode, `_PatternFingerprint_version`; `atomCounts`/`setOnlyBits` validated but unused as upstream) | ✅ | differential `patternfp` 11892/11892 identical (SMILES- and SMARTS-parsed molecules, 3 size/tautomer variants; reference RDKit 2026.03.6) |
 | 9 | `LayeredFingerprint` (`Chem.LayeredFingerprint`, all six layers, `atomCounts` write-back, `setOnlyBits`, `fromAtoms`, `LayeredFingerprint_substructLayers`, `_LayeredFingerprint_version`) | ✅ | differential `layeredfp` 11892/11892 identical (5 argument variants incl. atomCounts/setOnlyBits, SMILES and SMARTS molecules). Unbranched paths without `fromAtoms` deliberately differ: upstream passes `useBonds=false` there and crashes |
-| 9 | JSON (de)serialization, GetFPs bulk helpers | ⬜ | |
+| 9 | JSON (de)serialization, GetFPs bulk helpers | ✅ | `MolToJSON`/`JSONToMols` (stage 117, MolInterchange) and the bulk fingerprint helpers exist |
 | 11 | `rdSimDivPickers`: `MaxMinPicker` (`Pick` from a packed distance matrix, `LazyPick`, `LazyBitVectorPick`, `...WithThreshold`; seeding with boost `mt19937` + `uniform_int`), `LeaderPicker` (`LazyPick`, `LazyBitVectorPick` with `numThreads`: the distances of each round are computed in parallel, the picks do not depend on the thread count) and `HierarchicalClusterPicker` (+ `ClusterMethod`); `rdoxide.ML.Cluster.Clustering` (`MurtaghCluster` with parallel pairwise distances, `MurtaghDistCluster`) with Murtagh's `HC` (7 linkages); `rdoxide.SimDivFilters` and `rdoxide.ML.Cluster` packages (`Murtagh`, `Clusters`, `ClusterUtils`, `Butina` verbatim) | ✅ | identical to the reference RDKit on 427 scenarios (picks, cluster histories for every linkage on random and tied data, error types), including upstream's in-place side effects (the clustering overwrites the caller's distance array; the hierarchical picker scores representatives on the overwritten matrix). `UnitTestButina` 10/10, `UnitTestCluster` 3/3. `testPickers.py` needs `rdoxide.DataManip`, `UnitTestSimilarityPickers.py` `rdoxide.Dbase` (not ported) |
 | 11 | `rdoxide.DataManip.Metric.rdMetricMatrixCalc` (`GetEuclideanDistMat` for numpy arrays, lists and tuples; `GetTanimotoDistMat` / `GetTanimotoSimMat` for explicit and sparse bit vectors): the rows of a matrix are computed in parallel for big inputs | ✅ | identical to the reference on 47 scenarios incl. error types and messages; upstream `testMatricCalc.py` 5/5, `testPickers.py` now collected. Deliberate differences: integer arrays of any width are accepted (upstream only `int32`), and Fortran-ordered `float64` arrays give the correct distances (upstream reads their raw buffer and returns scrambled values) |
 | 8 | `rdMolDescriptors.AtomPairsParameters` and the pure-Python `rdoxide.Chem.AtomPairs` (`Pairs`, `Torsions`, `Utils`, `Sheridan`) and `rdoxide.Chem.Fingerprints` (`FingerprintMols`, `SimilarityScreener`) packages, verbatim from upstream | ✅ | `UnitTestDescriptors` 5/5 (including the stored pair/torsion regression data), `UnitTestFingerprints` 7/7, `UnitTestSimScreener` 4/4. `Scaffolds/MurckoScaffold` is copied too but its tests need `AllChem.ReactionFromSmarts` (ChemReactions); the `DbFpSupplier`/`MolSimilarity` modules need `rdoxide.Dbase` |
@@ -115,7 +115,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 20e | `MetalDisconnector` (+ options, `MetalNof`/`MetalNon` setters), `DisconnectOrganometallics(InPlace)` | ✅ | identical on 29k synthetic organometallics |
 | 20f | Validation: `RDKitValidation`, `NoAtom`, `Fragment`, `Neutral`, `Isotope`, `MolVSValidation` (also with Python-defined members), `AllowedAtoms`, `DisallowedAtoms`, `DisallowedRadical`, `Features`, `Is2D`, `Layout2D`, `StereoValidation`, `ValidateSmiles`; subclassable `ValidationMethod` | ✅ | all validators identical (with and without 2D coordinates/wedging) on the default + stress corpora |
 | 20g | `TautomerEnumerator` (`Enumerate`, `Canonicalize`, `PickCanonical` with custom Python scorers, limits, stereo options, callbacks), `TautomerEnumeratorResult`, `SmilesTautomerMap`, `Tautomer`, `GetV1TautomerEnumerator`, scoring (`ScoreRings`, `ScoreHeteroHs`, `ScoreSubstructs`, `SubstructTerm(Vector)`, `GetDefaultTautomerScoreSubstructs`), `CanonicalTautomer` | ✅ | enumeration (SMILES, status, modified atoms), scores and canonical tautomers identical on 35k molecules; std::map iteration semantics reproduced |
-| 20h | `Cleanup`, `StandardizeSmiles`, `TautomerParent`, `StereoParent`, `IsotopeParent`, `SuperParent`; every `*InPlace` with the multi-molecule `(mols, numThreads)` overload (parallel, GIL released) | ✅ | upstream `testMolStandardize.py` 38/41 when its `inchi`/`rdCIPLabeler` imports are stubbed (2 need CIPLabeler, 1 InChI); the file itself cannot be imported yet |
+| 20h | `Cleanup`, `StandardizeSmiles`, `TautomerParent`, `StereoParent`, `IsotopeParent`, `SuperParent`; every `*InPlace` with the multi-molecule `(mols, numThreads)` overload (parallel, GIL released) | ✅ | upstream `testMolStandardize.py` 41/41 |
 | 20i | `Pipeline` (`PipelineOptions`, `PipelineStatus`, `PipelineStage`, `PipelineLog(Entry)`, `PipelineResult`) | ✅ | output/parent mol blocks, status and log identical on the 33 upstream test mol files (all option combinations) and 3k generated mol blocks |
 | 21a | `ResonanceMolSupplier` (`graphmol::resonance`; `Chem.ResonanceMolSupplier`, `ResonanceMolSupplierCallback`, `ResonanceFlags`): per-group enumeration of bond/charge arrangements, ranking, breadth-first combination, `GetSubstructMatch(es)` over all structures (parallel), progress callbacks (Python exceptions propagate), `SetNumThreads`. Divergences: duplicates are detected on the exact fingerprint/metrics instead of boost hashes, and structures equal in every ranking criterion keep generation order (upstream: `unordered_map` order); enumeration runs on one thread when a callback is set. `testGitHub2597` is not in the ratchet because its last step relies on the enumeration taking over 3 s | ✅ | upstream `rough_test.py` resonance tests 7/7 (+5 in `nbWrap`) incl. crambin (72 structures, 56 groups, single- and multi-threaded); `test_resonance.py` |
 | 21b | Force-field framework (`forcefield::ForceField`: contributions, fixed points, BFGS minimization with the upstream gradient scaling, snapshots; positions are owned by the force field), `numerics::bfgs` (scalar path of `BFGSOpt.h`) and the UFF terms (`forcefield::uff`: parameters from `data/uff_params.tsv`, bond stretch, angle bend incl. the small-ring orders, torsion, inversion, vdW). The molecule-side atom typer/builder and the `rdForceFieldHelpers` module follow | 🟡 | every term's analytic gradient matches central differences (`forcefield::uff::tests`); not yet compared with RDKit energies. Upstream's batched `InversionContribs` and distance cache are not ported (same values, different summation order) |
@@ -201,12 +201,12 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 91 | Reaction enumeration (`chem_reactions::enumerate`: Cartesian, random, random-all-BBs and even-pairs strategies with libc++/boost-faithful `minstd_rand` sampling, `removeNonmatchingReagents`, `EnumerateLibrary`); Python `EnumerateLibrary[Base]`, `EnumerationParams`, `*Strategy` classes. Boost-archive serialization (`Serialize`, `GetState`, `SetState`) not ported: `EnumerateLibraryCanSerialize()` is False | 🟡 | `tests/reaction_enumeration.rs`; upstream `testEnumerations.py` 11/11 |
 | 92 | small API details: `GetNumAtoms(onlyHeavy)` hand-over to `onlyExplicit`, `ROMol.cpp` source/line in range errors, `RingInfo.AreRingFamiliesInitialized`, `_HasSubstructMatchStr`, text-mode check for writer streams | ✅ | `tests/python/test_small_api_fixes.py`; upstream `rough_test.py` +10 |
 | 93 | `ExplicitBitVect` atom properties (`RDValue::BitVect`, `Atom.SetExplicitBitVectProp`/`GetExplicitBitVectProp`) and `HasBitVectPropWithValueQueryAtom` (Tanimoto-distance tolerance); not picklable, as upstream | ✅ | `tests/python/test_bitvect_props.py`; upstream `rough_test.py` +3 |
-| 94 | InChI foundations (`external::inchi`, port of InChI 1.07.3, MIT; `external::inchi_api`, RDKit `External/INCHI-API`): license audit and port plan (docs/INCHI_PORT.md), InChIKey (`GetINCHIKeyFromINCHI`, `CheckINCHIKey`, base-26, own SHA-256), `InchiToInchiKey`, `GetInchiVersion`; Python `rdinchi` (full surface; `MolToInchi`, `MolBlockToInchi`, `InchiToMol`, `MolToInchiKey` raise `NotImplementedError`) and provisional `Chem.inchi` (`INCHI_AVAILABLE = False`) | 🟡 | `tests/inchi.rs`, `tests/python/test_inchi.py`, fixture `tests/data/inchi_corpus.jsonl`; differential `inchikey` 588/588; upstream `testMolStandardize.py` now imports (+40), ratchet +41 |
+| 94 | InChI foundations (`external::inchi`, port of InChI 1.07.3, MIT; `external::inchi_api`, RDKit `External/INCHI-API`): license audit and port plan (docs/INCHI_PORT.md), InChIKey (`GetINCHIKeyFromINCHI`, `CheckINCHIKey`, base-26, own SHA-256), `InchiToInchiKey`, `GetInchiVersion`; Python `rdinchi` | ✅ | first InChI step; the rest of the port is stages 125–278 and 281, see the InChI section below |
 | 48 | MolBundle substructure matching (`graphmol::mol_bundle::substruct_match_*` for bundle subjects and queries); Python `MolBundle.HasSubstructMatch/GetSubstructMatch(es)` and `Mol.*SubstructMatch*` with a bundle query (also with `SubstructMatchParameters`), `FixedMolSizeMolBundle`, `MolBundleCanSerialize` (False: no Boost serialization, so no pickles / `ToBinary`) | ✅ | upstream `rough_test.py` testMolBundles1-3, testSubstructParametersBundles(2) |
 | 47c | SynthonSpaceSearch shape search and shape building (`synthon_space_search::{shape, shape_build, shape_input}`): `SynthonShapeInput` with dummy volumes and Boost-text (de)serialisation of `ShapeInput` (byte-exact for upstream `.spc` files), sample-molecule trimming, stereoisomer + conformer generation (default ETKDGv3 or user generator), per-synthon shapes built on several threads with resume and interim files, fragment/synthon pre-computed overlays, shape hit building and verification (excluded volumes, conformer expansion); `StereoisomerEnumerator` now supports `tryEmbedding`; Python `ShapeSearch` (+ possible-hits lines), `BuildSynthonShapes`, `ConvertTextToDBFile` with fingerprints and shapes | ✅ | upstream `testSynthonSpaceSearch.py`: 17 pass, `testExcludedVolume` is Linux-only upstream (skipped); catch test "Shape Small test" ported |
 | 47b | SynthonSpaceSearch fingerprint search (synthon fingerprints built on demand, add/subtract fingerprints, approximate similarity) and RASCAL search; Python `FingerprintSearch`, `RascalSearch` (+ `Incremental` and possible-hits line variants), `BuildSynthonFingerprints` | ✅ | upstream `testSynthonSpaceSearch.py`: 13 of 16 pass (rest need shapes) |
 | 47a | SynthonSpaceSearch core (`graphmol::synthon_space_search`): synthon/synthon-set model, text and binary `.spc` reading and writing, query fragmentation, substructure search (incl. extended queries, incremental callback, possible-hits files, hit filters); Python `rdoxide.Chem.rdSynthonSpaceSearch` (params, results, `SynthonSpace`). Fingerprint, RASCAL and shape searches follow in 47b/47c | ✅ | upstream `testSynthonSpaceSearch.py`: the 8 substructure/IO tests pass |
-| 7–13 | see PLAN.md | ⬜ | |
+| 7–13 | later PLAN.md stages (see the rows above and PLAN.md) | 🟡 | not done: AvalonTools, CoordGen, FreeSASA, YAeHMOP, pubchem_shape (`rdShapeAlign`), Qt drawing (`rdMolDraw2DQt`), binary CDX reading and CDXML writing; each needs third-party sources or libraries |
 | 94 | Pharmacophore packages copied from upstream (`Chem.Pharm2D`, `Chem.FeatMaps`, `Chem.Pharm3D`: pure Python on the native ChemicalFeatures, DataStructs, Geometry and DistanceGeometry); `FreeChemicalFeature` is a subclassable class with a `__dict__` (`FeatMapPoint` derives from it) | ✅ | upstream `UnitTest*` of the three packages 51/53 (`Pharm3D/UnitTestEmbed` needs stage 95) |
 | 95 | Pure-Python `ML` helpers copied from upstream: `ML.Data` (Stats, Quantize, SplitData, MLData, ...), `ML.Scoring`, `ML.Descriptors`, `ML.SLT`, `MatOps`, `files` | ✅ | upstream `rdkit/ML/**/UnitTest*.py` 67/71 (the rest skip) |
 | 96 | Pure-Python `utils` (list, file and chem helpers), `Dbase` (DB connection, results, storage utils on sqlite) and `VLib` (node pipeline) copied from upstream | ✅ | upstream `UnitTest*` of the three packages 43/43; `UnitTestBitRanker` now runs |
@@ -221,176 +221,176 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 105 | Native `rdoxide.Numerics.rdAlignment.GetAlignmentTransform` (points as arrays, sequences or `Point3D`), pure-Python `sping` and `Chem.Subshape` copied from upstream | ✅ | upstream `testAlignment.py` 5/5, `UnitTestSubshape` 2/2; `testMolAlign.py` now loads (O3A functions are missing: 8/20) |
 | 106 | `graphmol::descriptors::dclv` (Shrake-Rupley surface area, volume, polar and partial variants, compactness, packing density, surface points) with the 320 standard dots generated from `DCLV_dots.h`; Python `rdMolDescriptors.DoubleCubicLatticeVolume` | ✅ | upstream `testMolDescriptors.py` `testDCLV` (1mup protein, ligand, TZL model: all values); `tests/python/test_dclv.py` closed-form sphere |
 | 107 | `file_parsers::property_lists` (`createAtom/Bond{Int,Double,Bool,String}PropertyList` with missing-value marker and line wrapping) and the `rdmolops._TestSetProps` test helper; Python `Create*PropertyList` | ✅ | upstream `testPropertyLists.py` 5/5; `tests/python/test_property_lists.py` |
-| 108 | SetQuery/ExpandQuery(None) ValueError (testGithub8877) | done |
-| 109 | Boost numeric-overflow text in Get{Int,Unsigned}Prop errors (testGetSetProps) | done |
-| 110 | Non-str property names raise TypeError 'Python argument types' (testGithub4570) | done |
-| 111 | rdBase.streambuf wrapper for Python file objects (test69) | done |
-| 112 | Chem.HasChemDrawCDXSupport() (reports False; test_cdxml test_formats) | done |
-| 113 | ScaffoldNetwork pickle compatible with upstream's Boost text archive (testPickleScaffoldNetwork) | done |
-| 114 | O3A (`mol_align_o3a`: MolHistogram, LAP, SDM, O3A; MMFF and Crippen schemes) and Python GetO3A, GetCrippenO3A, GetO3AForProbeConfs, GetCrippenO3AForProbeConfs, O3A | done |
-| 115 | CDXML reading (`file_parsers::cdxml`: XML reader, fragments, fusing, stereo groups, queries, schemes) with Python MolsFromCDXML/MolsFromCDXMLFile/CDXMLParserParams/CDXMLFormat/MolToCDXMLBlock and ReactionsFromCDXMLFile/Block (CDX binary and writing not supported) | done |
-| 116 | Enumeration strategy Initialize reads reagent list sizes instead of copying every molecule (20 ms -> 0.8 ms for 71k reagents) | done |
-| 117 | `Chem.MolToJSON`, `MolsToJSON`, `JSONToMols` and the JSON parameter classes re-exported from `rdMolInterchange` as upstream's Chem does | done |
-| 118 | Bonds with a complex bond type query contribute 0 to the valence, as `QueryBond::getValenceContrib` (SetHybridization/Compute2DCoords on SMARTS molecules) | done |
-| 119 | `rdChemReactions.Compute2DCoordsForReaction` (`chem_reactions::depict`, identical coordinates to RDKit) | done |
+| 108 | SetQuery/ExpandQuery(None) ValueError (testGithub8877) | ✅ |  |
+| 109 | Boost numeric-overflow text in Get{Int,Unsigned}Prop errors (testGetSetProps) | ✅ |  |
+| 110 | Non-str property names raise TypeError 'Python argument types' (testGithub4570) | ✅ |  |
+| 111 | rdBase.streambuf wrapper for Python file objects (test69) | ✅ |  |
+| 112 | Chem.HasChemDrawCDXSupport() (reports False; test_cdxml test_formats) | ✅ |  |
+| 113 | ScaffoldNetwork pickle compatible with upstream's Boost text archive (testPickleScaffoldNetwork) | ✅ |  |
+| 114 | O3A (`mol_align_o3a`: MolHistogram, LAP, SDM, O3A; MMFF and Crippen schemes) and Python GetO3A, GetCrippenO3A, GetO3AForProbeConfs, GetCrippenO3AForProbeConfs, O3A | ✅ |  |
+| 115 | CDXML reading (`file_parsers::cdxml`: XML reader, fragments, fusing, stereo groups, queries, schemes) with Python MolsFromCDXML/MolsFromCDXMLFile/CDXMLParserParams/CDXMLFormat/MolToCDXMLBlock and ReactionsFromCDXMLFile/Block (CDX binary and writing not supported) | ✅ |  |
+| 116 | Enumeration strategy Initialize reads reagent list sizes instead of copying every molecule (20 ms -> 0.8 ms for 71k reagents) | ✅ |  |
+| 117 | `Chem.MolToJSON`, `MolsToJSON`, `JSONToMols` and the JSON parameter classes re-exported from `rdMolInterchange` as upstream's Chem does | ✅ |  |
+| 118 | Bonds with a complex bond type query contribute 0 to the valence, as `QueryBond::getValenceContrib` (SetHybridization/Compute2DCoords on SMARTS molecules) | ✅ |  |
+| 119 | `rdChemReactions.Compute2DCoordsForReaction` (`chem_reactions::depict`, identical coordinates to RDKit) | ✅ |  |
 | 120 | `Chem.MolFromPNGFile/String`, `MolsFromPNGFile/String`, `MolMetadataToPNGFile/String`, `AddMetadataToPNGFile/String`, `MetadataFromPNGFile/String` and `PNGMetadataParams` (`file_parsers::png`: tEXt/zTXt chunks with a built-in inflate and stored-block zlib writer, CRC32, pickle/CXSMILES/mol block tags) | ✅ | Python tests; upstream `rough_test.py` testMolFromPNG, testMolsFromPNG, testMolToPNG, testMetadataToPNG |
 | 121 | `rdMolDescriptors.GetAtomFeatures` (`descriptors::atom_feat`: the 49/52 one-hot atom features of AtomFeat.cpp) | ✅ | Python tests against values from RDKit 2026.09.1 |
 | 122 | `rdFingerprintGenerator.FingerprintGenerator32`: the class exists as upstream's `no_init` class; no API returns a 32-bit generator (all `Get*Generator` return 64-bit ones) | ✅ | Python tests |
 | 123 | `Chem.MaeMolSupplier` (file name, binary file object e.g. `gzip.open`, `SetData`, iteration, `len`, indexing, `reset`): `file_parsers::mae_reader` reads the Maestro format (typed properties, indexed blocks parsed lazily, `maeparser` error messages with line and column) and `mae_mol_supplier` builds molecules (atom/bond/PDB/stereo labels, reserved atomic numbers). Identical to RDKit 2026.09.1 on all `FileParsers/test_data/*.mae*` files | ✅ | Python tests; upstream `rough_test.py` testMae*Supplier* (6) |
 | 124 | `Chem.MaeWriter` (file name or text file object, `SetProps`, `write`, `flush`, `close`, `NumMols`, static `GetText`; `file_parsers::mae_writer` with `maeparser`'s block layout: typed property groups, indexed atom and bond blocks, `<>` for undefined values, quoting rules, atom-numbering chirality labels, kekulization and 2D coordinates when needed). Output identical to RDKit 2026.09.1 on 152 of 153 molecules (the other differs by 3D embedding noise) | ✅ | Python tests; upstream `rough_test.py` testMaeWriter* (4) |
 | 125 | InChI port stage I1a: `external::inchi::ichisort` (`inchi_qsort`, `insertions_sort*`, neighbor-list comparisons, `iisort`), `ichierr` (error codes, `ErrMsg`, `AddErrorMessage`) and `util` (the element table `ElData`, generated by `tools/gen_inchi_eldata.py`, with the symbol/number/valence/mass helpers, `get_num_H`, `extract_charges_and_radicals`, `extract_H_atoms`), translated literally from InChI 1.07.3 `ichisort.c`, `ichierr.c` and `util.c`; the InChI sources are fetched with `tools/sync_upstream.py fetch` (pinned). Checked against the C code on 372 sort cases including the order of tied elements, 300 message sequences and 7171 element-helper cases (`tools/inchi_sort_reference.py`, `tools/inchi_err_reference.py`, `tools/inchi_util_reference.py`, `tests/inchi_utils.rs`). The comparators that need the canonicalization globals follow with their data model | 🟡 | `crates/rdoxide/tests/inchi_utils.rs` |
-| 126 | InChI I1b: `inpdef` (`inp_ATOM`, ATT_* flags) and `ichiring` (queue, smallest ring through a bond, 3-membered ring test), tested against the C code on 400 random graphs | done |
-| 127 | InChI I1c: the `inp_ATOM` helpers of `util` (bonds to metals, explicit H, ion groups, `nNoMetal*`), tested against the C code on 500 random atom arrays | done |
-| 128 | InChI I1d: the string helpers of `util` (normalize/trim/delimiter reading, InChI and AuxInfo extraction, case-insensitive compare, removed-protons text), tested against the C code on 600 random strings; `util` is complete | done |
-| 129 | InChI I1e: `ichi_io` (string/file streams, line readers, growing print buffer, record header), tested against the C code on 600 random inputs | done |
-| 130 | InChI I2a: `ichiparm::set_common_options_by_parg` (all option names and flags), tested against the C function on 568 cases; stage I1 closed (plain structs come with their first users) | done |
-| 131 | InChI I2b: `parse_options_string` (Windows-style quoting of the InChI option string), tested against the C function on 600 strings | done |
-| 132 | InChI I2c: `ReadCommandLineParms` of the library build with `INPUT_PARMS`, tested against the C function on 700 argument lists | done |
-| 133 | InChI I2d: the standardness-enforcement block of `GetINCHIEx` (`enforce_std_format`), tested against the C code on 600 option states | done |
-| 134 | InChI I2e: `inchi_dll` input conversion (`SetAtomProperties`, `SetBondProperties`, `SetAtomAndBondProperties`, `SetNumImplicitH`, the `ExtractOneStructure` loop, `WriteCoord`), tested against the C code on 1200 molecules incl. invalid input | done |
-| 135 | InChI I2f: `Extract0DParities` with the bond-parity reconciliation of `ichister`, tested against the C code on 1500 molecules with valid and invalid 0D descriptors | done |
-| 136 | InChI I2g: `InpAtom0DToInchiAtom` (inp_ATOM with parities back to inchi_Atom/inchi_Stereo0D), tested against the C code on 1500 molecules | done |
-| 137 | InChI I2h: RDKit's input side of `MolToInchi` (`rCleanUp`, `fixOptionSymbol`, `inchi_Atom`/`inchi_Stereo0D` from a molecule), checked against the AuxInfo of the reference corpus and hand-written stereo/isotope cases | done |
-| 138 | InChI I3a: `strutil` drawing corrections (non-uniformly drawn oxoanions and amidinium cations, doublet-radical neighbor, `nFindOneOM`), tested against the C code on 1500 atom arrays | done |
-| 139 | done |
-| 140 | done |
-| 141 | done |
-| 142 | done |
-| 143 | done |
-| 144 | done |
-| 145 | done |
-| 146 | done |
-| 147 | done |
-| 148 | done |
-| 149 | done |
-| 150 | done |
-| 151 | done |
-| 152 | done |
-| 153 | done |
-| 154 | done |
-| 155 | done |
-| 156 | done |
-| 157 | done |
-| 158 | done |
-| 159 | done |
-| 160 | done |
-| 161 | done |
-| 162 | done |
-| 163 | done |
-| 164 | done |
-| 165 | done |
-| 166 | done |
-| 167 | done |
-| 168 | done |
-| 169 | done |
-| 170 | done |
-| 171 | done |
-| 172 | done |
-| 173 | done |
-| 174 | done |
-| 175 | done |
-| 176 | done |
-| 177 | done |
-| 178 | done |
-| 179 | done |
-| 180 | done |
-| 181 | InChI I5h: ichister stereo geometry helpers (get_z_coord, triple products, Get2DTetrahedralAmbiguity, plane tests) verified on 4000 cases vs the C code |
-| 182 | InChI I5i: ichister stereocenter/stereobond candidate checks (bCanInpAtomBeAStereoCenter, can_be_a_stereo_bond_with_isotopic_H, bIsOxide, half_stereo_bond_action, ...) verified on 6000 random atom graphs vs the C code |
-| 183 | InChI I5j: ichister half_stereo_bond_parity + GetHalfStereobond0DParity verified on 8000 random neighborhoods vs the C code |
-| 184 | InChI I5k: ichister set_stereo_bonds_parity + FixSb0DParities + SpAtom verified on 6000 random molecules vs the C code |
-| 185 | InChI I5l: ichister set_stereo_parity, set_stereo_atom_parity, GetStereocenter0DParity verified on 8000 random molecules vs the C code |
-| 186 | InChI I6c: ichicans sp_ATOM parity bookkeeping (Set/Remove stereo bond, GetStereoBondParity, GetPermutationParity, GetStereoCenterParity, HalfStereoBondParity) verified on 5000 random tables vs the C code |
-| 187 | InChI I6d: ichicans UnmarkNonStereo, Fill(All|Single)StereoDescriptors, InvertStereo, SwitchAtomStereoAndIsotopicStereo verified on 5000 random tables vs the C code |
-| 188 | InChI I6e: ichicans SetKnown/MarkKnownEqual/RemoveKnownNonStereo bond parities verified on 6000 random molecules vs the C code |
-| 189 | InChI I6f: ichicans SetKnown/MarkKnownEqual/RemoveKnownNonStereo center parities and FillOutStereoParities verified on 6000 random molecules vs the C code |
-| 190 | InChI I6g: ichimap rank refinement (CreateNeighList, SetNewRanksFromNeighLists*, DifferentiateRanks*, BreakAllTies, CompAtomInvariants2) verified on 3000 random graphs vs the C code |
-| 191 | InChI port I6h: ichimap1 stereo mapping helpers (All_SC_Same, Next_SB_At_CanonRanks2, CompareLinCtStereo*, nGetMcr, CUR_TREE) with differential test against the C code |
-| 192 | InChI port I6i: ichimap2 mapping functions (NumberOfTies, map_an_atom2, parity_of_mapped_atom2/half_bond) with differential test against the C code |
-| 193 | InChI port I6j: ichimap2 BreakNeighborsTie, CheckNextSymmNeighborsAndBonds, CreateCheckSymmPaths with differential test against the C code |
-| 194 | InChI port I6k: ichimap2 CalculatedPathsParitiesAreIdentical with differential test against the C code |
-| 195 | InChI port I6l: ichimap2 RemoveCalculatedNonStereo (bond and center parts) with differential test against the C code; ichimap2 complete |
-| 196 | InChI port I6m: ichimap4 map_stereo_bonds4 and map_stereo_atoms4 with differential test against the C code; ichimap complete |
-| 197 | InChI port I6n: first part of ichican2 (partitions, cells, node sets, PartitionColorVertex) with differential test against the C code |
-| 198 | InChI port I6o: ichican2 connection table fill, compare and copy with differential test against the C code |
-| 199 | InChI port I6p: ichican2 SetInitialRanks2, FillOutAtomInvariant2 and Clean* helpers with differential test against the C code |
-| 200 | InChI port I6q: ichican2 CanonGraph (canonical numbering search) with differential test against the C code |
-| 201 | InChI port I6r: FixCanonEquivalenceInfo, make_iso_sort_key, ATOM_SIZES and canon flags with differential test against the C code |
-| 202 | InChI port I6s: ichican2 GetBaseCanonRanking (base, fixed-H and isotopic canonical numbering) with differential test against the C code |
-| 203 | InChI port I6t: ichicano GetCanonLengths, FillIsotopicAtLinearCT, FillTautLinearCT2, UpdateFullLinearCT and CANON_STAT with differential test against the C code |
-| 204 | InChI port I6u: ichicano AllocateCS, Canon_INChI3 and Canon_INChI with differential test against the C code |
-| 205 | ichimake started: inp2spATOM, CompareHillFormulas(NoH), set_atom_iso_sort_keys; ichi_bns complete |
-| 206 | INChI result structures (module ichi); CompINChI2/TautVsNonTaut/stereo comparators of ichimake |
-| 207 | CompINChILayers, MarkUnusedAndEmptyLayers, INChI_SegmentAction, Eql_INChI_Stereo |
-| 208 | GetDfsOrder4CT, mystrrev of ichimake |
-| 209 | ichimak2 started: Hill formula, stereo copy to INChI_Stereo, ambiguous stereo marking |
-| 210 | FillOutINChI: canonicalization result to INChI/INChI_Aux |
-| 211 | CheckCanonNumberingCorrectness (ichimake) |
-| 212 | InChI port I7h: `Create_INChI` orchestrator (ichimake), differential-tested on 3000 inputs vs the C library; fixes map_stereo length write-back |
-| 213 | InChI port I7i: `CompareReversedINChI`, `CompareReversedStereoINChI(2)` + ICR lists, differential-tested on 4000 pairs vs the C library |
-| 214 | InChI port I7j: `CompareReversedINChI2` + full `ICR` and `CompareIcr`, differential-tested vs the C library |
-| 215 | InChI port I7k: `Alloc_INChI*`, `GetProcessingWarnings*`, `CreateOneComponentINChI`, differential-tested on 3000 molecules vs the C library |
-| 216 | InChI port I7l: `CreateOneStructureINChI`, `GetOneComponent`, error classification; differential-tested on 4000 structures vs the C library |
-| 217 | InChI port I8a: `ichiprt2` (Make*String, Eql_INChI_Aux_*), differential-tested on 9000 inputs vs the C library |
-| 218 | InChI port I8b: `EquString` + first `ichiprt3` str_* layers, differential-tested on 6000 structures vs the C library |
-| 219 | InChI port I8c: `ichiprt3` stereo and isotopic str_* layers, differential-tested on 7000 structures vs the C library |
-| 220 | InChI port I9a: Molfile field reader and V2000 header/counts/atoms/bonds readers, differential-tested on 3900 cases vs the C library |
-| 221 | InChI port I9b: Molfile property block, S-groups, pseudo-elements and V2000 driver, differential-tested on 2200 molfiles vs the C library |
-| 222 | InChI port I9c: V3000 Molfile reader wired into the Molfile driver, differential-tested on 3449 fuzzed V3000 molfiles vs the C library |
-| 223 | InChI port I9d: ReadMolfile and the SD-file data readers of mol_fmt4, differential-tested on 2286 molfiles vs the C library |
-| 224 | InChI port I9e: mol2atom (Molfile to inp_ATOM, valences, polymer and V3000 containers), differential-tested on 2281 molfiles vs the C library |
-| 225 | InChI port I9f: molfile text to InChI string pipeline (option parsing, GetOneStructure, ProcessOneStructureEx, output assembly), differential-tested on 2990 molfiles vs the C library |
-| 226 | InChI port I9g: GetINCHI/GetStdINCHI (ExtractOneStructure, option summary log), differential-tested on 2998 inchi_Input structures vs the C library |
-| 227 | InChI port I9h: MolToInchi, MolBlockToInchi and MolToInchiKey wired to the InChI port, exact on the 539-record official-RDKit corpus |
-| 228 | InChI port I10a: ichiread /q and /p layers, delimited numbers, segment reader, differential-tested on 9786 cases vs the C library |
-| 229 | InChI port I10b: ichiread ParseSegmentFormula differential-tested vs the C library (12686 reader cases); polymer molfiles end with an error instead of a panic |
-| 230 | InChI port I10c: ichiread ParseSegmentConnections (plain and compressed), differential-tested vs the C library |
-| 231 | InChI port I10d: ichiread ParseSegmentMobileH with tautomeric groups, differential-tested vs the C library |
-| 232 | InChI port I10e: ichiread stereo layers (ParseSegmentSp2/Sp3/Sp3m/Sp3s) and CopySegment, differential-tested vs the C library |
-| 233 | InChI port I10f: ichiread ParseSegmentIsoAtoms/IsoExchgH/Perm, differential-tested vs the C library |
-| 234 | InChI port I10g: ichiread ReadInChILine (whole InChI string reader), differential-tested vs the C library |
-| 235 | InChI port I10h: ichiread InChILine2Data post-processing (omitted stereo/H/proton layers, balances), differential-tested vs the C library |
-| 236 | InChI port I10i: ichiread SetProtonsAndXchgIsoH, DetectInpInchiCreationOptions, RemoveFixHInChIIdentical2MobH, MarkDisconectedIdenticalToReconnected, differential-tested vs the C library |
-| 237 | InChI port I11a: restoration types, GetAtomRestoreInfo, t-group info from InChI (differential vs C) |
-| 238 | InChI port I11b: BondFlowMaxcapMinorder, AtomStcapStflow, RegisterTCGroup, edge lists (differential vs C) |
-| 239 | InChI port I11c: nCountBnsSizes, nAddSuperCGroups (differential vs C) |
-| 240 | InChI port I11d: AllocateAndInitTCGBnStruct, AddTGroups2/AddCGroups2TCGBnStruct, metal flower (differential vs C) |
-| 241 | InChI port I11e: EvaluateChargeChanges, RunBnsTestOnce/RestoreOnce, charge flower edge (differential vs C) |
-| 242 | InChI port I11f: explicit terminal H connect/disconnect (differential vs C) |
-| 243 | InChI port I11g: ichirvr2 RestoreAtomConnectionsSetStereo and stereo bond types (differential vs C) |
-| 244 | InChI port I11h: ichirvr2 CopyBnsToAtom (differential vs C) |
-| 245 | InChI port I11i: ichirvr2 MoveRadToAtomsAddCharges (differential vs C) |
-| 246 | InChI port I11j: ichirvr2 AdjustTgroupsToForbiddenEdges2 (differential vs C) |
-| 247 | InChI port I11k: RearrangePlusMinusEdgesFlow, IncrementZeroOrderBondsToHeteroat, ForbidCarbonChargeEdges |
-| 248 | InChI port I11l: MovePlusFromS2DiaminoCarbon, EliminateChargeSeparationOnHeteroatoms, BFS queue |
-| 249 | InChI port I11m: RestoreCyanoGroup, RestoreIsoCyanoGroup |
-| 250 | InChI port I11n: FixMetal_Nminus_Ominus, RestoreNNNgroup |
-| 251 | InChI port I11o: EliminateNitrogen5Val3Bonds, Convert_SIV_to_SVI, PlusFromDB_N_DB_O_to_Metal |
-| 252 | InChI port I11p: MoveMobileHToAvoidFixedBonds, RemoveRadFromMobileHEndpoint |
-| 253 | InChI port I11q: RemoveRadFromMobileHEndpointFixH |
-| 254 | InChI port I11r: MoveChargeToMakeCenerpoints — ichirvr2 complete |
-| 255 | InChI port I11s: ichirvr4 FixLess/MoreHydrogenInFormula, FixRemoveExtraTautEndpoints, ForbidNintrogenPlus2BondsInSmallRings |
-| 256 | InChI port I11t: ichirvr4 MoveChargeToRemoveCenerpoints, MakeSingleBondsMetal2ChargedHeteroat |
-| 257 | InChI port I11u: SaltBondsToCoordBonds, GetPlusMinusVertex (new module ichirvr5) |
-| 258 | InChI port I11v: ichirvr4 CheckAndRefixStereobonds, FillOutExtraFixedHDataInChI |
-| 259 | InChI port I11w: ichirvr4 FillOutCMP2FHINCHI, FillOutCMP2MHINCHI |
-| 260 | InChI port I11x: ichirvr1 MakeOneInChIOutOfStrFromINChI, MakeOneInChIOutOfStrFromINChI2 |
-| 261 | InChI port I11y: ichirvr3 FixFixedHRestoredStructure, FillTgDiffHChgFH, bHas_N_V |
-| 262 | InChI port I11z: ichirvr5 FixMobileHRestoredStructure, bIsUnsatCarbonInASmallRing |
-| 263 | InChI port I12a: ichirvr7 AddOneMsg, FillOutCompareMessage, RemoveFixHInChIIdentical2MobH, MarkDisconectedIdenticalToReconnected |
-| 264 | InChI port I12b: ichirvr7 CompareReversedINChI3, CompareReversedStereoINChI3, CompareTwoPairsOfInChI |
-| 265 | InChI port I12c: ichirvr1 MakeInChIOutOfStrFromINChI2; ichirvr4 MakeProtonComponent, AddRemProtonsInRestrStruct, AddRemIsoProtonsInRestrStruct |
-| 266 | | I12d | `ichirvr6`: `FixRestoredStructureStereo` (cases 01-06; compiled only) | done | |
-| 267 | | I12e | `ichirvr4`: `NormalizeAndCompare` (compiled only) | done | |
-| 268 | | I12f | `ichirvr4`: `RunBnsRestore1` (compiled only) | done | |
-| 269 | | I12g | `ichirvr4`: `RestoreAtomMakeBNS`, `OneInChI2Atom` (compiled only) | done | |
-| 270 | | I12h | `ichirvr7`: `InChI2Atom` (compiled only) | done | |
-| 271 | | I12i | `ichirvr7`: `MergeStructureComponents` (compiled only) | done | |
-| 272 | | I12j | `ichirvr7`: `AllInchiToStructure`; first end-to-end restore test (33 InChI round trip) | done | |
-| 273 | | I12k | `ichirvr7`: `AddProtonAndIsoHBalanceToMobHStruct` (exercised by the round-trip test) | done | |
-| 274 | | I12l | `ichirvr7`: `CompareOneOrigInchiToRevInChI`, `CompareAllOrigInchiToRevInChI` | done | |
-| 275 | | I12m | `ichirvr7`: `CompareAllDisconnectedOrigInchiToRevInChI` (compiled; trivial path tested) | done | |
-| 276 | | I12n | `ichirvr7`: `ConvertInChI2Struct` (tested on 5 InChI + a mismatch) | done | |
-| 277 | | I12o | `inchi_dll_c`: `CheckINCHI`, `ReadWriteInChI` (API path), `GetStructFromINCHI(Ex)`; 28 InChI round trip | done | |
+| 126 | InChI I1b: `inpdef` (`inp_ATOM`, ATT_* flags) and `ichiring` (queue, smallest ring through a bond, 3-membered ring test) | ✅ | tested against the C code on 400 random graphs |
+| 127 | InChI I1c: the `inp_ATOM` helpers of `util` (bonds to metals, explicit H, ion groups, `nNoMetal*`) | ✅ | tested against the C code on 500 random atom arrays |
+| 128 | InChI I1d: the string helpers of `util` (normalize/trim/delimiter reading, InChI and AuxInfo extraction, case-insensitive compare, removed-protons text) | ✅ | tested against the C code on 600 random strings; `util` is complete |
+| 129 | InChI I1e: `ichi_io` (string/file streams, line readers, growing print buffer, record header) | ✅ | tested against the C code on 600 random inputs |
+| 130 | InChI I2a: `ichiparm::set_common_options_by_parg` (all option names and flags) | ✅ | tested against the C function on 568 cases; stage I1 closed (plain structs come with their first users) |
+| 131 | InChI I2b: `parse_options_string` (Windows-style quoting of the InChI option string) | ✅ | tested against the C function on 600 strings |
+| 132 | InChI I2c: `ReadCommandLineParms` of the library build with `INPUT_PARMS` | ✅ | tested against the C function on 700 argument lists |
+| 133 | InChI I2d: the standardness-enforcement block of `GetINCHIEx` (`enforce_std_format`) | ✅ | tested against the C code on 600 option states |
+| 134 | InChI I2e: `inchi_dll` input conversion (`SetAtomProperties`, `SetBondProperties`, `SetAtomAndBondProperties`, `SetNumImplicitH`, the `ExtractOneStructure` loop, `WriteCoord`) | ✅ | tested against the C code on 1200 molecules incl. invalid input |
+| 135 | InChI I2f: `Extract0DParities` with the bond-parity reconciliation of `ichister` | ✅ | tested against the C code on 1500 molecules with valid and invalid 0D descriptors |
+| 136 | InChI I2g: `InpAtom0DToInchiAtom` (inp_ATOM with parities back to inchi_Atom/inchi_Stereo0D) | ✅ | tested against the C code on 1500 molecules |
+| 137 | InChI I2h: RDKit's input side of `MolToInchi` (`rCleanUp`, `fixOptionSymbol`, `inchi_Atom`/`inchi_Stereo0D` from a molecule) | ✅ | checked against the AuxInfo of the reference corpus and hand-written stereo/isotope cases |
+| 138 | InChI I3a: `strutil` drawing corrections (non-uniformly drawn oxoanions and amidinium cations, doublet-radical neighbor, `nFindOneOM`) | ✅ | tested against the C code on 1500 atom arrays |
+| 139 | InChI port I3b: ion pairs and odd things | ✅ |  |
+| 140 | InChI port I3c: bond removal | ✅ |  |
+| 141 | InChI port I3d: ammonium and metal salts | ✅ |  |
+| 142 | InChI port I3e: metal disconnection | ✅ |  |
+| 143 | InChI port I3f: terminal hydrogens | ✅ |  |
+| 144 | InChI port I3g: connected components | ✅ |  |
+| 145 | InChI port I3h: PreprocessOneStructure | ✅ |  |
+| 146 | InChI port I4a: ring systems | ✅ |  |
+| 147 | InChI port I4b: tautomer endpoints | ✅ |  |
+| 148 | InChI port I4c: charge groups and salt types | ✅ |  |
+| 149 | InChI port I4d: balanced network structure | ✅ |  |
+| 150 | InChI port I4e: balanced network search | ✅ |  |
+| 151 | InChI port I4f: network growth helpers | ✅ |  |
+| 152 | InChI port I4g: alternating path check setup | ✅ |  |
+| 153 | InChI port I4h: flow to bond transfer | ✅ |  |
+| 154 | InChI port I4i: radical endpoints | ✅ |  |
+| 155 | InChI port I4j: atom charge types | ✅ |  |
+| 156 | InChI port I4k: charge and H changes from alt paths | ✅ |  |
+| 157 | InChI port I4l: alternating path existence check | ✅ |  |
+| 158 | InChI port I4m: t-group and c-group vertices | ✅ |  |
+| 159 | InChI port I4n: creating and removing single groups | ✅ |  |
+| 160 | InChI port I4o: simple proton addition and removal | ✅ |  |
+| 161 | InChI port I4p: hard proton addition and removal | ✅ |  |
+| 162 | InChI port I4q: alternating bond test and marking | ✅ |  |
+| 163 | InChI port I4r: forbidden edges and fixed special bonds | ✅ |  |
+| 164 | InChI port I4s: alternating bond blocks and non-stereo marking | ✅ |  |
+| 165 | InChI port I4t: adding and removing protons of reconstructed structures | ✅ |  |
+| 166 | InChI port I4u: MarkChargeGroups | ✅ |  |
+| 167 | InChI port I4v: RegisterEndPoints and SetTautomericBonds | ✅ |  |
+| 168 | InChI port I4w: FindAccessibleEndPoints | ✅ |  |
+| 169 | InChI port I4x: MarkSaltChargeGroups2 | ✅ |  |
+| 170 | InChI port I4y: MarkSaltChargeGroups | ✅ |  |
+| 171 | InChI port I4z: MergeSaltTautGroups | ✅ |  |
+| 172 | InChI port I5a: MakeIsotopicHGroup | ✅ |  |
+| 173 | InChI port I5b: MarkTautomerGroups 1,3 rules | ✅ |  |
+| 174 | InChI port I5c: MarkTautomerGroups keto-enol | ✅ |  |
+| 175 | InChI port I5d: MarkTautomerGroups 1,5 rule | ✅ |  |
+| 176 | InChI port I5e: MarkTautomerGroups 4-pyridinol ring rule | ✅ |  |
+| 177 | InChI port I5f: MarkTautomerGroups pyrazole ring rule | ✅ |  |
+| 178 | InChI port I5g: MarkTautomerGroups tropolone ring rules | ✅ |  |
+| 179 | InChI port I6a: mark_alt_bonds_and_taut_groups driver | ✅ |  |
+| 180 | InChI port I6b: t-group counting and sorting | ✅ |  |
+| 181 | InChI I5h: ichister stereo geometry helpers (get_z_coord, triple products, Get2DTetrahedralAmbiguity, plane tests) | ✅ | verified on 4000 cases vs the C code |
+| 182 | InChI I5i: ichister stereocenter/stereobond candidate checks (bCanInpAtomBeAStereoCenter, can_be_a_stereo_bond_with_isotopic_H, bIsOxide, half_stereo_bond_action, ...) | ✅ | verified on 6000 random atom graphs vs the C code |
+| 183 | InChI I5j: ichister half_stereo_bond_parity + GetHalfStereobond0DParity | ✅ | verified on 8000 random neighborhoods vs the C code |
+| 184 | InChI I5k: ichister set_stereo_bonds_parity + FixSb0DParities + SpAtom | ✅ | verified on 6000 random molecules vs the C code |
+| 185 | InChI I5l: ichister set_stereo_parity, set_stereo_atom_parity, GetStereocenter0DParity | ✅ | verified on 8000 random molecules vs the C code |
+| 186 | InChI I6c: ichicans sp_ATOM parity bookkeeping (Set/Remove stereo bond, GetStereoBondParity, GetPermutationParity, GetStereoCenterParity, HalfStereoBondParity) | ✅ | verified on 5000 random tables vs the C code |
+| 187 | InChI I6d: ichicans UnmarkNonStereo, Fill(All/Single)StereoDescriptors, InvertStereo, SwitchAtomStereoAndIsotopicStereo | ✅ | verified on 5000 random tables vs the C code |
+| 188 | InChI I6e: ichicans SetKnown/MarkKnownEqual/RemoveKnownNonStereo bond parities | ✅ | verified on 6000 random molecules vs the C code |
+| 189 | InChI I6f: ichicans SetKnown/MarkKnownEqual/RemoveKnownNonStereo center parities and FillOutStereoParities | ✅ | verified on 6000 random molecules vs the C code |
+| 190 | InChI I6g: ichimap rank refinement (CreateNeighList, SetNewRanksFromNeighLists*, DifferentiateRanks*, BreakAllTies, CompAtomInvariants2) | ✅ | verified on 3000 random graphs vs the C code |
+| 191 | InChI port I6h: ichimap1 stereo mapping helpers (All_SC_Same, Next_SB_At_CanonRanks2, CompareLinCtStereo*, nGetMcr, CUR_TREE) | ✅ | differential test against the C code |
+| 192 | InChI port I6i: ichimap2 mapping functions (NumberOfTies, map_an_atom2, parity_of_mapped_atom2/half_bond) | ✅ | differential test against the C code |
+| 193 | InChI port I6j: ichimap2 BreakNeighborsTie, CheckNextSymmNeighborsAndBonds, CreateCheckSymmPaths | ✅ | differential test against the C code |
+| 194 | InChI port I6k: ichimap2 CalculatedPathsParitiesAreIdentical | ✅ | differential test against the C code |
+| 195 | InChI port I6l: ichimap2 RemoveCalculatedNonStereo (bond and center parts) | ✅ | differential test against the C code; ichimap2 complete |
+| 196 | InChI port I6m: ichimap4 map_stereo_bonds4 and map_stereo_atoms4 | ✅ | differential test against the C code; ichimap complete |
+| 197 | InChI port I6n: first part of ichican2 (partitions, cells, node sets, PartitionColorVertex) | ✅ | differential test against the C code |
+| 198 | InChI port I6o: ichican2 connection table fill, compare and copy | ✅ | differential test against the C code |
+| 199 | InChI port I6p: ichican2 SetInitialRanks2, FillOutAtomInvariant2 and Clean* helpers | ✅ | differential test against the C code |
+| 200 | InChI port I6q: ichican2 CanonGraph (canonical numbering search) | ✅ | differential test against the C code |
+| 201 | InChI port I6r: FixCanonEquivalenceInfo, make_iso_sort_key, ATOM_SIZES and canon flags | ✅ | differential test against the C code |
+| 202 | InChI port I6s: ichican2 GetBaseCanonRanking (base, fixed-H and isotopic canonical numbering) | ✅ | differential test against the C code |
+| 203 | InChI port I6t: ichicano GetCanonLengths, FillIsotopicAtLinearCT, FillTautLinearCT2, UpdateFullLinearCT and CANON_STAT | ✅ | differential test against the C code |
+| 204 | InChI port I6u: ichicano AllocateCS, Canon_INChI3 and Canon_INChI | ✅ | differential test against the C code |
+| 205 | ichimake started: inp2spATOM, CompareHillFormulas(NoH), set_atom_iso_sort_keys; ichi_bns complete | ✅ |  |
+| 206 | INChI result structures (module ichi); CompINChI2/TautVsNonTaut/stereo comparators of ichimake | ✅ |  |
+| 207 | CompINChILayers, MarkUnusedAndEmptyLayers, INChI_SegmentAction, Eql_INChI_Stereo | ✅ |  |
+| 208 | GetDfsOrder4CT, mystrrev of ichimake | ✅ |  |
+| 209 | ichimak2 started: Hill formula, stereo copy to INChI_Stereo, ambiguous stereo marking | ✅ |  |
+| 210 | FillOutINChI: canonicalization result to INChI/INChI_Aux | ✅ |  |
+| 211 | CheckCanonNumberingCorrectness (ichimake) | ✅ |  |
+| 212 | InChI port I7h: `Create_INChI` orchestrator (ichimake) | ✅ | differential-tested on 3000 inputs vs the C library; fixes map_stereo length write-back |
+| 213 | InChI port I7i: `CompareReversedINChI`, `CompareReversedStereoINChI(2)` + ICR lists | ✅ | differential-tested on 4000 pairs vs the C library |
+| 214 | InChI port I7j: `CompareReversedINChI2` + full `ICR` and `CompareIcr` | ✅ | differential-tested vs the C library |
+| 215 | InChI port I7k: `Alloc_INChI*`, `GetProcessingWarnings*`, `CreateOneComponentINChI` | ✅ | differential-tested on 3000 molecules vs the C library |
+| 216 | InChI port I7l: `CreateOneStructureINChI`, `GetOneComponent`, error classification | ✅ | differential-tested on 4000 structures vs the C library |
+| 217 | InChI port I8a: `ichiprt2` (Make*String, Eql_INChI_Aux_*) | ✅ | differential-tested on 9000 inputs vs the C library |
+| 218 | InChI port I8b: `EquString` + first `ichiprt3` str_* layers | ✅ | differential-tested on 6000 structures vs the C library |
+| 219 | InChI port I8c: `ichiprt3` stereo and isotopic str_* layers | ✅ | differential-tested on 7000 structures vs the C library |
+| 220 | InChI port I9a: Molfile field reader and V2000 header/counts/atoms/bonds readers | ✅ | differential-tested on 3900 cases vs the C library |
+| 221 | InChI port I9b: Molfile property block, S-groups, pseudo-elements and V2000 driver | ✅ | differential-tested on 2200 molfiles vs the C library |
+| 222 | InChI port I9c: V3000 Molfile reader wired into the Molfile driver | ✅ | differential-tested on 3449 fuzzed V3000 molfiles vs the C library |
+| 223 | InChI port I9d: ReadMolfile and the SD-file data readers of mol_fmt4 | ✅ | differential-tested on 2286 molfiles vs the C library |
+| 224 | InChI port I9e: mol2atom (Molfile to inp_ATOM, valences, polymer and V3000 containers) | ✅ | differential-tested on 2281 molfiles vs the C library |
+| 225 | InChI port I9f: molfile text to InChI string pipeline (option parsing, GetOneStructure, ProcessOneStructureEx, output assembly) | ✅ | differential-tested on 2990 molfiles vs the C library |
+| 226 | InChI port I9g: GetINCHI/GetStdINCHI (ExtractOneStructure, option summary log) | ✅ | differential-tested on 2998 inchi_Input structures vs the C library |
+| 227 | InChI port I9h: MolToInchi, MolBlockToInchi and MolToInchiKey wired to the InChI port | ✅ | exact on the 539-record official-RDKit corpus |
+| 228 | InChI port I10a: ichiread /q and /p layers, delimited numbers, segment reader | ✅ | differential-tested on 9786 cases vs the C library |
+| 229 | InChI port I10b: ichiread ParseSegmentFormula | ✅ | differential-tested vs the C library (12686 reader cases); polymer molfiles end with an error instead of a panic |
+| 230 | InChI port I10c: ichiread ParseSegmentConnections (plain and compressed) | ✅ | differential-tested vs the C library |
+| 231 | InChI port I10d: ichiread ParseSegmentMobileH with tautomeric groups | ✅ | differential-tested vs the C library |
+| 232 | InChI port I10e: ichiread stereo layers (ParseSegmentSp2/Sp3/Sp3m/Sp3s) and CopySegment | ✅ | differential-tested vs the C library |
+| 233 | InChI port I10f: ichiread ParseSegmentIsoAtoms/IsoExchgH/Perm | ✅ | differential-tested vs the C library |
+| 234 | InChI port I10g: ichiread ReadInChILine (whole InChI string reader) | ✅ | differential-tested vs the C library |
+| 235 | InChI port I10h: ichiread InChILine2Data post-processing (omitted stereo/H/proton layers, balances) | ✅ | differential-tested vs the C library |
+| 236 | InChI port I10i: ichiread SetProtonsAndXchgIsoH, DetectInpInchiCreationOptions, RemoveFixHInChIIdentical2MobH, MarkDisconectedIdenticalToReconnected | ✅ | differential-tested vs the C library |
+| 237 | InChI port I11a: restoration types, GetAtomRestoreInfo, t-group info from InChI | ✅ | differential vs C |
+| 238 | InChI port I11b: BondFlowMaxcapMinorder, AtomStcapStflow, RegisterTCGroup, edge lists | ✅ | differential vs C |
+| 239 | InChI port I11c: nCountBnsSizes, nAddSuperCGroups | ✅ | differential vs C |
+| 240 | InChI port I11d: AllocateAndInitTCGBnStruct, AddTGroups2/AddCGroups2TCGBnStruct, metal flower | ✅ | differential vs C |
+| 241 | InChI port I11e: EvaluateChargeChanges, RunBnsTestOnce/RestoreOnce, charge flower edge | ✅ | differential vs C |
+| 242 | InChI port I11f: explicit terminal H connect/disconnect | ✅ | differential vs C |
+| 243 | InChI port I11g: ichirvr2 RestoreAtomConnectionsSetStereo and stereo bond types | ✅ | differential vs C |
+| 244 | InChI port I11h: ichirvr2 CopyBnsToAtom | ✅ | differential vs C |
+| 245 | InChI port I11i: ichirvr2 MoveRadToAtomsAddCharges | ✅ | differential vs C |
+| 246 | InChI port I11j: ichirvr2 AdjustTgroupsToForbiddenEdges2 | ✅ | differential vs C |
+| 247 | InChI port I11k: RearrangePlusMinusEdgesFlow, IncrementZeroOrderBondsToHeteroat, ForbidCarbonChargeEdges | ✅ |  |
+| 248 | InChI port I11l: MovePlusFromS2DiaminoCarbon, EliminateChargeSeparationOnHeteroatoms, BFS queue | ✅ |  |
+| 249 | InChI port I11m: RestoreCyanoGroup, RestoreIsoCyanoGroup | ✅ |  |
+| 250 | InChI port I11n: FixMetal_Nminus_Ominus, RestoreNNNgroup | ✅ |  |
+| 251 | InChI port I11o: EliminateNitrogen5Val3Bonds, Convert_SIV_to_SVI, PlusFromDB_N_DB_O_to_Metal | ✅ |  |
+| 252 | InChI port I11p: MoveMobileHToAvoidFixedBonds, RemoveRadFromMobileHEndpoint | ✅ |  |
+| 253 | InChI port I11q: RemoveRadFromMobileHEndpointFixH | ✅ |  |
+| 254 | InChI port I11r: MoveChargeToMakeCenerpoints — ichirvr2 complete | ✅ |  |
+| 255 | InChI port I11s: ichirvr4 FixLess/MoreHydrogenInFormula, FixRemoveExtraTautEndpoints, ForbidNintrogenPlus2BondsInSmallRings | ✅ |  |
+| 256 | InChI port I11t: ichirvr4 MoveChargeToRemoveCenerpoints, MakeSingleBondsMetal2ChargedHeteroat | ✅ |  |
+| 257 | InChI port I11u: SaltBondsToCoordBonds, GetPlusMinusVertex (new module ichirvr5) | ✅ |  |
+| 258 | InChI port I11v: ichirvr4 CheckAndRefixStereobonds, FillOutExtraFixedHDataInChI | ✅ |  |
+| 259 | InChI port I11w: ichirvr4 FillOutCMP2FHINCHI, FillOutCMP2MHINCHI | ✅ |  |
+| 260 | InChI port I11x: ichirvr1 MakeOneInChIOutOfStrFromINChI, MakeOneInChIOutOfStrFromINChI2 | ✅ |  |
+| 261 | InChI port I11y: ichirvr3 FixFixedHRestoredStructure, FillTgDiffHChgFH, bHas_N_V | ✅ |  |
+| 262 | InChI port I11z: ichirvr5 FixMobileHRestoredStructure, bIsUnsatCarbonInASmallRing | ✅ |  |
+| 263 | InChI port I12a: ichirvr7 AddOneMsg, FillOutCompareMessage, RemoveFixHInChIIdentical2MobH, MarkDisconectedIdenticalToReconnected | ✅ |  |
+| 264 | InChI port I12b: ichirvr7 CompareReversedINChI3, CompareReversedStereoINChI3, CompareTwoPairsOfInChI | ✅ |  |
+| 265 | InChI port I12c: ichirvr1 MakeInChIOutOfStrFromINChI2; ichirvr4 MakeProtonComponent, AddRemProtonsInRestrStruct, AddRemIsoProtonsInRestrStruct | ✅ |  |
+| 266 | InChI port I12d: `ichirvr6`: `FixRestoredStructureStereo` (cases 01-06; compiled only) | ✅ |  |
+| 267 | InChI port I12e: `ichirvr4`: `NormalizeAndCompare` (compiled only) | ✅ |  |
+| 268 | InChI port I12f: `ichirvr4`: `RunBnsRestore1` (compiled only) | ✅ |  |
+| 269 | InChI port I12g: `ichirvr4`: `RestoreAtomMakeBNS`, `OneInChI2Atom` (compiled only) | ✅ |  |
+| 270 | InChI port I12h: `ichirvr7`: `InChI2Atom` (compiled only) | ✅ |  |
+| 271 | InChI port I12i: `ichirvr7`: `MergeStructureComponents` (compiled only) | ✅ |  |
+| 272 | InChI port I12j: `ichirvr7`: `AllInchiToStructure`; first end-to-end restore test (33 InChI round trip) | ✅ |  |
+| 273 | InChI port I12k: `ichirvr7`: `AddProtonAndIsoHBalanceToMobHStruct` (exercised by the round-trip test) | ✅ |  |
+| 274 | InChI port I12l: `ichirvr7`: `CompareOneOrigInchiToRevInChI`, `CompareAllOrigInchiToRevInChI` | ✅ |  |
+| 275 | InChI port I12m: `ichirvr7`: `CompareAllDisconnectedOrigInchiToRevInChI` (compiled; trivial path tested) | ✅ |  |
+| 276 | InChI port I12n: `ichirvr7`: `ConvertInChI2Struct` (tested on 5 InChI + a mismatch) | ✅ |  |
+| 277 | InChI port I12o: `inchi_dll_c`: `CheckINCHI`, `ReadWriteInChI` (API path), `GetStructFromINCHI(Ex)`; 28 InChI round trip | ✅ |  |
 | 278 | InChI: `InchiToMol` (assignBondDirs, findAlternatingBonds, cleanUp), upstream `inchi.py` + `UnitTestInchi.py` in the ratchet | ✅ | 290/290 standard corpus InChI round-trip identical; 19 new upstream tests pass |
 | 279 | Python wrapper fixes from the nbWrap rough_test follow-ups (SetStereoGroups owner check, AddConformer borrow panic, GetStringVectProp list) | ✅ | ratchet 1903/1973 (+3); remaining nbWrap failures conflict with boost Wrap tests |
 | 280 | `Chem.MolKey` copied from upstream (InchiInfo works on the InChI port; MolKey itself needs AvalonTools) | ✅ | ratchet +10 (UnitTestMolKey 10/15, the rest need Avalon) |
@@ -398,6 +398,29 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 282 | Ratchet extended with upstream testFeatures.py, DistGeom rough_test.py and VLib NodeLib tests; `FreeChemicalFeature` keyword arguments | ✅ | ratchet +13 |
 | 283 | `Chem.PandasTools`, `Chem.PandasPatcher` copied from upstream; pandas is an optional dependency (`rdoxide[pandas]`), installed in the ratchet CI job | ✅ | upstream UnitTestPandasTools 23 run, 5 skipped (ratchet +23) |
 | 284 | Python API satisfies both RDKit wrapper flavours where their tests contradict: `rdoxide._compat` (`TupleList` returned by substructure matches and `GetAtomIndices`; exceptions deriving from both OverflowError/ValueError/RuntimeError and TypeError); ratchet runner handles pytest-style files and scripts | ✅ | ratchet +13 nbWrap tests, +testGetPropDefault, +testThreads |
+
+## InChI port (summary, audited 2026-10-22)
+
+What works from Python (`rdoxide.Chem.rdinchi`, `rdoxide.Chem.inchi`, `INCHI_AVAILABLE = True`, the upstream
+`inchi.py` verbatim):
+
+| Capability | Status | Verified by | Notes |
+|------------|--------|-------------|-------|
+| `MolToInchi`, `MolToInchiAndAuxInfo`, `MolToInchiKey` with option strings (`/FixedH`, `/RecMet`, `/KET`, `/15T`, `/SUU`, `/SLUUD`, `/SNon`, ...) | ✅ | official RDKit 2026.09.1: differential `inchi` (InChI, return code, message, AuxInfo, key) 10312/10312 + 29200/29200 + 72/72 identical; `tests/data/inchi_corpus.jsonl` 588 records; upstream `UnitTestInchi` (PubChem hard set: 1162 identical, 19 reasonable variants) | |
+| `MolBlockToInchi`, `MolBlockToInchiAndAuxInfo` (InChI's own Molfile reader) | ✅ | C library: ~3000 molfiles through `MakeINCHIFromMolfileText`, fuzzed V2000/V3000 | polymer data is not processed (see below) |
+| `InchiToInchiKey`, `GetInchiVersion` | ✅ | 588/588 and 20558/20558 identical to the official wheel | version 1.07.3 |
+| `MolFromInchi`, `InchiToMol` (restoration of the structure, `cleanUp`, 0D stereo, bond directions) | ✅ | official RDKit: differential `molfrominchi` (SMILES and re-generated InChI) 10312/10312 + 29200/29200 + 72/72 identical; C `GetStructFromINCHI`: atoms, bonds, hydrogens and 0D stereo of 1576 InChI identical (`tests/inchi_getstruct.rs`); upstream `UnitTestInchi` 18/18 | InChI with keto-enol/1,5 layers (`/KET /15T`) are not restorable, as in C |
+| `MolFromInchiAndAuxInfo` | ✅ | upstream `TestMolFromInchiAndAuxInfo` | the AuxInfo is parsed by upstream's pure-Python code |
+| `Chem.MolKey.InchiInfo` | ✅ | `UnitTestMolKey` 10/15 | `MolKey` itself needs AvalonTools (not ported) |
+| Polymers (`-Polymers`, `-NPZz`, CRU folding, `/z` layer, `DetectAndExposePolymerInternals`) | ⬜ | | the options are parsed, the polymer code paths (`OAD_Polymer*`, `OutputINCHI_PolymerLayer`) are not ported; RDKit's `MolToInchi` never passes polymer data, only `MolBlockToInchi` with these options could differ |
+| Time limits (`-W`), user-quit callbacks | ⬜ | | accepted, never enforced |
+| `GetINCHIfromINCHI`, staged `INCHIGEN_*`/`STDINCHIGEN_*` API, IXA API, `mol_fmt4` SD/S-group writer, `inchi_gui`, the InChI executable | ⬜ | | not used by RDKit; not planned |
+
+How each part of the library was checked is in [INCHI_PORT.md](INCHI_PORT.md): about 120 reference generators
+(`tools/inchi_*_reference.py`) compile the C code and write fixtures (`tests/data/inchi_*.json`) that the Rust tests
+(`crates/rdoxide/tests/inchi*.rs`) must reproduce exactly, plus the end-to-end comparisons above. The restoration
+functions of `ichirvr4`–`ichirvr7` (stages 255–277) are checked only end to end (restored structures of 1576 InChI,
+round trips of the 527 corpus InChI: 519 identical, 6 `/KET /15T` ones refused by the C library too, 2 with a reconnected-metal `/r` layer that restores the disconnected structure), not function by function.
 
 ## Python package files
 
@@ -414,7 +437,9 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | `rdoxide/Chem/MolStandardize/__init__.py` | verbatim upstream |
 | `rdoxide/Chem/MolStandardize/rdMolStandardize.py` | shim → `rdoxide._rdoxide` |
 | `rdoxide/Chem/rdinchi.py` | shim → `rdoxide._rdoxide` |
-| `rdoxide/Chem/inchi.py` | provisional (upstream `External/INCHI-API/python/inchi.py` once MolToInchi/MolFromInchi are ported; see docs/INCHI_PORT.md) |
+| `rdoxide/Chem/inchi.py` | verbatim upstream `External/INCHI-API/python/inchi.py` (porting/copies.toml) |
+| `rdoxide/Chem/MolKey/`, `PandasTools.py`, `PandasPatcher.py` | verbatim upstream (porting/copies.toml); pandas is an optional dependency |
+| `rdoxide/_compat.py` | rdoxide only: `TupleList` and the dual-flavour exception classes (see stage 284) |
 
 ## Iteration log
 
@@ -469,8 +494,11 @@ interpreter (NCI 2D with wedges/explicit Hs, embedded 3D, upstream FileParsers t
 `_ChiralityPossible`) also matches on 35140 molecules from the stereo-rich upstream
 corpora (zinc, ChEMBL, idorsia enumeration, MMFF) and on `tests/data/stereo_edge_cases.smi`.
 `inchikey`: 588/588 (InChIs of `tests/data/inchi_corpus.jsonl`, default for the mode; also
-20558/20558 on the standard and `/FixedH /RecMet` InChIs of the default SMILES corpora). `inchi`
-(`MolToInchi`) is wired up but fails until the generation pipeline is ported.
+20558/20558 on the standard and `/FixedH /RecMet` InChIs of the default SMILES corpora).
+`inchi` (`MolToInchi` with AuxInfo and InChIKey) and `molfrominchi` (`InchiToMol`: SMILES of the
+restored molecule and its re-generated InChI): 10312/10312 on the default corpora, 29200/29200 on
+`idorsia_toy_space_enum.smi` and 72/72 on `stereo_edge_cases.smi`, all identical to the official
+RDKit 2026.09.1 (the PyPI wheel as `--ref-python`).
 New Python test files are also run against the official wheel to validate expectations.
 
 ## Known deviations (to revisit)
@@ -479,8 +507,7 @@ New Python test files are also run against the official wheel to validate expect
 
 * MolStandardize: the multi-molecule `*InPlace(mols, numThreads)` overloads treat
   `numThreads <= 0` as "all (but |n|) cores"; upstream strides its loop by `numThreads` and
-  never ends for 0 (and repeats molecules for negative values). The upstream InChI test of
-  `testMolStandardize.py` is skipped (`inchi.MolToInchi` is not ported yet).
+  never ends for 0 (and repeats molecules for negative values). 
 
 * Floating-point results follow the native RDKit build of the platform: on aarch64 rdoxide fuses
   multiply-adds exactly where clang does (`rdgeneral::fp::fmuladd`), on x86-64 it does not. The
