@@ -382,6 +382,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 266 | | I12d | `ichirvr6`: `FixRestoredStructureStereo` (cases 01-06; compiled only) | done | |
 | 267 | | I12e | `ichirvr4`: `NormalizeAndCompare` (compiled only) | done | |
 | 268 | | I12f | `ichirvr4`: `RunBnsRestore1` (compiled only) | done | |
+| 269 | | I12g | `ichirvr4`: `RestoreAtomMakeBNS`, `OneInChI2Atom` (compiled only) | done | |
 
 ## Python package files
 
@@ -832,3 +833,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-22 — Stage 266: I12d: FixRestoredStructureStereo
 * 2026-10-22 — Stage 267: I12e: NormalizeAndCompare
 * 2026-10-22 — Stage 268: I12f: RunBnsRestore1
+* 2026-10-22 — Stage 269: I12g: RestoreAtomMakeBNS, OneInChI2Atom
