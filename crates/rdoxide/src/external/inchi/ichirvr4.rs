@@ -1198,3 +1198,461 @@ pub fn check_and_refix_stereobonds(
     }
     ret
 }
+
+/// `MAX_DIFF_FIXH`
+pub const MAX_DIFF_FIXH: usize = 256;
+
+/// `CMP2FHATOMS`
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Cmp2FhAtoms {
+    pub endpt_inchi: u16,
+    pub endpt_revrs: u16,
+    pub atom_number: u16,
+    pub n_val_electr: u8,
+    pub n_period_num: u8,
+    pub n_fix_h_inchi: i8,
+    pub n_fix_h_revrs: i8,
+    pub n_mob_h_inchi: i8,
+    pub n_mob_h_revrs: i8,
+    pub n_num_h_revrs: i8,
+    pub n_at_charge_revrs: i8,
+}
+
+/// `CMP2FHINCHI`
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Cmp2FhInchi {
+    pub c2at: Vec<Cmp2FhAtoms>,
+    pub n_num_rem_h_inchi: i16,
+    pub n_num_rem_h_revrs: i16,
+    pub n_num_tg_inchi: i16,
+    pub n_num_tg_revrs: i16,
+    pub n_num_endp_inchi: i16,
+    pub n_num_endp_revrs: i16,
+    pub n_num_tg_diff_minus: i16,
+    pub n_num_tg_diff_h: i16,
+    pub n_num_tg_m_inchi: i16,
+    pub n_num_tg_h_inchi: i16,
+    pub n_num_tg_m_revrs: i16,
+    pub n_num_tg_h_revrs: i16,
+    pub n_charge_fix_h_inchi: i8,
+    pub n_charge_mob_h_inchi: i8,
+    pub n_charge_fix_h_revrs: i8,
+    pub n_charge_mob_h_revrs: i8,
+    pub n_charge_fix_h_revrs_non_metal: i8,
+    pub n_charge_mob_h_revrs_non_metal: i8,
+    pub b_fixed_h_layer_exists_revrs: bool,
+    pub b_has_difference: bool,
+    pub n_num_diff_mob_h: u8,
+}
+
+/// the per-t-group counts of `FillOutCMP2*`: (H, minus) of one t-group
+fn tg_h_m(t: &crate::external::inchi::ichitaut::TGroup) -> (i32, i32) {
+    (
+        i32::from(t.num[0]) - i32::from(t.num[1]),
+        i32::from(t.num[1]),
+    )
+}
+
+/// the common comparison of the t-groups of the original InChI and of the
+/// restored structure; `(h_inchi, m_inchi, h_revrs, m_revrs, diff_h,
+/// diff_minus, has_difference)`
+fn compare_t_groups(
+    ti: &crate::external::inchi::ichitaut::TGroupInfo,
+    one_ti: &crate::external::inchi::ichitaut::TGroupInfo,
+) -> (i32, i32, i32, i32, i32, i32, bool) {
+    let (mut hi, mut mi, mut hr, mut mr, mut dh, mut dm) = (0, 0, 0, 0, 0, 0);
+    let mut diff = false;
+    let tg = ti.t_group.as_deref().unwrap_or(&[]);
+    let otg = one_ti.t_group.as_deref().unwrap_or(&[]);
+    let (nt, no) = (ti.num_t_groups, one_ti.num_t_groups);
+    let mut i = 0;
+    while i < nt && i < no {
+        let (h_in, m_in) = tg_h_m(&tg[i]);
+        let (h_re, m_re) = tg_h_m(&otg[i]);
+        diff |= h_in != h_re;
+        diff |= m_in != m_re;
+        if tg[i].n_num_endpoints == otg[i].n_num_endpoints {
+            if h_in != h_re {
+                dh += 1;
+            }
+            if m_in != m_re {
+                dm += 1;
+            }
+        }
+        diff |= tg[i].n_num_endpoints != otg[i].n_num_endpoints;
+        hi += h_in;
+        mi += m_in;
+        hr += h_re;
+        mr += m_re;
+        i += 1;
+    }
+    while i < nt {
+        let (h_in, m_in) = tg_h_m(&tg[i]);
+        hi += h_in;
+        mi += m_in;
+        diff = true;
+        i += 1;
+    }
+    while i < no {
+        let (h_re, m_re) = tg_h_m(&otg[i]);
+        hr += h_re;
+        mr += m_re;
+        diff = true;
+        i += 1;
+    }
+    (hi, mi, hr, mr, dh, dm, diff)
+}
+
+/// `FillOutCMP2FHINCHI`: compares the original Fixed-H InChI with the InChI
+/// of the restored structure; returns the error and fills `pc2i`
+pub fn fill_out_cmp2fh_inchi(
+    ps: &StrFromInChI,
+    at2: &[InpAtom],
+    p_va: &[ValAt],
+    p_inchi: [Option<&InChI>; 2],
+    pc2i: &mut Cmp2FhInchi,
+) -> i32 {
+    use super::ichiread::RI_ERR_PROGR;
+    *pc2i = Cmp2FhInchi::default();
+    let mut ret = 0;
+    let fix_h_revrs_exists =
+        p_inchi[1].is_some_and(|c| c.n_number_of_atoms > 0 && c.b_deleted == 0);
+    let at_mh_revrs: Option<&[InpAtom]> = ps.p_one_norm_data[1]
+        .as_ref()
+        .filter(|d| !d.at.is_empty())
+        .map(|d| d.at.as_slice());
+    let nv = |c: Option<&InChI>| -> Option<Vec<i8>> {
+        c.filter(|c| !c.n_num_h.is_empty())
+            .map(|c| c.n_num_h.clone())
+    };
+    let num_fixed_h_revrs: Option<&Vec<i8>> = ps.p_one_inchi[0]
+        .as_ref()
+        .and_then(|c| c.n_num_h_fixed.as_ref());
+    let atno2canon = &ps.n_atno2canon[0];
+    let mob_h_inchi = nv(p_inchi[1]).or_else(|| nv(p_inchi[0]));
+    let mob_h_revrs = nv(ps.p_one_inchi[1].as_ref()).or_else(|| nv(ps.p_one_inchi[0].as_ref()));
+    pc2i.n_num_tg_inchi = ps.ti.num_t_groups as i16;
+    pc2i.n_num_tg_revrs = ps.one_ti.num_t_groups as i16;
+    pc2i.b_has_difference |= pc2i.n_num_tg_inchi != pc2i.n_num_tg_revrs;
+    pc2i.n_num_rem_h_inchi = ps.n_num_removed_protons_mobh_inchi as i16;
+    pc2i.n_num_rem_h_revrs = ps.one_ti.tni.n_num_removed_protons as i16;
+    pc2i.b_has_difference |= pc2i.n_num_rem_h_inchi != pc2i.n_num_rem_h_revrs;
+    pc2i.b_fixed_h_layer_exists_revrs = fix_h_revrs_exists;
+    pc2i.b_has_difference |= !fix_h_revrs_exists;
+    let (hi, mi, hr, mr, dh, dm, diff) = compare_t_groups(&ps.ti, &ps.one_ti);
+    pc2i.n_num_tg_h_inchi = hi as i16;
+    pc2i.n_num_tg_m_inchi = mi as i16;
+    pc2i.n_num_tg_h_revrs = hr as i16;
+    pc2i.n_num_tg_m_revrs = mr as i16;
+    pc2i.n_num_tg_diff_h = dh as i16;
+    pc2i.n_num_tg_diff_minus = dm as i16;
+    pc2i.b_has_difference |= diff;
+    let endpoint = ps.endpoint.as_deref().unwrap_or(&[]);
+    let fixed_h = ps.fixed_h.as_deref().unwrap_or(&[]);
+    for i in 0..ps.num_atoms as usize {
+        let icanon = atno2canon[i] as usize;
+        let endpt_inchi = i32::from(endpoint[i]);
+        let endpt_revrs = at_mh_revrs.map_or(0, |a| i32::from(a[i].endpoint));
+        let fix_inchi = i32::from(fixed_h[i]);
+        let fix_revrs = num_fixed_h_revrs.map_or(0, |a| i32::from(a[icanon]));
+        let mob_inchi = mob_h_inchi.as_ref().map_or(0, |a| i32::from(a[i]));
+        let mob_revrs = mob_h_revrs.as_ref().map_or(0, |a| i32::from(a[icanon]));
+        if fix_inchi != fix_revrs
+            || (endpt_inchi == 0) != (endpt_revrs == 0)
+            || mob_inchi != mob_revrs
+        {
+            if pc2i.c2at.len() >= MAX_DIFF_FIXH {
+                ret = RI_ERR_PROGR;
+                return finish_fh(pc2i, ret);
+            }
+            pc2i.b_has_difference |= (endpt_inchi == 0) != (endpt_revrs == 0);
+            pc2i.b_has_difference |= fix_inchi != fix_revrs;
+            pc2i.n_num_diff_mob_h = pc2i.n_num_diff_mob_h.wrapping_add(u8::from(
+                mob_inchi != mob_revrs && endpt_revrs == 0 && endpt_inchi == 0,
+            ));
+            pc2i.b_has_difference |= mob_inchi != mob_revrs;
+            pc2i.c2at.push(Cmp2FhAtoms {
+                endpt_inchi: endpt_inchi as u16,
+                endpt_revrs: endpt_revrs as u16,
+                atom_number: i as u16,
+                n_val_electr: p_va[i].c_num_valence_electrons as u8,
+                n_period_num: p_va[i].c_periodic_row_number as u8,
+                n_fix_h_inchi: fix_inchi as i8,
+                n_fix_h_revrs: fix_revrs as i8,
+                n_mob_h_inchi: mob_inchi as i8,
+                n_mob_h_revrs: mob_revrs as i8,
+                n_num_h_revrs: at2[i].num_h,
+                n_at_charge_revrs: at2[i].charge,
+            });
+        }
+        pc2i.n_num_endp_inchi += i16::from(endpt_inchi != 0);
+        pc2i.n_num_endp_revrs += i16::from(endpt_revrs != 0);
+        if p_va[i].c_metal == 0 {
+            pc2i.n_charge_fix_h_revrs_non_metal = pc2i
+                .n_charge_fix_h_revrs_non_metal
+                .wrapping_add(at2[i].charge);
+            pc2i.n_charge_mob_h_revrs_non_metal = pc2i
+                .n_charge_mob_h_revrs_non_metal
+                .wrapping_add(at_mh_revrs.map_or(0, |a| a[i].charge));
+        }
+    }
+    pc2i.n_charge_fix_h_inchi = p_inchi[0].map_or(0, |c| c.n_total_charge as i8);
+    pc2i.n_charge_mob_h_inchi = p_inchi[1].map_or(0, |c| c.n_total_charge as i8);
+    pc2i.n_charge_mob_h_revrs = match (&ps.p_one_inchi[1], &ps.p_one_inchi[0]) {
+        (Some(c), _) | (None, Some(c)) => c.n_total_charge as i8,
+        _ => 0,
+    };
+    pc2i.n_charge_fix_h_revrs = ps.p_one_inchi[0]
+        .as_ref()
+        .map_or(0, |c| c.n_total_charge as i8);
+    pc2i.b_has_difference |= pc2i.n_charge_fix_h_inchi != pc2i.n_charge_fix_h_revrs;
+    pc2i.b_has_difference |= pc2i.n_charge_mob_h_inchi != pc2i.n_charge_mob_h_revrs;
+    finish_fh(pc2i, ret)
+}
+
+fn finish_fh(_pc2i: &mut Cmp2FhInchi, ret: i32) -> i32 {
+    ret
+}
+
+/// `CMP2MHATOMS`
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Cmp2MhAtoms {
+    pub endpt_inchi: u16,
+    pub endpt_revrs: u16,
+    pub atom_number: u16,
+    pub n_val_electr: u8,
+    pub n_period_num: u8,
+    pub n_mob_h_inchi: i8,
+    pub n_mob_h_revrs: i8,
+    pub n_num_h_revrs: i8,
+    pub n_at_charge_revrs: i8,
+}
+
+/// `CMP2MHINCHI`
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Cmp2MhInchi {
+    pub c2at: Vec<Cmp2MhAtoms>,
+    pub n_num_rem_h_inchi: i16,
+    pub n_num_rem_h_revrs: i16,
+    pub n_num_tg_inchi: i16,
+    pub n_num_tg_revrs: i16,
+    pub n_num_endp_inchi: i16,
+    pub n_num_endp_revrs: i16,
+    pub n_num_tg_diff_minus: i16,
+    pub n_num_tg_diff_h: i16,
+    pub n_num_tg_m_inchi: i16,
+    pub n_num_tg_h_inchi: i16,
+    pub n_num_tg_o_inchi: i16,
+    pub n_num_tg_n_inchi: i16,
+    pub n_num_tg_m_revrs: i16,
+    pub n_num_tg_h_revrs: i16,
+    pub n_num_tg_o_revrs: i16,
+    pub n_num_tg_n_revrs: i16,
+    /// counts of the groups on endpoints in the restored structure: O(-),
+    /// OH, =O, N(-), NH(-), NH, NH2, =NH, =N(-), =N
+    pub revrs: [i16; 10],
+    /// the same according to the original InChI
+    pub inchi: [i16; 10],
+    pub n_charge_mob_h_inchi: i8,
+    pub n_charge_mob_h_revrs: i8,
+    pub n_charge_mob_h_revrs_non_metal: i8,
+    pub b_fixed_h_layer_exists_revrs: bool,
+    pub b_has_difference: bool,
+    pub n_num_diff_mob_h: u8,
+}
+
+/// indices into [`Cmp2MhInchi::revrs`]/[`Cmp2MhInchi::inchi`]
+pub const MH_O_MINUS: usize = 0;
+pub const MH_OH: usize = 1;
+pub const MH_DB_O: usize = 2;
+pub const MH_N_MINUS: usize = 3;
+pub const MH_NH_MINUS: usize = 4;
+pub const MH_NH: usize = 5;
+pub const MH_NH2: usize = 6;
+pub const MH_DB_NH: usize = 7;
+pub const MH_DB_N_MINUS: usize = 8;
+pub const MH_DB_N: usize = 9;
+
+/// counts one endpoint `iat` of the t-groups into `counts`; `Err` when the
+/// atom is neither N nor O (S, Se, Te)
+fn count_mh_endpoint(
+    at2: &[InpAtom],
+    p_va: &[ValAt],
+    iat: usize,
+    counts: &mut [i16; 10],
+    num_n: &mut i16,
+    num_o: &mut i16,
+) -> bool {
+    let is_n = p_va[iat].c_num_valence_electrons == 5 && p_va[iat].c_periodic_row_number == 1;
+    let is_o = p_va[iat].c_num_valence_electrons == 6;
+    if i32::from(is_n) + i32::from(is_o) != 1 {
+        return false;
+    }
+    *num_n += i16::from(is_n);
+    *num_o += i16::from(is_o);
+    let a = &at2[iat];
+    let (ch, nh) = (a.charge, a.num_h);
+    if a.chem_bonds_valence == a.valence {
+        if is_n {
+            counts[MH_NH] += i16::from(ch == 0 && nh == 1);
+            counts[MH_NH2] += i16::from(ch == 0 && nh == 2);
+            counts[MH_N_MINUS] += i16::from(ch == -1 && nh == 0);
+            counts[MH_NH_MINUS] += i16::from(ch == -1 && nh == 1);
+        } else {
+            counts[MH_OH] += i16::from(ch == 0 && nh == 1);
+            counts[MH_O_MINUS] += i16::from(ch == -1 && nh == 0);
+        }
+    } else if i32::from(a.chem_bonds_valence) == i32::from(a.valence) + 1 {
+        if is_n {
+            counts[MH_DB_NH] += i16::from(ch == 0 && nh == 1);
+            counts[MH_DB_N_MINUS] += i16::from(ch == -1 && nh == 0);
+            counts[MH_DB_N] += i16::from(ch == 0 && nh == 0);
+        } else {
+            counts[MH_DB_O] += i16::from(ch == 0 && nh == 0);
+        }
+    }
+    true
+}
+
+/// `FillOutCMP2MHINCHI`: compares the original Mobile-H InChI with the InChI
+/// of the restored structure
+pub fn fill_out_cmp2mh_inchi(
+    ps: &StrFromInChI,
+    tcg: &AllTcGroups,
+    at2: &[InpAtom],
+    p_va: &[ValAt],
+    p_inchi: [Option<&InChI>; 2],
+    pc2i: &mut Cmp2MhInchi,
+) -> i32 {
+    use super::ichiread::RI_ERR_SYNTAX;
+    *pc2i = Cmp2MhInchi::default();
+    let fix_h_revrs_exists =
+        p_inchi[1].is_some_and(|c| c.n_number_of_atoms > 0 && c.b_deleted == 0);
+    let at_mh_revrs: Option<&[InpAtom]> = ps.p_one_norm_data[0]
+        .as_ref()
+        .filter(|d| !d.at.is_empty())
+        .map(|d| d.at.as_slice());
+    let canon2atno = &ps.n_canon2atno[0];
+    let atno2canon = &ps.n_atno2canon[0];
+    let mob_h_inchi: Option<&Vec<i8>> = p_inchi[0]
+        .filter(|c| !c.n_num_h.is_empty())
+        .map(|c| &c.n_num_h);
+    let mob_h_revrs: Option<&Vec<i8>> = ps.p_one_inchi[0]
+        .as_ref()
+        .filter(|c| !c.n_num_h.is_empty())
+        .map(|c| &c.n_num_h);
+    pc2i.n_num_tg_inchi = ps.ti.num_t_groups as i16;
+    pc2i.n_num_tg_revrs = ps.one_ti.num_t_groups as i16;
+    pc2i.b_has_difference |= pc2i.n_num_tg_inchi != pc2i.n_num_tg_revrs;
+    pc2i.n_num_rem_h_inchi = ps.n_num_removed_protons_mobh_inchi as i16;
+    pc2i.n_num_rem_h_revrs = ps.one_ti.tni.n_num_removed_protons as i16;
+    pc2i.b_fixed_h_layer_exists_revrs = fix_h_revrs_exists;
+    let tg = ps.ti.t_group.as_deref().unwrap_or(&[]);
+    for t in tg.iter().take(ps.ti.num_t_groups) {
+        let (jfst, jnum) = (
+            t.n_first_endpoint_at_no_pos as usize,
+            t.n_num_endpoints as usize,
+        );
+        for j in 0..jnum {
+            let iat = ps.ti.n_endpoint_atom_number[jfst + j] as usize;
+            let (mut n, mut o) = (0, 0);
+            if !count_mh_endpoint(at2, p_va, iat, &mut pc2i.inchi, &mut n, &mut o) {
+                return RI_ERR_SYNTAX;
+            }
+            pc2i.n_num_tg_n_inchi += n;
+            pc2i.n_num_tg_o_inchi += o;
+        }
+    }
+    let otg = ps.one_ti.t_group.as_deref().unwrap_or(&[]);
+    for t in otg.iter().take(ps.one_ti.num_t_groups) {
+        let (jfst, jnum) = (
+            t.n_first_endpoint_at_no_pos as usize,
+            t.n_num_endpoints as usize,
+        );
+        for j in 0..jnum {
+            let iat = canon2atno[ps.one_ti.n_endpoint_atom_number[jfst + j] as usize] as usize;
+            let (mut n, mut o) = (0, 0);
+            if !count_mh_endpoint(at2, p_va, iat, &mut pc2i.revrs, &mut n, &mut o) {
+                return super::ichiread::RI_ERR_PROGR;
+            }
+            pc2i.n_num_tg_n_revrs += n;
+            pc2i.n_num_tg_o_revrs += o;
+        }
+    }
+    let (hi, mi, hr, mr, dh, dm, diff) = compare_t_groups(&ps.ti, &ps.one_ti);
+    pc2i.n_num_tg_h_inchi = hi as i16;
+    pc2i.n_num_tg_m_inchi = mi as i16;
+    pc2i.n_num_tg_h_revrs = hr as i16;
+    pc2i.n_num_tg_m_revrs = mr as i16;
+    pc2i.n_num_tg_diff_h = dh as i16;
+    pc2i.n_num_tg_diff_minus = dm as i16;
+    pc2i.b_has_difference |= diff;
+    let mut ret = 0;
+    for i in 0..ps.num_atoms as usize {
+        let icanon = atno2canon[i] as usize;
+        let endpt_inchi = i32::from(at2[i].endpoint);
+        let endpt_revrs = at_mh_revrs.map_or(0, |a| i32::from(a[i].endpoint));
+        let mob_inchi = mob_h_inchi.map_or(0, |a| i32::from(a[i]));
+        let mob_revrs = mob_h_revrs.map_or(0, |a| i32::from(a[icanon]));
+        if (endpt_inchi == 0) != (endpt_revrs == 0) || mob_inchi != mob_revrs {
+            if pc2i.c2at.len() >= MAX_DIFF_FIXH {
+                ret = super::ichiread::RI_ERR_PROGR;
+                return ret;
+            }
+            pc2i.b_has_difference |= (endpt_inchi == 0) != (endpt_revrs == 0);
+            let nm_inchi = p_inchi[1]
+                .filter(|c| !c.n_num_h.is_empty())
+                .map(|c| c.n_num_h[i])
+                .or_else(|| {
+                    p_inchi[0]
+                        .filter(|c| !c.n_num_h.is_empty())
+                        .map(|c| c.n_num_h[i])
+                })
+                .unwrap_or(0);
+            let nm_revrs = ps.p_one_inchi[1]
+                .as_ref()
+                .filter(|c| !c.n_num_h.is_empty())
+                .map(|c| c.n_num_h[icanon])
+                .or_else(|| {
+                    ps.p_one_inchi[0]
+                        .as_ref()
+                        .filter(|c| !c.n_num_h.is_empty())
+                        .map(|c| c.n_num_h[icanon])
+                })
+                .unwrap_or(0);
+            pc2i.n_num_diff_mob_h = pc2i.n_num_diff_mob_h.wrapping_add(u8::from(
+                mob_inchi != mob_revrs && endpt_revrs == 0 && endpt_inchi == 0,
+            ));
+            pc2i.b_has_difference |= mob_inchi != mob_revrs;
+            pc2i.c2at.push(Cmp2MhAtoms {
+                endpt_inchi: endpt_inchi as u16,
+                endpt_revrs: endpt_revrs as u16,
+                atom_number: i as u16,
+                n_val_electr: p_va[i].c_num_valence_electrons as u8,
+                n_period_num: p_va[i].c_periodic_row_number as u8,
+                n_mob_h_inchi: nm_inchi,
+                n_mob_h_revrs: nm_revrs,
+                n_num_h_revrs: at2[i].num_h,
+                n_at_charge_revrs: at2[i].charge,
+            });
+        }
+        pc2i.n_num_endp_inchi += i16::from(endpt_inchi != 0);
+        pc2i.n_num_endp_revrs += i16::from(endpt_revrs != 0);
+        if p_va[i].c_metal == 0 {
+            let add = at_mh_revrs
+                .filter(|a| a[i].endpoint == 0)
+                .map_or(0, |a| a[i].charge);
+            pc2i.n_charge_mob_h_revrs_non_metal =
+                pc2i.n_charge_mob_h_revrs_non_metal.wrapping_add(add);
+        }
+    }
+    pc2i.n_charge_mob_h_revrs_non_metal = pc2i
+        .n_charge_mob_h_revrs_non_metal
+        .wrapping_add(tcg.tgroup_charge as i8);
+    pc2i.n_charge_mob_h_inchi = p_inchi[0].map_or(0, |c| c.n_total_charge as i8);
+    pc2i.n_charge_mob_h_revrs = ps.p_one_inchi[0]
+        .as_ref()
+        .map_or(0, |c| c.n_total_charge as i8);
+    pc2i.b_has_difference |= pc2i.n_charge_mob_h_inchi != pc2i.n_charge_mob_h_revrs;
+    ret
+}
