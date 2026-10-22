@@ -218,6 +218,12 @@ int main(void) {
                                 int ric = RestoreIsoCyanoGroup(b, bd, &s3, at, a2, va, &g, &nr, &td, 4);
                                 printf("IC %d %d %d %d %d\n", ric, nr, td, b->tot_st_cap, b->tot_st_flow);
                                 for (int i = 0; i < b->num_edges; i++) printf("l%d %d %d\n", i, b->edge[i].flow, b->edge[i].forbidden);
+                                int rfm = FixMetal_Nminus_Ominus(b, bd, &s3, at, a2, va, &g, &nr, &td, 4);
+                                printf("FM %d %d %d %d %d\n", rfm, nr, td, b->tot_st_cap, b->tot_st_flow);
+                                for (int i = 0; i < b->num_edges; i++) printf("m%d %d %d\n", i, b->edge[i].flow, b->edge[i].forbidden);
+                                int rnn = RestoreNNNgroup(b, bd, &s3, at, a2, va, &g, &nr, &td, 4);
+                                printf("NN %d %d %d %d %d\n", rnn, nr, td, b->tot_st_cap, b->tot_st_flow);
+                                for (int i = 0; i < b->num_edges; i++) printf("o%d %d %d\n", i, b->edge[i].flow, b->edge[i].forbidden);
                             }
                             for (int i = 0; i < n; i++) at[i].bond_type[0] = 0;
                             IncrZeroBondsAndClearEndpts(at, n, 5);
