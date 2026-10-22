@@ -47,7 +47,7 @@ pub const MAX_NUM_VALENCES: usize = 5;
 pub const ERR_ELEM: i32 = 255;
 
 /// `nElDataLen`: the table without its terminating empty entry
-const N_EL_DATA_LEN: i32 = EL_DATA.len() as i32 - 1;
+pub const N_EL_DATA_LEN: i32 = EL_DATA.len() as i32 - 1;
 
 /// The index of the element `n_at_num` in the table (which has D and T after H).
 fn table_index(n_at_num: i32) -> i32 {

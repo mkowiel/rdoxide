@@ -11,7 +11,9 @@
 //! here a string is a byte slice that reads as zero past its end and a
 //! position is an index. Only string input streams are supported.
 
-use super::ichi::{InChI, InChIIsotopicAtom, InChIStereo};
+use super::ichi::{
+    INCHI_FLAG_RAC_STEREO, INCHI_FLAG_REL_STEREO, InChI, InChIIsotopicAtom, InChIStereo,
+};
 use super::ichi_io::{INCHI_IOS_TYPE_STRING, InchiIostream};
 use super::inpdef::MAXVAL;
 use super::util::strtol10;
@@ -3793,5 +3795,1048 @@ pub fn read_inchi_line(
     if ret >= 0 || c == RI_ERR_EOF || c == RI_ERR_EOL {
         line.len = 0;
     }
+    ret
+}
+
+// ---------------------------------------------------------------------------
+// `InChILine2Data`: the post-processing of the read layers (omitted layers)
+
+const NUM_H_ISOTOPES: usize = 3;
+const REL_RAC: u64 = INCHI_FLAG_REL_STEREO | INCHI_FLAG_RAC_STEREO;
+/// `REQ_MODE_RELATIVE_STEREO`, `REQ_MODE_RACEMIC_STEREO`
+pub const REQ_MODE_RELATIVE_STEREO: u64 = 0x0200;
+pub const REQ_MODE_RACEMIC_STEREO: u64 = 0x0400;
+
+/// `GetInChIIsoH`: the numbers of the isotopic H (H, D, T) of a component
+pub fn get_inchi_iso_h(c: &InChI) -> Result<[i32; 3], i32> {
+    let mut n = [0i32; 3];
+    for a in c
+        .isotopic_atom
+        .iter()
+        .take(c.n_number_of_isotopic_atoms.max(0) as usize)
+    {
+        if a.n_iso_difference > 0 && i32::from(a.n_iso_difference) <= NUM_H_ISOTOPES as i32 {
+            if c.n_atom.is_empty()
+                || a.n_atom_number == 0
+                || i32::from(a.n_atom_number) > c.n_number_of_atoms
+            {
+                return Err(RI_ERR_PROGR);
+            }
+            if c.n_atom
+                .get(a.n_atom_number as usize - 1)
+                .copied()
+                .unwrap_or(0)
+                == 1
+            {
+                n[a.n_iso_difference as usize - 1] += 1;
+            }
+        }
+        n[0] += i32::from(a.n_num_h);
+        n[1] += i32::from(a.n_num_d);
+        n[2] += i32::from(a.n_num_t);
+    }
+    Ok(n)
+}
+
+fn self_copy(c: &mut InChI, ty: i32, b_to: i32, b_from: i32) -> i32 {
+    let f = c.clone();
+    copy_segment(c, Some(&f), ty, b_to, b_from)
+}
+
+fn nsc(s: &Option<InChIStereo>) -> i32 {
+    s.as_ref().map_or(0, |s| s.n_number_of_stereo_centers)
+}
+fn nsb(s: &Option<InChIStereo>) -> i32 {
+    s.as_ref().map_or(0, |s| s.n_number_of_stereo_bonds)
+}
+fn inv(s: &Option<InChIStereo>) -> i32 {
+    s.as_ref().map_or(0, |s| s.n_comp_inv2_abs)
+}
+fn has_t(s: &Option<InChIStereo>) -> bool {
+    s.as_ref().is_some_and(|s| !s.t_parity.is_empty())
+}
+fn has_b(s: &Option<InChIStereo>) -> bool {
+    s.as_ref().is_some_and(|s| !s.b_parity.is_empty())
+}
+fn set_inv(s: &mut Option<InChIStereo>, v: i32) {
+    if let Some(s) = s.as_mut() {
+        s.n_comp_inv2_abs = v;
+    }
+}
+/// `!x || NO_VALUE_INT == x`
+fn is_unset(v: i32) -> bool {
+    v == 0 || v == NO_VALUE_INT
+}
+
+/// the part of `InChILine2Data` that restores the omitted stereo segments
+/// of one component (`pInChI` of the Fixed-H or Mobile-H layer `j`);
+/// `alt` is the component `k` of the other layer when it exists,
+/// `alt_atoms` tells that it has atoms (`pInChI_Alt` is not NULL then)
+#[allow(clippy::too_many_arguments)]
+fn restore_omitted_stereo(
+    j: usize,
+    cur: &mut InChI,
+    mut alt: Option<&mut InChI>,
+    alt_atoms: bool,
+    s: &[[i32; 2]; 2],
+    n_flags: u64,
+    n_flags_alt: u64,
+    n_comps_j: i32,
+    mh2fh_alt_inv: &mut i32,
+    fh2ifh_alt_inv: &mut i32,
+) -> i32 {
+    let ja = 1 - j;
+    let rr = |v: i32| (v & 6) != 0;
+
+    if j == TAUT_YES {
+        // (4) copy stereo: Mobile H --> isotopic Mobile H
+        let b_iso = cur.n_number_of_isotopic_atoms != 0
+            || (cur.stereo_isotopic.is_some()
+                && nsc(&cur.stereo_isotopic) + nsb(&cur.stereo_isotopic) != 0)
+            || (alt_atoms
+                && alt
+                    .as_ref()
+                    .is_some_and(|a| a.n_number_of_isotopic_atoms != 0));
+        if b_iso {
+            if nsc(&cur.stereo) != 0
+                && (cur.stereo_isotopic.is_none() || !has_t(&cur.stereo_isotopic))
+            {
+                let r = self_copy(cur, CPY_SP3, 1, 0);
+                if r < 0 {
+                    return r;
+                }
+                if is_unset(inv(&cur.stereo_isotopic)) {
+                    let r = self_copy(cur, CPY_SP3_M, 1, 0);
+                    if r < 0 {
+                        return r;
+                    }
+                }
+                if (n_flags & REL_RAC) != 0 {
+                    if inv(&cur.stereo) == NO_VALUE_INT {
+                        set_inv(&mut cur.stereo, if s[j][0] > 0 { 2 } else { 0 });
+                    }
+                    if inv(&cur.stereo_isotopic) == NO_VALUE_INT {
+                        set_inv(&mut cur.stereo_isotopic, if s[j][1] > 0 { 2 } else { 0 });
+                    }
+                }
+            } else if nsc(&cur.stereo) != 0
+                && nsc(&cur.stereo_isotopic) != 0
+                && inv(&cur.stereo) != 0
+            {
+                if (n_flags & REL_RAC) != 0
+                    && inv(&cur.stereo) == NO_VALUE_INT
+                    && inv(&cur.stereo_isotopic) == NO_VALUE_INT
+                {
+                    set_inv(&mut cur.stereo, if s[j][0] > 0 { 2 } else { 0 });
+                    set_inv(&mut cur.stereo_isotopic, if s[j][1] > 0 { 2 } else { 0 });
+                } else if is_unset(inv(&cur.stereo_isotopic)) {
+                    let v = inv(&cur.stereo);
+                    set_inv(&mut cur.stereo_isotopic, v);
+                }
+            }
+        }
+        if b_iso
+            && nsb(&cur.stereo) != 0
+            && (cur.stereo_isotopic.is_none() || !has_b(&cur.stereo_isotopic))
+        {
+            let r = self_copy(cur, CPY_SP2, 1, 0);
+            if r < 0 {
+                return r;
+            }
+        }
+    }
+
+    // (0) set nCompInv2Abs to Fixed-H
+    if j == TAUT_NON && nsc(&cur.stereo) != 0 && inv(&cur.stereo) == NO_VALUE_INT {
+        let alt_has_st = alt_atoms && alt.as_ref().is_some_and(|a| nsc(&a.stereo) != 0);
+        if s[j][0] == 0 && s[ja][0] > 0 && alt_has_st {
+            let a = alt.as_deref_mut().unwrap();
+            if inv(&a.stereo) == 0
+                && inv(&cur.stereo) == NO_VALUE_INT
+                && a.stereo_isotopic.is_some()
+                && inv(&a.stereo_isotopic) != 0
+                && inv(&a.stereo_isotopic) != NO_VALUE_INT
+                && s[j][0] == 0
+                && s[j][1] == 0
+                && s[ja][0] == 1
+                && s[ja][1] == 1
+            {
+                let r = copy_segment(cur, Some(a), CPY_SP3_M, 1, 1);
+                if r < 0 {
+                    return r;
+                }
+            } else if inv(&a.stereo) != NO_VALUE_INT && s[ja][0] == 1 {
+                let v = inv(&a.stereo);
+                set_inv(&mut cur.stereo, v);
+            } else if inv(&a.stereo) == NO_VALUE_INT
+                && inv(&cur.stereo) == NO_VALUE_INT
+                && s[j][0] == 0
+                && s[j][1] == 0
+                && rr(s[ja][0])
+                && rr(s[ja][1])
+            {
+                let b_iso = cur.n_number_of_isotopic_atoms != 0
+                    || (cur.stereo_isotopic.is_some()
+                        && nsc(&cur.stereo_isotopic) + nsb(&cur.stereo_isotopic) != 0)
+                    || a.n_number_of_isotopic_atoms != 0;
+                if b_iso {
+                    if a.stereo_isotopic.is_none() {
+                        let r = self_copy(a, CPY_SP3_M, 1, -1);
+                        if r < 0 {
+                            return r;
+                        }
+                    }
+                    set_inv(&mut a.stereo_isotopic, 2);
+                    set_inv(&mut a.stereo, 0);
+                    set_inv(&mut cur.stereo, NO_VALUE_INT + 1);
+                } else {
+                    set_inv(&mut cur.stereo, 2);
+                    set_inv(&mut a.stereo, 2);
+                }
+            } else {
+                set_inv(&mut cur.stereo, 2);
+                set_inv(&mut a.stereo, 2);
+            }
+        } else if s[j][0] == 0
+            && s[ja][0] == 0
+            && (n_flags & REL_RAC) != 0
+            && !(cur.stereo_isotopic.is_some() && nsc(&cur.stereo_isotopic) != 0)
+            && !(alt_atoms
+                && alt
+                    .as_ref()
+                    .is_some_and(|a| a.stereo_isotopic.is_some() && nsc(&a.stereo_isotopic) != 0))
+        {
+            set_inv(&mut cur.stereo, NO_VALUE_INT + 1);
+        } else {
+            set_inv(&mut cur.stereo, if s[j][0] > 0 { 2 } else { 0 });
+        }
+    }
+
+    // (1) copy stereo: non-isotopic Fixed H --> isotopic Fixed H
+    if j == TAUT_NON {
+        let b_iso = cur.n_number_of_isotopic_atoms != 0
+            || (cur.stereo_isotopic.is_some()
+                && nsc(&cur.stereo_isotopic) + nsb(&cur.stereo_isotopic) != 0)
+            || (alt_atoms
+                && alt
+                    .as_ref()
+                    .is_some_and(|a| a.n_number_of_isotopic_atoms != 0));
+        if b_iso {
+            if nsc(&cur.stereo) != 0
+                && (cur.stereo_isotopic.is_none() || !has_t(&cur.stereo_isotopic))
+            {
+                let r = self_copy(cur, CPY_SP3, 1, 0);
+                if r < 0 {
+                    return r;
+                }
+                if inv(&cur.stereo) == NO_VALUE_INT + 1 {
+                    set_inv(&mut cur.stereo, 0);
+                    set_inv(&mut cur.stereo_isotopic, 2);
+                } else if inv(&cur.stereo_isotopic) == 0 {
+                    let r = self_copy(cur, CPY_SP3_M, 1, 0);
+                    if r < 0 {
+                        return r;
+                    }
+                }
+                if (n_flags & REL_RAC) != 0 {
+                    if inv(&cur.stereo) == NO_VALUE_INT {
+                        set_inv(&mut cur.stereo, if s[j][0] > 0 { 2 } else { 0 });
+                    }
+                    if inv(&cur.stereo_isotopic) == NO_VALUE_INT {
+                        set_inv(&mut cur.stereo_isotopic, if s[j][1] > 0 { 2 } else { 0 });
+                    }
+                }
+            } else if nsc(&cur.stereo) != 0
+                && nsc(&cur.stereo_isotopic) != 0
+                && inv(&cur.stereo) != 0
+            {
+                if (n_flags & REL_RAC) != 0
+                    && inv(&cur.stereo) == NO_VALUE_INT
+                    && inv(&cur.stereo_isotopic) == NO_VALUE_INT
+                {
+                    set_inv(&mut cur.stereo, if s[j][0] > 0 { 2 } else { 0 });
+                    set_inv(&mut cur.stereo_isotopic, if s[j][1] > 0 { 2 } else { 0 });
+                } else if is_unset(inv(&cur.stereo_isotopic)) {
+                    let v = inv(&cur.stereo);
+                    set_inv(&mut cur.stereo_isotopic, v);
+                }
+            }
+        }
+        if b_iso
+            && nsb(&cur.stereo) != 0
+            && (cur.stereo_isotopic.is_none() || !has_b(&cur.stereo_isotopic))
+        {
+            let r = self_copy(cur, CPY_SP2, 1, 0);
+            if r < 0 {
+                return r;
+            }
+        }
+    }
+
+    // copy stereo: Mobile H --> Fixed H
+    if j == TAUT_NON {
+        if let Some(a) = alt {
+            let b_iso = cur.n_number_of_isotopic_atoms != 0
+                || (cur.stereo_isotopic.is_some()
+                    && nsc(&cur.stereo_isotopic) + nsb(&cur.stereo_isotopic) != 0)
+                || a.n_number_of_isotopic_atoms != 0
+                || (a.stereo_isotopic.is_some()
+                    && nsc(&a.stereo_isotopic) + nsb(&a.stereo_isotopic) != 0);
+            let b_no_t = !has_t(&cur.stereo);
+            let b_no_m = cur.stereo.is_none() || inv(&cur.stereo) == NO_VALUE_INT;
+
+            // (2) non-isotopic Mobile H => non-isotopic Fixed H
+            if nsc(&a.stereo) != 0 && !has_t(&cur.stereo) {
+                let mut b_have_t_stereo = if cur.stereo.is_some() {
+                    nsc(&cur.stereo)
+                } else {
+                    1
+                };
+                if b_have_t_stereo < 1 && nsb(&cur.stereo) > 0 {
+                    b_have_t_stereo = 1;
+                }
+                let r = copy_segment(cur, Some(a), CPY_SP3, 0, 0);
+                if r < 0 {
+                    return r;
+                }
+                if is_unset(inv(&cur.stereo)) {
+                    let r = copy_segment(cur, Some(a), CPY_SP3_M, 0, 0);
+                    if r < 0 {
+                        return r;
+                    }
+                }
+                if s[j][0] < 1 && b_have_t_stereo < 1 && nsc(&a.stereo) > 0 && s[ja][0] < 1 {
+                    let mut all_uu = true;
+                    if let Some(st) = a.stereo.as_ref() {
+                        for kc in 0..st.n_number_of_stereo_centers.max(0) as usize {
+                            let p = i32::from(st.t_parity.get(kc).copied().unwrap_or(0));
+                            if p != 3 && p != 4 {
+                                all_uu = false;
+                                break;
+                            }
+                        }
+                    }
+                    if !all_uu {
+                        if let Some(st) = cur.stereo.as_mut() {
+                            st.n_number_of_stereo_centers = 0;
+                        }
+                    }
+                }
+                if inv(&cur.stereo) == NO_VALUE_INT && (n_flags_alt & REL_RAC) != 0 {
+                    if s[ja][0] > 0 && s[j][0] > 0 {
+                        *mh2fh_alt_inv += 1;
+                        set_inv(&mut a.stereo, if *mh2fh_alt_inv % 2 != 0 { 2 } else { 0 });
+                        set_inv(&mut cur.stereo, 2);
+                    } else if n_comps_j > 1
+                        && b_no_t
+                        && b_no_m
+                        && n_flags == 0
+                        && !(a.stereo_isotopic.is_some() && has_t(&a.stereo_isotopic))
+                        && !(cur.stereo_isotopic.is_some() && has_t(&cur.stereo_isotopic))
+                        && s[j][0] == 0
+                        && s[j][1] == 0
+                        && rr(s[ja][0])
+                        && rr(s[ja][1])
+                    {
+                        if b_iso {
+                            if cur.stereo_isotopic.is_none() {
+                                let r = copy_segment(cur, Some(a), CPY_SP3_M, 1, -1);
+                                if r < 0 {
+                                    return r;
+                                }
+                            }
+                            if a.stereo_isotopic.is_none() {
+                                let r = self_copy(a, CPY_SP3_M, 1, -1);
+                                if r < 0 {
+                                    return r;
+                                }
+                            }
+                            set_inv(&mut cur.stereo_isotopic, 2);
+                            set_inv(&mut cur.stereo, 0);
+                            set_inv(&mut a.stereo_isotopic, 2);
+                            set_inv(&mut a.stereo, 0);
+                        } else if inv(&cur.stereo) == NO_VALUE_INT && inv(&a.stereo) == NO_VALUE_INT
+                        {
+                            set_inv(&mut cur.stereo, 2);
+                            set_inv(&mut a.stereo, 2);
+                        }
+                    } else if (s[ja][0] > 0 || s[j][0] > 0) && s[j][0] >= 0 {
+                        set_inv(&mut cur.stereo, 2);
+                    } else if b_iso
+                        && b_no_t
+                        && b_no_m
+                        && n_flags == 0
+                        && !(a.stereo_isotopic.is_some() && has_t(&a.stereo_isotopic))
+                        && !(cur.stereo_isotopic.is_some() && has_t(&cur.stereo_isotopic))
+                        && s[ja][0] == 0
+                        && s[j][0] == 0
+                        && s[j][1] == 0
+                        && rr(s[ja][1])
+                    {
+                        if cur.stereo_isotopic.is_none() {
+                            let r = copy_segment(cur, Some(a), CPY_SP3_M, 1, -1);
+                            if r < 0 {
+                                return r;
+                            }
+                        }
+                        set_inv(&mut cur.stereo_isotopic, 2);
+                        set_inv(&mut cur.stereo, 0);
+                    } else {
+                        set_inv(&mut cur.stereo, 0);
+                    }
+                    if cur.n_flags & REL_RAC == 0 {
+                        cur.n_flags |= (n_flags_alt | n_flags) & REL_RAC;
+                    }
+                }
+            } else if nsc(&a.stereo) != 0
+                && nsc(&cur.stereo) != 0
+                && inv(&a.stereo) != 0
+                && is_unset(inv(&cur.stereo))
+                && (!(n_flags_alt != 0 && n_flags == 0) || NO_VALUE_INT == inv(&cur.stereo))
+            {
+                let v = inv(&a.stereo);
+                set_inv(&mut cur.stereo, v);
+            }
+
+            // use the same rule to copy the stereobonds
+            if nsb(&a.stereo) != 0 && !has_b(&cur.stereo) {
+                let r = copy_segment(cur, Some(a), CPY_SP2, 0, 0);
+                if r < 0 {
+                    return r;
+                }
+            }
+            // (3) isotopic Mobile H -> isotopic Fixed H
+            if b_iso {
+                if !has_t(&cur.stereo)
+                    && !has_t(&a.stereo)
+                    && nsc(&a.stereo_isotopic) != 0
+                    && (cur.stereo_isotopic.is_none() || !has_t(&cur.stereo_isotopic))
+                {
+                    let r = copy_segment(cur, Some(a), CPY_SP3, 1, 1);
+                    if r < 0 {
+                        return r;
+                    }
+                    if is_unset(inv(&cur.stereo_isotopic)) {
+                        let r = copy_segment(cur, Some(a), CPY_SP3_M, 1, 1);
+                        if r < 0 {
+                            return r;
+                        }
+                    }
+                    if inv(&cur.stereo_isotopic) == NO_VALUE_INT && (n_flags_alt & REL_RAC) != 0 {
+                        set_inv(&mut cur.stereo_isotopic, if s[ja][1] > 0 { 2 } else { 0 });
+                        if cur.n_flags & REL_RAC == 0 {
+                            cur.n_flags |= n_flags_alt & REL_RAC;
+                        }
+                    }
+                } else if !has_t(&cur.stereo)
+                    && !has_t(&a.stereo)
+                    && nsc(&a.stereo_isotopic) != 0
+                    && nsc(&cur.stereo_isotopic) != 0
+                    && inv(&a.stereo_isotopic) != 0
+                    && is_unset(inv(&cur.stereo_isotopic))
+                {
+                    let r = copy_segment(cur, Some(a), CPY_SP3_M, 1, 1);
+                    if r < 0 {
+                        return r;
+                    }
+                }
+                // use the same rule to copy the stereobonds
+                if !has_b(&cur.stereo)
+                    && !has_b(&a.stereo)
+                    && nsb(&a.stereo_isotopic) != 0
+                    && (cur.stereo_isotopic.is_none() || !has_b(&cur.stereo_isotopic))
+                {
+                    let r = copy_segment(cur, Some(a), CPY_SP2, 1, 1);
+                    if r < 0 {
+                        return r;
+                    }
+                }
+
+                // (4) Copy Fixed-H -> isotopic Fixed-H
+                if nsc(&cur.stereo) != 0
+                    && !has_t(&a.stereo_isotopic)
+                    && !has_t(&cur.stereo_isotopic)
+                {
+                    if a.stereo_isotopic.is_some()
+                        && inv(&a.stereo_isotopic) != 0
+                        && b_no_t
+                        && NO_VALUE_INT != inv(&a.stereo_isotopic)
+                        && !(cur.stereo_isotopic.is_some()
+                            && NO_VALUE_INT != inv(&cur.stereo_isotopic))
+                    {
+                        let r = copy_segment(cur, Some(a), CPY_SP3_M, 1, 1);
+                        if r < 0 {
+                            return r;
+                        }
+                    }
+                    let r = self_copy(cur, CPY_SP3, 1, 0);
+                    if r < 0 {
+                        return r;
+                    }
+                    if is_unset(inv(&cur.stereo_isotopic)) {
+                        let r = self_copy(cur, CPY_SP3_M, 1, 0);
+                        if r < 0 {
+                            return r;
+                        }
+                    }
+                    if inv(&cur.stereo_isotopic) == NO_VALUE_INT && (n_flags & REL_RAC) != 0 {
+                        if s[j][0] > 0 && s[j][1] > 0 {
+                            set_inv(&mut cur.stereo_isotopic, 2);
+                            *fh2ifh_alt_inv += 1;
+                            set_inv(
+                                &mut cur.stereo,
+                                if *fh2ifh_alt_inv % 2 != 0 { 2 } else { 0 },
+                            );
+                        } else if (s[j][0] > 0 || s[j][1] > 0) && s[j][1] >= 0 {
+                            set_inv(&mut cur.stereo_isotopic, 2);
+                        } else {
+                            set_inv(&mut cur.stereo_isotopic, 0);
+                        }
+                        if cur.n_flags & REL_RAC == 0 {
+                            cur.n_flags |= n_flags & REL_RAC;
+                        }
+                    }
+                } else if has_t(&cur.stereo)
+                    && !has_t(&a.stereo_isotopic)
+                    && nsc(&a.stereo_isotopic) != 0
+                    && nsc(&cur.stereo_isotopic) != 0
+                    && inv(&cur.stereo) != 0
+                    && is_unset(inv(&cur.stereo_isotopic))
+                {
+                    let r = self_copy(cur, CPY_SP3_M, 1, 0);
+                    if r < 0 {
+                        return r;
+                    }
+                }
+            }
+            if b_iso
+                && nsb(&cur.stereo) == 0
+                && nsb(&a.stereo) == 0
+                && nsb(&a.stereo_isotopic) != 0
+                && (cur.stereo_isotopic.is_none() || !has_b(&cur.stereo_isotopic))
+            {
+                let r = copy_segment(cur, Some(a), CPY_SP2, 1, 1);
+                if r < 0 {
+                    return r;
+                }
+            }
+        }
+    }
+    0
+}
+
+/// `ReadInChICoord` (AuxInfo): the AuxInfo line is not ported; the lines
+/// that are not `AuxInfo=` are handled as in C
+fn read_inchi_coord(inp: &mut InchiIostream, line: &mut SegmLine, p_state: &mut i32) -> i32 {
+    *p_state = 0;
+    let c = if line.len != 0 {
+        line.c
+    } else {
+        n_get_inchi_segment(inp, line, INCHI_TOKEN)
+    };
+    if c == RI_ERR_EOF && line.len == 0 && at(&line.str, 0) == 0 {
+        line.len = 0;
+        return c;
+    }
+    if line.len == 0 || (c != SEG_END && c != RI_ERR_EOF && !inchi_inp_eol(c)) {
+        *p_state = -1;
+        line.len = 0;
+        return RI_ERR_PROGR;
+    }
+    if !line.str.starts_with(b"AuxInfo=") {
+        *p_state = -1;
+        return c;
+    }
+    // AuxInfo is not supported yet
+    *p_state = -1;
+    line.len = 0;
+    RI_ERR_SYNTAX
+}
+
+/// the stereo type of a layer pair: the maximum of the two `/s` values
+fn stereo_type_flags(s: &[[i32; 2]; 2], j: usize) -> (u64, u64) {
+    let ja = 1 - j;
+    let (mut t, mut ta) = (0, 0);
+    for b in 0..2 {
+        if t == 0 || t < s[j][b] {
+            t = s[j][b];
+        }
+        if ta == 0 || ta < s[ja][b] {
+            ta = s[ja][b];
+        }
+    }
+    let f = |t: i32| match t {
+        2 => INCHI_FLAG_REL_STEREO,
+        3 => INCHI_FLAG_RAC_STEREO,
+        _ => 0,
+    };
+    (f(t), f(ta))
+}
+
+/// the part of `InChILine2Data` after `ReadInChILine`: adds the omitted
+/// layers and checks the balances; returns `ret2` (0 or an error)
+fn line2data_postprocess(p_state: &mut i32, d: &mut InpInChI) -> i32 {
+    *p_state = IST_MATERIAL_BALANCE_ERROR;
+    let mut num_elem: [[Option<Vec<i32>>; 2]; 2] = Default::default();
+    let mut tot_charge = [[0i32; 2]; 2];
+    let el_len = super::util::N_EL_DATA_LEN as usize;
+    for i_inchi in 0..2usize {
+        for j in 0..2usize {
+            let ja = 1 - j;
+            let (mut mh2fh_alt_inv, mut fh2ifh_alt_inv) = (0i32, 0i32);
+            tot_charge[i_inchi][j] = 0;
+            let s = d.s[i_inchi];
+            let (n_flags, n_flags_alt) = stereo_type_flags(&s, j);
+            let ncj = d.n_num_components[i_inchi][j];
+            if ncj != 0 {
+                num_elem[i_inchi][j] = Some(vec![0; el_len + 1]);
+            }
+            for k in 0..ncj.max(0) as usize {
+                if d.p_inp_inchi[i_inchi][j].is_empty() {
+                    continue;
+                }
+                let n_alt = d.n_num_components[i_inchi][ja];
+                let alt_exists = (k as i32) < n_alt && !d.p_inp_inchi[i_inchi][ja].is_empty();
+                let alt_atoms = alt_exists && d.p_inp_inchi[i_inchi][ja][k].n_number_of_atoms != 0;
+                let ncomp_yes = d.n_num_components[i_inchi][TAUT_YES];
+                let ncomp_non = d.n_num_components[i_inchi][TAUT_NON];
+                // the data of the Mobile-H component read before it is changed
+                let mob_ct = if j == TAUT_NON
+                    && (k as i32) < ncomp_yes
+                    && !d.p_inp_inchi[i_inchi][TAUT_YES].is_empty()
+                {
+                    let m = &d.p_inp_inchi[i_inchi][TAUT_YES][k];
+                    Some((m.n_conn_table.clone(), m.len_conn_table, m.n_total_charge))
+                } else {
+                    None
+                };
+                let yes_exists = !d.p_inp_inchi[i_inchi][TAUT_YES].is_empty();
+                let pp = &mut d.p_inp_inchi[i_inchi];
+                {
+                    let cur = &mut pp[j][k];
+                    if n_flags != 0 {
+                        cur.n_flags |= n_flags;
+                    } else if j == TAUT_NON && n_flags_alt != 0 {
+                        cur.n_flags |= n_flags_alt;
+                    }
+                    // add empty immobile H (nNum_H) if it is missing
+                    if cur.n_num_h.is_empty() {
+                        cur.n_num_h = vec![0; cur.n_number_of_atoms.max(0) as usize + 1];
+                    }
+                    // add a single atom nConnTable if it is missing
+                    if cur.n_conn_table.is_empty() && yes_exists {
+                        match mob_ct.as_ref() {
+                            Some((ct, len, _)) if j == TAUT_NON && !ct.is_empty() && *len > 0 => {
+                                let mut v = vec![0u16; *len as usize + 1];
+                                for (x, y) in v.iter_mut().zip(ct.iter()).take(*len as usize) {
+                                    *x = *y;
+                                }
+                                cur.n_conn_table = v;
+                                cur.len_conn_table = *len;
+                            }
+                            _ => {
+                                if j == TAUT_YES && cur.n_number_of_atoms > 1 {
+                                    *p_state = IST_MOBILE_H_CONNECTIONS
+                                        + if i_inchi == INCHI_REC {
+                                            IST_HAPPENED_IN_RECMET
+                                        } else {
+                                            0
+                                        };
+                                    return RI_ERR_SYNTAX;
+                                }
+                                cur.n_conn_table =
+                                    vec![0; cur.n_number_of_atoms.max(0) as usize + 1];
+                                cur.len_conn_table = 1;
+                                cur.n_conn_table[0] = 1;
+                            }
+                        }
+                    } else if !cur.n_conn_table.is_empty()
+                        && cur.len_conn_table == 0
+                        && cur.n_number_of_atoms == 1
+                    {
+                        cur.n_conn_table[0] = 1;
+                        cur.len_conn_table = 1;
+                    }
+                    // copy charge: Mobile H --> Fixed H
+                    if j == TAUT_NON && cur.n_total_charge == 0 {
+                        if let Some((_, _, ch)) = mob_ct.as_ref() {
+                            if *ch != 0 && *ch != NO_VALUE_INT {
+                                cur.n_total_charge = *ch;
+                            }
+                        }
+                    }
+                    // Fixed H: add nNum_H_fixed to nNum_H
+                    if j == TAUT_NON && !cur.n_num_h.is_empty() {
+                        if let Some(fx) = cur.n_num_h_fixed.clone() {
+                            for m in 0..cur.n_number_of_atoms.max(0) as usize {
+                                let add = fx.get(m).copied().unwrap_or(0);
+                                if let Some(x) = cur.n_num_h.get_mut(m) {
+                                    *x = x.wrapping_add(add);
+                                }
+                            }
+                        }
+                    }
+                }
+                // copy isotopic atoms: Mobile H --> Fixed H
+                if j == TAUT_YES
+                    && pp[j][k].n_number_of_isotopic_atoms != 0
+                    && (k as i32) < ncomp_non
+                {
+                    let from = pp[TAUT_YES][k].clone();
+                    let alt = &mut pp[TAUT_NON][k];
+                    if alt.n_number_of_isotopic_atoms == 0 {
+                        let r = copy_segment(alt, Some(&from), CPY_ISO_AT, 0, 0);
+                        if r < 0 {
+                            return r;
+                        }
+                    }
+                }
+                // restore the omitted stereo segments
+                {
+                    let (a0, a1) = pp.split_at_mut(1);
+                    let (cur_v, alt_v) = if j == 0 {
+                        (&mut a0[0], &mut a1[0])
+                    } else {
+                        (&mut a1[0], &mut a0[0])
+                    };
+                    let cur = &mut cur_v[k];
+                    let alt = if alt_exists { alt_v.get_mut(k) } else { None };
+                    let r = restore_omitted_stereo(
+                        j,
+                        cur,
+                        alt,
+                        alt_atoms,
+                        &s,
+                        n_flags,
+                        n_flags_alt,
+                        ncj,
+                        &mut mh2fh_alt_inv,
+                        &mut fh2ifh_alt_inv,
+                    );
+                    if r < 0 {
+                        return r;
+                    }
+                }
+            }
+        }
+
+        // replace NO_VALUE_INT with zeroes in all Mobile & Fixed H components
+        for j in 0..2usize {
+            for k in 0..d.n_num_components[i_inchi][j].max(0) as usize {
+                if d.p_inp_inchi[i_inchi][j].is_empty() {
+                    continue;
+                }
+                let s = d.s[i_inchi];
+                let c = &mut d.p_inp_inchi[i_inchi][j][k];
+                if c.n_total_charge == NO_VALUE_INT {
+                    c.n_total_charge = 0;
+                }
+                if c.stereo.is_some()
+                    && c.stereo_isotopic.is_some()
+                    && inv(&c.stereo_isotopic) == NO_VALUE_INT
+                    && nsc(&c.stereo) != 0
+                    && inv(&c.stereo) != NO_VALUE_INT
+                {
+                    let v = inv(&c.stereo);
+                    set_inv(&mut c.stereo_isotopic, v);
+                }
+                // the special nCompInv2Abs = 2 forces /s2 or /s3 in the InChI output
+                if c.stereo.is_some() && inv(&c.stereo) == NO_VALUE_INT {
+                    if (c.n_flags & REL_RAC) != 0 && nsc(&c.stereo) != 0 {
+                        set_inv(&mut c.stereo, if s[j][0] > 0 { 2 } else { 0 });
+                    } else {
+                        set_inv(&mut c.stereo, 0);
+                    }
+                }
+                if c.stereo_isotopic.is_some() && inv(&c.stereo_isotopic) == NO_VALUE_INT {
+                    if (c.n_flags & REL_RAC) != 0 && nsc(&c.stereo_isotopic) != 0 {
+                        set_inv(&mut c.stereo_isotopic, if s[j][1] > 0 { 2 } else { 0 });
+                    } else {
+                        set_inv(&mut c.stereo_isotopic, 0);
+                    }
+                }
+                if (c.stereo.is_some() && inv(&c.stereo) == NO_VALUE_INT)
+                    || (c.stereo_isotopic.is_some() && inv(&c.stereo_isotopic) == NO_VALUE_INT)
+                {
+                    return RI_ERR_PROGR;
+                }
+                if c.b_deleted == 0 && c.n_number_of_atoms != 0 {
+                    tot_charge[i_inchi][j] += c.n_total_charge;
+                    for m in 0..c.n_number_of_atoms.max(0) as usize {
+                        let a = i32::from(c.n_atom.get(m).copied().unwrap_or(0));
+                        if a < i32::from(super::util::EL_NUMBER_H) || a > super::util::N_EL_DATA_LEN
+                        {
+                            return RI_ERR_PROGR;
+                        }
+                    }
+                    let nh = match get_inchi_num_h(c) {
+                        Ok(v) => v,
+                        Err(e) => return e,
+                    };
+                    if let Some(ne) = num_elem[i_inchi][j].as_mut() {
+                        for m in 0..c.n_number_of_atoms.max(0) as usize {
+                            let a = usize::from(c.n_atom.get(m).copied().unwrap_or(0));
+                            if a > super::util::EL_NUMBER_H as usize {
+                                ne[a] += 1;
+                            }
+                        }
+                        ne[super::util::EL_NUMBER_H as usize] += nh;
+                    }
+                }
+            }
+        }
+        for j in 0..2usize {
+            for k in 0..d.n_num_components[i_inchi][j].max(0) as usize {
+                if d.p_inp_inchi[i_inchi][j].is_empty() {
+                    continue;
+                }
+                let c = &mut d.p_inp_inchi[i_inchi][j][k];
+                if c.stereo.is_some() && nsc(&c.stereo) == 0 {
+                    set_inv(&mut c.stereo, 0);
+                }
+                if c.stereo_isotopic.is_some() && nsc(&c.stereo_isotopic) == 0 {
+                    set_inv(&mut c.stereo_isotopic, 0);
+                }
+            }
+        }
+
+        // (2008-04-10) missed repeating /s in FI after F for multi-component case
+        if d.n_num_components[i_inchi][TAUT_NON] > 1
+            && d.s[i_inchi][TAUT_YES][0] == 0
+            && d.s[i_inchi][TAUT_YES][1] == 0
+            && d.s[i_inchi][TAUT_NON][0] > 1
+            && d.s[i_inchi][TAUT_NON][1] > 1
+            && d.s[i_inchi][TAUT_NON][0] == d.s[i_inchi][TAUT_NON][1]
+        {
+            for k in 0..d.n_num_components[i_inchi][TAUT_NON].max(0) as usize {
+                let c = &mut d.p_inp_inchi[i_inchi][TAUT_NON][k];
+                if inv(&c.stereo) != 0 {
+                    set_inv(&mut c.stereo, 0);
+                    break;
+                }
+            }
+        }
+        if let Some(ne) = num_elem[i_inchi][TAUT_YES].as_mut() {
+            let np = i32::from(d.n_num_protons[i_inchi][TAUT_YES].n_num_removed_protons);
+            tot_charge[i_inchi][TAUT_YES] += np;
+            ne[super::util::EL_NUMBER_H as usize] += np;
+        }
+
+        // count H and isotopic H in Mobile and Fixed H representations
+        if d.n_num_components[i_inchi][TAUT_NON] != 0 {
+            let mut n_tot_removed_protons = 0i32;
+            let mut n_tot_removed_iso = [0i32; 3];
+            let len2 =
+                d.n_num_components[i_inchi][TAUT_YES].max(d.n_num_components[i_inchi][TAUT_NON]);
+            for k in 0..len2.max(0) as usize {
+                let mut exists = [false; 2];
+                for j in 0..2 {
+                    exists[j] = (k as i32) < d.n_num_components[i_inchi][j]
+                        && d.p_inp_inchi[i_inchi][j]
+                            .get(k)
+                            .is_some_and(|c| c.n_number_of_atoms != 0 && c.b_deleted == 0);
+                }
+                if !exists[TAUT_NON] {
+                    return RI_ERR_SYNTAX;
+                }
+                let mut formula_h = [0i32; 2];
+                let mut num_h = [0i32; 2];
+                let mut charge = [0i32; 2];
+                let mut iso_h = [[0i32; 3]; 2];
+                for j in 0..2 {
+                    if !exists[j] {
+                        continue;
+                    }
+                    let c = &d.p_inp_inchi[i_inchi][j][k];
+                    formula_h[j] = match get_inchi_formula_num_h(c) {
+                        Ok(v) => v,
+                        Err(e) => return e,
+                    };
+                    num_h[j] = match get_inchi_num_h(c) {
+                        Ok(v) => v,
+                        Err(e) => return e,
+                    };
+                    iso_h[j] = match get_inchi_iso_h(c) {
+                        Ok(v) => v,
+                        Err(e) => return e,
+                    };
+                    charge[j] = c.n_total_charge;
+                }
+                for j in 0..2 {
+                    if exists[j] && formula_h[j] != num_h[j] {
+                        return RI_ERR_SYNTAX;
+                    }
+                }
+                let mut found_removed_iso = 0;
+                let removed_charge = charge[TAUT_NON] - charge[TAUT_YES];
+                let removed_h = num_h[TAUT_NON] - num_h[TAUT_YES];
+                let mut removed_iso = [0i32; 3];
+                for m in 0..3 {
+                    removed_iso[m] = iso_h[TAUT_NON][m] - iso_h[TAUT_YES][m];
+                    found_removed_iso += i32::from(removed_iso[m] != 0);
+                }
+                if removed_charge != removed_h {
+                    return RI_ERR_SYNTAX;
+                }
+                if removed_charge != 0 || found_removed_iso != 0 {
+                    let np = &mut d.n_num_protons[i_inchi][TAUT_YES];
+                    if np.p_num_protons.is_none() {
+                        np.p_num_protons = Some(vec![[0; 4]; len2.max(0) as usize]);
+                    }
+                    let e = &mut np.p_num_protons.as_mut().unwrap()[k];
+                    e[0] = removed_h as i16;
+                    n_tot_removed_protons += removed_h;
+                    for m in 0..3 {
+                        e[1 + m] = removed_iso[m] as i16;
+                        n_tot_removed_iso[m] += removed_iso[m];
+                    }
+                    // make sure the Mobile-H InChI has nTautomer
+                    if exists[TAUT_YES] {
+                        let c = &mut d.p_inp_inchi[i_inchi][TAUT_YES][k];
+                        if c.len_tautomer == 0 {
+                            c.len_tautomer = 1;
+                        }
+                        if c.n_tautomer.is_empty() {
+                            c.n_tautomer = vec![0; c.len_tautomer.max(0) as usize];
+                        }
+                    }
+                }
+            }
+            let np = &d.n_num_protons[i_inchi][TAUT_YES];
+            if np.p_num_protons.is_some() {
+                if n_tot_removed_protons != i32::from(np.n_num_removed_protons) {
+                    return RI_ERR_SYNTAX;
+                }
+                for m in 0..3 {
+                    if n_tot_removed_iso[m] != i32::from(np.n_num_removed_isotopic_h[m]) {
+                        return RI_ERR_SYNTAX;
+                    }
+                }
+            }
+        }
+
+        // make the Mobile H and Fixed H InChI arrays have the same length
+        let (nm, nf) = (
+            d.n_num_components[i_inchi][TAUT_YES],
+            d.n_num_components[i_inchi][TAUT_NON],
+        );
+        let (j, len1, len2) = if nm < nf {
+            (TAUT_YES, nm, nf)
+        } else if nm > nf {
+            (TAUT_NON, nf, nm)
+        } else {
+            (0, 0, 0)
+        };
+        if len2 != 0 && len1 != 0 {
+            let pp = &mut d.p_inp_inchi[i_inchi];
+            pp[j].truncate(len1 as usize);
+            pp[j].resize(len2 as usize, InChI::default());
+            d.n_num_components[i_inchi][j] = len2;
+            for l in len1 as usize..len2 as usize {
+                if j == TAUT_YES {
+                    let r = n_fill_out_proton_mobile_h(&mut pp[TAUT_YES][l]);
+                    if r < 0 {
+                        return r;
+                    }
+                    let from = pp[TAUT_NON][l].clone();
+                    let r = n_proton_copy_isotopic_info(&mut pp[TAUT_YES][l], &from);
+                    if r < 0 {
+                        return r;
+                    }
+                } else {
+                    pp[l][0].b_deleted = 1;
+                }
+            }
+        }
+    }
+
+    // check balances
+    for i_inchi in 0..2usize {
+        for i in i_inchi..2usize {
+            for j in 0..2usize {
+                for k in j..2usize {
+                    if (i_inchi != i || j != k)
+                        && num_elem[i_inchi][j].is_some()
+                        && num_elem[i][k].is_some()
+                    {
+                        if tot_charge[i_inchi][j] != tot_charge[i][k] {
+                            return RI_ERR_SYNTAX;
+                        }
+                        let (a, b) = (
+                            num_elem[i_inchi][j].as_ref().unwrap(),
+                            num_elem[i][k].as_ref().unwrap(),
+                        );
+                        if a != b {
+                            return RI_ERR_SYNTAX;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    0
+}
+
+/// `InChILine2Data`: reads an InChI line and adds the omitted layers.
+/// Returns the result of `ReadInChILine`; `n_err` is the error of the
+/// conversion (0 or a negative `RI_ERR_*`).
+#[allow(clippy::too_many_arguments)]
+pub fn inchi_line2data(
+    inp: &mut InchiIostream,
+    line: &mut SegmLine,
+    p_str: &mut Option<Vec<u8>>,
+    p_state: &mut i32,
+    n_err: &mut i32,
+    d: &mut InpInChI,
+    b_read_coord: bool,
+    n_mode: u64,
+    b_std_format: &mut i32,
+    input_has_save_opt: &mut i32,
+    input_save_opt_bits: &mut u8,
+) -> i32 {
+    let target_stereo_type = if n_mode & REQ_MODE_RELATIVE_STEREO != 0 {
+        2
+    } else if n_mode & REQ_MODE_RACEMIC_STEREO != 0 {
+        3
+    } else {
+        1
+    };
+    let ret = read_inchi_line(
+        inp,
+        line,
+        p_str,
+        p_state,
+        d,
+        b_std_format,
+        input_has_save_opt,
+        input_save_opt_bits,
+    );
+    if target_stereo_type > 1 {
+        for i1 in 0..2 {
+            for i2 in 0..2 {
+                for i3 in 0..2 {
+                    if d.s[i1][i2][i3] != 0 {
+                        d.s[i1][i2][i3] = target_stereo_type;
+                    }
+                }
+            }
+        }
+    }
+    *n_err = 0;
+    let ncomp = d.n_num_components[INCHI_BAS][TAUT_YES] + d.n_num_components[INCHI_BAS][TAUT_NON];
+    if ret == RI_ERR_EOL && ncomp != 0 && b_read_coord {
+        let mut st = 0;
+        let _ = read_inchi_coord(inp, line, &mut st);
+    }
+    let ret2 = if (ret == RI_ERR_EOL || ret == RI_ERR_EOF) && ncomp != 0 {
+        line2data_postprocess(p_state, d)
+    } else {
+        ret
+    };
+    *n_err = if ret2 < 0 && ret2 != RI_ERR_EOL {
+        ret2
+    } else {
+        0
+    };
     ret
 }

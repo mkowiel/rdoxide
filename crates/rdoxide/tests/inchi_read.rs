@@ -657,3 +657,100 @@ fn read_inchi_line_matches_c() {
         );
     }
 }
+
+#[test]
+fn inchi_line2data_matches_c() {
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_read4.json")).unwrap();
+    for (ci, c) in data.as_array().unwrap().iter().enumerate() {
+        let inp = c["in"].as_str().unwrap();
+        let t: Vec<&str> = inp.split(' ').collect();
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        assert_eq!(t[0], "14");
+        let mode: u64 = t[1].parse().unwrap();
+        let bytes = unhex(t[2]);
+        let mut ios = InchiIostream::default();
+        inchi_ios_init(&mut ios, INCHI_IOS_TYPE_STRING, IosFile::None);
+        ios.s.n_used_length = bytes.len() as i32;
+        ios.s.p_str = Some(bytes);
+        ios.s.n_ptr = 0;
+        let mut line = SegmLine::default();
+        let mut pstr = None;
+        let mut state = -77;
+        let mut nerr = -9;
+        let mut d = InpInChI::default();
+        let (mut stdf, mut hso, mut bits) = (-5, -5, 0u8);
+        let r = inchi_line2data(
+            &mut ios, &mut line, &mut pstr, &mut state, &mut nerr, &mut d, true, mode, &mut stdf,
+            &mut hso, &mut bits,
+        );
+        let mut got = vec![
+            format!("R {r} {state} {stdf} {hso} {bits} {} {nerr}", line.len),
+            format!(
+                "N {} {} {} {}",
+                d.n_num_components[0][0],
+                d.n_num_components[0][1],
+                d.n_num_components[1][0],
+                d.n_num_components[1][1]
+            ),
+        ];
+        let s = d.s;
+        got.push(format!(
+            "S {} {} {} {} {} {} {} {}",
+            s[0][0][0],
+            s[0][0][1],
+            s[0][1][0],
+            s[0][1][1],
+            s[1][0][0],
+            s[1][0][1],
+            s[1][1][0],
+            s[1][1][1]
+        ));
+        for a in 0..2 {
+            for b in 0..2 {
+                let p = &d.n_num_protons[a][b];
+                let mut l = format!(
+                    "P{a}{b} {} {} {} {} |",
+                    p.n_num_removed_protons,
+                    p.n_num_removed_isotopic_h[0],
+                    p.n_num_removed_isotopic_h[1],
+                    p.n_num_removed_isotopic_h[2]
+                );
+                match &p.p_num_protons {
+                    Some(v) => {
+                        let n2 = d.n_num_components[a][0]
+                            .max(d.n_num_components[a][1])
+                            .max(0) as usize;
+                        for q in 0..n2 {
+                            let e = v.get(q).copied().unwrap_or([0; 4]);
+                            l.push_str(&format!(" {},{},{},{}", e[0], e[1], e[2], e[3]));
+                        }
+                    }
+                    None => l.push_str(" NULL"),
+                }
+                got.push(l);
+            }
+        }
+        for a in 0..2 {
+            for b in 0..2 {
+                for i in 0..d.n_num_components[a][b].max(0) as usize {
+                    let Some(comp) = d.p_inp_inchi[a][b].get(i) else {
+                        break;
+                    };
+                    got.push(format!("C{a}{b}.{i} {}", dump_full(comp)));
+                }
+            }
+        }
+        assert_eq!(
+            got,
+            want,
+            "case {ci}: {}",
+            String::from_utf8_lossy(&unhex(t[2]))
+        );
+    }
+}
