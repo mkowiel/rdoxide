@@ -1032,6 +1032,42 @@ fn restoration_helpers_match_c() {
                                                         sum(&b)
                                                     ));
                                                 }
+                                                ps.charge = (n % 3) as i8 - 1;
+                                                ps.i_mobile_h =
+                                                    if (n >> 1) & 1 == 1 { 0 } else { 1 };
+                                                ps.fixed_h = Some(
+                                                    (0..n).map(|i| i8::from(i % 7 == 0)).collect(),
+                                                );
+                                                let rmr = r4::move_charge_to_remove_centerpoints(
+                                                    &mut b, &mut bd, &mut ps, &mut a2, &mut va, &g,
+                                                    &mut nr, &mut td, 4,
+                                                );
+                                                let ci: i32 = (0..n)
+                                                    .map(|i| {
+                                                        i32::from(va[i].c_init_charge)
+                                                            * (i as i32 + 1)
+                                                    })
+                                                    .sum();
+                                                got.push(format!(
+                                                    "MR {rmr} {nr} {td} {} {} {ci} {}",
+                                                    b.tot_st_cap,
+                                                    b.tot_st_flow,
+                                                    sum(&b)
+                                                ));
+                                                let rms =
+                                                    r4::make_single_bonds_metal2_charged_heteroat(
+                                                        &mut b, &mut bd, &mut ps, &mut a2, &va, &g,
+                                                        &mut nr, &mut td, 4,
+                                                    );
+                                                got.push(format!(
+                                                    "MS {rms} {nr} {td} {} {} {}",
+                                                    b.tot_st_cap,
+                                                    b.tot_st_flow,
+                                                    sum(&b)
+                                                ));
+                                                ps.fixed_h = None;
+                                                ps.i_mobile_h = 0;
+                                                ps.charge = 0;
                                             }
                                             ps.endpoint = None;
                                             ps.ti.t_group = None;

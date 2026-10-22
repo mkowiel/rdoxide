@@ -290,6 +290,16 @@ int main(void) {
                                             int cf = 0; for (int i = 0; i < n; i++) cf += a2[i].cFlags;
                                             printf("FX%d %d %d %d %d %d %lld\n", pass, rr, nr, td, b->tot_st_flow, cf, chk);
                                         }
+                                        s3.charge = (n % 3) - 1; s3.iMobileH = ((n >> 1) & 1) ? 0 : 1;
+                                        s3.fixed_H = calloc(n + 1, 1); for (int i = 0; i < n; i++) s3.fixed_H[i] = (i % 7 == 0);
+                                        int rmr = MoveChargeToRemoveCenerpoints(b, bd, &s3, at, a2, va, &g, &nr, &td, 4);
+                                        chk = 0; for (int q = 0; q < b->num_edges; q++) chk = (chk + (long long)(b->edge[q].flow * 31 + b->edge[q].forbidden) * (q + 1)) % 1000000007LL;
+                                        int ci = 0; for (int i = 0; i < n; i++) ci += va[i].cInitCharge * (i + 1);
+                                        printf("MR %d %d %d %d %d %d %lld\n", rmr, nr, td, b->tot_st_cap, b->tot_st_flow, ci, chk);
+                                        int rms2 = MakeSingleBondsMetal2ChargedHeteroat(b, bd, &s3, at, a2, va, &g, &nr, &td, 4);
+                                        chk = 0; for (int q = 0; q < b->num_edges; q++) chk = (chk + (long long)(b->edge[q].flow * 31 + b->edge[q].forbidden) * (q + 1)) % 1000000007LL;
+                                        printf("MS %d %d %d %d %d %lld\n", rms2, nr, td, b->tot_st_cap, b->tot_st_flow, chk);
+                                        free(s3.fixed_H); s3.fixed_H = NULL; s3.iMobileH = 0; s3.charge = 0;
                                         free(atf); free(atn);
                                     }
                                     s3.endpoint = NULL; s3.ti.t_group = NULL; free(epl); free(epf);

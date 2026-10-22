@@ -87,6 +87,8 @@ pub struct StrFromInChI {
     pub b_mobile_h: i32,
     /// `iMobileH`: `TAUT_NON` (0) for the Fixed-H structure
     pub i_mobile_h: i32,
+    /// `fixed_H`: the atoms with the fixed H of the Fixed-H InChI
+    pub fixed_h: Option<Vec<i8>>,
     /// `endpoint`: the endpoints of the original Fixed-H InChI
     pub endpoint: Option<Vec<u16>>,
     /// `pbfsq`: work arrays of the ring search
@@ -2952,7 +2954,7 @@ fn finish_keep(ps: &StrFromInChI, at2: &mut Vec<InpAtom>, len_at: usize) -> i32 
     0
 }
 
-fn refresh_at2(
+pub fn refresh_at2(
     ps: &mut StrFromInChI,
     at2: &mut Vec<InpAtom>,
     bns: &BnStruct,
