@@ -1,7 +1,7 @@
 //! Differential tests of the InChI string reader (`ichiread.rs`) against the
 //! C library, with fixtures from `tools/inchi_read1_reference.py`.
 
-use rdoxide::external::inchi::ichi::InChI;
+use rdoxide::external::inchi::ichi::{InChI, InChIIsotopicAtom, InChIStereo};
 use rdoxide::external::inchi::ichi_io::{INCHI_IOS_TYPE_STRING, InchiIostream};
 use rdoxide::external::inchi::ichiread::*;
 
@@ -295,6 +295,220 @@ fn read_helpers_match_c() {
                         c.n_tautomer[0],
                     ) + &format!(" {}", c.len_tautomer),
                 );
+            }
+            _ => unreachable!(),
+        }
+        assert_eq!(got, want, "case {ci}: {inp}");
+    }
+}
+
+fn dump_stereo(s: &Option<InChIStereo>) -> String {
+    let Some(s) = s else {
+        return " NULL".into();
+    };
+    let mut o = format!(
+        " [{} {} {} {} {}{}{}{}{}",
+        s.n_number_of_stereo_centers,
+        s.n_number_of_stereo_bonds,
+        s.n_comp_inv2_abs,
+        s.b_trivial_inv,
+        u8::from(!s.t_parity.is_empty()),
+        u8::from(!s.n_number.is_empty()),
+        u8::from(!s.b_parity.is_empty()),
+        u8::from(!s.n_bond_atom1.is_empty()),
+        u8::from(!s.n_bond_atom2.is_empty()),
+    );
+    if !s.t_parity.is_empty() && !s.n_number.is_empty() {
+        o.push_str(" |");
+        for i in 0..s.n_number_of_stereo_centers.max(0) as usize {
+            o.push_str(&format!(" {}:{}", s.n_number[i], s.t_parity[i]));
+        }
+    }
+    if !s.b_parity.is_empty() && !s.n_bond_atom1.is_empty() && !s.n_bond_atom2.is_empty() {
+        o.push_str(" |");
+        for i in 0..s.n_number_of_stereo_bonds.max(0) as usize {
+            o.push_str(&format!(
+                " {}-{}:{}",
+                s.n_bond_atom1[i], s.n_bond_atom2[i], s.b_parity[i]
+            ));
+        }
+    }
+    o.push(']');
+    o
+}
+
+fn dump_inchi(c: &InChI) -> String {
+    let mut o = format!(
+        "{} {} {}",
+        c.n_number_of_atoms,
+        c.n_number_of_isotopic_atoms,
+        u8::from(!c.isotopic_atom.is_empty())
+    );
+    if !c.isotopic_atom.is_empty() {
+        for a in c
+            .isotopic_atom
+            .iter()
+            .take(c.n_number_of_isotopic_atoms.max(0) as usize)
+        {
+            o.push_str(&format!(
+                " ({} {} {} {} {})",
+                a.n_atom_number, a.n_iso_difference, a.n_num_h, a.n_num_d, a.n_num_t
+            ));
+        }
+    }
+    o.push_str(&dump_stereo(&c.stereo));
+    o.push_str(&dump_stereo(&c.stereo_isotopic));
+    o
+}
+
+fn mk_stereo(t: &[&str], k: &mut usize) -> Option<InChIStereo> {
+    let n = |k: &mut usize| {
+        *k += 1;
+        t[*k - 1].parse::<i32>().unwrap()
+    };
+    if n(k) == 0 {
+        return None;
+    }
+    let (nsc, nsb, inv, triv, tl, bl) = (n(k), n(k), n(k), n(k), n(k), n(k));
+    let mut s = InChIStereo {
+        n_number_of_stereo_centers: nsc,
+        n_number_of_stereo_bonds: nsb,
+        n_comp_inv2_abs: inv,
+        b_trivial_inv: triv,
+        ..Default::default()
+    };
+    if tl != 0 {
+        s.t_parity = (0..=nsc)
+            .map(|i| if i < nsc { ((i * 3 + 1) % 5) as i8 } else { 0 })
+            .collect();
+        s.n_number = (0..=nsc)
+            .map(|i| if i < nsc { (i * 7 + 2) as u16 } else { 0 })
+            .collect();
+    }
+    if bl != 0 {
+        s.b_parity = (0..=nsb)
+            .map(|i| if i < nsb { (i % 4 + 1) as i8 } else { 0 })
+            .collect();
+        s.n_bond_atom1 = (0..=nsb)
+            .map(|i| if i < nsb { (i + 10) as u16 } else { 0 })
+            .collect();
+        s.n_bond_atom2 = (0..=nsb)
+            .map(|i| if i < nsb { (i + 3) as u16 } else { 0 })
+            .collect();
+    }
+    Some(s)
+}
+
+fn mk_inchi(t: &[&str], k: &mut usize) -> InChI {
+    let mut n = || {
+        *k += 1;
+        t[*k - 1].parse::<i32>().unwrap()
+    };
+    let (na, ni, ip) = (n(), n(), n());
+    let mut c = InChI {
+        n_number_of_atoms: na,
+        n_number_of_isotopic_atoms: ni,
+        ..Default::default()
+    };
+    if ip != 0 {
+        c.isotopic_atom = (0..=ni)
+            .map(|i| {
+                if i < ni {
+                    InChIIsotopicAtom {
+                        n_atom_number: (i + 1) as u16,
+                        n_iso_difference: (i - 1) as i16,
+                        n_num_h: i as i16,
+                        n_num_d: (2 * i) as i16,
+                        n_num_t: 3,
+                    }
+                } else {
+                    InChIIsotopicAtom::default()
+                }
+            })
+            .collect();
+    }
+    c.stereo = mk_stereo(t, k);
+    c.stereo_isotopic = mk_stereo(t, k);
+    c
+}
+
+#[test]
+fn stereo_layers_match_c() {
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_read2.json")).unwrap();
+    for (ci, c) in data.as_array().unwrap().iter().enumerate() {
+        let inp = c["in"].as_str().unwrap();
+        let t: Vec<&str> = inp.split(' ').collect();
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        let mut got: Vec<String> = Vec::new();
+        let p = |k: usize| t[k].parse::<i32>().unwrap();
+        match t[0] {
+            "11" => {
+                let mut abc = p(1);
+                let nc = [p(2), p(3)];
+                let mut k = 4;
+                let mut pp: [Vec<InChI>; 2] = [Vec::new(), Vec::new()];
+                for m in 0..2 {
+                    if nc[m] > 0 {
+                        pp[m] = vec![InChI::default(); nc[m] as usize + 2];
+                        for i in 0..nc[m] as usize {
+                            pp[m][i].n_number_of_atoms = p(k);
+                            k += 1;
+                        }
+                    }
+                }
+                let mut sv = [[0i32; 2]; 2];
+                let nseg = p(k);
+                k += 1;
+                for _ in 0..nseg {
+                    let state = p(k);
+                    let s = unhex(t[k + 1]);
+                    k += 2;
+                    let mob = usize::from(state < IST_FIXED_H_LAYER_FORK);
+                    let r = match state {
+                        IST_MOBILE_H_SP2 | IST_FIXED_H_SP2 | IST_MOBILE_H_ISO_SP2
+                        | IST_FIXED_H_ISO_SP2 => {
+                            parse_segment_sp2(&s, mob, &mut pp, nc, state, &mut abc)
+                        }
+                        IST_MOBILE_H_SP3 | IST_FIXED_H_SP3 | IST_MOBILE_H_ISO_SP3
+                        | IST_FIXED_H_ISO_SP3 => {
+                            parse_segment_sp3(&s, mob, &mut pp, nc, state, &mut abc)
+                        }
+                        IST_MOBILE_H_SP3_M
+                        | IST_FIXED_H_SP3_M
+                        | IST_MOBILE_H_ISO_SP3_M
+                        | IST_FIXED_H_ISO_SP3_M => parse_segment_sp3m(&s, mob, &mut pp, nc, state),
+                        _ => parse_segment_sp3s(&s, mob, &mut pp, &mut sv, nc, state),
+                    };
+                    got.push(format!(
+                        "R {state} {r} {abc} {} {} {}",
+                        sv[0][0],
+                        sv[0][1],
+                        sv[1][0] * 10 + sv[1][1]
+                    ));
+                    if r < 0 {
+                        break;
+                    }
+                }
+                for m in 0..2 {
+                    for i in 0..nc[m] as usize {
+                        got.push(format!("C{m}.{i} {}", dump_inchi(&pp[m][i])));
+                    }
+                }
+            }
+            "12" => {
+                let (ty, bto, bfrom, hasfrom) = (p(1), p(2), p(3), p(4) != 0);
+                let mut k = 5;
+                let mut to = mk_inchi(&t, &mut k);
+                let from = hasfrom.then(|| mk_inchi(&t, &mut k));
+                let r = copy_segment(&mut to, from.as_ref(), ty, bto, bfrom);
+                got.push(format!("R {r}"));
+                got.push(format!("C {}", dump_inchi(&to)));
             }
             _ => unreachable!(),
         }

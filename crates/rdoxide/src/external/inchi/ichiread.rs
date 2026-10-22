@@ -11,7 +11,7 @@
 //! here a string is a byte slice that reads as zero past its end and a
 //! position is an index. Only string input streams are supported.
 
-use super::ichi::InChI;
+use super::ichi::{InChI, InChIIsotopicAtom, InChIStereo};
 use super::ichi_io::{INCHI_IOS_TYPE_STRING, InchiIostream};
 use super::inpdef::MAXVAL;
 use super::util::strtol10;
@@ -1972,4 +1972,1014 @@ pub fn parse_segment_mobile_h(
         return RI_ERR_SYNTAX;
     }
     i_component + 1
+}
+
+// ---------------------------------------------------------------------------
+// The stereo layers: `/b`, `/t`, `/m`, `/s` (and the isotopic ones)
+
+/// `COPY_SEG_TYPE`
+pub const CPY_SP2: i32 = 0;
+pub const CPY_SP3: i32 = 1;
+pub const CPY_SP3_M: i32 = 2;
+pub const CPY_SP3_S: i32 = 3;
+pub const CPY_ISO_AT: i32 = 4;
+
+const MULT_TYPE: &[u8] = b"mnMNe";
+const PARITY_TYPE: &[u8] = b"-+u?";
+const AB_MIN_KNOWN_PARITY: i32 = 1;
+const AB_MAX_KNOWN_PARITY: i32 = 4;
+
+/// `strchr(set, c)` over a C string constant: the position (the terminating
+/// zero is found as well when `c == 0`)
+fn strchr_set(set: &[u8], c: u8) -> Option<usize> {
+    if c == 0 {
+        return Some(set.len());
+    }
+    set.iter().position(|&x| x == c)
+}
+
+fn stereo_slot(c: &mut InChI, iso: bool) -> &mut Option<InChIStereo> {
+    if iso {
+        &mut c.stereo_isotopic
+    } else {
+        &mut c.stereo
+    }
+}
+
+/// `CopySegment`: copies the sp2/sp3/`/m`/`/s`/isotopic atoms segment of
+/// `from` (`None` for the C NULL) into `to`. Returns the number of the
+/// copied items plus one, 0 when there is nothing to copy, or a `RI_ERR_*`.
+pub fn copy_segment(
+    to: &mut InChI,
+    from: Option<&InChI>,
+    segment_type: i32,
+    b_isotopic_to: i32,
+    b_isotopic_from: i32,
+) -> i32 {
+    let stereo_from: Option<&InChIStereo> = match (from, b_isotopic_from) {
+        (Some(f), 1) => f.stereo_isotopic.as_ref(),
+        (Some(f), 0) => f.stereo.as_ref(),
+        _ => None,
+    };
+    let iso_to = b_isotopic_to != 0;
+    if matches!(segment_type, CPY_SP2 | CPY_SP3 | CPY_SP3_M | CPY_SP3_S) {
+        if stereo_from.is_none() && b_isotopic_from >= 0 {
+            return 0;
+        }
+        match segment_type {
+            CPY_SP2 => {
+                if b_isotopic_from >= 0 {
+                    let f = from.unwrap();
+                    if f.n_number_of_atoms > MAX_ATOMS || f.n_number_of_atoms < 0 {
+                        return RI_ERR_SYNTAX;
+                    }
+                }
+                let sf = stereo_from;
+                if b_isotopic_from < 0
+                    || sf.is_some_and(|s| {
+                        !s.b_parity.is_empty()
+                            && !s.n_bond_atom1.is_empty()
+                            && !s.n_bond_atom2.is_empty()
+                    })
+                {
+                    let len = if b_isotopic_from < 0 {
+                        0
+                    } else {
+                        sf.unwrap().n_number_of_stereo_bonds
+                    };
+                    let src = sf.cloned();
+                    let slot = stereo_slot(to, iso_to);
+                    let st = slot.get_or_insert_with(Default::default);
+                    if st.n_number_of_stereo_bonds > 0
+                        || !st.b_parity.is_empty()
+                        || !st.n_bond_atom1.is_empty()
+                        || !st.n_bond_atom2.is_empty()
+                    {
+                        return RI_ERR_SYNTAX;
+                    }
+                    let n = (len.max(0) + 1) as usize;
+                    st.b_parity = vec![0; n];
+                    st.n_bond_atom1 = vec![0; n];
+                    st.n_bond_atom2 = vec![0; n];
+                    if b_isotopic_from >= 0 && len != 0 {
+                        let s = src.unwrap();
+                        for k in 0..n {
+                            st.b_parity[k] = s.b_parity.get(k).copied().unwrap_or(0);
+                            st.n_bond_atom1[k] = s.n_bond_atom1.get(k).copied().unwrap_or(0);
+                            st.n_bond_atom2[k] = s.n_bond_atom2.get(k).copied().unwrap_or(0);
+                        }
+                    }
+                    st.n_number_of_stereo_bonds = len;
+                    return len + 1;
+                }
+                0
+            }
+            CPY_SP3 => {
+                let sf = stereo_from;
+                if b_isotopic_from < 0
+                    || sf.is_some_and(|s| !s.t_parity.is_empty() && !s.n_number.is_empty())
+                {
+                    let len = if b_isotopic_from < 0 {
+                        0
+                    } else {
+                        sf.unwrap().n_number_of_stereo_centers
+                    };
+                    let src = sf.cloned();
+                    let slot = stereo_slot(to, iso_to);
+                    let st = slot.get_or_insert_with(Default::default);
+                    if st.n_number_of_stereo_centers > 0
+                        || !st.t_parity.is_empty()
+                        || !st.n_number.is_empty()
+                    {
+                        return RI_ERR_SYNTAX;
+                    }
+                    let n = (len.max(0) + 1) as usize;
+                    st.t_parity = vec![0; n];
+                    st.n_number = vec![0; n];
+                    if b_isotopic_from >= 0 && len != 0 {
+                        let s = src.unwrap();
+                        for k in 0..n {
+                            st.t_parity[k] = s.t_parity.get(k).copied().unwrap_or(0);
+                            st.n_number[k] = s.n_number.get(k).copied().unwrap_or(0);
+                        }
+                    }
+                    st.n_number_of_stereo_centers = len;
+                    return len + 1;
+                }
+                0
+            }
+            CPY_SP3_M => {
+                let inv = stereo_from.map(|s| s.n_comp_inv2_abs);
+                let st = stereo_slot(to, iso_to).get_or_insert_with(Default::default);
+                if st.n_comp_inv2_abs != 0 && NO_VALUE_INT != st.n_comp_inv2_abs {
+                    return RI_ERR_SYNTAX;
+                }
+                st.n_comp_inv2_abs = if b_isotopic_from < 0 { 0 } else { inv.unwrap() };
+                1
+            }
+            _ => {
+                // CPY_SP3_S: uses `bIsotopicFrom` to select the target (as C does)
+                let triv = stereo_from.map(|s| s.b_trivial_inv);
+                let st = stereo_slot(to, b_isotopic_from != 0).get_or_insert_with(Default::default);
+                if st.b_trivial_inv != 0 {
+                    return RI_ERR_SYNTAX;
+                }
+                st.b_trivial_inv = if b_isotopic_from < 0 {
+                    0
+                } else {
+                    triv.unwrap()
+                };
+                1
+            }
+        }
+    } else if segment_type == CPY_ISO_AT {
+        let f = from.unwrap();
+        if b_isotopic_from < 0 || !f.isotopic_atom.is_empty() {
+            let len = if b_isotopic_from < 0 {
+                0
+            } else {
+                f.n_number_of_isotopic_atoms
+            };
+            if to.n_number_of_isotopic_atoms < 1 {
+                to.isotopic_atom = Vec::new();
+            }
+            let n = (len.max(0) + 1) as usize;
+            if to.isotopic_atom.is_empty() {
+                to.isotopic_atom = vec![InChIIsotopicAtom::default(); n];
+            }
+            if to.n_number_of_isotopic_atoms != 0 {
+                return RI_ERR_SYNTAX;
+            }
+            if b_isotopic_from >= 0 && len != 0 {
+                for k in 0..n.min(to.isotopic_atom.len()) {
+                    to.isotopic_atom[k] = f.isotopic_atom.get(k).cloned().unwrap_or_default();
+                }
+            }
+            to.n_number_of_isotopic_atoms = len;
+            return len + 1;
+        }
+        0
+    } else {
+        RI_ERR_PROGR
+    }
+}
+
+/// `inchi_strtol` + the cast to `AT_NUMB`
+fn num16(s: &[u8], p: &mut usize, base: i64) -> u16 {
+    let (v, q) = inchi_strtol(s, *p, base);
+    *p = q;
+    v as u16
+}
+
+/// `ParseSegmentSp3s`: the `/s` layer (`s` starts at the `s`)
+pub fn parse_segment_sp3s(
+    s: &[u8],
+    b_mobile_h: usize,
+    p_inp_inchi: &mut [Vec<InChI>; 2],
+    sv: &mut [[i32; 2]; 2],
+    ppn_num_components: [i32; 2],
+    state: i32,
+) -> i32 {
+    let b_iso = state == IST_MOBILE_H_ISO_SP3_S || state == IST_FIXED_H_ISO_SP3_S;
+    if !b_iso && state != IST_MOBILE_H_SP3_S && state != IST_FIXED_H_SP3_S {
+        return RI_ERR_PROGR;
+    }
+    if at(s, 0) != b's' {
+        return 0;
+    }
+    let p_start = 1usize;
+    let n_num = ppn_num_components[b_mobile_h];
+    if strchr(s, p_start, b'/').is_some() {
+        return RI_ERR_SYNTAX;
+    }
+    let p_end = p_start + strlen(s, p_start);
+    if p_end == p_start {
+        sv[b_mobile_h][b_iso as usize] = NO_VALUE_INT;
+        for i in 0..n_num.max(0) as usize {
+            let Some(c) = p_inp_inchi[b_mobile_h].get_mut(i) else {
+                return RI_ERR_SYNTAX;
+            };
+            let st = stereo_slot(c, b_iso).get_or_insert_with(Default::default);
+            st.n_comp_inv2_abs = 0;
+            if st.n_number_of_stereo_centers != 0 {
+                return RI_ERR_SYNTAX;
+            }
+            if st.t_parity.is_empty() {
+                st.t_parity = vec![0; 1];
+            }
+            if st.n_number.is_empty() {
+                st.n_number = vec![0; 1];
+            }
+        }
+        n_num + 1
+    } else {
+        let (val, q) = strtol(s, p_start);
+        if q == p_end && (1..=3).contains(&(val as i32)) {
+            sv[b_mobile_h][b_iso as usize] = val as i32;
+            n_num + 1
+        } else {
+            RI_ERR_SYNTAX
+        }
+    }
+}
+
+/// `bIsSp3LayerNotEmpty`
+pub fn is_sp3_layer_not_empty(
+    p_inp_inchi: &[Vec<InChI>; 2],
+    b_mobile_h: usize,
+    b_iso: bool,
+    n_num_components: i32,
+) -> i32 {
+    let mut n = 0;
+    for i in 0..n_num_components.max(0) as usize {
+        let Some(c) = p_inp_inchi[b_mobile_h].get(i) else {
+            break;
+        };
+        if c.b_deleted != 0 || c.n_number_of_atoms == 0 {
+            continue;
+        }
+        let st = if b_iso {
+            c.stereo_isotopic.as_ref()
+        } else {
+            c.stereo.as_ref()
+        };
+        if st.is_some_and(|s| {
+            s.n_number_of_stereo_centers > 0 && !s.n_number.is_empty() && !s.t_parity.is_empty()
+        }) {
+            n += 1;
+        }
+    }
+    n
+}
+
+/// `ParseSegmentSp3m`: the `/m` layer
+pub fn parse_segment_sp3m(
+    s: &[u8],
+    b_mobile_h: usize,
+    p_inp_inchi: &mut [Vec<InChI>; 2],
+    ppn_num_components: [i32; 2],
+    state: i32,
+) -> i32 {
+    let b_iso = state == IST_MOBILE_H_ISO_SP3_M || state == IST_FIXED_H_ISO_SP3_M;
+    if !b_iso && state != IST_MOBILE_H_SP3_M && state != IST_FIXED_H_SP3_M {
+        return RI_ERR_PROGR;
+    }
+    let mut n_num = ppn_num_components[b_mobile_h];
+    if at(s, 0) != b'm' {
+        // /m is missing: inherit from a preceding stereo layer
+        let (mut from_m, mut from_iso): (i32, i32) = (-1, -1);
+        if b_mobile_h == TAUT_YES && !b_iso {
+            return 0;
+        }
+        if b_mobile_h == TAUT_NON && !b_iso {
+            from_m = TAUT_YES as i32;
+            from_iso = 0;
+        } else if b_mobile_h == TAUT_YES && b_iso {
+            from_m = TAUT_YES as i32;
+            from_iso = 0;
+        } else if b_mobile_h == TAUT_NON && b_iso {
+            from_m = TAUT_NON as i32;
+            from_iso = 0;
+            if is_sp3_layer_not_empty(p_inp_inchi, TAUT_NON, false, ppn_num_components[TAUT_NON])
+                == 0
+                && is_sp3_layer_not_empty(
+                    p_inp_inchi,
+                    TAUT_YES,
+                    false,
+                    ppn_num_components[TAUT_YES],
+                ) == 0
+            {
+                from_m = TAUT_YES as i32;
+                from_iso = 1;
+            }
+        }
+        if from_m < 0 || from_iso < 0 {
+            return RI_ERR_PROGR;
+        }
+        if is_sp3_layer_not_empty(
+            p_inp_inchi,
+            from_m as usize,
+            from_iso != 0,
+            ppn_num_components[from_m as usize],
+        ) == 0
+        {
+            if (from_m == 0 && from_iso != 0) || (from_m != 0 && from_iso == 0) {
+                from_m = TAUT_YES as i32;
+                from_iso = 0;
+                if is_sp3_layer_not_empty(
+                    p_inp_inchi,
+                    from_m as usize,
+                    false,
+                    ppn_num_components[from_m as usize],
+                ) == 0
+                {
+                    return 0;
+                }
+            } else {
+                return 0;
+            }
+        }
+        n_num = ppn_num_components[b_mobile_h].min(ppn_num_components[from_m as usize]);
+        for i in 0..n_num.max(0) as usize {
+            let (Some(f), Some(t)) = (
+                p_inp_inchi[from_m as usize].get(i),
+                p_inp_inchi[b_mobile_h].get(i),
+            ) else {
+                break;
+            };
+            if f.n_number_of_atoms > 0
+                && f.b_deleted == 0
+                && t.n_number_of_atoms > 0
+                && t.b_deleted == 0
+            {
+                let sf = if from_iso != 0 {
+                    f.stereo_isotopic.as_ref()
+                } else {
+                    f.stereo.as_ref()
+                };
+                let inv = sf.map(|x| x.n_comp_inv2_abs);
+                let t = &mut p_inp_inchi[b_mobile_h][i];
+                if let (Some(inv), Some(st)) = (inv, stereo_slot(t, b_iso).as_mut()) {
+                    st.n_comp_inv2_abs = inv;
+                }
+            }
+        }
+        return 0;
+    }
+
+    let p_start = 1usize;
+    if strchr(s, p_start, b'/').is_some() {
+        return RI_ERR_SYNTAX;
+    }
+    let p_end = p_start + strlen(s, p_start);
+    let mut p = p_start;
+    if p_end == p_start {
+        for i in 0..n_num.max(0) as usize {
+            let Some(c) = p_inp_inchi[b_mobile_h].get_mut(i) else {
+                return RI_ERR_SYNTAX;
+            };
+            let st = stereo_slot(c, b_iso).get_or_insert_with(Default::default);
+            st.n_comp_inv2_abs = NO_VALUE_INT;
+            if st.t_parity.is_empty() {
+                st.t_parity = vec![0; 1];
+            }
+            if st.n_number.is_empty() {
+                st.n_number = vec![0; 1];
+            }
+        }
+        n_num + 1
+    } else {
+        let mut i_comp = 0i32;
+        while p < p_end && i_comp < n_num {
+            let Some(c) = p_inp_inchi[b_mobile_h].get_mut(i_comp as usize) else {
+                return RI_ERR_SYNTAX;
+            };
+            let slot = stereo_slot(c, b_iso);
+            if at(s, p) != b'.' && slot.is_none() {
+                *slot = Some(InChIStereo::default());
+            }
+            match at(s, p) {
+                b'1' => slot.as_mut().unwrap().n_comp_inv2_abs = -1,
+                b'0' => slot.as_mut().unwrap().n_comp_inv2_abs = 1,
+                b'.' => {
+                    if let Some(st) = slot.as_mut() {
+                        st.n_comp_inv2_abs = 0;
+                    }
+                }
+                _ => return RI_ERR_SYNTAX,
+            }
+            i_comp += 1;
+            p += 1;
+        }
+        if p != p_end || i_comp != n_num {
+            return RI_ERR_SYNTAX;
+        }
+        n_num + 1
+    }
+}
+
+/// the parsing of the number before a `mnMNe` abbreviation or a `*`
+/// multiplier shared by `/b` and `/t`: `(val, q, if_cnd)`
+fn leading_count(s: &[u8], p_start: usize) -> (i32, usize, bool) {
+    if strtol(s, p_start).0 as i32 > 0 {
+        let (v, q) = strtol(s, p_start);
+        (v as i32, q, is_digit(at(s, p_start)))
+    } else {
+        (1, p_start, true)
+    }
+}
+
+/// `INChI_Stereo` slot `i` of the sp3 arrays (they hold `len + 1` entries)
+fn put_sp3(st: &mut InChIStereo, i: usize, parity: i32, n: u16) {
+    if i < st.t_parity.len() {
+        st.t_parity[i] = parity as i8;
+    }
+    if i < st.n_number.len() {
+        st.n_number[i] = n;
+    }
+}
+
+/// `SegmentSp3StoreStereoCenters`
+fn segment_sp3_store_stereo_centers(
+    pb_abc: i32,
+    s: &[u8],
+    p_start: usize,
+    p_end: usize,
+    n_atoms: i32,
+    st: &mut InChIStereo,
+) -> i32 {
+    let mut p = p_start;
+    let mut i_atom = 0usize;
+    if pb_abc == 1 {
+        while p < p_end {
+            // (the C `base` stays 10 here, so a compressed list is rejected)
+            let n1 = num16(s, &mut p, 10);
+            if n1 == 0 {
+                return RI_ERR_SYNTAX;
+            }
+            let (v, q) = strtol(s, p);
+            p = q;
+            let parity = v as i32;
+            if !(AB_MIN_KNOWN_PARITY..=AB_MAX_KNOWN_PARITY).contains(&parity) {
+                return RI_ERR_SYNTAX;
+            }
+            if i32::from(n1) > n_atoms {
+                return RI_ERR_SYNTAX;
+            }
+            put_sp3(st, i_atom, parity, n1);
+            if i_atom > 0 && st.n_number[i_atom - 1] >= n1 {
+                return RI_ERR_SYNTAX;
+            }
+            i_atom += 1;
+        }
+    } else {
+        while p < p_end {
+            let (v, q) = strtol(s, p);
+            let n1 = v as u16;
+            if i32::from(n1) > MAX_ATOMS {
+                return RI_ERR_SYNTAX;
+            }
+            let Some(r) = strchr_set(PARITY_TYPE, at(s, q)) else {
+                return RI_ERR_SYNTAX;
+            };
+            p = q + 1;
+            put_sp3(st, i_atom, r as i32 + 1, n1);
+            if i_atom > 0 && st.n_number[i_atom - 1] >= n1 {
+                return RI_ERR_SYNTAX;
+            }
+            i_atom += 1;
+            p += usize::from(at(s, p) == b',');
+        }
+    }
+    st.n_number_of_stereo_centers = i_atom as i32;
+    st.n_comp_inv2_abs = NO_VALUE_INT;
+    if p != p_end {
+        return RI_ERR_SYNTAX;
+    }
+    0
+}
+
+/// the `(from, bIsoTo, bIsoFrom)` of a `/t` or `/b` abbreviation, or the
+/// syntax error; `from` is 0 for the layer itself, 1 for the other tautomer
+/// layer
+fn stereo_abbreviation(
+    b_mobile_h: usize,
+    state: i32,
+    q: u8,
+    sp2: bool,
+) -> Result<(usize, i32, i32), i32> {
+    let (st_iso, st_fixed, st_fixed_iso) = if sp2 {
+        (IST_MOBILE_H_ISO_SP2, IST_FIXED_H_SP2, IST_FIXED_H_ISO_SP2)
+    } else {
+        (IST_MOBILE_H_ISO_SP3, IST_FIXED_H_SP3, IST_FIXED_H_ISO_SP3)
+    };
+    let alt = 1 - b_mobile_h;
+    if b_mobile_h == TAUT_YES {
+        if state == st_iso {
+            return match q {
+                b'm' => Ok((b_mobile_h, 1, 0)),
+                b'e' => Ok((b_mobile_h, 1, -1)),
+                _ => Err(RI_ERR_SYNTAX),
+            };
+        }
+        Err(RI_ERR_SYNTAX)
+    } else if state == st_fixed {
+        if q == b'm' {
+            return Ok((alt, 0, 0));
+        }
+        // the sp2 layer has no other abbreviation here; the sp3 one has `e`
+        if !sp2 && q == b'e' {
+            return Ok((b_mobile_h, 1, -1));
+        }
+        Err(RI_ERR_SYNTAX)
+    } else if state == st_fixed_iso {
+        match q {
+            b'm' => Ok((alt, 1, 0)),
+            b'M' => Ok((alt, 1, 1)),
+            b'n' => Ok((b_mobile_h, 1, 0)),
+            b'e' => Ok((b_mobile_h, 1, -1)),
+            _ => Err(RI_ERR_SYNTAX),
+        }
+    } else {
+        Err(RI_ERR_SYNTAX)
+    }
+}
+
+/// `ParseSegmentSp3`: the `/t` layer
+pub fn parse_segment_sp3(
+    s: &[u8],
+    b_mobile_h: usize,
+    p_inp_inchi: &mut [Vec<InChI>; 2],
+    ppn_num_components: [i32; 2],
+    state: i32,
+    pb_abc: &mut i32,
+) -> i32 {
+    let b_iso = state == IST_MOBILE_H_ISO_SP3 || state == IST_FIXED_H_ISO_SP3;
+    if !b_iso && state != IST_MOBILE_H_SP3 && state != IST_FIXED_H_SP3 {
+        return RI_ERR_PROGR;
+    }
+    if at(s, 0) != b't' {
+        return 0;
+    }
+    let mut p_start = 1usize;
+    let mut i_comp = 0i32;
+    let n_num = ppn_num_components[b_mobile_h];
+
+    if at(s, p_start) == 0 {
+        // SegmentSp3CreateEmpty
+        for i in 0..n_num.max(0) as usize {
+            let Some(c) = p_inp_inchi[b_mobile_h].get_mut(i) else {
+                return RI_ERR_SYNTAX;
+            };
+            let st = stereo_slot(c, b_iso).get_or_insert_with(Default::default);
+            if st.b_parity.is_empty() {
+                st.b_parity = vec![0; 1];
+            }
+            if st.n_bond_atom1.is_empty() {
+                st.n_bond_atom1 = vec![0; 1];
+            }
+            if st.n_bond_atom2.is_empty() {
+                st.n_bond_atom2 = vec![0; 1];
+            }
+            st.n_comp_inv2_abs = NO_VALUE_INT;
+        }
+        return n_num + 1;
+    }
+
+    loop {
+        let p_end = strchr(s, p_start, b';').unwrap_or(p_start + strlen(s, p_start));
+        let (val, q, if_cnd) = leading_count(s, p_start);
+        let mpy_component: i32;
+        let mut p: usize;
+        if if_cnd && strchr_set(MULT_TYPE, at(s, q)).is_some() && q + 1 == p_end {
+            // SegmentSp3ProcessAbbreviation
+            if i_comp.wrapping_add(val) > n_num {
+                return RI_ERR_SYNTAX;
+            }
+            let (from, iso_to, iso_from) =
+                match stereo_abbreviation(b_mobile_h, state, at(s, q), false) {
+                    Ok(x) => x,
+                    Err(e) => return e,
+                };
+            for i in 0..val {
+                let idx = (i_comp + i) as usize;
+                let src = p_inp_inchi[from].get(idx).cloned();
+                let Some(t) = p_inp_inchi[b_mobile_h].get_mut(idx) else {
+                    return RI_ERR_SYNTAX;
+                };
+                let mut r = copy_segment(t, src.as_ref(), CPY_SP3, iso_to, iso_from);
+                if r == 0 {
+                    r = RI_ERR_SYNTAX;
+                }
+                if r < 0 {
+                    if r == RI_ERR_SYNTAX {
+                        return RI_ERR_SYNTAX;
+                    }
+                    // other errors are ignored by the caller
+                    break;
+                }
+                if iso_from >= 0 {
+                    if let Some(st) = stereo_slot(t, iso_to != 0).as_mut() {
+                        st.n_comp_inv2_abs = NO_VALUE_INT;
+                    }
+                }
+            }
+            mpy_component = val;
+        } else {
+            if let Some(star) = strchr(s, p_start, b'*').filter(|&x| x < p_end) {
+                let (v, q) = strtol(s, p_start);
+                mpy_component = v as i32;
+                if star != q {
+                    return RI_ERR_SYNTAX;
+                }
+                p = star + 1;
+            } else {
+                mpy_component = 1;
+                p = p_start;
+            }
+            if i_comp.wrapping_add(mpy_component) > n_num {
+                return RI_ERR_SYNTAX;
+            }
+            p_start = p;
+            if p < p_end && *pb_abc == -1 {
+                *pb_abc = i32::from(upper(s, p));
+            }
+            let base = if *pb_abc == 1 { ALPHA_BASE } else { 10 };
+            let n_atoms = match p_inp_inchi[b_mobile_h].get(i_comp.max(0) as usize) {
+                Some(c) if i_comp >= 0 => c.n_number_of_atoms,
+                _ => 0,
+            };
+            // pass 1: the number of the stereo centres
+            let mut i_atom = 0usize;
+            p = p_start;
+            if *pb_abc == 1 {
+                while p < p_end {
+                    let n1 = num16(s, &mut p, base);
+                    let ok = n1 != 0 && {
+                        let (v, q) = strtol(s, p);
+                        p = q;
+                        (AB_MIN_KNOWN_PARITY..=AB_MAX_KNOWN_PARITY).contains(&(v as i32))
+                    };
+                    if !ok || i32::from(n1) > n_atoms {
+                        return RI_ERR_SYNTAX;
+                    }
+                    i_atom += 1;
+                }
+            } else {
+                while p < p_end {
+                    let (v, q) = strtol(s, p);
+                    let n1 = v as u16;
+                    p = q + 1;
+                    if n1 == 0
+                        || i32::from(n1) > n_atoms
+                        || strchr_set(PARITY_TYPE, at(s, q)).is_none()
+                    {
+                        return RI_ERR_SYNTAX;
+                    }
+                    i_atom += 1;
+                    p += usize::from(at(s, p) == b',');
+                }
+            }
+            if p != p_end {
+                return RI_ERR_SYNTAX;
+            }
+            let len = i_atom;
+            if i_comp > n_num - 1 || i_comp < 0 {
+                return RI_ERR_SYNTAX;
+            }
+            if n_atoms <= 0 || n_atoms > MAX_ATOMS {
+                return RI_ERR_SYNTAX;
+            }
+            let Some(c) = p_inp_inchi[b_mobile_h].get_mut(i_comp as usize) else {
+                return RI_ERR_SYNTAX;
+            };
+            let st = stereo_slot(c, b_iso).get_or_insert_with(Default::default);
+            if !st.t_parity.is_empty()
+                || st.n_number_of_stereo_centers != 0
+                || !st.n_number.is_empty()
+            {
+                return RI_ERR_SYNTAX;
+            }
+            st.t_parity = vec![0; len + 1];
+            st.n_number = vec![0; len + 1];
+            if segment_sp3_store_stereo_centers(*pb_abc, s, p_start, p_end, n_atoms, st)
+                == RI_ERR_SYNTAX
+            {
+                return RI_ERR_SYNTAX;
+            }
+            // SegmentSp3CopyMultiplierCovered
+            for i in 1..mpy_component {
+                let src = p_inp_inchi[b_mobile_h].get(i_comp as usize).cloned();
+                let Some(t) = p_inp_inchi[b_mobile_h].get_mut((i_comp + i) as usize) else {
+                    return RI_ERR_SYNTAX;
+                };
+                for ty in [CPY_SP3, CPY_SP3_M] {
+                    let mut r =
+                        copy_segment(t, src.as_ref(), ty, i32::from(b_iso), i32::from(b_iso));
+                    if r == 0 {
+                        r = RI_ERR_SYNTAX;
+                    }
+                    if r < 0 {
+                        if r == RI_ERR_SYNTAX {
+                            return RI_ERR_SYNTAX;
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+        i_comp = i_comp.wrapping_add(mpy_component);
+        if at(s, p_end) != 0 {
+            p_start = p_end + 1;
+        } else {
+            break;
+        }
+    }
+    if n_num != i_comp {
+        return RI_ERR_SYNTAX;
+    }
+    i_comp + 1
+}
+
+/// `ParseSegmentSp2`: the `/b` layer
+pub fn parse_segment_sp2(
+    s: &[u8],
+    b_mobile_h: usize,
+    p_inp_inchi: &mut [Vec<InChI>; 2],
+    ppn_num_components: [i32; 2],
+    state: i32,
+    pb_abc: &mut i32,
+) -> i32 {
+    let b_iso = state == IST_MOBILE_H_ISO_SP2 || state == IST_FIXED_H_ISO_SP2;
+    if !b_iso && state != IST_MOBILE_H_SP2 && state != IST_FIXED_H_SP2 {
+        return RI_ERR_PROGR;
+    }
+    if at(s, 0) != b'b' {
+        return 0;
+    }
+    let mut p_start = 1usize;
+    let mut i_comp = 0i32;
+    let n_num = ppn_num_components[b_mobile_h];
+
+    if at(s, p_start) == 0 {
+        // an empty sp2 segment means no sp2
+        for i in 0..n_num.max(0) as usize {
+            let Some(c) = p_inp_inchi[b_mobile_h].get_mut(i) else {
+                return RI_ERR_SYNTAX;
+            };
+            if let Some(st) = stereo_slot(c, b_iso).as_ref() {
+                if !st.b_parity.is_empty()
+                    || st.n_number_of_stereo_bonds != 0
+                    || !st.n_bond_atom1.is_empty()
+                    || !st.n_bond_atom2.is_empty()
+                {
+                    return RI_ERR_SYNTAX;
+                }
+            }
+            let r = copy_segment(c, None, CPY_SP2, i32::from(b_iso), -1);
+            if r < 0 {
+                return r;
+            }
+        }
+        return n_num + 1;
+    }
+
+    loop {
+        let p_end = strchr(s, p_start, b';').unwrap_or(p_start + strlen(s, p_start));
+        let (val, q, if_cnd) = leading_count(s, p_start);
+        let mpy_component: i32;
+        if if_cnd && strchr_set(MULT_TYPE, at(s, q)).is_some() && q + 1 == p_end {
+            if i_comp.wrapping_add(val) > n_num {
+                return RI_ERR_SYNTAX;
+            }
+            let (from, iso_to, iso_from) =
+                match stereo_abbreviation(b_mobile_h, state, at(s, q), true) {
+                    Ok(x) => x,
+                    Err(e) => return e,
+                };
+            for i in 0..val {
+                let idx = i_comp + i;
+                if idx > n_num - 1 || idx < 0 {
+                    return RI_ERR_SYNTAX;
+                }
+                let idx = idx as usize;
+                let src = p_inp_inchi[from].get(idx).cloned();
+                match &src {
+                    None => return RI_ERR_SYNTAX,
+                    Some(f) if f.n_number_of_atoms <= 0 || f.n_number_of_atoms > MAX_ATOMS => {
+                        return RI_ERR_SYNTAX;
+                    }
+                    _ => {}
+                }
+                let Some(t) = p_inp_inchi[b_mobile_h].get_mut(idx) else {
+                    return RI_ERR_SYNTAX;
+                };
+                let mut r = copy_segment(t, src.as_ref(), CPY_SP2, iso_to, iso_from);
+                if r == 0 {
+                    r = RI_ERR_SYNTAX;
+                }
+                if r < 0 {
+                    return r;
+                }
+            }
+            mpy_component = val;
+        } else {
+            let mut p: usize;
+            if let Some(star) = strchr(s, p_start, b'*').filter(|&x| x < p_end) {
+                let (v, q) = strtol(s, p_start);
+                mpy_component = v as i32;
+                if !(0..=MAX_ATOMS).contains(&mpy_component) {
+                    return RI_ERR_SYNTAX;
+                }
+                if star != q {
+                    return RI_ERR_SYNTAX;
+                }
+                p = star + 1;
+            } else {
+                mpy_component = 1;
+                p = p_start;
+            }
+            if i_comp.wrapping_add(mpy_component) > n_num {
+                return RI_ERR_SYNTAX;
+            }
+            p_start = p;
+            if p < p_end && *pb_abc == -1 {
+                *pb_abc = i32::from(upper(s, p));
+            }
+            let base = if *pb_abc == 1 { ALPHA_BASE } else { 10 };
+            let n_atoms = match p_inp_inchi[b_mobile_h].get(i_comp.max(0) as usize) {
+                Some(c) if i_comp >= 0 => c.n_number_of_atoms,
+                _ => 0,
+            };
+            // pass 1: the number of the stereo bonds
+            let mut i_bond = 0usize;
+            p = p_start;
+            if *pb_abc == 1 {
+                while p < p_end {
+                    let a1 = num16(s, &mut p, base);
+                    let a2 = if a1 != 0 { num16(s, &mut p, base) } else { 0 };
+                    let ok = a1 != 0 && a2 != 0 && {
+                        let (v, q) = strtol(s, p);
+                        p = q;
+                        (AB_MIN_KNOWN_PARITY..=AB_MAX_KNOWN_PARITY).contains(&(v as i32))
+                    };
+                    if !ok || a1 <= a2 || i32::from(a1) > n_atoms {
+                        return RI_ERR_SYNTAX;
+                    }
+                    i_bond += 1;
+                }
+            } else {
+                while p < p_end {
+                    let (v1, q) = strtol(s, p);
+                    if i32::from(v1 as u16) > MAX_ATOMS {
+                        return RI_ERR_SYNTAX;
+                    }
+                    if at(s, q) != b'-' {
+                        return RI_ERR_SYNTAX;
+                    }
+                    let (v2, q) = strtol(s, q + 1);
+                    if i32::from(v2 as u16) > MAX_ATOMS {
+                        return RI_ERR_SYNTAX;
+                    }
+                    let (a1, a2) = (v1 as u16, v2 as u16);
+                    if a1 == 0
+                        || a2 == 0
+                        || a1 <= a2
+                        || i32::from(a1) > n_atoms
+                        || strchr_set(PARITY_TYPE, at(s, q)).is_none()
+                    {
+                        return RI_ERR_SYNTAX;
+                    }
+                    p = q + 1;
+                    i_bond += 1;
+                    p += usize::from(at(s, p) == b',');
+                }
+            }
+            if p != p_end {
+                return RI_ERR_SYNTAX;
+            }
+            let len = i_bond;
+            if i_comp > n_num - 1 || i_comp < 0 {
+                return RI_ERR_SYNTAX;
+            }
+            if n_atoms <= 0 || n_atoms > MAX_ATOMS {
+                return RI_ERR_SYNTAX;
+            }
+            let Some(c) = p_inp_inchi[b_mobile_h].get_mut(i_comp as usize) else {
+                return RI_ERR_SYNTAX;
+            };
+            let st = stereo_slot(c, b_iso).get_or_insert_with(Default::default);
+            if !st.b_parity.is_empty()
+                || st.n_number_of_stereo_bonds != 0
+                || !st.n_bond_atom1.is_empty()
+                || !st.n_bond_atom2.is_empty()
+            {
+                return RI_ERR_SYNTAX;
+            }
+            st.b_parity = vec![0; len + 1];
+            st.n_bond_atom1 = vec![0; len + 1];
+            st.n_bond_atom2 = vec![0; len + 1];
+            // pass 2: store the stereo bonds
+            let mut i_bond = 0usize;
+            p = p_start;
+            if *pb_abc == 1 {
+                while p < p_end {
+                    let a1 = num16(s, &mut p, base);
+                    let a2 = if a1 != 0 { num16(s, &mut p, base) } else { 0 };
+                    let ok = a1 != 0 && a2 != 0 && {
+                        let (v, q) = strtol(s, p);
+                        p = q;
+                        st.b_parity[i_bond] = v as i8;
+                        (AB_MIN_KNOWN_PARITY..=AB_MAX_KNOWN_PARITY).contains(&(v as i32))
+                    };
+                    if !ok {
+                        return RI_ERR_SYNTAX;
+                    }
+                    st.n_bond_atom1[i_bond] = a1;
+                    st.n_bond_atom2[i_bond] = a2;
+                    if i_bond > 0
+                        && !(st.n_bond_atom1[i_bond - 1] < a1
+                            || (st.n_bond_atom1[i_bond - 1] == a1
+                                && st.n_bond_atom2[i_bond - 1] < a2))
+                    {
+                        return RI_ERR_SYNTAX;
+                    }
+                    i_bond += 1;
+                }
+            } else {
+                while p < p_end {
+                    let (v1, q) = strtol(s, p);
+                    if i32::from(v1 as u16) > MAX_ATOMS || at(s, q) != b'-' {
+                        return RI_ERR_SYNTAX;
+                    }
+                    let (v2, q) = strtol(s, q + 1);
+                    if i32::from(v2 as u16) > MAX_ATOMS {
+                        return RI_ERR_SYNTAX;
+                    }
+                    let Some(r) = strchr_set(PARITY_TYPE, at(s, q)) else {
+                        return RI_ERR_SYNTAX;
+                    };
+                    p = q + 1;
+                    let (a1, a2) = (v1 as u16, v2 as u16);
+                    st.b_parity[i_bond] = (r + 1) as i8;
+                    st.n_bond_atom1[i_bond] = a1;
+                    st.n_bond_atom2[i_bond] = a2;
+                    if i_bond > 0
+                        && !(st.n_bond_atom1[i_bond - 1] < a1
+                            || (st.n_bond_atom1[i_bond - 1] == a1
+                                && st.n_bond_atom2[i_bond - 1] < a2))
+                    {
+                        return RI_ERR_SYNTAX;
+                    }
+                    i_bond += 1;
+                    p += usize::from(at(s, p) == b',');
+                }
+            }
+            st.n_number_of_stereo_bonds = i_bond as i32;
+            if p != p_end {
+                return RI_ERR_SYNTAX;
+            }
+            // multiplier
+            for i in 1..mpy_component {
+                let src = p_inp_inchi[b_mobile_h].get(i_comp as usize).cloned();
+                let Some(t) = p_inp_inchi[b_mobile_h].get_mut((i_comp + i) as usize) else {
+                    return RI_ERR_SYNTAX;
+                };
+                let r = copy_segment(t, src.as_ref(), CPY_SP2, i32::from(b_iso), i32::from(b_iso));
+                if r < 0 {
+                    return r;
+                }
+            }
+        }
+        i_comp = i_comp.wrapping_add(mpy_component);
+        if at(s, p_end) != 0 {
+            p_start = p_end + 1;
+        } else {
+            break;
+        }
+    }
+    if n_num != i_comp {
+        return RI_ERR_SYNTAX;
+    }
+    i_comp + 1
 }
