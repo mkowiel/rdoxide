@@ -2,7 +2,9 @@
 //! C library, with fixtures from `tools/inchi_read1_reference.py`.
 
 use rdoxide::external::inchi::ichi::{InChI, InChIIsotopicAtom, InChIStereo};
-use rdoxide::external::inchi::ichi_io::{INCHI_IOS_TYPE_STRING, InchiIostream};
+use rdoxide::external::inchi::ichi_io::{
+    INCHI_IOS_TYPE_STRING, InchiIostream, IosFile, inchi_ios_init,
+};
 use rdoxide::external::inchi::ichiread::*;
 
 fn unhex(h: &str) -> Vec<u8> {
@@ -525,5 +527,133 @@ fn stereo_layers_match_c() {
             _ => unreachable!(),
         }
         assert_eq!(got, want, "case {ci}: {inp}");
+    }
+}
+
+fn dump_full(c: &InChI) -> String {
+    let nat = c.n_number_of_atoms.max(0) as usize;
+    let list = |v: &[i8]| -> String {
+        if v.is_empty() {
+            "NULL".to_string()
+        } else {
+            (0..=nat)
+                .map(|j| format!("{},", v.get(j).copied().unwrap_or(0)))
+                .collect()
+        }
+    };
+    let atoms = if c.n_atom.is_empty() {
+        "NULL".to_string()
+    } else {
+        (0..=nat)
+            .map(|j| format!("{},", c.n_atom.get(j).copied().unwrap_or(0)))
+            .collect()
+    };
+    let fixed = c.n_num_h_fixed.as_deref().map_or("NULL".to_string(), list);
+    let taut = if c.n_tautomer.is_empty() {
+        " NULL".to_string()
+    } else {
+        (0..=c.len_tautomer.max(0) as usize)
+            .map(|j| format!(" {}", c.n_tautomer.get(j).copied().unwrap_or(0)))
+            .collect()
+    };
+    let ct = if c.n_conn_table.is_empty() {
+        " NULL".to_string()
+    } else {
+        (0..=c.len_conn_table.max(0) as usize)
+            .map(|j| format!(" {}", c.n_conn_table.get(j).copied().unwrap_or(0)))
+            .collect()
+    };
+    format!(
+        "{} {} {} {} {} |{atoms} | {} | {fixed} | {} |{taut} | {} |{ct} | {}",
+        c.n_number_of_atoms,
+        c.b_deleted,
+        c.n_total_charge,
+        c.n_flags,
+        c.sz_hill_formula.as_deref().unwrap_or("NULL"),
+        list(&c.n_num_h),
+        c.len_tautomer,
+        c.len_conn_table,
+        dump_inchi(c)
+    )
+}
+
+#[test]
+fn read_inchi_line_matches_c() {
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_read3.json")).unwrap();
+    for (ci, c) in data.as_array().unwrap().iter().enumerate() {
+        let inp = c["in"].as_str().unwrap();
+        let t: Vec<&str> = inp.split(' ').collect();
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        assert_eq!(t[0], "13");
+        let bytes = unhex(t[1]);
+        let mut ios = InchiIostream::default();
+        inchi_ios_init(&mut ios, INCHI_IOS_TYPE_STRING, IosFile::None);
+        ios.s.n_used_length = bytes.len() as i32;
+        ios.s.p_str = Some(bytes);
+        ios.s.n_ptr = 0;
+        let mut line = SegmLine::default();
+        let mut pstr = None;
+        let mut state = -77;
+        let mut d = InpInChI::default();
+        let (mut stdf, mut hso, mut bits) = (-5, -5, 0u8);
+        let r = read_inchi_line(
+            &mut ios, &mut line, &mut pstr, &mut state, &mut d, &mut stdf, &mut hso, &mut bits,
+        );
+        let mut got = vec![
+            format!("R {r} {state} {stdf} {hso} {bits} {}", line.len),
+            format!(
+                "N {} {} {} {}",
+                d.n_num_components[0][0],
+                d.n_num_components[0][1],
+                d.n_num_components[1][0],
+                d.n_num_components[1][1]
+            ),
+        ];
+        let s = d.s;
+        got.push(format!(
+            "S {} {} {} {} {} {} {} {}",
+            s[0][0][0],
+            s[0][0][1],
+            s[0][1][0],
+            s[0][1][1],
+            s[1][0][0],
+            s[1][0][1],
+            s[1][1][0],
+            s[1][1][1]
+        ));
+        for a in 0..2 {
+            for b in 0..2 {
+                let p = &d.n_num_protons[a][b];
+                got.push(format!(
+                    "P{a}{b} {} {} {} {}",
+                    p.n_num_removed_protons,
+                    p.n_num_removed_isotopic_h[0],
+                    p.n_num_removed_isotopic_h[1],
+                    p.n_num_removed_isotopic_h[2]
+                ));
+            }
+        }
+        for a in 0..2 {
+            for b in 0..2 {
+                for i in 0..d.n_num_components[a][b].max(0) as usize {
+                    let Some(comp) = d.p_inp_inchi[a][b].get(i) else {
+                        break;
+                    };
+                    got.push(format!("C{a}{b}.{i} {}", dump_full(comp)));
+                }
+            }
+        }
+        assert_eq!(
+            got,
+            want,
+            "case {ci}: {}",
+            String::from_utf8_lossy(&unhex(t[1]))
+        );
     }
 }

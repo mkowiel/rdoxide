@@ -3372,3 +3372,426 @@ fn parse_iso_counts(s: &[u8], p: &mut usize, iso: &mut InChIIsotopicAtom, letter
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// The segment state machine: `ReadInChILine`
+
+pub const INCHI_BAS: usize = 0;
+pub const INCHI_REC: usize = 1;
+const SEG_END: i32 = b'/' as i32;
+/// `INCHI_TOKEN`
+pub const INCHI_TOKEN: &[u8] = b"/\n\r\t\\";
+pub const SAVE_OPT_KET: u8 = 0x10;
+pub const SAVE_OPT_15T: u8 = 0x20;
+
+/// `INCHI_INP_EOL`
+fn inchi_inp_eol(c: i32) -> bool {
+    c == 10 || c == 13 || c == 9
+}
+
+/// `strstr(s, pat) != NULL` over a zero-terminated string
+fn contains_c(s: &[u8], pat: &[u8]) -> bool {
+    let n = strlen(s, 0);
+    s[..n].windows(pat.len()).any(|w| w == pat)
+}
+
+/// `ParseSegmentPolymer`: only the layer test; the polymer units are not
+/// ported, so a `/z` layer is a syntax error
+fn parse_segment_polymer_stub(s: &[u8]) -> i32 {
+    if at(s, 0) != b'z' {
+        return 0;
+    }
+    RI_ERR_SYNTAX
+}
+
+/// the state of the `InChI` structures read by `ReadInChILine`
+#[derive(Debug, Clone, Default)]
+pub struct InpInChI {
+    pub p_inp_inchi: [[Vec<InChI>; 2]; 2],
+    pub n_num_components: [[i32; 2]; 2],
+    pub n_num_protons: [[RemProtons; 2]; 2],
+    pub s: [[[i32; 2]; 2]; 2],
+}
+
+/// `ReadInChILine`: reads the InChI string of the stream into `inp_inchi`;
+/// returns `RI_ERR_EOL`/`RI_ERR_EOF` at the end of the line/data, or the
+/// error with the failed state in `p_state`. (A `/z` layer is a syntax
+/// error.) `p_str` receives a `Structure ...` line.
+#[allow(clippy::too_many_arguments)]
+pub fn read_inchi_line(
+    inp: &mut InchiIostream,
+    line: &mut SegmLine,
+    p_str: &mut Option<Vec<u8>>,
+    p_state: &mut i32,
+    d: &mut InpInChI,
+    b_std_format: &mut i32,
+    input_has_save_opt: &mut i32,
+    input_save_opt_bits: &mut u8,
+) -> i32 {
+    let mut ret: i32;
+    let mut b_mobile_h = TAUT_YES;
+    let mut b_reconn = INCHI_BAS;
+    let mut state: i32;
+    let mut prev_state: i32 = -1;
+    let mut b_abc = -1i32;
+    let mut na_total: i32;
+    let mut nb_total = 0i32;
+    let (mut let1, mut let2) = (0u8, 0u8);
+    const A2P: &[u8] = b"ABCDEFGHIJKLMNOP";
+    *p_state = 0;
+    let mut c: i32;
+
+    loop {
+        // next_line
+        c = if line.len != 0 {
+            line.c
+        } else {
+            n_get_inchi_segment(inp, line, INCHI_TOKEN)
+        };
+        if c == RI_ERR_EOF && line.len == 0 && at(&line.str, 0) == 0 {
+            ret = c;
+            if ret >= 0 || c == RI_ERR_EOF || c == RI_ERR_EOL {
+                line.len = 0;
+            }
+            return ret;
+        }
+        if line.len == 0 || (c != SEG_END && c != RI_ERR_EOF) || !contains_c(&line.str, b"InChI=1")
+        {
+            if line.str.starts_with(b"Structure") {
+                let n = strlen(&line.str, 0);
+                *p_str = Some(line.str[..n].to_vec());
+                *line = SegmLine::default();
+                while c != 0 && !inchi_inp_eol(c) {
+                    c = get_inchi_char(inp);
+                }
+                continue;
+            }
+            while c != RI_ERR_EOF && !inchi_inp_eol(c) {
+                c = get_inchi_char(inp);
+            }
+            line.len = 0;
+            continue;
+        }
+        break;
+    }
+
+    // a standard InChI?
+    *b_std_format = i32::from(line.len == 8 && at(&line.str, 7) == b'S');
+
+    state = IST_MOBILE_H_FORMULA;
+    ret = 1;
+    'main: loop {
+        if ret < 0 {
+            *p_state = prev_state;
+            break;
+        }
+        prev_state = state
+            + if b_reconn != 0 {
+                IST_HAPPENED_IN_RECMET
+            } else {
+                0
+            };
+        if 0 < ret {
+            if c != RI_ERR_EOF && c != SEG_END {
+                // abnormal reading result unless we got backslash-SaveOpt
+                if c == i32::from(b'\\') {
+                    *input_has_save_opt = 1;
+                }
+                let mut k = 0usize;
+                while c != RI_ERR_EOF && !inchi_inp_eol(c) {
+                    c = get_inchi_char(inp);
+                    k += 1;
+                    if k == 1 {
+                        let1 = c as u8;
+                    } else if k == 2 {
+                        let2 = c as u8;
+                    }
+                }
+                if k != 3 {
+                    *input_has_save_opt = 0;
+                } else if (b'A'..=b'D').contains(&let2) {
+                    *input_has_save_opt = 0;
+                    *input_save_opt_bits = 0;
+                    for (kk, &a) in A2P.iter().enumerate() {
+                        if a == let1 {
+                            *input_save_opt_bits = kk as u8;
+                            *input_has_save_opt = 1;
+                            break;
+                        }
+                    }
+                    if *input_has_save_opt != 0 {
+                        if let2 == b'B' || let2 == b'D' {
+                            *input_save_opt_bits |= SAVE_OPT_15T;
+                        }
+                        if let2 == b'C' || let2 == b'D' {
+                            *input_save_opt_bits |= SAVE_OPT_KET;
+                        }
+                    }
+                }
+                ret = if c == RI_ERR_EOF {
+                    RI_ERR_EOF
+                } else {
+                    RI_ERR_EOL
+                };
+                line.len = 0;
+                line.c = ret;
+                break 'main;
+            }
+            if c == RI_ERR_EOF {
+                ret = RI_ERR_EOF;
+                break 'main;
+            }
+            if c == SEG_END {
+                c = n_get_inchi_segment(inp, line, INCHI_TOKEN);
+            }
+            if c < 0 {
+                // exit_error
+                break 'main;
+            }
+            if line.len == 0 {
+                ret = RI_ERR_EOL;
+                break 'main;
+            }
+        }
+        let rc = b_reconn;
+        let mob = b_mobile_h;
+        let str_ = line.str.clone();
+        let s = &str_[..];
+        match state {
+            IST_MOBILE_H_FORMULA => {
+                b_mobile_h = TAUT_YES;
+                na_total = state;
+                ret = parse_segment_formula(
+                    s,
+                    TAUT_YES,
+                    &mut d.p_inp_inchi[rc],
+                    &mut d.n_num_components[rc],
+                    &mut na_total,
+                );
+                state = IST_MOBILE_H_CONNECTIONS;
+            }
+            IST_MOBILE_H_CONNECTIONS => {
+                ret = parse_segment_connections(
+                    s,
+                    &mut d.p_inp_inchi[rc][mob],
+                    &mut d.n_num_components[rc][mob],
+                    &mut b_abc,
+                    &mut nb_total,
+                );
+                state = IST_MOBILE_H;
+            }
+            IST_MOBILE_H | IST_FIXED_H => {
+                ret = parse_segment_mobile_h(
+                    s,
+                    mob,
+                    &mut d.p_inp_inchi[rc],
+                    d.n_num_components[rc],
+                    &mut b_abc,
+                );
+                state = if state == IST_MOBILE_H {
+                    IST_MOBILE_H_CHARGE
+                } else {
+                    IST_FIXED_H_CHARGE
+                };
+            }
+            IST_MOBILE_H_CHARGE | IST_FIXED_H_CHARGE => {
+                ret = parse_segment_charge(s, mob, &mut d.p_inp_inchi[rc], d.n_num_components[rc]);
+                state = if state == IST_MOBILE_H_CHARGE {
+                    IST_MOBILE_H_PROTONS
+                } else {
+                    IST_FIXED_H_SP2
+                };
+            }
+            IST_MOBILE_H_PROTONS => {
+                ret = parse_segment_protons(s, mob, &mut d.n_num_protons[rc]);
+                state = IST_MOBILE_H_POLYMER;
+            }
+            IST_MOBILE_H_POLYMER => {
+                ret = parse_segment_polymer_stub(s);
+                state = IST_MOBILE_H_SP2;
+            }
+            IST_MOBILE_H_SP2 | IST_MOBILE_H_ISO_SP2 | IST_FIXED_H_SP2 | IST_FIXED_H_ISO_SP2 => {
+                ret = parse_segment_sp2(
+                    s,
+                    mob,
+                    &mut d.p_inp_inchi[rc],
+                    d.n_num_components[rc],
+                    state,
+                    &mut b_abc,
+                );
+                state = match state {
+                    IST_MOBILE_H_SP2 => IST_MOBILE_H_SP3,
+                    IST_MOBILE_H_ISO_SP2 => IST_MOBILE_H_ISO_SP3,
+                    IST_FIXED_H_SP2 => IST_FIXED_H_SP3,
+                    _ => IST_FIXED_H_ISO_SP3,
+                };
+            }
+            IST_MOBILE_H_SP3 | IST_MOBILE_H_ISO_SP3 | IST_FIXED_H_SP3 | IST_FIXED_H_ISO_SP3 => {
+                ret = parse_segment_sp3(
+                    s,
+                    mob,
+                    &mut d.p_inp_inchi[rc],
+                    d.n_num_components[rc],
+                    state,
+                    &mut b_abc,
+                );
+                state = match state {
+                    IST_MOBILE_H_SP3 => IST_MOBILE_H_SP3_M,
+                    IST_MOBILE_H_ISO_SP3 => IST_MOBILE_H_ISO_SP3_M,
+                    IST_FIXED_H_SP3 => IST_FIXED_H_SP3_M,
+                    _ => IST_FIXED_H_ISO_SP3_M,
+                };
+            }
+            IST_MOBILE_H_SP3_M
+            | IST_MOBILE_H_ISO_SP3_M
+            | IST_FIXED_H_SP3_M
+            | IST_FIXED_H_ISO_SP3_M => {
+                ret = parse_segment_sp3m(
+                    s,
+                    mob,
+                    &mut d.p_inp_inchi[rc],
+                    d.n_num_components[rc],
+                    state,
+                );
+                state = match state {
+                    IST_MOBILE_H_SP3_M => IST_MOBILE_H_SP3_S,
+                    IST_MOBILE_H_ISO_SP3_M => IST_MOBILE_H_ISO_SP3_S,
+                    IST_FIXED_H_SP3_M => IST_FIXED_H_SP3_S,
+                    _ => IST_FIXED_H_ISO_SP3_S,
+                };
+            }
+            IST_MOBILE_H_SP3_S
+            | IST_MOBILE_H_ISO_SP3_S
+            | IST_FIXED_H_SP3_S
+            | IST_FIXED_H_ISO_SP3_S => {
+                ret = parse_segment_sp3s(
+                    s,
+                    mob,
+                    &mut d.p_inp_inchi[rc],
+                    &mut d.s[rc],
+                    d.n_num_components[rc],
+                    state,
+                );
+                state = match state {
+                    IST_MOBILE_H_SP3_S => IST_MOBILE_H_ISO_LAYER_FORK,
+                    IST_MOBILE_H_ISO_SP3_S => IST_FIXED_H_LAYER_FORK,
+                    IST_FIXED_H_SP3_S => IST_FIXED_H_PERMUTATION,
+                    _ => IST_FIXED_H_ISO_PERMUTATION,
+                };
+            }
+            IST_MOBILE_H_ISO_LAYER_FORK
+            | IST_FIXED_H_LAYER_FORK
+            | IST_FIXED_H_ISO_LAYER_FORK
+            | IST_RECONNECTED_LAYER_FORK => {
+                // find the layer type after M, MI, F or FI
+                ret = 0;
+                let first = at(s, 0);
+                let mut next = state;
+                let mut keep_first = false; // `state == ISO_ATOMS`: the layer letter stays
+                match (state, first) {
+                    (IST_MOBILE_H_ISO_LAYER_FORK, b'i') => {
+                        next = IST_MOBILE_H_ISO_ATOMS;
+                        keep_first = true;
+                    }
+                    (IST_MOBILE_H_ISO_LAYER_FORK, b'f') | (IST_FIXED_H_LAYER_FORK, b'f') => {
+                        next = IST_FIXED_H_FORMULA;
+                    }
+                    (IST_MOBILE_H_ISO_LAYER_FORK, b'r')
+                    | (IST_FIXED_H_LAYER_FORK, b'r')
+                    | (IST_FIXED_H_ISO_LAYER_FORK, b'r')
+                    | (IST_RECONNECTED_LAYER_FORK, b'r') => {
+                        next = IST_RECONNECTED_FORMULA;
+                    }
+                    (IST_FIXED_H_ISO_LAYER_FORK, b'i') => {
+                        next = IST_FIXED_H_ISO_ATOMS;
+                        keep_first = true;
+                    }
+                    _ => ret = RI_ERR_SYNTAX,
+                }
+                state = next;
+                if inchi_inp_eol(c) && ret == 0 && at(s, 1) == 0 {
+                    prev_state = state
+                        + if b_reconn != 0 {
+                            IST_HAPPENED_IN_RECMET
+                        } else {
+                            0
+                        };
+                    ret = RI_ERR_SYNTAX;
+                } else if ret == 0 && !keep_first {
+                    let len = strlen(s, 0);
+                    if len > 1 {
+                        // memmove(str, str + 1, len)
+                        line.str.remove(0);
+                    } else {
+                        ret = 1;
+                    }
+                }
+            }
+            IST_MOBILE_H_ISO_ATOMS | IST_FIXED_H_ISO_ATOMS => {
+                ret = parse_segment_iso_atoms(
+                    s,
+                    mob,
+                    &mut d.p_inp_inchi[rc],
+                    d.n_num_components[rc],
+                    state,
+                    &mut b_abc,
+                );
+                state = if state == IST_MOBILE_H_ISO_ATOMS {
+                    IST_MOBILE_H_ISO_EXCH_H
+                } else {
+                    IST_FIXED_H_ISO_SP2
+                };
+            }
+            IST_MOBILE_H_ISO_EXCH_H => {
+                ret =
+                    parse_segment_iso_exchg_h(s, mob, &mut d.n_num_protons[rc], state, &mut b_abc);
+                state = IST_MOBILE_H_ISO_SP2;
+            }
+            IST_FIXED_H_FORMULA => {
+                b_mobile_h = TAUT_NON;
+                na_total = state;
+                ret = parse_segment_formula(
+                    s,
+                    TAUT_NON,
+                    &mut d.p_inp_inchi[rc],
+                    &mut d.n_num_components[rc],
+                    &mut na_total,
+                );
+                state = IST_FIXED_H;
+            }
+            IST_FIXED_H_PERMUTATION | IST_FIXED_H_ISO_PERMUTATION => {
+                ret = parse_segment_perm(
+                    s,
+                    mob,
+                    &mut d.p_inp_inchi[rc],
+                    d.n_num_components[rc],
+                    state,
+                    &mut b_abc,
+                );
+                state = if state == IST_FIXED_H_PERMUTATION {
+                    IST_FIXED_H_ISO_LAYER_FORK
+                } else {
+                    IST_RECONNECTED_LAYER_FORK
+                };
+            }
+            IST_RECONNECTED_FORMULA => {
+                if b_reconn == INCHI_REC {
+                    // the reconnected layer may appear only once
+                    ret = RI_ERR_SYNTAX;
+                } else {
+                    b_reconn = INCHI_REC;
+                    b_mobile_h = TAUT_YES;
+                    state = IST_MOBILE_H_FORMULA;
+                }
+            }
+            _ => {}
+        }
+        if c < 0 {
+            break;
+        }
+    }
+    if ret >= 0 || c == RI_ERR_EOF || c == RI_ERR_EOL {
+        line.len = 0;
+    }
+    ret
+}
