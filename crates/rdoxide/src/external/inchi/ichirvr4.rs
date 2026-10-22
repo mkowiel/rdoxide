@@ -4,19 +4,23 @@
 //! Copyright (c) 2024 IUPAC and InChI Trust.
 //! Licensed under the MIT license (see LICENSES/InChI-MIT.txt).
 
-use super::ichi_bns::{BnData, BnStruct, NO_VERTEX};
+use super::ichi_bns::{BNS_EDGE_FORBIDDEN_TEST, BnData, BnStruct, NO_VERTEX, set_forbidden_edges};
 use super::ichimake::Icr;
 use super::ichiread::RI_ERR_PROGR;
 use super::ichirvr1::{
     BnsTestResult, CN_BITS_MNP, CN_LIST, EdgeList, add_to_edge_list, alloc_edge_list,
-    get_charge_flower_upper_edge, remove_forbidden_edge_mask, run_bns_restore_once,
-    run_bns_test_once,
+    get_charge_flower_upper_edge, is_bns_vt_c_gr, remove_forbidden_bond_flow_bits,
+    remove_forbidden_edge_mask, run_bns_restore_once, run_bns_test_once, set_forbidden_edge_mask,
 };
-use super::ichirvr2::StrFromInChI;
-use super::ichirvrs::{AllTcGroups, TCG_MINUS_C0, TCG_PLUS_C0, ValAt};
+use super::ichirvr2::{StrFromInChI, refresh_at2};
+use super::ichirvrs::{
+    AllTcGroups, CN_BITS_M, CN_BITS_N, CN_BITS_P, CN_BITS_SHIFT, TCG_MINUS_C0, TCG_PLUS_C0, ValAt,
+    make_cn_bits,
+};
 use super::ichitaut::{BOND_ALT12NS, is_centerpoint_elem};
 use super::incomdef::{BOND_TYPE_DOUBLE, BOND_TYPE_SINGLE, BOND_TYPE_TRIPLE};
 use super::inpdef::{BOND_TYPE_MASK, InpAtom};
+use super::util::get_endpoint_valence;
 
 /// `ForbidCarbonChargeEdges`: forbids the edges that charge carbon atoms;
 /// returns their number or an error
@@ -505,5 +509,354 @@ pub fn fix_remove_extra_taut_endpoints(
         }
     }
     remove_forbidden_edge_mask(bns, &fixed, forbidden_edge_mask);
+    ret
+}
+
+/// `MoveChargeToRemoveCenerpoints`: finds and eliminates false Mobile-H
+/// groups: Cl(=O)3(-O(-)) => Cl(-)(=O)4
+#[allow(clippy::too_many_arguments)]
+pub fn move_charge_to_remove_centerpoints(
+    bns: &mut BnStruct,
+    bd: &mut BnData,
+    ps: &mut StrFromInChI,
+    at2: &mut Vec<InpAtom>,
+    p_va: &mut [ValAt],
+    tcg: &AllTcGroups,
+    num_run_bns: &mut i32,
+    total_delta: &mut i32,
+    forbidden_edge_mask: i32,
+) -> i32 {
+    let num_at = ps.num_atoms as usize;
+    let test = i32::from(BNS_EDGE_FORBIDDEN_TEST);
+    let b_possibly_ignore =
+        ps.charge >= 0 && (tcg.num_tgroups == 0 || (ps.i_mobile_h == 0 && ps.ti.num_t_groups != 0));
+    let mut charge_list = EdgeList::default();
+    let mut res = BnsTestResult::default();
+    let mut num_success = 0;
+    let r2 = refresh_at2(ps, at2, bns, p_va, tcg);
+    if r2 < 0 {
+        return r2;
+    }
+    let r2 = super::ichinorm::mark_ring_systems_inp(&mut at2[..num_at], 0);
+    if r2 < 0 {
+        return r2;
+    }
+    let ret_forbid_edges = set_forbidden_edges(bns, at2, num_at as i32, test);
+    if ret_forbid_edges < 0 {
+        return ret_forbid_edges;
+    }
+    let endp = |ps: &StrFromInChI, v: usize| ps.endpoint.as_ref().is_some_and(|e| e[v] != 0);
+    for i in 0..num_at {
+        let a = &at2[i];
+        let va = p_va[i];
+        if !(va.c_num_valence_electrons != 4
+            && !(va.n_taut_group_edge != 0 || (ps.i_mobile_h == 0 && endp(ps, i)))
+            && a.num_h == 0
+            && a.charge == 0
+            && a.valence >= 2
+            && a.valence < a.chem_bonds_valence
+            && is_centerpoint_elem(a.el_number))
+        {
+            continue;
+        }
+        let is_centerpoint_n =
+            va.c_num_valence_electrons == 5 && (va.c_periodic_row_number == 1 || va.c_metal != 0);
+        let mut mobile_charge_neigh: Vec<usize> = Vec::new();
+        let mut double_bond_acceptors = 0;
+        let mut double_bond_not_o_neigh: Vec<usize> = Vec::new();
+        let (mut num_donors, mut num_acceptors, mut num_donors_o, mut num_acceptors_o) =
+            (0, 0, 0, 0);
+        let (mut num_known_endpoints, mut num_wrong_neigh) = (0, 0);
+        let mut j = 0;
+        while j < a.valence as usize {
+            let neigh = a.neighbor[j] as usize;
+            let nb = &at2[neigh];
+            if nb.endpoint != 0 || (ps.i_mobile_h == 0 && endp(ps, neigh)) || nb.charge > 0 {
+                num_known_endpoints += 1;
+                j += 1;
+                continue;
+            }
+            if i32::from(bns.edge[bns.iedge[bns.vert[i].iedge + j] as usize].forbidden) & test != 0
+            {
+                j += 1;
+                continue;
+            }
+            let bond_type = i32::from(a.bond_type[j]) & BOND_TYPE_MASK;
+            if bond_type > BOND_TYPE_DOUBLE {
+                num_wrong_neigh += 1;
+                j += 1;
+                continue;
+            }
+            if nb.num_h != 0 && bond_type == BOND_TYPE_SINGLE {
+                break;
+            }
+            if i32::from(nb.chem_bonds_valence) - i32::from(nb.charge)
+                != get_endpoint_valence(nb.el_number)
+            {
+                if bond_type == BOND_TYPE_DOUBLE && p_va[neigh].c_num_valence_electrons != 6 {
+                    double_bond_not_o_neigh.push(j);
+                }
+                j += 1;
+                continue;
+            }
+            if nb.charge == -1
+                && bond_type == BOND_TYPE_SINGLE
+                && (p_va[neigh].n_c_minus_group_edge < 1
+                    || bns.edge[(p_va[neigh].n_c_minus_group_edge - 1) as usize].flow != 1)
+            {
+                break;
+            }
+            let o_like =
+                p_va[neigh].c_num_valence_electrons == 6 && p_va[neigh].c_periodic_row_number <= 4;
+            if bond_type == BOND_TYPE_SINGLE {
+                if nb.charge != -1 || p_va[neigh].n_c_minus_group_edge <= 0 {
+                    num_wrong_neigh += 1;
+                    j += 1;
+                    continue;
+                }
+                num_donors += 1;
+                num_donors_o += i32::from(o_like);
+                mobile_charge_neigh.push(j);
+            } else if bond_type == BOND_TYPE_DOUBLE {
+                if nb.charge != 0 {
+                    num_wrong_neigh += 1;
+                    j += 1;
+                    continue;
+                }
+                double_bond_acceptors += 1;
+                num_acceptors += 1;
+                num_acceptors_o += i32::from(o_like);
+            }
+            j += 1;
+        }
+        let _ = double_bond_acceptors;
+        if j != a.valence as usize || num_donors == 0 || num_acceptors == 0 {
+            continue;
+        }
+        if is_centerpoint_n && num_donors == num_donors_o && num_acceptors == num_acceptors_o {
+            continue;
+        }
+        if ps.i_mobile_h == 0 && num_donors as usize == double_bond_not_o_neigh.len() {
+            if charge_list.num_edges == 0 {
+                for k in 0..num_at {
+                    let ak = &at2[k];
+                    let e0 = bns.iedge[bns.vert[k].iedge] as usize;
+                    let em = p_va[k].n_c_minus_group_edge - 1;
+                    let ep = p_va[k].n_c_plus_group_edge - 1;
+                    let skip = (ak.valence == 1
+                        && bns.edge[e0].flow != 0
+                        && bns.edge[e0].forbidden == 0
+                        && !(em >= 0 && bns.edge[em as usize].flow != 0)
+                        && !(ep >= 0 && bns.edge[ep as usize].flow == 0)
+                        && p_va[k].c_num_valence_electrons == 6
+                        && p_va[k].c_metal == 0
+                        && endp(ps, k))
+                        || ps.fixed_h.as_ref().is_some_and(|f| f[k] != 0);
+                    if !skip
+                        && em >= 0
+                        && bns.edge[em as usize].flow == 0
+                        && bns.edge[em as usize].forbidden == 0
+                    {
+                        let r = add_to_edge_list(&mut charge_list, em, 64);
+                        if r != 0 {
+                            return r;
+                        }
+                    }
+                    if ep >= 0 && bns.edge[ep as usize].forbidden == 0 {
+                        let r = add_to_edge_list(&mut charge_list, ep, 64);
+                        if r != 0 {
+                            return r;
+                        }
+                    }
+                }
+            }
+            for &jj in &double_bond_not_o_neigh {
+                let e = bns.iedge[bns.vert[i].iedge + jj];
+                if bns.edge[e as usize].forbidden == 0 {
+                    let r = add_to_edge_list(&mut charge_list, e, 64);
+                    if r != 0 {
+                        return r;
+                    }
+                }
+            }
+            set_forbidden_edge_mask(bns, &charge_list, forbidden_edge_mask);
+            let mut num_moved = 0usize;
+            let mut k = 0;
+            while k < double_bond_not_o_neigh.len() && num_moved < mobile_charge_neigh.len() {
+                let pe = bns.iedge[bns.vert[i].iedge + double_bond_not_o_neigh[k]] as usize;
+                k += 1;
+                if bns.edge[pe].flow != 1 {
+                    continue;
+                }
+                let v1 = bns.edge[pe].neighbor1 as usize;
+                let v2 = (bns.edge[pe].neighbor12 as usize) ^ v1;
+                bns.vert[v1].st_edge.flow -= 1;
+                bns.vert[v2].st_edge.flow -= 1;
+                bns.edge[pe].flow -= 1;
+                bns.tot_st_flow -= 2;
+                let ret = run_bns_test_once(bns, bd, p_va, &mut res);
+                if ret < 0 {
+                    return ret;
+                }
+                let (x, y) = (v1 as i32, v2 as i32);
+                if ret == 1
+                    && ((res.v_last == x && res.v_first == y)
+                        || (res.v_last == y && res.v_first == x))
+                    && res.delta_charge == 0
+                {
+                    let ret = run_bns_restore_once(bns, bd);
+                    *num_run_bns += 1;
+                    if ret < 0 {
+                        return ret;
+                    }
+                    if ret == 1 {
+                        *total_delta += ret;
+                        num_moved += 1;
+                    } else {
+                        return RI_ERR_PROGR;
+                    }
+                } else {
+                    bns.vert[v1].st_edge.flow += 1;
+                    bns.vert[v2].st_edge.flow += 1;
+                    bns.edge[pe].flow += 1;
+                    bns.tot_st_flow += 2;
+                }
+            }
+            remove_forbidden_edge_mask(bns, &charge_list, forbidden_edge_mask);
+        } else if !b_possibly_ignore
+            || (num_known_endpoints == 0
+                && num_wrong_neigh == 0
+                && num_acceptors_o + num_donors_o >= 3)
+        {
+            bns.vert[i].st_edge.cap += num_donors;
+            bns.tot_st_cap += num_donors;
+            p_va[i].c_init_charge = p_va[i].c_init_charge.wrapping_sub(num_donors as i8);
+            for &jm in &mobile_charge_neigh {
+                let neigh = at2[i].neighbor[jm] as usize;
+                let pm = (p_va[neigh].n_c_minus_group_edge - 1) as usize;
+                let v1m = bns.edge[pm].neighbor1 as usize;
+                let v2m = (bns.edge[pm].neighbor12 as usize) ^ v1m;
+                let delta = bns.edge[pm].flow;
+                bns.vert[v1m].st_edge.flow -= delta;
+                bns.vert[v2m].st_edge.flow -= delta;
+                if is_bns_vt_c_gr(bns.vert[v1m].type_) {
+                    bns.vert[v1m].st_edge.cap -= delta;
+                } else if is_bns_vt_c_gr(bns.vert[v2m].type_) {
+                    bns.vert[v2m].st_edge.cap -= delta;
+                } else {
+                    return RI_ERR_PROGR;
+                }
+                bns.tot_st_cap -= delta;
+                bns.tot_st_flow -= 2 * delta;
+                bns.edge[pm].flow -= delta;
+            }
+            let ret = run_bns_restore_once(bns, bd);
+            *num_run_bns += 1;
+            if ret < 0 {
+                return ret;
+            }
+            if ret == num_donors {
+                *total_delta += ret;
+                num_success += 1;
+            } else {
+                return RI_ERR_PROGR;
+            }
+        }
+    }
+    if ret_forbid_edges != 0 {
+        remove_forbidden_bond_flow_bits(bns, test);
+    }
+    num_success
+}
+
+/// `MakeSingleBondsMetal2ChargedHeteroat`: bonds of a metal to a charged
+/// heteroatom that are not single get flow removed and the BNS is rerun
+#[allow(clippy::too_many_arguments)]
+pub fn make_single_bonds_metal2_charged_heteroat(
+    bns: &mut BnStruct,
+    bd: &mut BnData,
+    ps: &mut StrFromInChI,
+    at2: &mut Vec<InpAtom>,
+    p_va: &[ValAt],
+    tcg: &AllTcGroups,
+    num_run_bns: &mut i32,
+    total_delta: &mut i32,
+    forbidden_edge_mask: i32,
+) -> i32 {
+    let num_at = ps.num_atoms as usize;
+    let len_at = (ps.num_atoms + ps.num_deleted_h) as usize;
+    let mask = forbidden_edge_mask as i8;
+    let r2 = refresh_at2(ps, at2, bns, p_va, tcg);
+    if r2 < 0 {
+        return r2;
+    }
+    let mut fixed: Vec<usize> = Vec::new();
+    for i in 0..num_at {
+        if p_va[i].c_metal == 0 {
+            continue;
+        }
+        for j in 0..at2[i].valence as usize {
+            let neigh = at2[i].neighbor[j] as usize;
+            if p_va[neigh].c_num_valence_electrons == 4 && p_va[neigh].c_periodic_row_number == 1 {
+                continue;
+            }
+            if i32::from(at2[i].bond_type[j]) > BOND_TYPE_SINGLE
+                && at2[neigh].charge != 0
+                && p_va[neigh].c_metal == 0
+                && p_va[neigh].c_cn_list_index > 0
+            {
+                let cn_bits = if at2[neigh].charge > 0 {
+                    make_cn_bits(CN_BITS_N, CN_BITS_P, 0, 0)
+                } else {
+                    make_cn_bits(CN_BITS_N, CN_BITS_M, 0, 0)
+                };
+                let mut at_bits = CN_LIST[p_va[neigh].c_cn_list_index as usize - 1].bits;
+                let mut k = 0;
+                while k < 3 {
+                    if at_bits & cn_bits == cn_bits {
+                        break;
+                    }
+                    k += 1;
+                    at_bits >>= CN_BITS_SHIFT;
+                }
+                if k == 3 {
+                    continue;
+                }
+                fixed.push(bns.iedge[bns.vert[i].iedge + j] as usize);
+            }
+        }
+    }
+    at2.clear();
+    at2.extend_from_slice(&ps.at[..len_at]);
+    if fixed.is_empty() {
+        return 0;
+    }
+    for &e in &fixed {
+        let v1 = bns.edge[e].neighbor1 as usize;
+        let v2 = (bns.edge[e].neighbor12 as usize) ^ v1;
+        bns.edge[e].flow -= 1;
+        bns.edge[e].forbidden |= mask;
+        bns.vert[v1].st_edge.flow -= 1;
+        bns.vert[v2].st_edge.flow -= 1;
+        bns.tot_st_flow -= 2;
+        *total_delta -= 2;
+    }
+    let mut ret = run_bns_restore_once(bns, bd);
+    *num_run_bns += 1;
+    if ret < 0 {
+        return ret;
+    }
+    *total_delta += ret;
+    for &e in &fixed {
+        bns.edge[e].forbidden &= !mask;
+    }
+    if ret < 2 * fixed.len() as i32 {
+        ret = run_bns_restore_once(bns, bd);
+        *num_run_bns += 1;
+        if ret < 0 {
+            return ret;
+        }
+        *total_delta += ret;
+    }
     ret
 }
