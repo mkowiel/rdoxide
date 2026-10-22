@@ -9,10 +9,19 @@
 #![allow(clippy::needless_late_init)]
 
 use super::ichi::{InChI, InChIStereo};
-use super::ichi_bns::{BNS_VERT_TYPE_TGROUP, BnStruct, NO_VERTEX};
+use super::ichi_bns::{
+    BNS_VERT_TYPE_AUX, BNS_VERT_TYPE_TGROUP, BnData, BnStruct, NO_VERTEX, RAD_SRCH_FROM_FICT,
+    remove_rad_endpoints, set_rad_endpoints,
+};
 use super::ichiread::{RI_ERR_PROGR, RI_ERR_SYNTAX};
-use super::ichirvr1::{bond_flow_maxcap_minorder, get_tgroup_info_from_inchi};
-use super::ichirvrs::{AllTcGroups, Srm, TGRF_MINUS_FIRST, ValAt};
+use super::ichirvr1::CN_LIST;
+use super::ichirvr1::{
+    bond_flow_maxcap_minorder, comp_cc_cand, get_tgroup_info_from_inchi, run_bns_restore_once,
+};
+use super::ichirvrs::{
+    AllTcGroups, BNS_VT_C_POS, CN_BITS_SHIFT, CcCand, Srm, TGRF_MINUS_FIRST, ValAt,
+};
+use super::ichisort::insertions_sort;
 use super::ichister::{
     AB_PARITY_EVEN, AB_PARITY_ODD, MAX_CUMULENE_LEN, MAX_NUM_STEREO_BOND_NEIGH,
     MIN_NUM_STEREO_BOND_NEIGH, atom_parity_well_def, b_can_atom_be_middle_allene,
@@ -1195,5 +1204,189 @@ pub fn copy_bns_to_atom(
 
 /// `CheckBnsConsistency` (a no-op in the library build: `TARGET_API_LIB`)
 pub fn check_bns_consistency() -> i32 {
+    0
+}
+
+/// `MoveRadToAtomsAddCharges`: moves the radicals of the charge structure to
+/// atoms and adds the charges that this requires. `at2` receives the atoms
+/// made from the BNS (the work array of the C function).
+#[allow(clippy::too_many_arguments)]
+pub fn move_rad_to_atoms_add_charges(
+    bns: &mut BnStruct,
+    bd: &mut BnData,
+    ps: &mut StrFromInChI,
+    at2: &mut Vec<InpAtom>,
+    p_va: &mut [ValAt],
+    tcg: &AllTcGroups,
+    forbidden_mask: i32,
+) -> i32 {
+    let num_atoms = bns.num_atoms as usize;
+    let len_at = (ps.num_atoms + ps.num_deleted_h) as usize;
+    let mut num_rad_not_atom = 0;
+    for i in num_atoms..bns.num_vertices as usize {
+        num_rad_not_atom += bns.vert[i].st_edge.cap - bns.vert[i].st_edge.flow;
+    }
+    if num_rad_not_atom == 0 {
+        return 0;
+    }
+    let nv = bns.num_vertices as usize;
+    let mut pn_rad: Vec<i16> = (0..nv)
+        .map(|i| (bns.vert[i].st_edge.cap - bns.vert[i].st_edge.flow) as i16)
+        .collect();
+    let mut pn_delta = vec![0i16; num_atoms];
+    let mut num_moved = 0;
+    let mut num_candidates = 0;
+    let mut extra_charge = 0;
+    let mut atom_rad_removed = 0;
+    loop {
+        for i in 0..num_atoms {
+            pn_delta[i] = (bns.vert[i].st_edge.cap - bns.vert[i].st_edge.flow) as i16;
+            bns.vert[i].st_edge.cap -= i32::from(pn_delta[i]);
+            atom_rad_removed += i32::from(pn_delta[i] != 0);
+        }
+        let ret = set_rad_endpoints(bns, bd, RAD_SRCH_FROM_FICT);
+        if ret == 0 {
+            break;
+        }
+        if ret < 0 {
+            return ret;
+        }
+        for i in 0..ret as usize {
+            let ie = bd.rad_edges[i] as usize;
+            let (n1, n12, fl) = (
+                bns.edge[ie].neighbor1 as usize,
+                bns.edge[ie].neighbor12 as usize,
+                bns.edge[ie].flow,
+            );
+            let v2 = n12 ^ n1;
+            bns.vert[n1].st_edge.flow -= fl;
+            bns.vert[v2].st_edge.flow -= fl;
+            bns.tot_st_flow -= 2 * fl;
+            bns.edge[ie].flow = 0;
+            bns.edge[ie].forbidden |= forbidden_mask as i8;
+            bns.edge_forbidden_mask |= forbidden_mask as i8;
+        }
+        let ret = run_bns_restore_once(bns, bd);
+        if ret < 0 {
+            return ret;
+        }
+        num_moved += ret;
+        remove_rad_endpoints(bns, bd, None);
+        if ret == 0 {
+            break;
+        }
+        if atom_rad_removed != 0 {
+            for i in 0..num_atoms {
+                bns.vert[i].st_edge.cap += i32::from(pn_delta[i]);
+            }
+            atom_rad_removed = 0;
+        }
+    }
+    if atom_rad_removed != 0 {
+        for i in 0..num_atoms {
+            bns.vert[i].st_edge.cap += i32::from(pn_delta[i]);
+        }
+    }
+    bns.edge_forbidden_mask &= !(forbidden_mask as i8);
+
+    if num_moved != 0 {
+        extra_charge = 0;
+        for i in num_atoms..nv {
+            let pv = &bns.vert[i];
+            let delta = pv.st_edge.cap - pv.st_edge.flow;
+            if delta != 0 {
+                if pv.type_ & BNS_VT_C_POS != 0 {
+                    extra_charge -= delta;
+                } else if BNS_VERT_TYPE_AUX == pv.type_ {
+                    extra_charge += delta;
+                } else {
+                    return RI_ERR_PROGR;
+                }
+            }
+        }
+        if extra_charge == 0 {
+            return 0;
+        }
+        num_candidates = 0;
+        for i in 0..nv {
+            pn_rad[i] = (bns.vert[i].st_edge.cap - bns.vert[i].st_edge.flow) as i16;
+            if pn_rad[i] > 0 && i < num_atoms && p_va[i].n_taut_group_edge == 0 {
+                num_candidates += 1;
+            }
+        }
+    }
+    if num_candidates > 0 {
+        at2.clear();
+        at2.extend_from_slice(&ps.at[..len_at]);
+        std::mem::swap(&mut ps.at, at2);
+        let ret2 = copy_bns_to_atom(ps, bns, p_va, tcg, true);
+        std::mem::swap(&mut ps.at, at2);
+        if ret2 < 0 {
+            return ret2;
+        }
+        let mut cand: Vec<CcCand> = Vec::new();
+        for i in 0..nv {
+            if pn_rad[i] > 0 && i < num_atoms && p_va[i].n_taut_group_edge == 0 {
+                let mut c = CcCand {
+                    iat: i as i16,
+                    num_bonds: at2[i].valence,
+                    chem_valence: at2[i].chem_bonds_valence,
+                    c_metal: p_va[i].c_metal,
+                    c_num_bonds_to_metal: p_va[i].c_num_bonds_to_metal,
+                    c_num_valence_electrons: p_va[i].c_num_valence_electrons,
+                    c_periodic_row_number: p_va[i].c_periodic_row_number,
+                    c_num_charge_states: 0,
+                    el_number: at2[i].el_number,
+                };
+                let mut cn_bits = if p_va[i].c_cn_list_index > 0 {
+                    CN_LIST[p_va[i].c_cn_list_index as usize - 1].bits
+                } else {
+                    0
+                };
+                while cn_bits > 0 {
+                    c.c_num_charge_states += 1;
+                    cn_bits >>= CN_BITS_SHIFT;
+                }
+                cand.push(c);
+            }
+        }
+        let j = cand.len();
+        if j > 1 {
+            insertions_sort(&mut cand, comp_cc_cand);
+        }
+        let mut added_charge = 0;
+        for k in 0..j {
+            let rest = extra_charge - added_charge;
+            let per_left = (rest.abs() + j as i32 - k as i32 - 1) / (j - k) as i32;
+            let mut this_add = if rest > 0 { per_left } else { -per_left };
+            p_va[cand[k].iat as usize].c_init_charge += this_add as i8;
+            added_charge += this_add;
+            if this_add != 0 {
+                let mut i = nv as isize - 1;
+                while this_add != 0 && num_atoms as isize <= i {
+                    let pv = &mut bns.vert[i as usize];
+                    let mut delta = pv.st_edge.cap - pv.st_edge.flow;
+                    if delta != 0 {
+                        if this_add < 0 && pv.type_ & BNS_VT_C_POS != 0 {
+                            if delta + this_add > 0 {
+                                delta = -this_add;
+                            }
+                            pv.st_edge.cap -= delta;
+                            bns.tot_st_cap -= delta;
+                            this_add += delta;
+                        } else if this_add > 0 && BNS_VERT_TYPE_AUX == pv.type_ {
+                            if delta > this_add {
+                                delta = this_add;
+                            }
+                            pv.st_edge.cap -= delta;
+                            bns.tot_st_cap -= delta;
+                            this_add -= delta;
+                        }
+                    }
+                    i -= 1;
+                }
+            }
+        }
+    }
     0
 }
