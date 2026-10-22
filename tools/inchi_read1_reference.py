@@ -145,6 +145,36 @@ int main(void) {
                     printf("\n");
                 }
             }
+        } else if (t == 10) {
+            static char hs[5][4096], bs[5][2048];
+            int abc, hasfixed;
+            scanf("%d %d %s %s %s %s %s", &abc, &hasfixed, hs[0], hs[1], hs[2], hs[3], hs[4]);
+            for (int k = 0; k < 5; k++) unhex(hs[k], bs[k]);
+            INChI *pp[2] = { NULL, NULL }; int pn[2] = { 0, 0 };
+            int na, nb, r;
+            na = IST_MOBILE_H_FORMULA;
+            r = ParseSegmentFormula(bs[0], 1, pp, pn, &na); printf("F1 %d %d\n", r, pn[1]);
+            if (r >= 0) { r = ParseSegmentConnections(bs[1], 1, &pp[1], &pn[1], &abc, &nb); printf("C1 %d %d %d\n", r, pn[1], abc); }
+            if (r >= 0) { r = ParseSegmentMobileH(bs[2], 1, pp, pn, &abc); printf("H1 %d %d\n", r, abc); }
+            if (r >= 0 && hasfixed) {
+                na = IST_FIXED_H_FORMULA;
+                r = ParseSegmentFormula(bs[3], 0, pp, pn, &na); printf("F2 %d %d\n", r, pn[0]);
+                if (r >= 0) { r = ParseSegmentMobileH(bs[4], 0, pp, pn, &abc); printf("H2 %d %d\n", r, abc); }
+            }
+            for (int m = 1; m >= 0; m--) for (int i = 0; i < pn[m] && pp[m]; i++) {
+                INChI *c = &pp[m][i];
+                printf("D%d.%d %d %s |", m, i, c->nNumberOfAtoms, c->szHillFormula ? c->szHillFormula : "NULL");
+                if (c->nAtom) for (int j = 0; j <= c->nNumberOfAtoms; j++) printf("%d,", c->nAtom[j]); else printf("NULL");
+                printf(" | ");
+                if (c->nNum_H) for (int j = 0; j <= c->nNumberOfAtoms; j++) printf("%d,", c->nNum_H[j]); else printf("NULL");
+                printf(" | ");
+                if (c->nNum_H_fixed) for (int j = 0; j <= c->nNumberOfAtoms; j++) printf("%d,", c->nNum_H_fixed[j]); else printf("NULL");
+                printf(" | %d |", c->lenTautomer);
+                if (c->nTautomer) for (int j = 0; j <= c->lenTautomer; j++) printf(" %d", c->nTautomer[j]); else printf(" NULL");
+                printf(" | %d |", c->lenConnTable);
+                if (c->nConnTable) for (int j = 0; j <= c->lenConnTable; j++) printf(" %d", c->nConnTable[j]); else printf(" NULL");
+                printf("\n");
+            }
         } else if (t == 7) {
             INChI c; memset(&c, 0, sizeof(c));
             int r = nFillOutProtonMobileH(&c);
@@ -268,6 +298,32 @@ def main():
         cases.append(f"9 {hx(f.encode())} {hx(c.encode())} {R.choice([-1, 1, 1, 0])} 0")
     for _ in range(100):
         cases.append(f"9 {hx(b'C')} {hx(R.choice(['c1-2', 'h', 'c', '']).encode())} {R.choice([-1, 0, 1])} 1")
+    def layers(ic):
+        ly = ic.split("/")
+        if len(ly) < 2:
+            return None
+        F1 = ly[1]
+        rest = ly[2:]
+        fi = next((k for k, x in enumerate(rest) if x.startswith("f")), None)
+        main, fixed = (rest, []) if fi is None else (rest[:fi], rest[fi:])
+        C1 = main[0] if main else ""
+        H1 = ""
+        if main and main[0].startswith("c"):
+            H1 = main[1] if len(main) > 1 and main[1].startswith("h") else ""
+        elif main and main[0].startswith("h"):
+            H1 = main[0]
+        F2 = fixed[0][1:] if fixed else ""
+        H2 = fixed[1] if len(fixed) > 1 and fixed[1].startswith("h") else ""
+        return F1, C1 if C1.startswith("c") else "", H1, F2, H2, bool(fixed)
+
+    def mut2(x):
+        return mutate(x) if R.random() < 0.5 else x
+
+    allp = [layers(i) for i in inchis]
+    allp = [x for x in allp if x]
+    for _ in range(9000):
+        F1, C1, H1, F2, H2, hf = R.choice(allp)
+        cases.append(f"10 {R.choice([-1, -1, 0, 1])} {int(hf)} " + " ".join(hx(mut2(x).encode()) for x in (F1, C1, H1, F2, H2)))
     cases.append("7")
     objs = ma.build_lib()
     with tempfile.TemporaryDirectory() as d:
