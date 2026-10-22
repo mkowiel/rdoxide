@@ -117,6 +117,10 @@ pub struct StrFromInChI {
     /// `n_zy`, `n_pzz`: the polymer Zy / Zz counts of the input
     pub n_zy: i32,
     pub n_pzz: i32,
+    /// `iINCHI`: `INCHI_BAS` / `INCHI_REC` of the reversed InChI
+    pub i_inchi: i8,
+    /// `num_inp_actual`
+    pub num_inp_actual: i64,
     /// `fixed_H`: the atoms with the fixed H of the Fixed-H InChI
     pub fixed_h: Option<Vec<i8>>,
     /// `endpoint`: the endpoints of the original Fixed-H InChI

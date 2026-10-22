@@ -652,3 +652,137 @@ pub fn compare_two_pairs_of_inchi(
         }
     }
 }
+
+/// `I2A_FLAG_FIXEDH`, `I2A_FLAG_RECMET`
+pub const I2A_FLAG_FIXEDH: i32 = 0x0001;
+pub const I2A_FLAG_RECMET: i32 = 0x0002;
+/// `EL_NUMBER_ZY`, `EL_NUMBER_ZZ`
+const EL_NUMBER_ZY: u8 = 119;
+const EL_NUMBER_ZZ: u8 = 120;
+
+/// `InChI2Atom`: restores the component `i_component` of the input InChI
+/// (Fixed-H or Mobile-H, disconnected or reconnected as the flag says) as
+/// the structure in `ps`. `num_inp_actual` and `polymer` are the
+/// `num_inp` and `polymer` members of `OneInput`. Returns 0 when the
+/// component does not exist.
+#[allow(clippy::too_many_arguments)]
+pub fn inchi2_atom(
+    ip: &super::ichiparm::InputParms,
+    sd: &mut super::runichi3::StructData,
+    num_inp: i64,
+    ps: &mut super::ichirvr2::StrFromInChI,
+    i_component: usize,
+    i_at_no_offset: i32,
+    i2a_flag: i32,
+    b_has_some_fixed_h: bool,
+    one_input: &mut InpInChI,
+    num_inp_actual: i64,
+    polymer: Option<&super::mol2atom::OadPolymer>,
+) -> i32 {
+    let mut i_inchi = if i2a_flag & I2A_FLAG_RECMET != 0 {
+        INCHI_REC
+    } else {
+        INCHI_BAS
+    };
+    let mut b_mobile_h = if i2a_flag & I2A_FLAG_FIXEDH != 0 {
+        TAUT_NON
+    } else {
+        TAUT_YES
+    };
+    let ic = i_component as i32;
+    // disconnected or reconnected
+    if i_inchi == INCHI_REC && one_input.n_num_components[i_inchi][TAUT_YES] == 0 {
+        i_inchi = INCHI_BAS;
+    }
+    if ic >= one_input.n_num_components[i_inchi][TAUT_YES] {
+        return 0; // component does not exist
+    }
+    // mobile or fixed H
+    ps.b_fixed_h_exists = 0;
+    if b_mobile_h == TAUT_NON && one_input.n_num_components[i_inchi][b_mobile_h] == 0 {
+        // only one InChI exists (no mobile H)
+        b_mobile_h = TAUT_YES;
+    }
+    if ic >= one_input.n_num_components[i_inchi][b_mobile_h] {
+        return 0;
+    }
+    ps.b_mobile_h = b_mobile_h as i32;
+    ps.i_inchi = i_inchi as i8;
+    // deleted component only in case Mobile-H and compound contains only protons
+    if one_input.p_inp_inchi[i_inchi][b_mobile_h][i_component].b_deleted != 0 {
+        return 0;
+    }
+    if b_mobile_h == TAUT_NON
+        && let Some(v) = &one_input.n_num_protons[i_inchi][TAUT_YES].p_num_protons
+    {
+        ps.n_num_removed_protons_mobh_inchi = i32::from(v[i_component][0]);
+    }
+    let fixed_exists = one_input.p_inp_inchi[i_inchi][TAUT_NON]
+        .get(i_component)
+        .is_some_and(|c| c.n_number_of_atoms > 0 && c.b_deleted == 0);
+    if b_mobile_h == TAUT_NON || (b_mobile_h == TAUT_YES && fixed_exists) {
+        ps.b_fixed_h_exists = 1;
+    }
+    let mobile_exists = b_mobile_h == TAUT_NON
+        && ic < one_input.n_num_components[i_inchi][TAUT_YES]
+        && one_input.p_inp_inchi[i_inchi][TAUT_YES]
+            .get(i_component)
+            .is_some_and(|c| c.n_number_of_atoms > 0 && c.b_deleted == 0);
+    ps.num_inp_actual = num_inp_actual;
+    // non-polymer Zz to Zy
+    if let Some(p) = polymer {
+        ps.n_pzz = 0;
+        ps.n_zy = 0;
+        let inchi = &mut one_input.p_inp_inchi[i_inchi][b_mobile_h][i_component];
+        for a in 0..inchi.n_number_of_atoms as usize {
+            let aglob = i_at_no_offset + a as i32 + 1;
+            if inchi.n_atom[a] == EL_NUMBER_ZZ {
+                let mut new_num = EL_NUMBER_ZY;
+                if p.units
+                    .iter()
+                    .take(p.n.max(0) as usize)
+                    .any(|u| aglob == u.cap1 || aglob == u.cap2)
+                {
+                    new_num = EL_NUMBER_ZZ;
+                }
+                inchi.n_atom[a] = new_num;
+                if new_num == EL_NUMBER_ZY {
+                    ps.n_zy += 1;
+                } else {
+                    ps.n_pzz += 1;
+                }
+            }
+        }
+    }
+    let ret = {
+        let p0 = &one_input.p_inp_inchi[i_inchi][b_mobile_h][i_component];
+        let p1 = mobile_exists.then(|| &one_input.p_inp_inchi[i_inchi][TAUT_YES][i_component]);
+        super::ichirvr4::one_inchi2_atom(
+            ip,
+            sd,
+            num_inp,
+            ps,
+            ic,
+            0,
+            b_has_some_fixed_h,
+            [Some(p0), p1],
+        )
+    };
+    // the Zy atoms are returned to Zz
+    if !ps.at.is_empty() && !ps.at2.is_empty() {
+        let inchi = &mut one_input.p_inp_inchi[i_inchi][b_mobile_h][i_component];
+        for a in 0..inchi.n_number_of_atoms as usize {
+            if inchi.n_atom[a] == EL_NUMBER_ZY {
+                inchi.n_atom[a] = EL_NUMBER_ZZ;
+                for at in [&mut ps.at[a], &mut ps.at2[a]] {
+                    at.el_number = EL_NUMBER_ZZ;
+                    at.elname = [0; super::inpdef::ATOM_EL_LEN];
+                    at.elname[..2].copy_from_slice(b"Zz");
+                }
+                ps.n_zy -= 1;
+                ps.n_pzz += 1;
+            }
+        }
+    }
+    ret
+}
