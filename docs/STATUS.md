@@ -12,11 +12,11 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not done. Eve
 | 1 | RDGeneral: Dict/RDValue/RDProps | ✅ |  |
 | 1 | RDGeneral: RDLog + `rdBase` logging API | ✅ | upstream `UnitTestLogging.py` 32/32 |
 | 1 | RDGeneral: RNG (`boost::minstd_rand`, glibc `rand`) | ✅ |  |
-| 1 | `rdBase` vector types `_vecti`, `_vectj`, `_vectd`, list of int vectors (mutable sequences without value equality, like Boost.Python's indexing suites) | 🟡 | used by DataStructs and Subgraphs; string/nested-vector variants later |
+| 1 | `rdBase` vector types `_vecti`, `_vectj`, `_vectd`, list of int vectors (mutable sequences without value equality, like Boost.Python's indexing suites) | ✅ | used by DataStructs and Subgraphs; `vector<string>` and the nested `vector<vector<int/unsigned/double>>` and `list<vector<int/unsigned>>` variants (C++-mangled class names as upstream) present; every `rdBase` vector class of RDKit 2026.09.1 exists |
 | 2 | PeriodicTable (+ data extraction from upstream) | ✅ |  |
 | 2 | Atom, Bond, Conformer, ROMol/RWMol, RingInfo, StereoGroup (core) | ✅ | boost adjacency ordering, RWMol edits, batch edits, valence calc |
 | 2 | `rdchem` Python: Atom, Bond, Mol, RWMol, EditableMol, Conformer, RingInfo, StereoGroup, enums, props API, sanitize exceptions | ✅ | `_wrapperType = 'nanobind'` (PyO3 semantics match nanobind's) |
-| 2 | `rdGeometry` Point3D / Point2D | 🟡 | PointND, UniformGrid3D later |
+| 2 | `rdGeometry` Point3D / Point2D / PointND, UniformGrid3D | ✅ | PointND and the grids came with stage 12b; every public name and method of `rdGeometry` matches RDKit 2026.09.1 (checked 2026-10-22) |
 | 2b | SubstanceGroup, MonomerInfo / PDBResidueInfo, bookmarks API in Python, QueryAtom/QueryBond | ✅ | SubstanceGroup in stage 13e; `AtomMonomerInfo` and `AtomPDBResidueInfo` are exposed (checked 2026-10-22) |
 | 3 | Ring finding: RingDecomposerLib port, findSSSR, symmetrizeSSSR (RDL + legacy), fastFindRings, ring families | ✅ | differential: 10312/10312 identical to RDKit 2026.09.1 |
 | 3 | sanitizeMol: cleanUp, cleanUpOrganometallics, Kekulize (canonical + input order), aromaticity (RDKit/simple/MDL/MMFF94), conjugation, hybridization, radicals, adjustHs, chirality/atropisomer cleanup | ✅ | differential `sanitize` 10312/10312 |

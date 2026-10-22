@@ -109,138 +109,147 @@ flat_vect!(
     String
 );
 
+macro_rules! nested_list {
+    ($py:ident, $inner:ident, $t:ty) => {
+        #[pyclass(module = "rdoxide.rdBase", sequence, skip_from_py_object)]
+        #[derive(Debug, Clone, Default)]
+        pub struct $py {
+            pub v: Vec<Vec<$t>>,
+        }
+
+        impl $py {
+            pub fn new_py(py: Python<'_>, v: Vec<Vec<$t>>) -> PyResult<Py<PyAny>> {
+                Ok(Py::new(py, $py { v })?.into_any())
+            }
+        }
+
+        #[pymethods]
+        impl $py {
+            #[new]
+            fn new() -> Self {
+                Self::default()
+            }
+            fn __len__(&self) -> usize {
+                self.v.len()
+            }
+            fn __getitem__(&self, py: Python<'_>, idx: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+                if let Ok(s) = idx.cast::<PySlice>() {
+                    let ind = s.indices(self.v.len() as isize)?;
+                    let mut out = Vec::new();
+                    let mut i = ind.start;
+                    while (ind.step > 0 && i < ind.stop) || (ind.step < 0 && i > ind.stop) {
+                        out.push(self.v[i as usize].clone());
+                        i += ind.step;
+                    }
+                    return Self::new_py(py, out);
+                }
+                let i = norm_index(idx.extract::<isize>()?, self.v.len())?;
+                $inner::new_py(py, self.v[i].clone())
+            }
+            fn __iter__(slf: PyRef<'_, Self>) -> PyResult<Py<PyAny>> {
+                let py = slf.py();
+                let items = slf
+                    .v
+                    .iter()
+                    .map(|p| $inner::new_py(py, p.clone()))
+                    .collect::<PyResult<Vec<_>>>()?;
+                Ok(PyList::new(py, items)?
+                    .into_any()
+                    .try_iter()?
+                    .into_any()
+                    .unbind())
+            }
+            fn __contains__(&self, val: &Bound<'_, PyAny>) -> bool {
+                val.extract::<PyRef<'_, $inner>>()
+                    .is_ok_and(|x| self.v.contains(&x.v))
+                    || val.extract::<Vec<$t>>().is_ok_and(|x| self.v.contains(&x))
+            }
+        }
+    };
+}
+
+/// Adds the `list_indexing_suite` item assignment error of `std::list`.
+macro_rules! list_setitem {
+    ($py:ident) => {
+        #[pymethods]
+        impl $py {
+            fn __setitem__(&mut self, _idx: isize, _val: &Bound<'_, PyAny>) -> PyResult<()> {
+                Err(PyTypeError::new_err(
+                    "'list' object does not support item assignment",
+                ))
+            }
+        }
+    };
+}
+
+macro_rules! nested_vect_mut {
+    ($py:ident, $t:ty) => {
+        #[pymethods]
+        impl $py {
+            fn __setitem__(&mut self, idx: isize, val: Vec<$t>) -> PyResult<()> {
+                let i = norm_index(idx, self.v.len())?;
+                self.v[i] = val;
+                Ok(())
+            }
+            fn __delitem__(&mut self, idx: isize) -> PyResult<()> {
+                let i = norm_index(idx, self.v.len())?;
+                self.v.remove(i);
+                Ok(())
+            }
+            fn append(&mut self, val: Vec<$t>) {
+                self.v.push(val);
+            }
+        }
+    };
+}
+
 #[cfg(target_os = "macos")]
 const LIST_VECTI: &str = "_listNSt3__16vectorIiNS_9allocatorIiEEEE";
 #[cfg(not(target_os = "macos"))]
 const LIST_VECTI: &str = "_listSt6vectorIiSaIiEE";
-
-/// A sequence of int vectors (`std::list<std::vector<int>>`, e.g. `PATH_LIST`).
-/// Items come back as `_vecti` copies.
-#[pyclass(module = "rdoxide.rdBase", sequence, skip_from_py_object)]
-#[derive(Debug, Clone, Default)]
-pub struct PyListVectI {
-    pub v: Vec<Vec<i32>>,
-}
-
-impl PyListVectI {
-    pub fn new_py(py: Python<'_>, v: Vec<Vec<i32>>) -> PyResult<Py<PyAny>> {
-        Ok(Py::new(py, PyListVectI { v })?.into_any())
-    }
-}
-
-#[pymethods]
-impl PyListVectI {
-    fn __len__(&self) -> usize {
-        self.v.len()
-    }
-    fn __getitem__(&self, py: Python<'_>, idx: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
-        if let Ok(s) = idx.cast::<PySlice>() {
-            let ind = s.indices(self.v.len() as isize)?;
-            let mut out = Vec::new();
-            let mut i = ind.start;
-            while (ind.step > 0 && i < ind.stop) || (ind.step < 0 && i > ind.stop) {
-                out.push(self.v[i as usize].clone());
-                i += ind.step;
-            }
-            return Self::new_py(py, out);
-        }
-        let i = norm_index(idx.extract::<isize>()?, self.v.len())?;
-        PyVectI::new_py(py, self.v[i].clone())
-    }
-    fn __iter__(slf: PyRef<'_, Self>) -> PyResult<Py<PyAny>> {
-        let py = slf.py();
-        let items = slf
-            .v
-            .iter()
-            .map(|p| PyVectI::new_py(py, p.clone()))
-            .collect::<PyResult<Vec<_>>>()?;
-        Ok(PyList::new(py, items)?
-            .into_any()
-            .try_iter()?
-            .into_any()
-            .unbind())
-    }
-    fn __contains__(&self, val: &Bound<'_, PyAny>) -> bool {
-        val.extract::<PyRef<'_, PyVectI>>()
-            .is_ok_and(|x| self.v.contains(&x.v))
-            || val.extract::<Vec<i32>>().is_ok_and(|x| self.v.contains(&x))
-    }
-    fn __setitem__(&mut self, _idx: isize, _val: &Bound<'_, PyAny>) -> PyResult<()> {
-        Err(PyTypeError::new_err(
-            "'list' object does not support item assignment",
-        ))
-    }
-}
-
+#[cfg(target_os = "macos")]
+const LIST_VECTJ: &str = "_listNSt3__16vectorIjNS_9allocatorIjEEEE";
+#[cfg(not(target_os = "macos"))]
+const LIST_VECTJ: &str = "_listSt6vectorIjSaIjEE";
 #[cfg(target_os = "macos")]
 const VECT_VECTI: &str = "_vectNSt3__16vectorIiNS_9allocatorIiEEEE";
 #[cfg(not(target_os = "macos"))]
 const VECT_VECTI: &str = "_vectSt6vectorIiSaIiEE";
+#[cfg(target_os = "macos")]
+const VECT_VECTJ: &str = "_vectNSt3__16vectorIjNS_9allocatorIjEEEE";
+#[cfg(not(target_os = "macos"))]
+const VECT_VECTJ: &str = "_vectSt6vectorIjSaIjEE";
+#[cfg(target_os = "macos")]
+const VECT_VECTD: &str = "_vectNSt3__16vectorIdNS_9allocatorIdEEEE";
+#[cfg(not(target_os = "macos"))]
+const VECT_VECTD: &str = "_vectSt6vectorIdSaIdEE";
 
-/// A vector of int vectors (`std::vector<std::vector<int>>`, e.g. the
-/// clusters of a picker). Items come back as `_vecti` copies.
-#[pyclass(module = "rdoxide.rdBase", sequence, skip_from_py_object)]
-#[derive(Debug, Clone, Default)]
-pub struct PyVectVectI {
-    pub v: Vec<Vec<i32>>,
-}
+// `std::list<std::vector<int>>` (e.g. `PATH_LIST`) and `std::list<std::vector<unsigned>>`:
+// items come back as copies of the flat vector types
+nested_list!(PyListVectI, PyVectI, i32);
+list_setitem!(PyListVectI);
+nested_list!(PyListVectJ, PyVectJ, u32);
+list_setitem!(PyListVectJ);
+// `std::vector<std::vector<T>>` (e.g. the clusters of a picker)
+nested_list!(PyVectVectI, PyVectI, i32);
+nested_vect_mut!(PyVectVectI, i32);
+nested_list!(PyVectVectJ, PyVectJ, u32);
+nested_vect_mut!(PyVectVectJ, u32);
+nested_list!(PyVectVectD, PyVectD, f64);
+nested_vect_mut!(PyVectVectD, f64);
 
-impl PyVectVectI {
-    pub fn new_py(py: Python<'_>, v: Vec<Vec<i32>>) -> PyResult<Py<PyAny>> {
-        Ok(Py::new(py, PyVectVectI { v })?.into_any())
-    }
-}
-
-#[pymethods]
-impl PyVectVectI {
-    fn __len__(&self) -> usize {
-        self.v.len()
-    }
-    fn __getitem__(&self, py: Python<'_>, idx: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
-        if let Ok(s) = idx.cast::<PySlice>() {
-            let ind = s.indices(self.v.len() as isize)?;
-            let mut out = Vec::new();
-            let mut i = ind.start;
-            while (ind.step > 0 && i < ind.stop) || (ind.step < 0 && i > ind.stop) {
-                out.push(self.v[i as usize].clone());
-                i += ind.step;
-            }
-            return Self::new_py(py, out);
-        }
-        let i = norm_index(idx.extract::<isize>()?, self.v.len())?;
-        PyVectI::new_py(py, self.v[i].clone())
-    }
-    fn __setitem__(&mut self, idx: isize, val: Vec<i32>) -> PyResult<()> {
-        let i = norm_index(idx, self.v.len())?;
-        self.v[i] = val;
-        Ok(())
-    }
-    fn __delitem__(&mut self, idx: isize) -> PyResult<()> {
-        let i = norm_index(idx, self.v.len())?;
-        self.v.remove(i);
-        Ok(())
-    }
-    fn __iter__(slf: PyRef<'_, Self>) -> PyResult<Py<PyAny>> {
-        let py = slf.py();
-        let items = slf
-            .v
-            .iter()
-            .map(|p| PyVectI::new_py(py, p.clone()))
-            .collect::<PyResult<Vec<_>>>()?;
-        Ok(PyList::new(py, items)?
-            .into_any()
-            .try_iter()?
-            .into_any()
-            .unbind())
-    }
-    fn __contains__(&self, val: &Bound<'_, PyAny>) -> bool {
-        val.extract::<PyRef<'_, PyVectI>>()
-            .is_ok_and(|x| self.v.contains(&x.v))
-            || val.extract::<Vec<i32>>().is_ok_and(|x| self.v.contains(&x))
-    }
-    fn append(&mut self, val: Vec<i32>) {
-        self.v.push(val);
-    }
+fn add_named<T: pyo3::PyClass>(
+    m: &Bound<'_, PyModule>,
+    rust_name: &str,
+    name: &str,
+) -> PyResult<()> {
+    let py = m.py();
+    let cls = py.get_type::<T>();
+    cls.setattr("__name__", name)?;
+    cls.setattr("__qualname__", name)?;
+    m.add(name, cls)?;
+    let _ = rust_name;
+    Ok(())
 }
 
 pub fn add_classes(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -248,18 +257,10 @@ pub fn add_classes(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyVectJ>()?;
     m.add_class::<PyVectD>()?;
     m.add_class::<PyVectStr>()?;
-    m.add_class::<PyListVectI>()?;
-    // the mangled name upstream exposes for this class
-    let cls = m.getattr("PyListVectI")?;
-    cls.setattr("__name__", LIST_VECTI)?;
-    cls.setattr("__qualname__", LIST_VECTI)?;
-    m.add(LIST_VECTI, &cls)?;
-    m.delattr("PyListVectI")?;
-    m.add_class::<PyVectVectI>()?;
-    let cls = m.getattr("PyVectVectI")?;
-    cls.setattr("__name__", VECT_VECTI)?;
-    cls.setattr("__qualname__", VECT_VECTI)?;
-    m.add(VECT_VECTI, &cls)?;
-    m.delattr("PyVectVectI")?;
+    add_named::<PyListVectI>(m, "PyListVectI", LIST_VECTI)?;
+    add_named::<PyListVectJ>(m, "PyListVectJ", LIST_VECTJ)?;
+    add_named::<PyVectVectI>(m, "PyVectVectI", VECT_VECTI)?;
+    add_named::<PyVectVectJ>(m, "PyVectVectJ", VECT_VECTJ)?;
+    add_named::<PyVectVectD>(m, "PyVectVectD", VECT_VECTD)?;
     Ok(())
 }
