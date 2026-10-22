@@ -342,6 +342,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 226 | InChI port I9g: GetINCHI/GetStdINCHI (ExtractOneStructure, option summary log), differential-tested on 2998 inchi_Input structures vs the C library |
 | 227 | InChI port I9h: MolToInchi, MolBlockToInchi and MolToInchiKey wired to the InChI port, exact on the 539-record official-RDKit corpus |
 | 228 | InChI port I10a: ichiread /q and /p layers, delimited numbers, segment reader, differential-tested on 9786 cases vs the C library |
+| 229 | InChI port I10b: ichiread ParseSegmentFormula differential-tested vs the C library (12686 reader cases); polymer molfiles end with an error instead of a panic |
 
 ## Python package files
 
@@ -752,3 +753,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-22 — Stage 226: I9g GetINCHI/GetStdINCHI differential-tested against C (2998 cases)
 * 2026-10-22 — Stage 227: I9h MolToInchi/MolBlockToInchi/MolToInchiKey exact against the official RDKit corpus (539 records)
 * 2026-10-22 — Stage 228: I10a ichiread: charge/proton layers and segment reader differential-tested against C (9786 cases)
+* 2026-10-22 — Stage 229: I10b ichiread: formula layer differential-tested against C

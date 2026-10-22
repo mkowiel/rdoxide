@@ -503,3 +503,270 @@ pub fn n_get_inchi_segment(inp: &mut InchiIostream, line: &mut SegmLine, token: 
     line.c = c;
     c
 }
+
+use super::util::{ERR_ELEM, get_periodic_table_number};
+
+/// `isupper`/`islower`/`isdigit` of a position (reads as 0 past the end)
+fn upper(s: &[u8], i: usize) -> bool {
+    at(s, i).is_ascii_uppercase()
+}
+fn lower(s: &[u8], i: usize) -> bool {
+    at(s, i).is_ascii_lowercase()
+}
+
+/// the elements and counts of a Hill formula string, as parsed by
+/// `ParseSegmentFormula` pass 2: `(element symbol, count)`; `Err` is the
+/// return code
+fn formula_items(f: &[u8]) -> Result<Vec<(String, i32)>, i32> {
+    let mut items = Vec::new();
+    let mut e = 0;
+    while at(f, e) != 0 {
+        if !upper(f, e) {
+            return Err(RI_ERR_SYNTAX);
+        }
+        let mut el = String::new();
+        el.push(at(f, e) as char);
+        e += 1;
+        if lower(f, e) {
+            el.push(at(f, e) as char);
+            e += 1;
+        }
+        let mpy_atom;
+        if is_digit(at(f, e)) {
+            let (v, q) = strtol(f, e);
+            mpy_atom = v as i32;
+            if !(0..=MAX_ATOMS).contains(&mpy_atom) {
+                return Err(RI_ERR_SYNTAX);
+            }
+            e = q;
+        } else {
+            mpy_atom = 1;
+        }
+        if mpy_atom == 0 {
+            return Err(RI_ERR_SYNTAX);
+        }
+        items.push((el, mpy_atom));
+    }
+    Ok(items)
+}
+
+/// `ParseSegmentFormula`: the formula layer; `*na_total` is the reading
+/// state on entry and the total number of atoms except H on return
+pub fn parse_segment_formula(
+    s: &[u8],
+    b_mobile_h: usize,
+    p_inp_inchi: &mut [Vec<InChI>; 2],
+    pn_num_components: &mut [i32; 2],
+    na_total: &mut i32,
+) -> i32 {
+    let alt = 1 - b_mobile_h;
+    let state = *na_total;
+    *na_total = 0;
+    let mut n_num_components: i32 = 0;
+
+    // Pass 1. Count components
+    let mut p_start = 0usize;
+    let mut p_end;
+    loop {
+        p_end = strchr(s, p_start, b'.').unwrap_or(p_start + strlen(s, p_start));
+        let mut p = p_start;
+        let mpy_component;
+        if is_digit(at(s, p)) {
+            let (v, q) = strtol(s, p);
+            mpy_component = v as i32;
+            p = q;
+        } else {
+            mpy_component = 1;
+        }
+        if mpy_component == 0 {
+            break;
+        }
+        if !upper(s, p) {
+            break;
+        }
+        if p_end == p {
+            break;
+        }
+        n_num_components = n_num_components.wrapping_add(mpy_component);
+        if at(s, p_end) != 0 {
+            p_start = p_end + 1;
+        } else {
+            break;
+        }
+    }
+    pn_num_components[b_mobile_h] = n_num_components;
+    if n_num_components > MAX_ATOMS {
+        pn_num_components[b_mobile_h] = 0;
+        return RI_ERR_SYNTAX;
+    }
+    if n_num_components == 0 {
+        let low_case = at(s, p_start) != 0 && lower(s, p_start);
+        if at(s, p_start) == 0 || low_case {
+            if low_case
+                && state == IST_MOBILE_H_FORMULA
+                && at(s, p_start) != b'q'
+                && at(s, p_start) != b'p'
+            {
+                return RI_ERR_SYNTAX;
+            }
+            let n_alt = pn_num_components[alt];
+            if b_mobile_h == TAUT_NON && n_alt > 0 {
+                let mut v = vec![InChI::default(); n_alt as usize];
+                pn_num_components[b_mobile_h] = n_alt;
+                for (i, c) in v.iter_mut().enumerate() {
+                    let a = &p_inp_inchi[alt][i];
+                    c.n_number_of_atoms = a.n_number_of_atoms;
+                    let len = (a.n_number_of_atoms + 1) as usize;
+                    let mut na: Vec<u8> = (0..len)
+                        .map(|k| a.n_atom.get(k).copied().unwrap_or(0))
+                        .collect();
+                    na.push(0);
+                    c.n_atom = na;
+                    let f = a.sz_hill_formula.clone().unwrap_or_default();
+                    c.sz_hill_formula = Some(f);
+                }
+                p_inp_inchi[b_mobile_h] = v;
+            } else if b_mobile_h == TAUT_YES {
+                pn_num_components[b_mobile_h] = 1;
+                let mut c = InChI::default();
+                let ret = n_fill_out_proton_mobile_h(&mut c);
+                p_inp_inchi[b_mobile_h] = vec![c];
+                if ret < 0 {
+                    return ret;
+                }
+            }
+            return 0;
+        }
+        return RI_ERR_SYNTAX;
+    }
+    if at(s, p_end) != 0 {
+        return RI_ERR_SYNTAX;
+    }
+
+    // allocate InChI
+    p_inp_inchi[b_mobile_h] = vec![InChI::default(); n_num_components as usize];
+
+    // Pass 2. Count elements, save formulas and elements
+    let mut p_start = 0usize;
+    let mut i_component: i32 = 0;
+    let mut n_num_atoms: i32 = -999;
+    loop {
+        let p_end = strchr(s, p_start, b'.').unwrap_or(p_start + strlen(s, p_start));
+        let mut p = p_start;
+        let mpy_component;
+        if is_digit(at(s, p)) {
+            let (v, q) = strtol(s, p);
+            mpy_component = v as i32;
+            if !(0..=MAX_ATOMS).contains(&mpy_component) {
+                return RI_ERR_SYNTAX;
+            }
+            p = q;
+        } else {
+            mpy_component = 1;
+        }
+        if i_component + mpy_component > MAX_ATOMS {
+            return RI_ERR_SYNTAX;
+        }
+        let formula: Vec<u8> = s[p.min(s.len())..p_end.min(s.len())].to_vec();
+        for i in 0..mpy_component {
+            if i_component + i >= n_num_components {
+                return RI_ERR_SYNTAX;
+            }
+            let ic = i_component as usize;
+            let ici = (i_component + i) as usize;
+            p_inp_inchi[b_mobile_h][ici].sz_hill_formula =
+                Some(String::from_utf8_lossy(&formula).into_owned());
+            if i == 0 {
+                // Pass 2.1 Parse formula and count atoms except H
+                n_num_atoms = 0;
+                let mut n_num_h: i32 = 0;
+                let items = match formula_items(&formula) {
+                    Ok(v) => v,
+                    Err(r) => return r,
+                };
+                for (el, m) in &items {
+                    if el == "H" {
+                        n_num_h = n_num_h.wrapping_add(*m);
+                        continue;
+                    }
+                    n_num_atoms = n_num_atoms.wrapping_add(*m);
+                }
+                if n_num_atoms > MAX_ATOMS {
+                    return RI_ERR_SYNTAX;
+                }
+                *na_total = na_total.wrapping_add(mpy_component.wrapping_mul(n_num_atoms));
+                let n_num_atoms_and_h = if n_num_atoms != 0 {
+                    n_num_atoms
+                } else {
+                    i32::from(n_num_h > 0)
+                };
+                p_inp_inchi[b_mobile_h][ici].n_number_of_atoms = n_num_atoms_and_h;
+                // Pass 2.2 Store elements; this assumes no bridging H
+                let mut atoms: Vec<u8> = Vec::new();
+                if n_num_atoms > 0 {
+                    for (el, m) in &items {
+                        if el == "H" {
+                            continue;
+                        }
+                        let el_number = get_periodic_table_number(el);
+                        if el_number == ERR_ELEM {
+                            return RI_ERR_SYNTAX;
+                        }
+                        for _ in 0..*m {
+                            if atoms.len() as i32 >= n_num_atoms {
+                                return RI_ERR_PROGR;
+                            }
+                            atoms.push(el_number as u8);
+                        }
+                    }
+                } else if n_num_h > 0 {
+                    atoms.push(1);
+                    n_num_atoms = 1;
+                }
+                let n_atoms = atoms.len() as i32;
+                atoms.push(0);
+                p_inp_inchi[b_mobile_h][ici].n_atom = atoms;
+                if n_num_atoms != n_atoms {
+                    return RI_ERR_PROGR;
+                }
+            } else {
+                // copy the duplicated formula and atoms
+                let first = p_inp_inchi[b_mobile_h][ic].clone();
+                let c = &mut p_inp_inchi[b_mobile_h][ici];
+                c.sz_hill_formula = first.sz_hill_formula;
+                c.n_number_of_atoms = n_num_atoms;
+                c.n_atom = (0..=n_num_atoms as usize)
+                    .map(|k| first.n_atom.get(k).copied().unwrap_or(0))
+                    .collect();
+            }
+        }
+        i_component += mpy_component;
+        if at(s, p_end) != 0 {
+            if at(s, p_end) != b'.' {
+                return RI_ERR_SYNTAX;
+            }
+            p_start = p_end + 1;
+        } else {
+            break;
+        }
+    }
+    if i_component != n_num_components {
+        return RI_ERR_PROGR;
+    }
+    if b_mobile_h == TAUT_NON {
+        // the exact number of atoms including bridging H is known from TAUT_YES
+        let n = (n_num_components.min(pn_num_components[alt])).max(0) as usize;
+        for i in 0..n {
+            let len = p_inp_inchi[alt][i].n_number_of_atoms;
+            if p_inp_inchi[b_mobile_h][i].n_number_of_atoms < len {
+                let mut na: Vec<u8> = (0..len as usize)
+                    .map(|k| p_inp_inchi[alt][i].n_atom.get(k).copied().unwrap_or(0))
+                    .collect();
+                na.push(0);
+                p_inp_inchi[b_mobile_h][i].n_atom = na;
+                p_inp_inchi[b_mobile_h][i].n_number_of_atoms = len;
+            }
+        }
+    }
+    n_num_components + 1
+}

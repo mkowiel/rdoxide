@@ -105,6 +105,25 @@ int main(void) {
             scanf("%d", &st);
             getInchiStateReadErr(st, m);
             printf("M %s\n%s\n", m, getInchiErrName(st));
+        } else if (t == 8) {
+            char h1[4096], h2[4096], b1[2048], b2[2048];
+            int state, first;
+            scanf("%s %s %d %d", h1, h2, &state, &first);
+            unhex(h1, b1); unhex(h2, b2);
+            INChI *pp[2] = { NULL, NULL }; int pn[2] = { 0, 0 };
+            for (int k = 0; k < 2; k++) {
+                int mob = (k == 0) == (first == 1) ? 1 : 0;
+                int na = state;
+                int r = ParseSegmentFormula(k == 0 ? b1 : b2, mob, pp, pn, &na);
+                printf("R%d %d %d %d %d\n", mob, r, pn[mob], na, pn[1 - mob]);
+                if (r > 0 || r == 0) for (int i = 0; i < pn[mob] && pp[mob]; i++) {
+                    INChI *c = &pp[mob][i];
+                    printf("C %d %s %d ", i, c->szHillFormula ? c->szHillFormula : "NULL", c->nNumberOfAtoms);
+                    if (c->nAtom) for (int j = 0; j <= c->nNumberOfAtoms; j++) printf("%d,", c->nAtom[j]); else printf("NULL");
+                    printf(" %d %d\n", c->nTotalCharge, c->bDeleted);
+                }
+                if (r < 0 && r != RI_ERR_SYNTAX && r != RI_ERR_PROGR) break;
+            }
         } else if (t == 7) {
             INChI c; memset(&c, 0, sizeof(c));
             int r = nFillOutProtonMobileH(&c);
@@ -176,6 +195,23 @@ def main():
         cases.append(f"5 {n} " + " ".join(str(R.randrange(0, 40)) for _ in range(n)))
     for st in list(range(-3, 40)) + [100, 105, 136, 137, 99, -1, -2, -3, -4, -9]:
         cases.append(f"6 {st}")
+    els = ["C", "H", "O", "N", "Cl", "Br", "Na", "Fe", "Xx", "c", "Zz", "S", "P", "D", "Ca", "Uuo"]
+
+    def formula():
+        parts = []
+        for _ in range(R.randrange(0, 5)):
+            f = "".join(R.choice(els) + R.choice(["", "", "2", "3", "10", "0", "40000"]) for _ in range(R.randrange(0, 5)))
+            parts.append(R.choice(["", "", "2", "3", "0"]) + f)
+        z = ".".join(parts)
+        if R.random() < 0.2:
+            z += R.choice(["/q+1", "q+1", "/c1-2", "p+1", "x", "/h", ".", "(", "-"])
+        return z
+
+    for _ in range(3000):
+        a, b = formula(), formula()
+        if R.random() < 0.5:
+            b = a if R.random() < 0.5 else b
+        cases.append(f"8 {hx(a.encode())} {hx(b.encode())} {R.choice([0, 0, 17, 1, 0])} {R.choice([0, 1])}")
     cases.append("7")
     objs = ma.build_lib()
     with tempfile.TemporaryDirectory() as d:

@@ -121,6 +121,45 @@ fn read_helpers_match_c() {
                 got.push(format!("M {}", get_inchi_state_read_err(st)));
                 got.push(get_inchi_err_name(st).to_string());
             }
+            "8" => {
+                let (a, b) = (unhex(t[1]), unhex(t[2]));
+                let (state, first) = (p(3), p(4));
+                let mut pp: [Vec<InChI>; 2] = [Vec::new(), Vec::new()];
+                let mut pn = [0i32; 2];
+                for k in 0..2 {
+                    let mob = if (k == 0) == (first == 1) { 1 } else { 0 };
+                    let mut na = state;
+                    let r = parse_segment_formula(
+                        if k == 0 { &a } else { &b },
+                        mob,
+                        &mut pp,
+                        &mut pn,
+                        &mut na,
+                    );
+                    got.push(format!("R{mob} {r} {} {na} {}", pn[mob], pn[1 - mob]));
+                    if r >= 0 {
+                        for i in 0..pn[mob] as usize {
+                            if i >= pp[mob].len() {
+                                break;
+                            }
+                            let c = &pp[mob][i];
+                            let atoms: String = (0..=c.n_number_of_atoms as usize)
+                                .map(|j| format!("{},", c.n_atom.get(j).copied().unwrap_or(0)))
+                                .collect();
+                            got.push(format!(
+                                "C {i} {} {} {atoms} {} {}",
+                                c.sz_hill_formula.as_deref().unwrap_or("NULL"),
+                                c.n_number_of_atoms,
+                                c.n_total_charge,
+                                c.b_deleted
+                            ));
+                        }
+                    }
+                    if r < 0 && r != RI_ERR_SYNTAX && r != RI_ERR_PROGR {
+                        break;
+                    }
+                }
+            }
             "7" => {
                 let mut c = InChI::default();
                 let r = n_fill_out_proton_mobile_h(&mut c);
