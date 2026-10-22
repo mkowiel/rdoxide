@@ -661,6 +661,50 @@ fn restoration_helpers_match_c() {
                                             got.push(l);
                                         }
                                     }
+                                    {
+                                        use rdoxide::external::inchi::ichirvr2::*;
+                                        let mut ps = StrFromInChI {
+                                            at: at.clone(),
+                                            num_atoms: n as i32,
+                                            srm: s,
+                                            ..Default::default()
+                                        };
+                                        let mut a2: Vec<_> = Vec::new();
+                                        let rm = move_rad_to_atoms_add_charges(
+                                            &mut b, &mut bd, &mut ps, &mut a2, &mut va, &g, 4,
+                                        );
+                                        got.push(format!(
+                                            "M {rm} {} {} {}",
+                                            b.tot_st_cap, b.tot_st_flow, b.edge_forbidden_mask
+                                        ));
+                                        for i in 0..b.num_vertices as usize {
+                                            got.push(format!(
+                                                "m{i} {} {}",
+                                                b.vert[i].st_edge.cap, b.vert[i].st_edge.flow
+                                            ));
+                                        }
+                                        for i in 0..b.num_edges as usize {
+                                            got.push(format!(
+                                                "f{i} {} {}",
+                                                b.edge[i].flow, b.edge[i].forbidden
+                                            ));
+                                        }
+                                        for i in 0..n {
+                                            let (v, cb, ch) = if a2.is_empty() {
+                                                (0, 0, 0)
+                                            } else {
+                                                (
+                                                    a2[i].valence,
+                                                    a2[i].chem_bonds_valence,
+                                                    a2[i].charge,
+                                                )
+                                            };
+                                            got.push(format!(
+                                                "c{i} {} {} {} {}",
+                                                va[i].c_init_charge, v, cb, ch
+                                            ));
+                                        }
+                                    }
                                     for a in at.iter_mut().take(n) {
                                         a.bond_type[0] = 0;
                                     }

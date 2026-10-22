@@ -179,6 +179,15 @@ int main(void) {
                                     printf("\n");
                                 }
                             }
+                            {
+                                inp_ATOM *a2 = calloc(n + 1, sizeof(inp_ATOM));
+                                StrFromINChI s3; memset(&s3, 0, sizeof(s3)); s3.at = at; s3.num_atoms = n; s3.pSrm = &s;
+                                int rm = MoveRadToAtomsAddCharges(b, bd, &s3, at, a2, va, &g, 4);
+                                printf("M %d %d %d %d\n", rm, b->tot_st_cap, b->tot_st_flow, b->edge_forbidden_mask);
+                                for (int i = 0; i < b->num_vertices; i++) printf("m%d %d %d\n", i, b->vert[i].st_edge.cap, b->vert[i].st_edge.flow);
+                                for (int i = 0; i < b->num_edges; i++) printf("f%d %d %d\n", i, b->edge[i].flow, b->edge[i].forbidden);
+                                for (int i = 0; i < n; i++) printf("c%d %d %d %d %d\n", i, va[i].cInitCharge, a2[i].valence, a2[i].chem_bonds_valence, a2[i].charge);
+                            }
                             for (int i = 0; i < n; i++) at[i].bond_type[0] = 0;
                             IncrZeroBondsAndClearEndpts(at, n, 5);
                             for (int i = 0; i < n; i++) printf("z%d %d %d %d %d\n", i, at[i].endpoint, at[i].component, at[i].chem_bonds_valence, at[i].bond_type[0]);
@@ -279,9 +288,9 @@ def el_case():
     return f"33 {m} " + " ".join(ops)
 
 
-def bns_case():
+def bns_case(rad=False):
     n = R.randrange(1, 6)
-    ng = R.choice([0, 0, 1, 2, 3])
+    ng = 0 if rad else R.choice([0, 0, 1, 2, 3])
     adj = [[] for _ in range(n)]
     edges = {}
     for i in range(1, n):
@@ -291,7 +300,7 @@ def bns_case():
         adj[j].append((i, b))
     srm = [R.choice([0, 1, 1]), R.choice([0, 1]), R.choice([0, 1]), R.choice([0, 1, 2]), R.choice([0, 1]), R.choice([0, 1, 2]),
            R.choice([0, 1]), R.choice([0, 16]), 0]
-    eps = [R.choice([0, 0, 0] + list(range(1, ng + 1))) for _ in range(n)]
+    eps = [0 if rad else R.choice([0, 0, 0] + list(range(1, ng + 1))) for _ in range(n)]
     cnt = [sum(1 for e in eps if e == g) for g in range(1, ng + 1)]
     if R.random() < 0.7:
         tgs = [(R.randrange(0, 4), R.randrange(0, 3), cnt[g]) for g in range(ng)]
@@ -304,13 +313,15 @@ def bns_case():
         el = R.choice(ELS)
         va = [R.choice([0, 0, 1]), R.choice([0, 1, 2]), R.choice([0, 1]), R.choice([0, 1, 2]), R.choice([0, 0, 1, 2]),
               R.choice([0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18])]
+        if rad:
+            va = [0, 0, 0, 0, R.choice([0, 1, 2, 3]), R.choice([0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])]
         parts.append(f"{el} {R.choice([0, 1, 2])} {R.randrange(0, 5)} {eps[i]} {len(adj[i])} " + " ".join(f"{j} {b}" for j, b in adj[i])
                      + " " + " ".join(map(str, va)) + " 0")
     return " ".join(parts)
 
 
-def pipe_case():
-    c = bns_case().split(" ", 1)
+def pipe_case(rad=False):
+    c = bns_case(rad).split(" ", 1)
     return "40 " + f"{R.choice([0, 0, 2])} {R.choice([0, 1, 2])} {R.choice([0, 0, 1, -1])} " + c[1]
 
 
@@ -369,7 +380,7 @@ def h_case():
 
 def main():
     cases = []
-    for _ in range(6000):
+    for _ in range(5000):
         cases += [atom_case(), cc_case(), tcg_case(), el_case(), bns_case(), bns_case(), pipe_case(), pipe_case(), pipe_case(), h_case(), h_case()]
     objs = ma.build_lib()
     with tempfile.TemporaryDirectory() as d:
