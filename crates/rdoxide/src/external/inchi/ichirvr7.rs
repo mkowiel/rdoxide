@@ -786,3 +786,130 @@ pub fn inchi2_atom(
     }
     ret
 }
+
+/// `MergeStructureComponents`: merges the restored components `at2` of
+/// the highest available detail level into one atom array (all explicit H
+/// are moved to the end). `p_struct[iInchiRec][bMobileH]` are the
+/// restored components. Returns the result of the C function and the merged
+/// atoms (`OneInput->atom`, `->num_atoms` is their count).
+pub fn merge_structure_components(
+    p_struct: &[[Vec<super::ichirvr2::StrFromInChI>; 2]; 2],
+    one_input: &InpInChI,
+) -> (i32, Vec<super::inpdef::InpAtom>) {
+    use super::inpdef::{InpAtom, MAX_NUM_STEREO_ATOM_NEIGH, MAX_NUM_STEREO_BONDS};
+
+    let n_comp = |r: usize, m: usize| one_input.n_num_components[r][m];
+    // select the highest detail level
+    let (i_inchi_rec, i_mobile_h, num_components) = if n_comp(INCHI_REC, TAUT_NON) != 0 {
+        (INCHI_REC, TAUT_NON, n_comp(INCHI_REC, TAUT_NON))
+    } else if n_comp(INCHI_REC, TAUT_YES) != 0 {
+        (INCHI_REC, TAUT_YES, n_comp(INCHI_REC, TAUT_YES))
+    } else if n_comp(INCHI_BAS, TAUT_NON) != 0 {
+        (INCHI_BAS, TAUT_NON, n_comp(INCHI_BAS, TAUT_NON))
+    } else if n_comp(INCHI_BAS, TAUT_YES) != 0 {
+        (INCHI_BAS, TAUT_YES, n_comp(INCHI_BAS, TAUT_YES))
+    } else {
+        return (0, Vec::new());
+    };
+    let num_components = num_components as usize;
+    let i_altern_h = if i_mobile_h == TAUT_NON && n_comp(i_inchi_rec, TAUT_YES) != 0 {
+        Some(TAUT_YES)
+    } else {
+        None
+    };
+    // the component structure chosen for the component k
+    let pick = |k: usize| {
+        let has = |m: usize| p_struct[i_inchi_rec][m].get(k).filter(|c| c.num_atoms != 0);
+        has(i_mobile_h).or_else(|| i_altern_h.and_then(has))
+    };
+    // count number of atoms and removed H
+    let mut atom_offs = vec![0usize; num_components + 1];
+    let mut del_h_offs = vec![0usize; num_components + 1];
+    for k in 0..num_components {
+        let (cur_na, cur_nh) = match pick(k) {
+            Some(c) if !c.at2.is_empty() && c.b_deleted == 0 => {
+                (c.num_atoms as usize, c.num_deleted_h as usize)
+            }
+            _ => (0, 0),
+        };
+        atom_offs[k + 1] = atom_offs[k] + cur_na;
+        del_h_offs[k + 1] = del_h_offs[k] + cur_nh;
+    }
+    let tot_just_atoms = atom_offs[num_components];
+    // shift all H to the end
+    for o in del_h_offs.iter_mut() {
+        *o += tot_just_atoms;
+    }
+    let tot_atoms = del_h_offs[num_components];
+    if tot_atoms == 0 {
+        return (0, Vec::new());
+    }
+    // copy
+    let mut at = vec![InpAtom::default(); tot_atoms];
+    for k in 0..num_components {
+        let len = atom_offs[k + 1] - atom_offs[k];
+        if len != 0 {
+            let c = pick(k).expect("component with atoms");
+            at[atom_offs[k]..atom_offs[k] + len].clone_from_slice(&c.at2[..len]);
+            let len2 = del_h_offs[k + 1] - del_h_offs[k];
+            if len2 != 0 {
+                at[del_h_offs[k]..del_h_offs[k] + len2].clone_from_slice(&c.at2[len..len + len2]);
+            }
+        }
+    }
+    // update atom numbers
+    let mut icomp = 0u16;
+    for k in 0..num_components {
+        let (cur_at, nxt_at) = (atom_offs[k], atom_offs[k + 1]);
+        let (cur_h, nxt_h) = (del_h_offs[k], del_h_offs[k + 1]);
+        let len = nxt_at - cur_at;
+        let shift_h = cur_h as i64 - len as i64;
+        if len == 0 {
+            continue;
+        }
+        icomp += 1;
+        let add = |v: u16, base: usize, cond: bool| -> u16 {
+            if cond {
+                v.wrapping_add(base as u16)
+            } else {
+                v.wrapping_add(shift_h as u16)
+            }
+        };
+        for a in &mut at[cur_at..nxt_at] {
+            a.endpoint = 0;
+            a.b_ambiguous_stereo = 0;
+            a.at_type = 0;
+            a.b_cut_vertex = 0;
+            a.b_used_0d_parity = 0;
+            a.c_flags = 0;
+            a.n_block_system = 0;
+            a.n_num_at_in_ring_system = 0;
+            a.n_ring_system = 0;
+            for j in 0..a.valence as usize {
+                let is_atom = (a.neighbor[j] as usize) < len;
+                a.neighbor[j] = add(a.neighbor[j], cur_at, is_atom);
+            }
+            a.orig_at_number = a.orig_at_number.wrapping_add(cur_at as u16);
+            a.component = icomp;
+            if a.p_parity != 0 {
+                for j in 0..MAX_NUM_STEREO_ATOM_NEIGH {
+                    // orig_at_num = atom_index + 1, hence <=
+                    let is_atom = (a.p_orig_at_num[j] as usize) <= len;
+                    a.p_orig_at_num[j] = add(a.p_orig_at_num[j], cur_at, is_atom);
+                }
+            }
+            let mut j = 0;
+            while j < MAX_NUM_STEREO_BONDS && a.sb_parity[j] != 0 {
+                let is_atom = (a.sn_orig_at_num[j] as usize) <= len;
+                a.sn_orig_at_num[j] = add(a.sn_orig_at_num[j], cur_at, is_atom);
+                j += 1;
+            }
+        }
+        // fixed-H
+        for a in &mut at[cur_h..nxt_h] {
+            a.neighbor[0] = a.neighbor[0].wrapping_add(cur_at as u16);
+            a.orig_at_number = a.orig_at_number.wrapping_add(shift_h as u16);
+        }
+    }
+    (0, at)
+}

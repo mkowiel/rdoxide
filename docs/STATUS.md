@@ -384,6 +384,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 268 | | I12f | `ichirvr4`: `RunBnsRestore1` (compiled only) | done | |
 | 269 | | I12g | `ichirvr4`: `RestoreAtomMakeBNS`, `OneInChI2Atom` (compiled only) | done | |
 | 270 | | I12h | `ichirvr7`: `InChI2Atom` (compiled only) | done | |
+| 271 | | I12i | `ichirvr7`: `MergeStructureComponents` (compiled only) | done | |
 
 ## Python package files
 
@@ -836,3 +837,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-22 — Stage 268: I12f: RunBnsRestore1
 * 2026-10-22 — Stage 269: I12g: RestoreAtomMakeBNS, OneInChI2Atom
 * 2026-10-22 — Stage 270: I12h: InChI2Atom
+* 2026-10-22 — Stage 271: I12i: MergeStructureComponents
