@@ -202,6 +202,15 @@ int main(void) {
                                 int riz = IncrementZeroOrderBondsToHeteroat(b, bd, &s3, at, a2, va, &g, &nr, &td, 4);
                                 printf("IZ %d %d %d %d %d\n", riz, nr, td, b->tot_st_cap, b->tot_st_flow);
                                 for (int i = 0; i < b->num_edges; i++) printf("h%d %d %d\n", i, b->edge[i].flow, b->edge[i].forbidden);
+                                BFS_Q bq; memset(&bq, 0, sizeof(bq)); AllocBfsQueue(&bq, n, 0); s3.pbfsq = &bq;
+                                nr = 0; td = 0;
+                                int rmp = MovePlusFromS2DiaminoCarbon(b, bd, &s3, at, a2, va, &g, &nr, &td, 4);
+                                printf("MP %d %d %d %d\n", rmp, nr, b->tot_st_cap, b->tot_st_flow);
+                                for (int i = 0; i < b->num_edges; i++) printf("i%d %d %d\n", i, b->edge[i].flow, b->edge[i].forbidden);
+                                if ((n & 1) && b->num_edges > 0) b->edge[0].forbidden = 8;
+                                int rec = EliminateChargeSeparationOnHeteroatoms(b, bd, &s3, at, a2, va, &g, &nr, &td, 4, (n & 1) ? 8 : 0);
+                                printf("EC %d %d %d %d %d\n", rec, nr, td, b->tot_st_cap, b->tot_st_flow);
+                                for (int i = 0; i < b->num_edges; i++) printf("j%d %d %d\n", i, b->edge[i].flow, b->edge[i].forbidden);
                             }
                             for (int i = 0; i < n; i++) at[i].bond_type[0] = 0;
                             IncrZeroBondsAndClearEndpts(at, n, 5);

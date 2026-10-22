@@ -4893,3 +4893,43 @@ pub fn disconnected_connected_h(at: &mut [InpAtom], num_atoms: usize, num_delete
     }
     tot_atoms as i32
 }
+
+/// `BFS_Q`: the queue and work arrays of the ring search
+#[derive(Debug, Clone, Default)]
+pub struct BfsQ {
+    pub q: Option<super::ichiring::Queue>,
+    pub n_atom_level: Vec<u16>,
+    pub c_source: Vec<i8>,
+    pub num_at: i32,
+    pub min_ring_size: i32,
+}
+
+pub const BFS_Q_CLEAR: i32 = -1;
+pub const BFS_Q_FREE: i32 = -2;
+
+/// `AllocBfsQueue`
+pub fn alloc_bfs_queue(pq: &mut BfsQ, num_at: i32, min_ring_size: i32) -> i32 {
+    match num_at {
+        BFS_Q_FREE | BFS_Q_CLEAR => {
+            *pq = BfsQ::default();
+            0
+        }
+        _ => {
+            if num_at <= 0 {
+                return RI_ERR_PROGR;
+            }
+            if num_at > pq.num_at {
+                *pq = BfsQ::default();
+                pq.q = super::ichiring::Queue::create(num_at + 1);
+                pq.n_atom_level = vec![0; num_at as usize];
+                pq.c_source = vec![0; num_at as usize];
+                if pq.q.is_none() {
+                    return RI_ERR_ALLOC;
+                }
+                pq.num_at = num_at;
+            }
+            pq.min_ring_size = min_ring_size;
+            0
+        }
+    }
+}
