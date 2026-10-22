@@ -35,7 +35,7 @@ int main(void) {
         printf("#CASE %d\n", cs);
         scanf("%d", &t);
         if (t == 30) {
-            SRM s;
+            SRM s; memset(&s, 0, sizeof(s));
             scanf("%d %d %d %d %d %d %d %d %d", &s.bMetalAddFlower, &s.nMetalMinBondOrder, &s.nMetalInitEdgeFlow, &s.nMetalInitBondOrder,
                   &s.nMetal2EndpointMinBondOrder, &s.nMetal2EndpointInitBondOrder, &s.nMetal2EndpointInitEdgeFlow, &s.nMetalMaxCharge_D, &s.bFixStereoBonds);
             int n; scanf("%d", &n);
@@ -83,10 +83,13 @@ int main(void) {
                 printf("r%d %d %d %d\n", i, r, g.num_tc_groups, g.max_tc_groups);
             }
             for (int i = 0; i < g.num_tc_groups; i++) printf("g%d %d %d %d %d %d %d %d\n", i, g.pTCG[i].type, g.pTCG[i].ord_num, g.pTCG[i].num_edges, g.pTCG[i].st_cap, g.pTCG[i].st_flow, g.pTCG[i].edges_cap, g.pTCG[i].edges_flow);
-        } else if (t == 34) {
-            SRM s;
+        } else if (t == 34 || t == 40) {
+            int xa = 0, xe = 0, coa = 0;
+            if (t == 40) scanf("%d %d %d", &xa, &xe, &coa);
+            SRM s; memset(&s, 0, sizeof(s));
             scanf("%d %d %d %d %d %d %d %d %d", &s.bMetalAddFlower, &s.nMetalMinBondOrder, &s.nMetalInitEdgeFlow, &s.nMetalInitBondOrder,
                   &s.nMetal2EndpointMinBondOrder, &s.nMetal2EndpointInitBondOrder, &s.nMetal2EndpointInitEdgeFlow, &s.nMetalMaxCharge_D, &s.bFixStereoBonds);
+            s.nMetalFlowerParam_D = s.nMetalMaxCharge_D ? 16 : 3;
             int n, ng, tch; scanf("%d %d %d", &n, &ng, &tch);
             T_GROUP_INFO ti; memset(&ti, 0, sizeof(ti));
             ti.num_t_groups = ng;
@@ -108,7 +111,7 @@ int main(void) {
             }
             ALL_TC_GROUPS g; memset(&g, 0, sizeof(g));
             for (int k = 0; k < NUM_TCGROUP_TYPES; k++) g.nGroup[k] = -1;
-            g.total_charge = tch;
+            g.total_charge = tch; g.charge_on_atoms = coa;
             int r = nCountBnsSizes(at, n, 0, 0, &ti, va, &s, &g);
             printf("C %d | %d %d %d %d %d %d %d %d %d %d | %d %d\n", r, g.num_atoms, g.num_bonds, g.num_tgroups, g.num_tgroup_edges, g.tgroup_charge,
                    g.nVertices, g.nEdges, g.num_metal_atoms, g.num_metal_bonds, g.total_electrons, g.total_electrons_metals, g.num_tc_groups);
@@ -120,6 +123,33 @@ int main(void) {
                 for (int k = 0; k < NUM_TCGROUP_TYPES; k++) printf(" %d", g.nGroup[k]);
                 printf("\n");
                 for (int i = 0; i < g.num_tc_groups; i++) printf("u%d %d %d %d\n", i, g.pTCG[i].type, g.pTCG[i].ord_num, g.pTCG[i].num_edges);
+                if (t == 40 && r2 >= 0) {
+                    StrFromINChI st; memset(&st, 0, sizeof(st)); st.at = at; st.num_atoms = n; st.pSrm = &s;
+                    int nch = -1;
+                    BN_STRUCT *b = AllocateAndInitTCGBnStruct(&st, va, &g, xa, xe, 1, &nch);
+                    if (!b) { printf("NULL\n"); }
+                    else {
+                        int r3 = AddTGroups2TCGBnStruct(b, &st, va, &g, xe);
+                        printf("T %d\n", r3);
+                        int r4 = r3 < 0 ? 0 : AddCGroups2TCGBnStruct(b, &st, va, &g, xe);
+                        printf("Q %d %d\n", r4, nch);
+                        printf("N %d %d %d %d %d %d %d %d %d %d %d\n", b->num_atoms, b->num_added_atoms, b->num_c_groups, b->num_t_groups, b->num_vertices, b->num_bonds, b->num_edges,
+                               b->max_vertices, b->max_edges, b->max_iedges, b->tot_st_cap * 1000 + b->tot_st_flow);
+                        for (int i = 0; i < b->num_vertices; i++) {
+                            BNS_VERTEX *v = b->vert + i;
+                            printf("V%d %d %d %d %d %d %d %d %d %d |", i, v->st_edge.cap, v->st_edge.cap0, v->st_edge.flow, v->st_edge.flow0, v->type, v->num_adj_edges, v->max_adj_edges, (int)(v->iedge - b->iedge), 0);
+                            for (int k = 0; k < v->num_adj_edges; k++) printf(" %d", v->iedge[k]);
+                            printf("\n");
+                        }
+                        for (int i = 0; i < b->num_edges; i++) {
+                            BNS_EDGE *e = b->edge + i;
+                            printf("E%d %d %d %d %d %d %d %d %d %d %d\n", i, e->neighbor1, e->neighbor12, e->neigh_ord[0], e->neigh_ord[1], e->cap, e->cap0, e->flow, e->flow0, e->pass, e->forbidden);
+                        }
+                        for (int i = 0; i < n; i++) printf("W%d %d %d %d %d | %d %d\n", i, va[i].nCMinusGroupEdge, va[i].nCPlusGroupEdge, va[i].nMetalGroupEdge, va[i].nTautGroupEdge, at[i].bond_type[0], at[i].valence ? at[i].bond_type[at[i].valence - 1] : 0);
+                        for (int i = 0; i < g.num_tc_groups; i++) printf("X%d %d %d %d %d %d %d %d %d\n", i, g.pTCG[i].nVertexNumber, g.pTCG[i].nForwardEdge, g.pTCG[i].nBackwardEdge, g.pTCG[i].st_cap, g.pTCG[i].st_flow, g.pTCG[i].edges_cap, g.pTCG[i].edges_flow, g.pTCG[i].num_edges);
+                        printf("Y %d %d %d %d\n", g.nEdgePlus, g.nEdgeMinus, g.nEdge4charge, g.added_charge);
+                    }
+                }
             }
         } else if (t == 33) {
             EDGE_LIST e; memset(&e, 0, sizeof(e));
@@ -223,10 +253,15 @@ def bns_case():
     return " ".join(parts)
 
 
+def pipe_case():
+    c = bns_case().split(" ", 1)
+    return "40 " + f"{R.choice([0, 0, 2])} {R.choice([0, 1, 2])} {R.choice([0, 0, 1, -1])} " + c[1]
+
+
 def main():
     cases = []
     for _ in range(15000):
-        cases += [atom_case(), cc_case(), tcg_case(), el_case(), bns_case(), bns_case()]
+        cases += [atom_case(), cc_case(), tcg_case(), el_case(), bns_case(), bns_case(), pipe_case(), pipe_case(), pipe_case()]
     objs = ma.build_lib()
     with tempfile.TemporaryDirectory() as d:
         (Path(d) / "h.c").write_text(HARNESS)
