@@ -1113,3 +1113,321 @@ pub fn enforce_std_format(ip: &mut InputParms) {
     ip.b_inchi_output_options |= INCHI_OUT_STDINCHI;
     ip.b_inchi_output_options &= !INCHI_OUT_SAVEOPT;
 }
+
+/// `PrintInputParms` (release build without the engineering options): the
+/// summary of the options written to the log
+pub fn print_input_parms(log: &mut InchiIostream, ip: &InputParms) {
+    let mut p = |s: &str| {
+        inchi_ios_eprint(Some(log), s);
+    };
+    let in2struct =
+        ip.b_read_inchi_options & READ_INCHI_TO_STRUCTURE != 0 && ip.n_input_type == INPUT_INCHI;
+    let n_mode = ip.n_mode;
+    let std_format = ip.b_inchi_output_options & INCHI_OUT_STDINCHI != 0;
+    let mut first = true;
+    if n_mode & REQ_MODE_STEREO == 0 {
+        p("Using specific structure perception features:\n");
+        first = false;
+        p("  Stereo OFF\n");
+    } else if TG_FLAG_POINTED_EDGE_STEREO & ip.b_taut_flags == 0 {
+        if first {
+            p("Using specific structure perception features:\n");
+            first = false;
+        }
+        p("  Both ends of wedge point to stereocenters\n");
+    }
+    if ip.b_do_not_add_h != 0 {
+        if first {
+            p("Using specific structure perception features:\n");
+        }
+        p("  Do not add H\n");
+    }
+    if ip.b_underivatize == 1 {
+        p("\nConvert input structure to derivative precursor before InChI calculation\n\n");
+    } else if ip.b_underivatize == 3 {
+        p("\nOutputs derivative information for the input structure\n\n");
+    }
+    if std_format {
+        if ip.b_inchi_output_options & INCHI_OUT_SDFILE_ONLY == 0 && !in2struct {
+            p("Generating standard InChI\n");
+        }
+    } else {
+        p("Generating non-standard InChI with the options: \n");
+    }
+    if ip.b_inchi_output_options & INCHI_OUT_SDFILE_ONLY != 0 {
+        p(&format!(
+            "Output SDfile only without stereochemical information and atom coordinates{}\n",
+            if ip.b_inchi_output_options & INCHI_OUT_SDFILE_ATOMS_DT != 0 {
+                "\n(write H isotopes as D, T)"
+            } else {
+                ""
+            }
+        ));
+    }
+    if !std_format {
+        let bt = n_mode & (REQ_MODE_BASIC | REQ_MODE_TAUT);
+        p(if bt == REQ_MODE_BASIC | REQ_MODE_TAUT {
+            "  Mobile H Perception OFF (include FixedH layer)\n"
+        } else if bt == REQ_MODE_TAUT {
+            "  Mobile H Perception ON  (omit FixedH layer)\n"
+        } else if bt == REQ_MODE_BASIC {
+            "  Mobile H ignored\n"
+        } else {
+            "  Undefined Mobile H mode\n"
+        });
+        if ip.b_taut_flags & TG_FLAG_VARIABLE_PROTONS != 0
+            && ip.b_taut_flags & TG_FLAG_HARD_ADD_REM_PROTONS == 0
+        {
+            p("  Disabled Aggressive (De)protonation\n");
+        }
+        if ip.b_taut_flags & TG_FLAG_DISCONNECT_COORD != 0 {
+            if ip.b_taut_flags & TG_FLAG_RECONNECT_COORD != 0 {
+                p("  Include bonds to metals\n");
+            } else {
+                p("  Do not reconnect metals (omit RecMet layer)\n");
+            }
+        } else {
+            p("  Do not disconnect metals\n");
+        }
+        if n_mode & REQ_MODE_STEREO != 0 {
+            p(&format!(
+                "  {}{}{}{}Stereo ON\n",
+                if n_mode & REQ_MODE_NOEQ_STEREO != 0 {
+                    "Slow "
+                } else {
+                    ""
+                },
+                if n_mode & REQ_MODE_REDNDNT_STEREO != 0 {
+                    "Redund. "
+                } else {
+                    ""
+                },
+                if n_mode & REQ_MODE_NO_ALT_SBONDS != 0 {
+                    "No AltBond "
+                } else {
+                    ""
+                },
+                if n_mode & REQ_MODE_RACEMIC_STEREO != 0 {
+                    "Racemic "
+                } else if n_mode & REQ_MODE_RELATIVE_STEREO != 0 {
+                    "Relative "
+                } else if n_mode & REQ_MODE_CHIR_FLG_STEREO != 0 {
+                    "Chiral Flag "
+                } else {
+                    "Absolute "
+                }
+            ));
+            let uu = n_mode & (REQ_MODE_SB_IGN_ALL_UU | REQ_MODE_SC_IGN_ALL_UU);
+            p(if uu == 0 {
+                "  Include undefined/unknown stereogenic centers and bonds\n"
+            } else if uu == REQ_MODE_SC_IGN_ALL_UU {
+                "  Omit undefined/unknown stereogenic centers\n"
+            } else if uu == REQ_MODE_SB_IGN_ALL_UU {
+                "  Omit undefined/unknown stereogenic bonds\n"
+            } else {
+                "  Omit undefined/unknown stereogenic centers and bonds\n"
+            });
+            if n_mode & REQ_MODE_DIFF_UU_STEREO != 0 {
+                p("  Make labels for unknown and undefined stereo different\n");
+            }
+            let k = (n_mode & REQ_MODE_MIN_SB_RING_MASK) >> REQ_MODE_MIN_SB_RING_SHFT;
+            if k != 8 {
+                if k >= 3 {
+                    p(&format!("  Min. stereobond ring size: {k}\n"));
+                } else {
+                    p("  Min. stereobond ring size: NONE\n");
+                }
+            }
+        }
+        let tf = ip.b_taut_flags;
+        let onoff = |p: &mut dyn FnMut(&str), flag: u64, what: &str| {
+            p(&format!(
+                "  {} {}\n",
+                if tf & flag != 0 {
+                    "Account for"
+                } else {
+                    "Do not account for"
+                },
+                what
+            ));
+        };
+        let mut q = |s: &str| {
+            inchi_ios_eprint(Some(log), s);
+        };
+        onoff(&mut q, TG_FLAG_KETO_ENOL_TAUT, "keto-enol tautomerism");
+        onoff(&mut q, TG_FLAG_1_5_TAUT, "1,5-tautomerism");
+        onoff(&mut q, TG_FLAG_PT_22_00, "PT_22_00 tautomerism");
+        onoff(&mut q, TG_FLAG_PT_16_00, "PT_16_00 tautomerism");
+        onoff(&mut q, TG_FLAG_PT_06_00, "PT_06_00 tautomerism");
+        onoff(&mut q, TG_FLAG_PT_39_00, "PT_39_00 tautomerism");
+        onoff(&mut q, TG_FLAG_PT_13_00, "PT_13_00 tautomerism");
+        onoff(&mut q, TG_FLAG_PT_18_00, "PT_18_00 tautomerism");
+    }
+    let mut p = |s: &str| {
+        inchi_ios_eprint(Some(log), s);
+    };
+    if ip.b_calc_inchi_hash != INCHIHASH_NONE {
+        p(if std_format {
+            "Generating standard InChIKey\n"
+        } else {
+            "Generating InChIKey\n"
+        });
+        match ip.b_calc_inchi_hash {
+            INCHIHASH_KEY_XTRA1 => p("Generating hash extension (1st block)\n"),
+            INCHIHASH_KEY_XTRA2 => p("Generating hash extension (2nd block)\n"),
+            INCHIHASH_KEY_XTRA1_XTRA2 => p("Generating hash extension (two blocks)\n"),
+            _ => {}
+        }
+    }
+    if ip.b_inchi_output_options & INCHI_OUT_SAVEOPT != 0 {
+        p("Saving InChI creation options");
+        if std_format {
+            p(" suppressed for standard InChI");
+        }
+        p("\n");
+    }
+    if ip.b_allow_empty_structure != 0 {
+        p("Issue warning on empty structure\n");
+    }
+    if ip.n_input_type != 0 {
+        p(&format!(
+            "Input format: {}",
+            match ip.n_input_type {
+                INPUT_MOLFILE => "MOLfile",
+                INPUT_SDFILE => "SDfile",
+                INPUT_INCHI => "InChI (plain identifier)",
+                INPUT_INCHI_PLAIN => "InChI AuxInfo (plain)",
+                _ => "Unknown",
+            }
+        ));
+        if (ip.n_input_type == INPUT_MOLFILE || ip.n_input_type == INPUT_SDFILE)
+            && ip.b_get_molfile_number != 0
+        {
+            p("  (attempting to read Molfile number)");
+        }
+        p("\n");
+    }
+    if !ip.sz_sdf_data_header.is_empty() && ip.n_input_type != INPUT_SDFILE {
+        p(&format!(
+            "  SDfile data header: \"{}\"\n",
+            ip.sz_sdf_data_header
+        ));
+    }
+    let oo = ip.b_inchi_output_options;
+    p(&format!(
+        "Output format: {}{}\n",
+        if oo & INCHI_OUT_PLAIN_TEXT != 0 {
+            "Plain text"
+        } else if oo & INCHI_OUT_SDFILE_ONLY != 0 && in2struct {
+            "SDfile only (without stereochemical info and atom coordinates)"
+        } else if oo & INCHI_OUT_SDFILE_ONLY != 0 {
+            "SDfile only"
+        } else {
+            "Unknown"
+        },
+        if oo & INCHI_OUT_PLAIN_TEXT != 0 && oo & INCHI_OUT_TABBED_OUTPUT != 0 {
+            ", tabbed"
+        } else {
+            ""
+        }
+    ));
+    if ip.b_ct_predecessors != 0 || ip.b_abc_numbers != 0 {
+        if ip.b_ct_predecessors != 0 && ip.b_abc_numbers != 0 {
+            p("Representation: Compressed\n");
+        } else {
+            p(&format!(
+                "Connection table: {}, {}\n",
+                if ip.b_ct_predecessors != 0 {
+                    "Predecessor_numbers(closures)"
+                } else {
+                    "Canon_numbers(branching, ring closures)"
+                },
+                if ip.b_abc_numbers != 0 {
+                    "Shorter alternative"
+                } else {
+                    "Numerical"
+                }
+            ));
+        }
+    }
+    if ip.b_no_warnings != 0 {
+        p("Warnings suppressed\n");
+    }
+    if ip.b_hide_inchi != 0 {
+        p("Printing InChI string itself suppressed\n");
+    }
+    if ip.b_merge_hash != 0 {
+        p("InChIKey combined with extra hash(es)\n");
+    }
+    if oo & INCHI_OUT_SDFILE_ONLY == 0 {
+        p(if oo & INCHI_OUT_NO_AUX_INFO != 0 {
+            "Aux. info suppressed\n"
+        } else if oo & INCHI_OUT_SHORT_AUX_INFO != 0 {
+            "Minimal Aux. info\n"
+        } else {
+            "Full Aux. info\n"
+        });
+    }
+    if ip.first_struct_number > 1 {
+        p(&format!(
+            "Skipping {} structure{}\n",
+            ip.first_struct_number - 1,
+            if ip.first_struct_number == 2 { "" } else { "s" }
+        ));
+    }
+    if ip.last_struct_number > 0 {
+        p(&format!(
+            "Terminate after structure #{}\n",
+            ip.last_struct_number
+        ));
+    }
+    let path3 = ip.path[3].as_deref().is_some_and(|s| !s.is_empty());
+    if ip.b_save_warning_structs_as_problem != 0 && path3 {
+        p("Saving warning structures into the problem file\n");
+    }
+    if ip.b_save_all_good_structs_as_problem != 0 && path3 {
+        p("Saving only all good structures into the problem file\n");
+    }
+    if ip.b_inchi_output_options2 & INCHI_OUT_INCHI_GEN_ERROR != 0 {
+        p("Print empty InChI if generation fails\n");
+    }
+    if ip.b_inchi_output_options2 & INCHI_OUT_MISMATCH_AS_ERROR != 0 {
+        p("Consider problem/mismatch on InChI conversion as error\n");
+    }
+    if ip.msec_max_time != 0 {
+        p(&format!(
+            "Timeout per structure: {} msec\n",
+            ip.msec_max_time
+        ));
+    } else {
+        p("No timeout\n");
+    }
+    if ip.b_loose_tsa_check != 0 {
+        p("Relax criteria of ambiguous drawing for in-ring stereo centers\n");
+    }
+    let mut maxna = 1024;
+    if ip.b_large_molecules != 0 {
+        p("Experimental mode: ");
+        maxna = 32766;
+    }
+    p(&format!("Up to {maxna} atoms per structure\n"));
+    if ip.b_polymers != POLYMERS_NO {
+        p("Experimental mode: Treating polymers");
+        if ip.b_polymers == POLYMERS_LEGACY {
+            p(" (v. 1.05 legacy mode)");
+        } else if ip.b_polymers == POLYMERS_LEGACY_PLUS {
+            p(" (v. 1.05 legacy mode with senior link placed at start)");
+        }
+        if ip.b_fold_polymer_sru != 0 {
+            p("; CRU folding enabled");
+        }
+    }
+    p("\n");
+    if ip.b_np_zz == 1 {
+        p("Allowing non-polymer Zz pseudo atoms\n");
+    }
+    if ip.b_stereo_at_zz == 1 {
+        p("Allowing stereo at atoms connected to Zz\n");
+    }
+    p("\n");
+}

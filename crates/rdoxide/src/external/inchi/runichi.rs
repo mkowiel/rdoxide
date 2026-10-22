@@ -231,7 +231,14 @@ pub fn create_one_structure_inchi(
             let f = sd.taut_flags_done[INCHI_BAS] | ip.b_taut_flags_done;
             nc_flags.b_taut_flags_done[i_inchi] = [f, f];
             if sd.n_error_type == IS_ERROR || sd.n_error_type == IS_FATAL {
-                n_ret = treat_errors_in_read_the_structure(sd, ip, log, &prep[0], num_inp);
+                n_ret = treat_errors_in_read_the_structure(
+                    sd,
+                    ip,
+                    super::runichi2::LOG_MASK_ALL,
+                    log,
+                    &prep[0],
+                    num_inp,
+                );
                 break 'cycle;
             }
         }
