@@ -239,6 +239,19 @@ int main(void) {
                                 int rx = RemoveRadFromMobileHEndpoint(b, bd, &s3, at, a2, va, &g, &nr, &td, 4);
                                 printf("RR %d %d %d %d %d\n", rx, nr, td, b->tot_st_cap, b->tot_st_flow);
                                 for (int i = 0; i < b->num_edges; i++) printf("y%d %d %d\n", i, b->edge[i].flow, b->edge[i].forbidden);
+                                {
+                                    T_GROUP tgx; memset(&tgx, 0, sizeof(tgx));
+                                    AT_NUMB *epl = calloc(n + 1, sizeof(AT_NUMB)), *epf = calloc(n + 1, sizeof(AT_NUMB));
+                                    int ne = 0;
+                                    for (int i = 0; i < n; i++) { if (at[i].endpoint) epl[ne++] = i; epf[i] = at[i].endpoint; }
+                                    tgx.nNumEndpoints = ne;
+                                    s3.ti.t_group = &tgx; s3.ti.num_t_groups = ne ? 1 : 0; s3.ti.nNumEndpoints = ne;
+                                    s3.ti.nEndpointAtomNumber = epl; s3.endpoint = epf; s3.iMobileH = 0;
+                                    int rfh = RemoveRadFromMobileHEndpointFixH(b, bd, &s3, at, a2, va, &g, &nr, &td, 4);
+                                    printf("FH %d %d %d %d %d %d\n", rfh, nr, td, b->tot_st_cap, b->tot_st_flow, ne);
+                                    for (int i = 0; i < b->num_edges; i++) printf("V%d %d %d\n", i, b->edge[i].flow, b->edge[i].forbidden);
+                                    s3.endpoint = NULL; s3.ti.t_group = NULL; free(epl); free(epf);
+                                }
                             }
                             for (int i = 0; i < n; i++) at[i].bond_type[0] = 0;
                             IncrZeroBondsAndClearEndpts(at, n, 5);
