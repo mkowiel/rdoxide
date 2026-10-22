@@ -1216,6 +1216,8 @@ pub struct Cmp2FhAtoms {
     pub n_mob_h_revrs: i8,
     pub n_num_h_revrs: i8,
     pub n_at_charge_revrs: i8,
+    /// flag(s)
+    pub n_value: i8,
 }
 
 /// `CMP2FHINCHI`
@@ -1383,6 +1385,7 @@ pub fn fill_out_cmp2fh_inchi(
                 n_mob_h_revrs: mob_revrs as i8,
                 n_num_h_revrs: at2[i].num_h,
                 n_at_charge_revrs: at2[i].charge,
+                n_value: 0,
             });
         }
         pc2i.n_num_endp_inchi += i16::from(endpt_inchi != 0);
@@ -1655,4 +1658,45 @@ pub fn fill_out_cmp2mh_inchi(
         .map_or(0, |c| c.n_total_charge as i8);
     pc2i.b_has_difference |= pc2i.n_charge_mob_h_inchi != pc2i.n_charge_mob_h_revrs;
     ret
+}
+
+/// `FillOutExtraFixedHDataRestr`: fills `nCanon2Atno` / `nAtno2Canon` of the
+/// restored structure from the canonical numbers of its InChI (`INChI_Aux`)
+pub fn fill_out_extra_fixed_h_data_restr(ps: &mut StrFromInChI) -> i32 {
+    let n = ps.num_atoms as usize;
+    for i in 0..2 {
+        let pnum: Option<Vec<u16>> = ps.p_one_inchi_aux[i].as_ref().and_then(|a| {
+            if a.n_isotopic_orig_at_nos_in_canon_ord
+                .first()
+                .is_some_and(|&x| x != 0)
+            {
+                Some(a.n_isotopic_orig_at_nos_in_canon_ord.clone())
+            } else if a
+                .n_orig_at_nos_in_canon_ord
+                .first()
+                .is_some_and(|&x| x != 0)
+            {
+                Some(a.n_orig_at_nos_in_canon_ord.clone())
+            } else {
+                None
+            }
+        });
+        if let Some(p) = pnum {
+            ps.n_canon2atno[i].resize(n.max(ps.n_canon2atno[i].len()), 0);
+            ps.n_atno2canon[i].resize(n.max(ps.n_atno2canon[i].len()), 0);
+            for j in 0..n {
+                let k = (p[j] as usize).wrapping_sub(1);
+                ps.n_canon2atno[i][j] = k as u16;
+                if k < ps.n_atno2canon[i].len() {
+                    ps.n_atno2canon[i][k] = j as u16;
+                }
+            }
+        } else if i == 0 {
+            return RI_ERR_PROGR;
+        } else {
+            ps.n_canon2atno[i].clear();
+            ps.n_atno2canon[i].clear();
+        }
+    }
+    0
 }
