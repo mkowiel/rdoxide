@@ -173,6 +173,27 @@ int main(void) {
                     }
                 }
             }
+        } else if (t == 50 || t == 51) {
+            int n, nd; scanf("%d %d", &n, &nd);
+            inp_ATOM *at = calloc(n + nd + 1, sizeof(inp_ATOM));
+            for (int i = 0; i < n + nd; i++) {
+                int orig, nh, nb, cbv, iso[3], iad, nsb;
+                scanf("%d %d %d", &orig, &nh, &nb);
+                at[i].orig_at_number = orig; at[i].num_H = nh; at[i].valence = nb;
+                for (int k = 0; k < nb; k++) { int nn, bt, bs; scanf("%d %d %d", &nn, &bt, &bs); at[i].neighbor[k] = nn; at[i].bond_type[k] = bt; at[i].bond_stereo[k] = bs; }
+                scanf("%d %d %d %d %d %d", &cbv, &iso[0], &iso[1], &iso[2], &iad, &nsb);
+                at[i].chem_bonds_valence = cbv; at[i].num_iso_H[0] = iso[0]; at[i].num_iso_H[1] = iso[1]; at[i].num_iso_H[2] = iso[2]; at[i].iso_atw_diff = iad;
+                for (int k = 0; k < nsb; k++) { int a, b, c, d; scanf("%d %d %d %d", &a, &b, &c, &d); at[i].sb_parity[k] = a; at[i].sb_ord[k] = b; at[i].sn_ord[k] = c; at[i].sn_orig_at_num[k] = d; }
+            }
+            int r = t == 50 ? ConnectDisconnectedH(at, n, nd) : DisconnectedConnectedH(at, n, nd);
+            printf("H %d\n", r);
+            for (int i = 0; i < n + nd; i++) {
+                printf("a%d %d %d %d %d %d %d %d |", i, at[i].valence, at[i].chem_bonds_valence, at[i].num_H, at[i].num_iso_H[0], at[i].num_iso_H[1], at[i].num_iso_H[2], at[i].iso_atw_diff);
+                for (int k = 0; k < MAXVAL; k++) printf(" %d,%d,%d", at[i].neighbor[k], at[i].bond_type[k], at[i].bond_stereo[k]);
+                printf(" |");
+                for (int k = 0; k < 3; k++) printf(" %d,%d,%d,%d", at[i].sb_parity[k], at[i].sb_ord[k], at[i].sn_ord[k], at[i].sn_orig_at_num[k]);
+                printf("\n");
+            }
         } else if (t == 33) {
             EDGE_LIST e; memset(&e, 0, sizeof(e));
             int m; scanf("%d", &m);
@@ -280,10 +301,63 @@ def pipe_case():
     return "40 " + f"{R.choice([0, 0, 2])} {R.choice([0, 1, 2])} {R.choice([0, 0, 1, -1])} " + c[1]
 
 
+def h_case():
+    n = R.randrange(1, 4)
+    adj = [[] for _ in range(n)]
+    for i in range(1, n):
+        j = R.randrange(0, i)
+        b = R.choice([1, 1, 2])
+        adj[i].append((j, b))
+        adj[j].append((i, b))
+    groups = []  # (parent, [iso diffs])
+    parents = list(range(n))
+    if R.random() < 0.2:
+        R.shuffle(parents)
+    for k in parents:
+        if R.random() < 0.7:
+            e = R.randrange(1, 4)
+            diffs = [0] * R.randrange(0, e + 1)
+            diffs += sorted(R.choice([1, 2, 3]) for _ in range(e - len(diffs))) if R.random() < 0.8 else [R.choice([1, 2, 3, 4])] * (e - len(diffs))
+            groups.append((k, diffs))
+    nd = sum(len(d) for _, d in groups)
+    conn = R.random() < 0.5
+    hidx = {}
+    idx = n
+    for k, diffs in groups:
+        hidx[k] = list(range(idx, idx + len(diffs)))
+        idx += len(diffs)
+    atoms = []
+    for i in range(n):
+        iso = [0, 0, 0]
+        e = 0
+        if i in hidx:
+            e = len(hidx[i])
+            for gk, diffs in groups:
+                if gk == i:
+                    for d in diffs:
+                        if 1 <= d <= 3 and R.random() < 0.93:
+                            iso[d - 1] += 1
+        nh = e + R.randrange(0, 3) + sum(iso) if R.random() < 0.9 else R.randrange(0, 3)
+        neigh = [(j, b, R.choice([0, 0, 1, 6])) for j, b in adj[i]]
+        if conn:
+            neigh = [(h, 1, 0) for h in hidx.get(i, [])] + neigh
+        nsb = R.choice([0, 0, 1, 2])
+        sb = []
+        for _ in range(nsb):
+            sn = R.choice([-1, -1, 0, 1])
+            sb += [R.choice([1, 2]), R.randrange(0, 2), sn, R.choice([100 + h for h in hidx.get(i, [0])] + [1])]
+        cbv = sum(b for _, b, _ in neigh) + (0 if conn else R.choice([0, 0, 1]))
+        atoms.append(f"{i + 1} {nh} {len(neigh)} " + " ".join(f"{a} {b} {c}" for a, b, c in neigh) + f" {cbv} {iso[0]} {iso[1]} {iso[2]} 0 {nsb} " + " ".join(map(str, sb)))
+    for k, diffs in groups:
+        for q, d in enumerate(diffs):
+            atoms.append(f"{100 + hidx[k][q]} 0 1 {k} 1 0 1 0 0 0 {d} 0")
+    return f"{51 if conn else 50} {n} {nd} " + " ".join(atoms)
+
+
 def main():
     cases = []
-    for _ in range(15000):
-        cases += [atom_case(), cc_case(), tcg_case(), el_case(), bns_case(), bns_case(), pipe_case(), pipe_case(), pipe_case()]
+    for _ in range(6000):
+        cases += [atom_case(), cc_case(), tcg_case(), el_case(), bns_case(), bns_case(), pipe_case(), pipe_case(), pipe_case(), h_case(), h_case()]
     objs = ma.build_lib()
     with tempfile.TemporaryDirectory() as d:
         (Path(d) / "h.c").write_text(HARNESS)

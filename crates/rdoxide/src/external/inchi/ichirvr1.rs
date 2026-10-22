@@ -23,12 +23,12 @@ use super::ichicano::{T_GROUP_HDR_LEN, TGSO_SYMM_IORDER};
 use super::ichierr::{
     BNS_BOND_ERR, BNS_CPOINT_ERR, BNS_PROGRAM_ERR, BNS_VERT_EDGE_OVFL, is_bns_error,
 };
-use super::ichiread::{NO_VALUE_INT, RI_ERR_ALLOC, RI_ERR_PROGR};
+use super::ichiread::{NO_VALUE_INT, RI_ERR_ALLOC, RI_ERR_PROGR, RI_ERR_SYNTAX};
 use super::ichirvrs::*;
 use super::ichisort::insertions_sort;
 use super::ichitaut::{TGroup, TGroupInfo};
-use super::incomdef::{BOND_TYPE_DOUBLE, BOND_TYPE_SINGLE, BOND_TYPE_TRIPLE};
-use super::inpdef::{BOND_TYPE_MASK, InpAtom, MAX_NUM_STEREO_BONDS};
+use super::incomdef::{BOND_TYPE_DOUBLE, BOND_TYPE_SINGLE, BOND_TYPE_TRIPLE, NUM_H_ISOTOPES};
+use super::inpdef::{BOND_TYPE_MASK, InpAtom, MAX_NUM_STEREO_BONDS, MAXVAL};
 use super::util::{
     EL_NUMBER_N, EL_NUMBER_O, EL_NUMBER_P, EL_NUMBER_S, EL_NUMBER_SE, EL_NUMBER_TE, get_el_valence,
     get_endpoint_valence, if_skip_add_h, is_el_a_metal, n_no_metal_bonds_valence,
@@ -4750,4 +4750,146 @@ pub fn get_charge_flower_upper_edge(bns: &BnStruct, charge_edge: i32) -> i32 {
         return NO_VERTEX;
     }
     pe1[i0] as i32
+}
+
+// ---------------------------------------------------------------------------
+// Explicit terminal H
+
+/// `ConnectDisconnectedH`: connects the explicit H atoms stored after the
+/// `num_atoms` atoms; returns the total number of atoms or an error
+pub fn connect_disconnected_h(at: &mut [InpAtom], num_atoms: usize, num_deleted_h: usize) -> i32 {
+    let tot_atoms = num_atoms + num_deleted_h;
+    let mut i = num_atoms;
+    while i < tot_atoms {
+        let k = at[i].neighbor[0] as usize;
+        let mut j = i;
+        while j < tot_atoms && at[j].neighbor[0] as usize == k {
+            j += 1;
+        }
+        let num_h = j - i;
+        if num_h as i32 > i32::from(at[k].num_h) {
+            return RI_ERR_PROGR;
+        }
+        if num_h + at[k].valence as usize > MAXVAL {
+            return RI_ERR_SYNTAX;
+        }
+        let n = at[k].valence as usize;
+        at[k].neighbor.copy_within(0..n, num_h);
+        at[k].bond_stereo.copy_within(0..n, num_h);
+        at[k].bond_type.copy_within(0..n, num_h);
+        for q in 0..num_h {
+            at[k].neighbor[q] = (i + q) as u16;
+            at[k].bond_stereo[q] = 0;
+            at[k].bond_type[q] = BOND_TYPE_SINGLE as u8;
+        }
+        let mut m = 0;
+        while m < MAX_NUM_STEREO_BONDS && at[k].sb_parity[m] != 0 {
+            at[k].sb_ord[m] = at[k].sb_ord[m].wrapping_add(num_h as i8);
+            if at[k].sn_ord[m] < 0 {
+                let mut n = i;
+                while n < j {
+                    if at[n].orig_at_number == at[k].sn_orig_at_num[m] {
+                        at[k].sn_ord[m] = (n - i) as i8;
+                        break;
+                    }
+                    n += 1;
+                }
+                if n == j {
+                    return RI_ERR_PROGR;
+                }
+            } else {
+                at[k].sn_ord[m] = at[k].sn_ord[m].wrapping_add(num_h as i8);
+            }
+            m += 1;
+        }
+        at[k].valence = at[k].valence.wrapping_add(num_h as i8);
+        at[k].chem_bonds_valence = at[k].chem_bonds_valence.wrapping_add(num_h as i8);
+        at[k].num_h = at[k].num_h.wrapping_sub(num_h as i8);
+        for a in &mut at[i..j] {
+            a.chem_bonds_valence = BOND_TYPE_SINGLE as i8;
+        }
+        let mut m = j as isize - 1;
+        while i as isize <= m && at[m as usize].iso_atw_diff > 0 {
+            let d = at[m as usize].iso_atw_diff as usize;
+            if d > NUM_H_ISOTOPES {
+                return RI_ERR_PROGR;
+            }
+            let old = at[k].num_iso_h[d - 1];
+            at[k].num_iso_h[d - 1] = old.wrapping_sub(1);
+            if old <= 0 {
+                return RI_ERR_PROGR;
+            }
+            m -= 1;
+        }
+        i = j;
+    }
+    for a in &mut at[..num_atoms] {
+        for m in 0..NUM_H_ISOTOPES {
+            a.num_h = a.num_h.wrapping_sub(a.num_iso_h[m]);
+        }
+        if a.num_h < 0 {
+            return RI_ERR_PROGR;
+        }
+    }
+    tot_atoms as i32
+}
+
+/// `DisconnectedConnectedH`: the reverse of [`connect_disconnected_h`]
+pub fn disconnected_connected_h(at: &mut [InpAtom], num_atoms: usize, num_deleted_h: usize) -> i32 {
+    let tot_atoms = num_atoms + num_deleted_h;
+    for a in &mut at[..num_atoms] {
+        for m in 0..NUM_H_ISOTOPES {
+            a.num_h = a.num_h.wrapping_add(a.num_iso_h[m]);
+        }
+    }
+    let mut i = num_atoms;
+    while i < tot_atoms {
+        let k = at[i].neighbor[0] as usize;
+        let mut j = i;
+        while j < tot_atoms && at[j].neighbor[0] as usize == k {
+            at[j].chem_bonds_valence = 0;
+            j += 1;
+        }
+        let num_h = j - i;
+        let mut n = 0usize;
+        while n < at[k].valence as usize && at[k].neighbor[n] as usize >= num_atoms {
+            n += 1;
+        }
+        if n != num_h {
+            return RI_ERR_PROGR;
+        }
+        at[k].valence = at[k].valence.wrapping_sub(num_h as i8);
+        let n = at[k].valence as usize;
+        at[k].chem_bonds_valence = at[k].chem_bonds_valence.wrapping_sub(num_h as i8);
+        if n != 0 {
+            at[k].neighbor.copy_within(num_h..num_h + n, 0);
+            at[k].bond_stereo.copy_within(num_h..num_h + n, 0);
+            at[k].bond_type.copy_within(num_h..num_h + n, 0);
+        }
+        for q in n..n + num_h {
+            at[k].neighbor[q] = 0;
+            at[k].bond_stereo[q] = 0;
+            at[k].bond_type[q] = 0;
+        }
+        let mut m = 0;
+        while m < MAX_NUM_STEREO_BONDS && at[k].sb_parity[m] != 0 {
+            at[k].sb_ord[m] = at[k].sb_ord[m].wrapping_sub(num_h as i8);
+            if 0 <= at[k].sn_ord[m] && (at[k].sn_ord[m] as usize) < num_h {
+                at[k].sn_ord[m] = -1;
+            }
+            m += 1;
+        }
+        let mut m = j as isize - 1;
+        while i as isize <= m && at[m as usize].iso_atw_diff > 0 {
+            let d = at[m as usize].iso_atw_diff as usize;
+            if d > NUM_H_ISOTOPES {
+                return RI_ERR_PROGR;
+            }
+            at[k].num_iso_h[d - 1] = at[k].num_iso_h[d - 1].wrapping_add(1);
+            m -= 1;
+        }
+        at[k].num_h = at[k].num_h.wrapping_add(num_h as i8);
+        i = j;
+    }
+    tot_atoms as i32
 }
