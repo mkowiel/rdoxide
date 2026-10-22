@@ -305,6 +305,14 @@ int main(void) {
                                         ci = 0; for (int i = 0; i < n; i++) ci += va[i].cInitCharge * (i + 1);
                                         printf("SB %d %d %d %d %d %d %d %lld\n", rsb, nr, td, b->tot_st_cap, b->tot_st_flow, ci, s.bMetalAddFlower, chk);
                                         s3.iInchiRec = 0;
+                                        for (int i = 0; i < n; i++) if (at[i].valence == 3) {
+                                            at[i].sb_parity[0] = 1; at[i].sb_parity[1] = 1; at[i].sb_parity[2] = 0;
+                                            at[i].sb_ord[0] = (i % 3 == 1) ? 1 : 0; at[i].sb_ord[1] = (i % 3 == 0) ? 1 : 2;
+                                        }
+                                        int rcr = CheckAndRefixStereobonds(b, bd, &s3, at, a2, va, &g, &nr, &td, 4);
+                                        chk = 0; for (int q = 0; q < b->num_edges; q++) chk = (chk + (long long)(b->edge[q].flow * 31 + b->edge[q].forbidden) * (q + 1)) % 1000000007LL;
+                                        printf("CR %d %d %d %d %d %lld\n", rcr, nr, td, b->tot_st_cap, b->tot_st_flow, chk);
+                                        for (int i = 0; i < n; i++) if (at[i].valence == 3) { at[i].sb_parity[0] = at[i].sb_parity[1] = 0; at[i].sb_ord[0] = at[i].sb_ord[1] = 0; }
                                         free(s3.fixed_H); s3.fixed_H = NULL; s3.iMobileH = 0; s3.charge = 0;
                                         free(atf); free(atn);
                                     }
