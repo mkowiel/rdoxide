@@ -10,14 +10,16 @@
 
 use super::ichi::{InChI, InChIStereo};
 use super::ichi_bns::{
-    BNS_VERT_TYPE_AUX, BNS_VERT_TYPE_C_GROUP, BNS_VERT_TYPE_TEMP, BNS_VERT_TYPE_TGROUP, BnData,
-    BnStruct, NO_VERTEX, RAD_SRCH_FROM_FICT, remove_rad_endpoints, set_rad_endpoints,
+    BNS_VERT_TYPE_AUX, BNS_VERT_TYPE_C_GROUP, BNS_VERT_TYPE_ENDPOINT, BNS_VERT_TYPE_TEMP,
+    BNS_VERT_TYPE_TGROUP, BnData, BnStruct, NO_VERTEX, RAD_SRCH_FROM_FICT, remove_rad_endpoints,
+    set_forbidden_edges, set_rad_endpoints,
 };
 use super::ichiread::{RI_ERR_PROGR, RI_ERR_SYNTAX};
 use super::ichiring::is_bond_in_nmax_memb_ring;
 use super::ichirvr1::CN_LIST;
 use super::ichirvr1::{
     BfsQ, CN_BITS_MN, CN_BITS_NPN, get_charge_flower_upper_edge, is_bns_vt_c_gr,
+    remove_forbidden_bond_flow_bits,
 };
 use super::ichirvr1::{
     BnsTestResult, EL_TYPE_C, EL_TYPE_MASK, EL_TYPE_N, EL_TYPE_O, EL_TYPE_OST, EL_TYPE_P,
@@ -4228,5 +4230,340 @@ pub fn plus_from_db_n_db_o_to_metal(
     }
     remove_forbidden_edge_mask(bns, &carbon_edges, forbidden_edge_mask);
     remove_forbidden_edge_mask(bns, &no_edges, forbidden_edge_mask);
+    ret
+}
+
+/// `RemoveForbiddenBondFlowBits` is in ichirvr1; `MoveMobileHToAvoidFixedBonds`
+#[allow(clippy::too_many_arguments)]
+pub fn move_mobile_h_to_avoid_fixed_bonds(
+    bns: &mut BnStruct,
+    bd: &mut BnData,
+    ps: &mut StrFromInChI,
+    at2: &mut Vec<InpAtom>,
+    p_va: &[ValAt],
+    tcg: &AllTcGroups,
+    num_run_bns: &mut i32,
+    total_delta: &mut i32,
+    forbidden_edge_mask: i32,
+) -> i32 {
+    let num_at = ps.num_atoms as usize;
+    if tcg.num_tgroups == 0 {
+        return 0;
+    }
+    let r2 = refresh_at2(ps, at2, bns, p_va, tcg);
+    if r2 < 0 {
+        return r2;
+    }
+    let r2 = super::ichinorm::mark_ring_systems_inp(&mut at2[..num_at], 0);
+    if r2 < 0 {
+        return r2;
+    }
+    let num_fixed = set_forbidden_edges(bns, at2, num_at as i32, forbidden_edge_mask);
+    let mut ret = adjust_tgroups_to_forbidden_edges2(bns, at2, p_va, num_at, forbidden_edge_mask);
+    let num_adj = ret;
+    if ret != 0 {
+        bns.edge_forbidden_mask |= forbidden_edge_mask as i8;
+        ret = run_bns_restore_once(bns, bd);
+        *num_run_bns += 1;
+        if ret < 0 {
+            return ret;
+        }
+        *total_delta += ret;
+    }
+    if num_fixed != 0 || num_adj != 0 {
+        remove_forbidden_bond_flow_bits(bns, forbidden_edge_mask);
+    }
+    ret
+}
+
+/// `RemoveRadFromMobileHEndpoint`: a mobile-H endpoint with a radical
+/// (typical for the wrong P(VI)(=O)3OH)
+#[allow(clippy::too_many_arguments)]
+pub fn remove_rad_from_mobile_h_endpoint(
+    bns: &mut BnStruct,
+    bd: &mut BnData,
+    ps: &mut StrFromInChI,
+    at2: &mut Vec<InpAtom>,
+    p_va: &[ValAt],
+    tcg: &AllTcGroups,
+    _num_run_bns: &mut i32,
+    _total_delta: &mut i32,
+    _forbidden_edge_mask: i32,
+) -> i32 {
+    let num_at = ps.num_atoms as usize;
+    let len_at = (ps.num_atoms + ps.num_deleted_h) as usize;
+    let mut res = BnsTestResult::default();
+    let mut tot_num_fixes = 0;
+    let ret;
+    let is_c =
+        |v: usize| p_va[v].c_num_valence_electrons == 4 && p_va[v].c_periodic_row_number == 1;
+    'body: {
+        let r2 = refresh_at2(ps, at2, bns, p_va, tcg);
+        if r2 < 0 {
+            ret = r2;
+            break 'body;
+        }
+        // is `cp` better than the centerpoint found so far (`cpf`)?
+        let better = |ps: &StrFromInChI, found: Option<usize>, cp: usize| -> bool {
+            match found {
+                None => true,
+                Some(cpf) => {
+                    (!is_c(cp) && is_c(cpf))
+                        || (!is_c(cp)
+                            && (ps.at[cp].valence > ps.at[cpf].valence
+                                || (ps.at[cp].valence == ps.at[cpf].valence
+                                    && ps.at[cp].el_number > ps.at[cpf].el_number)))
+                }
+            }
+        };
+        // values kept by C between the t-groups
+        let (mut etg1_found, mut ecp1_found, mut ecp0_found) = (0usize, 0usize, 0usize);
+        let mut ecp2_found: Option<usize> = None;
+        let mut endp2_found: Option<usize> = None;
+        let mut etg0 = 0usize;
+        let mut endpoint0 = 0usize;
+        while bns.tot_st_cap > bns.tot_st_flow && tcg.num_tgroups != 0 {
+            let mut num_fixes = 0;
+            for itg in 0..tcg.num_tgroups as usize {
+                let mut cp_found: Option<usize> = None;
+                let vtg1 = tcg.p_tcg[itg].n_vertex_number as usize;
+                let num_endpoints = tcg.p_tcg[itg].num_edges as usize;
+                let mut i = 0;
+                while i < num_endpoints {
+                    etg0 = bns.iedge[bns.vert[vtg1].iedge + i] as usize;
+                    endpoint0 = bns.edge[etg0].neighbor12 as usize ^ vtg1;
+                    if (endpoint0 as i32) < tcg.n_vertices + 2 {
+                        let st = &bns.vert[endpoint0].st_edge;
+                        if st.cap > st.flow {
+                            break;
+                        }
+                    }
+                    i += 1;
+                }
+                if i == num_endpoints {
+                    continue;
+                }
+                // 1st attempt
+                for j in 0..num_endpoints {
+                    if i == j {
+                        continue;
+                    }
+                    let etg1 = bns.iedge[bns.vert[vtg1].iedge + j] as usize;
+                    let endpoint1 = bns.edge[etg1].neighbor12 as usize ^ vtg1;
+                    if bns.vert[endpoint1].st_edge.cap > bns.vert[endpoint1].st_edge.flow
+                        || bns.edge[etg1].flow == 0
+                        || bns.vert[endpoint1].type_ & BNS_VERT_TYPE_ENDPOINT == 0
+                    {
+                        continue;
+                    }
+                    for k in 0..at2[endpoint1].valence as usize {
+                        let ecp1 = bns.iedge[bns.vert[endpoint1].iedge + k] as usize;
+                        if bns.edge[ecp1].flow != 0 {
+                            continue;
+                        }
+                        let centerpoint = bns.edge[ecp1].neighbor12 as usize ^ endpoint1;
+                        for n in 0..at2[centerpoint].valence as usize {
+                            let ecp2 = bns.iedge[bns.vert[centerpoint].iedge + n] as usize;
+                            if bns.edge[ecp2].flow != 0 {
+                                continue;
+                            }
+                            let endpoint2 = bns.edge[ecp2].neighbor12 as usize ^ centerpoint;
+                            if endpoint2 <= endpoint1 || p_va[endpoint2].n_taut_group_edge == 0 {
+                                continue;
+                            }
+                            if bns.vert[endpoint2].type_ & BNS_VERT_TYPE_ENDPOINT == 0 {
+                                continue;
+                            }
+                            let etg2 = (p_va[endpoint2].n_taut_group_edge - 1) as usize;
+                            if bns.edge[etg2].flow == 0
+                                || (bns.edge[etg2].neighbor12 as usize ^ endpoint2) != vtg1
+                            {
+                                continue;
+                            }
+                            if better(ps, cp_found, centerpoint) {
+                                cp_found = Some(centerpoint);
+                                etg1_found = etg1;
+                                ecp1_found = ecp1;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if let Some(cp) = cp_found {
+                    bns.edge[etg0].flow += 1;
+                    bns.vert[endpoint0].st_edge.flow += 1;
+                    bns.edge[etg1_found].flow -= 1;
+                    bns.edge[ecp1_found].flow += 1;
+                    bns.vert[cp].st_edge.flow += 1;
+                    bns.vert[cp].st_edge.cap += 1;
+                    bns.tot_st_flow += 2;
+                    bns.tot_st_cap += 1;
+                    num_fixes += 1;
+                    tot_num_fixes += 1;
+                    continue;
+                }
+                // 2nd attempt
+                for j in 0..num_endpoints {
+                    if i == j {
+                        continue;
+                    }
+                    let etg1 = bns.iedge[bns.vert[vtg1].iedge + j] as usize;
+                    let endpoint1 = bns.edge[etg1].neighbor12 as usize ^ vtg1;
+                    if bns.vert[endpoint1].st_edge.cap > bns.vert[endpoint1].st_edge.flow
+                        || bns.edge[etg1].flow == 0
+                        || bns.vert[endpoint1].type_ & BNS_VERT_TYPE_ENDPOINT == 0
+                    {
+                        continue;
+                    }
+                    for k in 0..at2[endpoint1].valence as usize {
+                        let ecp1 = bns.iedge[bns.vert[endpoint1].iedge + k] as usize;
+                        if bns.edge[ecp1].flow != 0 {
+                            continue;
+                        }
+                        let centerpoint = bns.edge[ecp1].neighbor12 as usize ^ endpoint1;
+                        if bns.vert[centerpoint].type_ & BNS_VERT_TYPE_ENDPOINT != 0 {
+                            continue;
+                        }
+                        let mut ecp2: Option<usize> = None;
+                        let mut endp2: Option<usize> = None;
+                        for n in 0..at2[centerpoint].valence as usize {
+                            let ecp0 = bns.iedge[bns.vert[centerpoint].iedge + n] as usize;
+                            if bns.edge[ecp0].flow != 0 {
+                                let endpoint2 = bns.edge[ecp0].neighbor12 as usize ^ centerpoint;
+                                if bns.vert[endpoint2].type_ & BNS_VERT_TYPE_ENDPOINT != 0 {
+                                    continue;
+                                }
+                                let a = &ps.at[centerpoint];
+                                let mut stereo = false;
+                                for m in 0..MAX_NUM_STEREO_BONDS {
+                                    if a.sb_parity[m] == 0 {
+                                        break;
+                                    }
+                                    if a.sb_ord[m] as usize == n {
+                                        stereo = true;
+                                        break;
+                                    }
+                                }
+                                if stereo {
+                                    continue;
+                                }
+                                endp2 = Some(endpoint2);
+                                ecp2 = Some(ecp0);
+                                break;
+                            }
+                        }
+                        for n in 0..ps.at[centerpoint].valence as usize {
+                            let ecp0 = bns.iedge[bns.vert[centerpoint].iedge + n] as usize;
+                            if bns.edge[ecp0].flow != 0 {
+                                continue;
+                            }
+                            if endpoint0 != (bns.edge[ecp0].neighbor12 as usize ^ centerpoint) {
+                                continue;
+                            }
+                            if better(ps, cp_found, centerpoint) {
+                                cp_found = Some(centerpoint);
+                                etg1_found = etg1;
+                                ecp0_found = ecp0;
+                                endp2_found = endp2;
+                                ecp2_found = ecp2;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if let Some(cp) = cp_found {
+                    bns.edge[ecp0_found].flow += 1;
+                    if bns.edge[ecp0_found].cap < bns.edge[ecp0_found].flow {
+                        bns.edge[ecp0_found].cap = bns.edge[ecp0_found].flow;
+                    }
+                    bns.vert[endpoint0].st_edge.flow += 1;
+                    if let (Some(e2), Some(v2)) = (ecp2_found, endp2_found) {
+                        bns.edge[e2].flow -= 1;
+                        bns.vert[v2].st_edge.flow -= 1;
+                    } else {
+                        bns.vert[cp].st_edge.flow += 1;
+                        bns.vert[cp].st_edge.cap += 1;
+                        bns.tot_st_flow += 2;
+                        bns.tot_st_cap += 1;
+                    }
+                    num_fixes += 1;
+                    tot_num_fixes += 1;
+                    continue;
+                }
+                // 3rd attempt: find =C= and move the radical to it
+                for jj in 0..num_at {
+                    if at2[i].endpoint != 0 {
+                        continue;
+                    }
+                    if at2[jj].valence != 2
+                        || bns.vert[jj].st_edge.cap != bns.vert[jj].st_edge.flow
+                        || p_va[jj].c_num_valence_electrons != 4
+                    {
+                        continue;
+                    }
+                    let mut ecp0 = bns.iedge[bns.vert[jj].iedge] as usize;
+                    if bns.edge[ecp0].forbidden != 0 {
+                        continue;
+                    }
+                    let ecp1 = bns.iedge[bns.vert[jj].iedge + 1] as usize;
+                    if bns.edge[ecp1].forbidden != 0
+                        || bns.edge[ecp0].flow != 1
+                        || bns.edge[ecp1].flow != 1
+                        || at2[at2[i].neighbor[0] as usize].sb_parity[0] != 0
+                        || at2[at2[i].neighbor[1] as usize].sb_parity[0] != 0
+                    {
+                        continue;
+                    }
+                    let mut k = bns.edge[ecp0].neighbor12 as usize ^ jj;
+                    if at2[k].endpoint != 0 {
+                        ecp0 = ecp1;
+                        k = bns.edge[ecp0].neighbor12 as usize ^ jj;
+                        if at2[k].endpoint != 0 {
+                            continue;
+                        }
+                    }
+                    bns.vert[jj].st_edge.flow -= 1;
+                    bns.vert[jj].st_edge.cap -= 1;
+                    bns.edge[ecp0].flow -= 1;
+                    bns.vert[k].st_edge.flow -= 1;
+                    bns.tot_st_cap -= 1;
+                    bns.tot_st_flow -= 2;
+                    let (v1, v2) = (endpoint0 as i32, k as i32);
+                    let mut r = run_bns_test_once(bns, bd, p_va, &mut res);
+                    if r == 1
+                        && ((res.v_last == v1 && res.v_first == v2)
+                            || (res.v_last == v2 && res.v_first == v1))
+                        && res.delta_charge == 0
+                    {
+                        r = run_bns_restore_once(bns, bd);
+                        if r > 0 {
+                            num_fixes += 1;
+                            tot_num_fixes += 1;
+                            bns.vert[jj].st_edge.cap += 1;
+                            bns.tot_st_cap += 1;
+                            break;
+                        }
+                    } else {
+                        bns.vert[jj].st_edge.flow += 1;
+                        bns.vert[jj].st_edge.cap += 1;
+                        bns.edge[ecp0].flow += 1;
+                        bns.vert[k].st_edge.flow += 1;
+                        bns.tot_st_cap += 1;
+                        bns.tot_st_flow += 2;
+                    }
+                    if r < 0 {
+                        ret = r;
+                        break 'body;
+                    }
+                }
+            }
+            if num_fixes == 0 {
+                break;
+            }
+        }
+        ret = tot_num_fixes;
+    }
+    at2.clear();
+    at2.extend_from_slice(&ps.at[..len_at]);
     ret
 }

@@ -879,6 +879,28 @@ fn restoration_helpers_match_c() {
                                                 b.edge[i].flow, b.edge[i].forbidden
                                             ));
                                         }
+                                        let rv = rdoxide::external::inchi::ichirvr2::move_mobile_h_to_avoid_fixed_bonds(&mut b, &mut bd, &mut ps, &mut a2, &va, &g, &mut nr, &mut td, 4);
+                                        got.push(format!(
+                                            "MM {rv} {nr} {td} {} {}",
+                                            b.tot_st_cap, b.tot_st_flow
+                                        ));
+                                        for i in 0..b.num_edges as usize {
+                                            got.push(format!(
+                                                "w{i} {} {}",
+                                                b.edge[i].flow, b.edge[i].forbidden
+                                            ));
+                                        }
+                                        let rx = rdoxide::external::inchi::ichirvr2::remove_rad_from_mobile_h_endpoint(&mut b, &mut bd, &mut ps, &mut a2, &va, &g, &mut nr, &mut td, 4);
+                                        got.push(format!(
+                                            "RR {rx} {nr} {td} {} {}",
+                                            b.tot_st_cap, b.tot_st_flow
+                                        ));
+                                        for i in 0..b.num_edges as usize {
+                                            got.push(format!(
+                                                "y{i} {} {}",
+                                                b.edge[i].flow, b.edge[i].forbidden
+                                            ));
+                                        }
                                     }
                                     for a in at.iter_mut().take(n) {
                                         a.bond_type[0] = 0;
