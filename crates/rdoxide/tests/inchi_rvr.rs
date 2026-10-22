@@ -1,3 +1,4 @@
+#![allow(clippy::needless_late_init)]
 //! Differential tests of the InChI -> structure restoration (`ichirvr*.rs`)
 //! against the C library, with fixtures from `tools/inchi_rvr*_reference.py`.
 
@@ -945,6 +946,92 @@ fn restoration_helpers_match_c() {
                                                     "V{i} {} {}",
                                                     b.edge[i].flow, b.edge[i].forbidden
                                                 ));
+                                            }
+                                            {
+                                                use rdoxide::external::inchi::ichirvr4 as r4;
+                                                let sum = |b: &rdoxide::external::inchi::ichi_bns::BnStruct| {
+                                                    let mut chk = 0i64;
+                                                    for q in 0..b.num_edges as usize {
+                                                        chk = (chk + (i64::from(b.edge[q].flow) * 31 + i64::from(b.edge[q].forbidden)) * (q as i64 + 1)) % 1_000_000_007;
+                                                    }
+                                                    chk
+                                                };
+                                                let mut nl = rdoxide::external::inchi::ichirvr1::EdgeList::default();
+                                                let rn =
+                                                    r4::forbid_nitrogen_plus2_bonds_in_small_rings(
+                                                        &mut b, &a2, n, &va, 6, &mut nl, 4,
+                                                    );
+                                                got.push(format!(
+                                                    "FN {rn} {} {}",
+                                                    nl.num_edges,
+                                                    sum(&b)
+                                                ));
+                                                rdoxide::external::inchi::ichirvr1::remove_forbidden_edge_mask(&mut b, &nl, 4);
+                                                for pass in 0..3 {
+                                                    let mut atf = a2.clone();
+                                                    let mut atn = a2.clone();
+                                                    let rr;
+                                                    if pass == 0 {
+                                                        for i in 0..n {
+                                                            if i % 2 == 0 && atf[i].num_h > 0 {
+                                                                atf[i].num_h -= 1;
+                                                            }
+                                                            for j in 0..atf[i].valence as usize {
+                                                                if (i + j) & 1 == 1 {
+                                                                    let bt = i32::from(
+                                                                        atf[i].bond_type[j],
+                                                                    );
+                                                                    let m = bt & 15;
+                                                                    if m == 1 {
+                                                                        atf[i].bond_type[j] =
+                                                                            (bt + 1) as _;
+                                                                    } else if m == 2 || m == 3 {
+                                                                        atf[i].bond_type[j] =
+                                                                            (bt - 1) as _;
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                        rr = r4::fix_less_hydrogen_in_formula(
+                                                            &mut b, &mut bd, &ps, &at, &mut a2,
+                                                            &atf, &va, &mut nr, &mut td, 4,
+                                                        );
+                                                    } else if pass == 1 {
+                                                        for i in 0..n {
+                                                            if a2[i].charge == -1 {
+                                                                atf[i].charge = 0;
+                                                                atf[i].num_h = a2[i].num_h + 1;
+                                                            }
+                                                        }
+                                                        ps.b_mobile_h = (n & 1) as i32;
+                                                        rr = r4::fix_more_hydrogen_in_formula(
+                                                            &mut b, &mut bd, &ps, &at, &a2, &atf,
+                                                            &va, &mut nr, &mut td, 4,
+                                                        );
+                                                    } else {
+                                                        let icr = rdoxide::external::inchi::ichimake::Icr {
+                                                            endp_in1_only: (0..n.min(32)).map(|i| i as u16 + 1).collect(),
+                                                            ..Default::default()
+                                                        };
+                                                        for a in atn.iter_mut().take(n) {
+                                                            a.endpoint = 1;
+                                                        }
+                                                        rr = r4::fix_remove_extra_taut_endpoints(
+                                                            &mut b, &mut bd, &ps, &a2, &atn, &va,
+                                                            &icr, &mut nr, &mut td, 4,
+                                                        );
+                                                    }
+                                                    let cf: i32 = a2
+                                                        .iter()
+                                                        .take(n)
+                                                        .map(|a| i32::from(a.c_flags))
+                                                        .sum();
+                                                    got.push(format!(
+                                                        "FX{pass} {rr} {nr} {td} {} {cf} {}",
+                                                        b.tot_st_flow,
+                                                        sum(&b)
+                                                    ));
+                                                }
                                             }
                                             ps.endpoint = None;
                                             ps.ti.t_group = None;
