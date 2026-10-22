@@ -504,3 +504,11 @@ exclude = ["UnitTest*.py", "test_data", "__pycache__", "demoCombined.py"]
 from = "rdkit/Chem/MolKey"
 to = "python/rdoxide/Chem/MolKey"
 exclude = ["UnitTest*.py", "__pycache__"]
+
+[[copy]]
+from = "rdkit/Chem/PandasTools.py"
+to = "python/rdoxide/Chem/PandasTools.py"
+
+[[copy]]
+from = "rdkit/Chem/PandasPatcher.py"
+to = "python/rdoxide/Chem/PandasPatcher.py"
