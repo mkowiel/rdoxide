@@ -4840,3 +4840,470 @@ pub fn inchi_line2data(
     };
     ret
 }
+
+// ---------------------------------------------------------------------------
+// Preparing the read InChI for the structure restoration
+
+/// `MODE_PIXH`
+pub const MODE_PIXH_UNDEFINED: i32 = 0;
+pub const MODE_PIXH_ADD_TO_FIRST: i32 = 1;
+pub const MODE_PIXH_ADD_TO_EACH: i32 = 2;
+pub const MODE_PIXH_ADD_A_PIXH_COMPONENT: i32 = 3;
+pub const MODE_PIXH_KEEP_TOTALS: i32 = 4;
+
+/// `GetNumNeighborsFromInchi`: the number of the neighbours (+1000 for a
+/// tautomeric atom) or a negative `RI_ERR_*`
+pub fn get_num_neighbors_from_inchi(inchi: &InChI, n_at_number: u16) -> i32 {
+    let at_number = i32::from(n_at_number) - 1;
+    let mut num_neigh = 0;
+    let mut b_taut_atom = 0;
+    let num_atoms = inchi.n_number_of_atoms;
+    let ct = |i: usize| i32::from(inchi.n_conn_table.get(i).copied().unwrap_or(0));
+    let mut n_vertex = ct(0) - 1;
+    let mut i = 1;
+    while i < inchi.len_conn_table {
+        let n_neigh = ct(i as usize) - 1;
+        if n_neigh < n_vertex {
+            num_neigh += i32::from(at_number == n_vertex || at_number == n_neigh);
+        } else {
+            n_vertex = n_neigh;
+            if n_vertex >= num_atoms {
+                return RI_ERR_PROGR;
+            }
+        }
+        i += 1;
+    }
+    if inchi.len_tautomer > 1 && !inchi.n_tautomer.is_empty() && inchi.n_tautomer[0] > 0 {
+        let t = |j: i32| i32::from(inchi.n_tautomer.get(j as usize).copied().unwrap_or(0));
+        let tot_len_tg = inchi.len_tautomer - T_GROUP_HDR_LEN_I * t(0) - 1;
+        let mut j = 1;
+        let mut i = 0;
+        for _ in 0..t(0) {
+            let mut len_tg = t(j);
+            j += T_GROUP_HDR_LEN_I;
+            len_tg -= T_GROUP_HDR_LEN_I - 1;
+            while 0 < len_tg {
+                len_tg -= 1;
+                let taut_at_number = t(j) - 1;
+                b_taut_atom += i32::from(taut_at_number == at_number);
+                j += 1;
+                i += 1;
+            }
+        }
+        if i != tot_len_tg {
+            return RI_ERR_PROGR;
+        }
+    }
+    let num_h = if inchi.n_num_h.is_empty() {
+        0
+    } else {
+        i32::from(
+            inchi
+                .n_num_h
+                .get(at_number.max(0) as usize)
+                .copied()
+                .unwrap_or(0),
+        )
+    };
+    let mut tot = num_neigh + num_h;
+    if b_taut_atom != 0 {
+        tot += 1000;
+    }
+    tot
+}
+
+const T_GROUP_HDR_LEN_I: i32 = super::ichicano::T_GROUP_HDR_LEN as i32;
+
+/// `CountStereoTypes`: returns 0 (no InChI), 1 (no stereo), 2 (has stereo)
+/// or a negative error; the counters are added to
+pub fn count_stereo_types(
+    inchi: &InChI,
+    num_known_sb: &mut i32,
+    num_known_sc: &mut i32,
+    num_unk_und_sb: &mut i32,
+    num_unk_und_sc: &mut i32,
+    num_sc_piii: &mut i32,
+    num_sc_asiii: &mut i32,
+) -> i32 {
+    if inchi.n_number_of_atoms == 0 || inchi.b_deleted != 0 {
+        return 0;
+    }
+    let tot = |s: &Option<InChIStereo>| nsb(s) + nsc(s);
+    let stereo = if inchi.stereo_isotopic.is_some() && tot(&inchi.stereo_isotopic) != 0 {
+        inchi.stereo_isotopic.as_ref()
+    } else if inchi.stereo.is_some() && tot(&inchi.stereo) != 0 {
+        inchi.stereo.as_ref()
+    } else {
+        None
+    };
+    let Some(st) = stereo else {
+        return 1;
+    };
+    for i in 0..st.n_number_of_stereo_bonds.max(0) as usize {
+        if super::ichister::atom_parity_well_def(i32::from(
+            st.b_parity.get(i).copied().unwrap_or(0),
+        )) {
+            *num_known_sb += 1;
+        } else {
+            *num_unk_und_sb += 1;
+        }
+    }
+    for i in 0..st.n_number_of_stereo_centers.max(0) as usize {
+        let at_number = st.n_number.get(i).copied().unwrap_or(0);
+        if at_number == 0 || i32::from(at_number) > inchi.n_number_of_atoms {
+            return RI_ERR_PROGR;
+        }
+        if super::ichister::atom_parity_well_def(i32::from(
+            st.t_parity.get(i).copied().unwrap_or(0),
+        )) {
+            *num_known_sc += 1;
+        } else {
+            *num_unk_und_sc += 1;
+        }
+        let el = inchi
+            .n_atom
+            .get(at_number as usize - 1)
+            .copied()
+            .unwrap_or(0);
+        if el != super::util::EL_NUMBER_P && el != super::util::EL_NUMBER_AS {
+            continue;
+        }
+        let ret = get_num_neighbors_from_inchi(inchi, at_number);
+        if ret < 0 {
+            return ret;
+        }
+        if ret == 3 {
+            *num_sc_piii += i32::from(el == super::util::EL_NUMBER_P);
+            *num_sc_asiii += i32::from(el == super::util::EL_NUMBER_AS);
+        }
+    }
+    2
+}
+
+/// `bInpInchiComponentExists`
+pub fn b_inp_inchi_component_exists(
+    d: &InpInChI,
+    i_inchi: usize,
+    b_mobile_h: usize,
+    k: i32,
+) -> bool {
+    if i_inchi > 1 || b_mobile_h > 1 || k < 0 {
+        return false;
+    }
+    k < d.n_num_components[i_inchi][b_mobile_h]
+        && d.p_inp_inchi[i_inchi][b_mobile_h]
+            .get(k as usize)
+            .is_some_and(|c| c.n_number_of_atoms > 0 && c.b_deleted == 0)
+}
+
+/// `bInpInchiComponentDeleted`
+pub fn b_inp_inchi_component_deleted(
+    d: &InpInChI,
+    i_inchi: usize,
+    b_mobile_h: usize,
+    k: i32,
+) -> bool {
+    if i_inchi > 1 || b_mobile_h > 1 || k < 0 {
+        return false;
+    }
+    k < d.n_num_components[i_inchi][b_mobile_h]
+        && d.p_inp_inchi[i_inchi][b_mobile_h]
+            .get(k as usize)
+            .is_some_and(|c| c.n_number_of_atoms > 0 && c.b_deleted != 0)
+}
+
+/// `bInChIHasReconnectedMetal`
+pub fn b_inchi_has_reconnected_metal(c: &InChI) -> bool {
+    if c.b_deleted == 0 && c.n_number_of_atoms != 0 && !c.n_atom.is_empty() {
+        for i in 0..c.n_number_of_atoms.max(0) as usize {
+            if super::util::is_el_a_metal(i32::from(c.n_atom.get(i).copied().unwrap_or(0)))
+                && (c.n_number_of_atoms > 1 || c.n_num_h.first().copied().unwrap_or(0) != 0)
+            {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// the result of `DetectInpInchiCreationOptions`
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct InpInchiOptions {
+    pub has_reconnected: bool,
+    pub has_metal: bool,
+    pub has_fixed_h: bool,
+    pub mode_flags_stereo: u64,
+    pub taut_flags_stereo: u64,
+}
+
+/// `DetectInpInchiCreationOptions`; `Err` is the return code
+pub fn detect_inp_inchi_creation_options(d: &InpInChI) -> Result<InpInchiOptions, i32> {
+    use super::ichiparm::{
+        REQ_MODE_ISO_STEREO, REQ_MODE_SB_IGN_ALL_UU, REQ_MODE_SC_IGN_ALL_UU, REQ_MODE_STEREO,
+        TG_FLAG_ARSINE_STEREO, TG_FLAG_PHOSPHINE_STEREO,
+    };
+    let mut o = InpInchiOptions::default();
+    let mut mode = 0u64;
+    let mut taut = 0u64;
+    let mut has_stereo = 0;
+    let (mut nksb, mut nksc, mut nusb, mut nusc, mut npiii, mut nasiii) = (0, 0, 0, 0, 0, 0);
+    for i_inchi in 0..2usize {
+        for i_mob in 0..2usize {
+            let mut b_iso = 1i32;
+            while mode == 0 && b_iso >= 0 {
+                match d.s[i_inchi][i_mob][b_iso as usize] {
+                    1 => mode |= REQ_MODE_STEREO | REQ_MODE_ISO_STEREO,
+                    2 => mode |= REQ_MODE_STEREO | REQ_MODE_ISO_STEREO | REQ_MODE_RELATIVE_STEREO,
+                    3 => mode |= REQ_MODE_STEREO | REQ_MODE_ISO_STEREO | REQ_MODE_RACEMIC_STEREO,
+                    _ => {}
+                }
+                b_iso -= 1;
+            }
+            let max_components = if d.p_inp_inchi[i_inchi][i_mob].is_empty() {
+                0
+            } else {
+                d.n_num_components[i_inchi][i_mob]
+            };
+            for k in 0..max_components.max(0) as usize {
+                let Some(c) = d.p_inp_inchi[i_inchi][i_mob].get(k) else {
+                    break;
+                };
+                let ret = count_stereo_types(
+                    c,
+                    &mut nksb,
+                    &mut nksc,
+                    &mut nusb,
+                    &mut nusc,
+                    &mut npiii,
+                    &mut nasiii,
+                );
+                if ret < 0 {
+                    return Err(ret);
+                }
+                has_stereo += i32::from(ret == 2);
+                if ret > 0 {
+                    o.has_reconnected |= i_inchi == INCHI_REC;
+                    o.has_fixed_h |= i_mob == TAUT_NON;
+                }
+                o.has_metal |= b_inchi_has_reconnected_metal(c);
+            }
+        }
+    }
+    if (mode & REQ_MODE_RELATIVE_STEREO) != 0 && (mode & REQ_MODE_RACEMIC_STEREO) != 0 {
+        return Err(RI_ERR_SYNTAX);
+    }
+    if has_stereo != 0 && mode == 0 {
+        mode = REQ_MODE_STEREO | REQ_MODE_ISO_STEREO;
+    }
+    if !(nksb == 0 && nusb != 0) {
+        mode |= REQ_MODE_SB_IGN_ALL_UU;
+    }
+    if !(nksc == 0 && nusc != 0) {
+        mode |= REQ_MODE_SC_IGN_ALL_UU;
+    }
+    if npiii != 0 {
+        taut |= TG_FLAG_PHOSPHINE_STEREO;
+    }
+    if nasiii != 0 {
+        taut |= TG_FLAG_ARSINE_STEREO;
+    }
+    o.mode_flags_stereo = mode;
+    o.taut_flags_stereo = taut;
+    Ok(o)
+}
+
+/// `RemoveFixHInChIIdentical2MobH`: eliminates the Fixed-H InChI that are
+/// exactly the same as the corresponding Mobile-H ones
+pub fn remove_fix_h_inchi_identical2_mob_h(d: &mut InpInChI) {
+    for i_rec in 0..2usize {
+        let n = d.n_num_components[i_rec][TAUT_YES].min(d.n_num_components[i_rec][TAUT_NON]);
+        for k in 0..n.max(0) as usize {
+            let (Some(m), Some(f)) = (
+                d.p_inp_inchi[i_rec][TAUT_YES].get(k),
+                d.p_inp_inchi[i_rec][TAUT_NON].get(k),
+            ) else {
+                break;
+            };
+            if super::ichimake::compare_reversed_inchi(Some(m), Some(f), None, None) == 0 {
+                d.p_inp_inchi[i_rec][TAUT_NON][k] = InChI::default();
+            }
+        }
+    }
+}
+
+/// `MarkDisconectedIdenticalToReconnected`: returns the number of the
+/// marked components
+pub fn mark_disconnected_identical_to_reconnected(d: &mut InpInChI) -> i32 {
+    use super::ichimake::compare_reversed_inchi as cmp;
+    let mut num_marked = 0;
+    let nc = d.n_num_components;
+    let k1max = nc[INCHI_BAS][TAUT_YES].max(nc[INCHI_BAS][TAUT_NON]);
+    for k1 in 0..k1max.max(0) {
+        let k2max = nc[INCHI_REC][TAUT_YES].max(nc[INCHI_REC][TAUT_NON]);
+        for k2 in 0..k2max.max(0) {
+            let (u1, u2) = (k1 as usize, k2 as usize);
+            let pi = &d.p_inp_inchi;
+            let eq_m = k1 < nc[INCHI_BAS][TAUT_YES]
+                && k2 < nc[INCHI_REC][TAUT_YES]
+                && pi[INCHI_REC][TAUT_YES][u2].n_link == 0
+                && pi[INCHI_BAS][TAUT_YES][u1].b_deleted == 0
+                && pi[INCHI_BAS][TAUT_YES][u1].n_number_of_atoms != 0
+                && pi[INCHI_BAS][TAUT_YES][u1].n_number_of_atoms
+                    == pi[INCHI_REC][TAUT_YES][u2].n_number_of_atoms
+                && pi[INCHI_REC][TAUT_YES][u2].b_deleted == 0
+                && cmp(
+                    Some(&pi[INCHI_REC][TAUT_YES][u2]),
+                    Some(&pi[INCHI_BAS][TAUT_YES][u1]),
+                    None,
+                    None,
+                ) == 0;
+            let is_f1 = k1 < nc[INCHI_BAS][TAUT_NON]
+                && pi[INCHI_BAS][TAUT_NON][u1].b_deleted == 0
+                && pi[INCHI_BAS][TAUT_NON][u1].n_number_of_atoms > 0;
+            let is_f2 = k2 < nc[INCHI_REC][TAUT_NON]
+                && pi[INCHI_REC][TAUT_NON][u2].b_deleted == 0
+                && pi[INCHI_REC][TAUT_NON][u2].n_number_of_atoms > 0;
+            let eq_f = is_f1
+                && is_f2
+                && pi[INCHI_REC][TAUT_NON][u2].n_link == 0
+                && pi[INCHI_BAS][TAUT_NON][u1].n_number_of_atoms
+                    == pi[INCHI_REC][TAUT_NON][u2].n_number_of_atoms
+                && cmp(
+                    Some(&pi[INCHI_REC][TAUT_NON][u2]),
+                    Some(&pi[INCHI_BAS][TAUT_NON][u1]),
+                    None,
+                    None,
+                ) == 0;
+            if eq_m && ((!is_f1 && !is_f2) || eq_f) {
+                d.p_inp_inchi[INCHI_BAS][TAUT_YES][u1].n_link = -(k2 + 1);
+                d.p_inp_inchi[INCHI_REC][TAUT_YES][u2].n_link = k1 + 1;
+                if eq_f {
+                    d.p_inp_inchi[INCHI_BAS][TAUT_NON][u1].n_link = -(k2 + 1);
+                    d.p_inp_inchi[INCHI_REC][TAUT_NON][u2].n_link = k1 + 1;
+                }
+                num_marked += 1;
+                break;
+            }
+        }
+    }
+    num_marked
+}
+
+/// `SetProtonsAndXchgIsoH`: decides how to treat the removed protons and
+/// the exchangeable isotopic H; `Err`/`Ok` carry `ret2`. Returns the
+/// numbers of the components and the modes.
+#[allow(clippy::too_many_arguments)]
+pub fn set_protons_and_xchg_iso_h(
+    b_inchi2_structure: bool,
+    b_req_split_output_inchi: bool,
+    b_req_protons_for_each_component: bool,
+    b_req_non_taut: bool,
+    b_req_stereo: bool,
+    d: &mut InpInChI,
+) -> (i32, [i32; 2], [i32; 2]) {
+    let mut num_components = [0i32; 2];
+    let mut mode = [MODE_PIXH_UNDEFINED; 2];
+    for i_inchi in 0..2usize {
+        mode[i_inchi] = MODE_PIXH_UNDEFINED;
+        let np = &d.n_num_protons[i_inchi][TAUT_YES];
+        let mut avail_total = np.n_num_removed_protons != 0;
+        for k1 in 0..NUM_H_ISOTOPES {
+            avail_total |= np.n_num_removed_isotopic_h[k1] != 0;
+        }
+        let mut avail_each = np.p_num_protons.is_some();
+        if b_inchi2_structure {
+            mode[i_inchi] = if avail_each {
+                MODE_PIXH_ADD_TO_EACH
+            } else {
+                MODE_PIXH_KEEP_TOTALS
+            };
+        } else if !b_req_split_output_inchi {
+            mode[i_inchi] = if avail_each {
+                MODE_PIXH_ADD_TO_EACH
+            } else {
+                MODE_PIXH_ADD_TO_FIRST
+            };
+        } else if !avail_each {
+            mode[i_inchi] = if avail_total {
+                MODE_PIXH_ADD_A_PIXH_COMPONENT
+            } else {
+                MODE_PIXH_ADD_TO_FIRST
+            };
+        } else if b_req_protons_for_each_component {
+            mode[i_inchi] = MODE_PIXH_ADD_TO_EACH;
+        } else {
+            mode[i_inchi] = if b_req_non_taut {
+                MODE_PIXH_ADD_TO_EACH
+            } else {
+                MODE_PIXH_ADD_A_PIXH_COMPONENT
+            };
+        }
+        // remove unneeded data: protons for each component
+        if avail_each && mode[i_inchi] != MODE_PIXH_ADD_TO_EACH {
+            d.n_num_protons[i_inchi][TAUT_YES].p_num_protons = None;
+            avail_each = false;
+        }
+        // remove unneeded data: total protons of all components
+        if avail_total && mode[i_inchi] == MODE_PIXH_ADD_TO_EACH {
+            let np = &mut d.n_num_protons[i_inchi][TAUT_YES];
+            np.n_num_removed_protons = 0;
+            np.n_num_removed_isotopic_h = [0; 3];
+        }
+        // remove unneeded data: Fixed-H InChI
+        if !b_req_non_taut && d.n_num_components[i_inchi][TAUT_NON] != 0 {
+            d.p_inp_inchi[i_inchi][TAUT_NON] = Vec::new();
+            d.n_num_components[i_inchi][TAUT_NON] = 0;
+        }
+        // add one more component containing only /p and /i/h
+        if (mode[i_inchi] == MODE_PIXH_ADD_A_PIXH_COMPONENT
+            && d.n_num_components[i_inchi][TAUT_YES] != 0)
+            || (b_inchi2_structure
+                && !avail_each
+                && d.n_num_components[i_inchi][TAUT_NON] == 0
+                && d.n_num_components[i_inchi][TAUT_YES] != 0)
+        {
+            let j = TAUT_YES;
+            let prev_len = d.n_num_components[i_inchi][j];
+            let mut n_len = 0;
+            for k in 0..prev_len.max(0) as usize {
+                n_len += i32::from(
+                    d.p_inp_inchi[i_inchi][j]
+                        .get(k)
+                        .is_none_or(|c| c.b_deleted == 0),
+                );
+            }
+            let v = &mut d.p_inp_inchi[i_inchi][j];
+            if n_len == prev_len {
+                v.truncate(n_len.max(0) as usize);
+                v.push(InChI::default());
+            }
+            d.n_num_components[i_inchi][j] = n_len + 1;
+            let v = &mut d.p_inp_inchi[i_inchi][j];
+            for k in n_len.max(0) as usize..prev_len.max(0) as usize {
+                if let Some(c) = v.get_mut(k) {
+                    *c = InChI::default();
+                }
+            }
+            let r = n_fill_out_proton_mobile_h(&mut v[n_len as usize]);
+            if r < 0 {
+                return (r, num_components, mode);
+            }
+        }
+        // remove unneeded Stereo
+        if !b_req_stereo {
+            for j in 0..2usize {
+                for k in 0..d.n_num_components[i_inchi][j].max(0) as usize {
+                    if let Some(c) = d.p_inp_inchi[i_inchi][j].get_mut(k) {
+                        c.stereo = None;
+                        c.stereo_isotopic = None;
+                    }
+                }
+            }
+        }
+    }
+    num_components[INCHI_BAS] =
+        d.n_num_components[INCHI_BAS][TAUT_YES].max(d.n_num_components[INCHI_BAS][TAUT_NON]);
+    num_components[INCHI_REC] =
+        d.n_num_components[INCHI_REC][TAUT_YES].max(d.n_num_components[INCHI_REC][TAUT_NON]);
+    (0, num_components, mode)
+}

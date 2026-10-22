@@ -79,6 +79,9 @@ pub struct InChI {
     pub stereo_isotopic: Option<InChIStereo>,
     pub n_possible_locations_of_isotopic_h: Vec<u16>,
     pub b_deleted: i32,
+    /// `nLink`: negative: ignore InChI; positive: index of (Reconnected
+    /// component) + 1 linked to it
+    pub n_link: i32,
 }
 
 /// `INCHI_SORT`
