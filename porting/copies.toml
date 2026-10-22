@@ -499,3 +499,8 @@ exclude = ["tests", "examples", "__pycache__"]
 from = "rdkit/Chem/Subshape"
 to = "python/rdoxide/Chem/Subshape"
 exclude = ["UnitTest*.py", "test_data", "__pycache__", "demoCombined.py"]
+
+[[copy]]
+from = "rdkit/Chem/MolKey"
+to = "python/rdoxide/Chem/MolKey"
+exclude = ["UnitTest*.py", "__pycache__"]
