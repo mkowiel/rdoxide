@@ -41,7 +41,7 @@ fn round_trip_corpus() {
             continue;
         }
         let inchi = v["inchi"].as_str().unwrap();
-        if !inchi.starts_with("InChI=1S/") || inchi.contains("/o") || inchi.contains("/z") {
+        if !inchi.starts_with("InChI=1") || inchi.contains("/o") || inchi.contains("/z") {
             continue;
         }
         n += 1;
@@ -50,7 +50,7 @@ fn round_trip_corpus() {
             Ok(Some(m)) => m,
             Ok(None) => {
                 none += 1;
-                bad.push(format!("{inchi}: none"));
+                bad.push(format!("{inchi}: none {} {}", rv.return_code, rv.message));
                 continue;
             }
             Err(e) => {
@@ -60,14 +60,19 @@ fn round_trip_corpus() {
         };
         let mut rv2 = ExtraInchiReturnValues::default();
         let back = mol_to_inchi(&m, &mut rv2, None).unwrap();
-        if back == inchi {
+        // the standard InChI of the restored molecule has no fixed-H layer
+        let want = match inchi.strip_prefix("InChI=1/") {
+            Some(rest) => format!("InChI=1S/{}", rest.split("/f").next().unwrap()),
+            None => inchi.to_string(),
+        };
+        if back == want {
             same += 1;
         } else {
             bad.push(format!("{inchi} -> {back}"));
         }
     }
     eprintln!("{same}/{n} identical, {none} none");
-    for b in bad.iter().take(40) {
+    for b in bad.iter().take(80) {
         eprintln!("  {b}");
     }
     assert!(same * 10 >= n * 9, "too many round-trip differences");
