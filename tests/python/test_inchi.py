@@ -45,15 +45,24 @@ def test_module_surface():
         assert callable(getattr(rdinchi, name))
 
 
-def test_unported_conversions_raise():
+def test_mol_to_inchi():
     m = Chem.MolFromSmiles("CC(=O)[O-]")
-    with pytest.raises(NotImplementedError):
-        rdinchi.MolToInchi(m)
-    with pytest.raises(NotImplementedError):
-        rdinchi.MolToInchi(m, options="/FixedH")
-    with pytest.raises(NotImplementedError):
-        rdinchi.MolToInchiKey(m)
-    with pytest.raises(NotImplementedError):
-        rdinchi.MolBlockToInchi(Chem.MolToMolBlock(m))
+    inchi, code, msg, log, aux = rdinchi.MolToInchi(m)
+    assert inchi == "InChI=1S/C2H4O2/c1-2(3)4/h1H3,(H,3,4)/p-1"
+    assert code in (0, 1)
+    assert aux.startswith("AuxInfo=1/1/")
+    inchi, code, msg, log, aux = rdinchi.MolToInchi(m, options="/FixedH")
+    assert inchi.endswith("/fC2H3O2/q-1")
+    assert rdinchi.MolToInchiKey(m) == "QTBSBXVTEAMEQO-UHFFFAOYSA-M"
+
+
+def test_mol_block_to_inchi():
+    m = Chem.MolFromSmiles("CCO")
+    inchi, code, msg, log, aux = rdinchi.MolBlockToInchi(Chem.MolToMolBlock(m))
+    assert inchi == "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3"
+    assert code == 0
+
+
+def test_inchi_to_mol_not_ported():
     with pytest.raises(NotImplementedError):
         rdinchi.InchiToMol("InChI=1S/CH4/h1H4", sanitize=True, removeHs=True)

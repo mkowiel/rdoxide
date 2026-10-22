@@ -99,8 +99,12 @@ fn mol_to_inchi_matches_rdkit() {
                 assert_eq!(rv.return_code as i64, r["retcode"].as_i64().unwrap(), "{r}");
                 assert_eq!(rv.message, s(&r["message"]), "{r}");
                 assert_eq!(rv.aux_info, s(&r["aux"]), "{r}");
+                // the usage text of an empty molecule carries the build date and platform
+                if !s(&r["log"]).starts_with("InChI version 1, Software") {
+                    assert_eq!(rv.log, s(&r["log"]), "{r}");
+                }
             }
-            Err(e) => assert!(matches!(e, RDKitError::NotImplemented(_)), "{e}"),
+            Err(e) => panic!("{e}: {r}"),
         }
     }
 }

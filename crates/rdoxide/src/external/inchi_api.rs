@@ -8,13 +8,16 @@
 //! LICENSES/RDKit-ChemReactions-Novartis-BSD-3-Clause.txt, the same Novartis
 //! license text).
 //!
-//! Status: [`inchi_to_inchi_key`] and [`get_inchi_version`] are complete.
-//! [`mol_to_inchi`], [`mol_block_to_inchi`], [`inchi_to_mol`] and
-//! [`mol_to_inchi_key`] need the InChI generation / structure restoration
-//! pipelines, which are not ported yet; they return
+//! Status: [`inchi_to_inchi_key`], [`get_inchi_version`], [`mol_to_inchi`],
+//! [`mol_block_to_inchi`] and [`mol_to_inchi_key`] are complete (structures
+//! without polymer data). [`inchi_to_mol`] needs the structure restoration
+//! pipeline, which is not ported yet; it returns
 //! [`RDKitError::NotImplemented`] (see `docs/INCHI_PORT.md`).
 
+use crate::external::inchi::inchi_dll::{InchiInput as InchiLibInput, get_inchi};
+use crate::external::inchi::inchi_dll_b::{InchiOutput, make_inchi_from_molfile_text};
 use crate::external::inchi::{self, InchiKeyError};
+use crate::external::inchi_input::{fix_option_symbol, mol_to_inchi_input};
 use crate::graphmol::romol::{ROMol, RWMol};
 use crate::{RDKitError, Result};
 
@@ -53,21 +56,48 @@ pub fn inchi_to_mol(
 /// InChI option string passed through to the InChI API (`-` and `/`
 /// prefixes are both accepted).
 pub fn mol_to_inchi(
-    _mol: &ROMol,
-    _rv: &mut ExtraInchiReturnValues,
-    _options: Option<&str>,
+    mol: &ROMol,
+    rv: &mut ExtraInchiReturnValues,
+    options: Option<&str>,
 ) -> Result<String> {
-    Err(not_ported("MolToInchi"))
+    let Some(input) = mol_to_inchi_input(mol, options)? else {
+        return Ok(String::new());
+    };
+    let (code, out) = get_inchi(&InchiLibInput {
+        atom: input.atoms,
+        stereo_0d: input.stereo_0d,
+        options: input.options,
+    });
+    rv.return_code = code;
+    fill_extra(rv, &out);
+    Ok(out.sz_inchi.unwrap_or_default())
+}
+
+fn fill_extra(rv: &mut ExtraInchiReturnValues, out: &InchiOutput) {
+    if let Some(m) = &out.sz_message {
+        rv.message = m.clone();
+    }
+    if let Some(l) = &out.sz_log {
+        rv.log = l.clone();
+    }
+    if let Some(a) = &out.sz_aux_info {
+        rv.aux_info = a.clone();
+    }
 }
 
 /// `MolBlockToInchi`: the InChI of a mol block, parsed by the InChI library's
 /// own MOL reader (`MakeINCHIFromMolfileText`).
 pub fn mol_block_to_inchi(
-    _mol_block: &str,
-    _rv: &mut ExtraInchiReturnValues,
-    _options: Option<&str>,
+    mol_block: &str,
+    rv: &mut ExtraInchiReturnValues,
+    options: Option<&str>,
 ) -> Result<String> {
-    Err(not_ported("MolBlockToInchi"))
+    let opts = options.map(fix_option_symbol);
+    let (code, out) =
+        make_inchi_from_molfile_text(mol_block.as_bytes(), opts.as_deref().map(str::as_bytes));
+    rv.return_code = code;
+    fill_extra(rv, &out);
+    Ok(out.sz_inchi.unwrap_or_default())
 }
 
 /// `InchiToInchiKey`: the InChIKey of an InChI string; an empty string (with
