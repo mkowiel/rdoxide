@@ -363,6 +363,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 247 | InChI port I11k: RearrangePlusMinusEdgesFlow, IncrementZeroOrderBondsToHeteroat, ForbidCarbonChargeEdges |
 | 248 | InChI port I11l: MovePlusFromS2DiaminoCarbon, EliminateChargeSeparationOnHeteroatoms, BFS queue |
 | 249 | InChI port I11m: RestoreCyanoGroup, RestoreIsoCyanoGroup |
+| 250 | InChI port I11n: FixMetal_Nminus_Ominus, RestoreNNNgroup |
 
 ## Python package files
 
@@ -794,3 +795,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-22 — Stage 247: InChI I11k — charge rearrangement; no runtime effect, upstream_speed.html not regenerated
 * 2026-10-22 — Stage 248: InChI I11l — charge separation fixes; no runtime effect, upstream_speed.html not regenerated
 * 2026-10-22 — Stage 249: InChI I11m — cyano group restoration; no runtime effect, upstream_speed.html not regenerated
+* 2026-10-22 — Stage 250: InChI I11n — metal N(-)O(-) and N-N-N group fixes; no runtime effect, upstream_speed.html not regenerated

@@ -816,6 +816,32 @@ fn restoration_helpers_match_c() {
                                                 b.edge[i].flow, b.edge[i].forbidden
                                             ));
                                         }
+                                        let rfm = rdoxide::external::inchi::ichirvr2::fix_metal_nminus_ominus(&mut b, &mut bd, &mut ps, &mut a2, &va, &g, &mut nr, &mut td, 4);
+                                        got.push(format!(
+                                            "FM {rfm} {nr} {td} {} {}",
+                                            b.tot_st_cap, b.tot_st_flow
+                                        ));
+                                        for i in 0..b.num_edges as usize {
+                                            got.push(format!(
+                                                "m{i} {} {}",
+                                                b.edge[i].flow, b.edge[i].forbidden
+                                            ));
+                                        }
+                                        let rnn =
+                                            rdoxide::external::inchi::ichirvr2::restore_nnn_group(
+                                                &mut b, &mut bd, &mut ps, &mut a2, &va, &g,
+                                                &mut nr, &mut td, 4,
+                                            );
+                                        got.push(format!(
+                                            "NN {rnn} {nr} {td} {} {}",
+                                            b.tot_st_cap, b.tot_st_flow
+                                        ));
+                                        for i in 0..b.num_edges as usize {
+                                            got.push(format!(
+                                                "o{i} {} {}",
+                                                b.edge[i].flow, b.edge[i].forbidden
+                                            ));
+                                        }
                                     }
                                     for a in at.iter_mut().take(n) {
                                         a.bond_type[0] = 0;
