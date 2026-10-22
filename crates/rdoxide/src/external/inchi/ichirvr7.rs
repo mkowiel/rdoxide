@@ -1376,3 +1376,392 @@ pub fn compare_all_orig_inchi_to_rev_inchi(
     }
     ret
 }
+
+/// `bRevInchiComponentDeleted`
+fn rev_component_deleted(
+    ps: &super::ichirvr2::StrFromInChI,
+    i_inchi: usize,
+    b_mobile_h: usize,
+    k: usize,
+) -> bool {
+    ps.num_atoms != 0
+        && (k as i32) < ps.rev_inchi.num_components[i_inchi]
+        && ps.rev_inchi.p_inchi[i_inchi]
+            .get(k)
+            .and_then(|c| c[b_mobile_h].as_ref())
+            .is_some_and(|c| c.n_number_of_atoms > 0 && c.b_deleted != 0)
+}
+
+/// a fragment of the `INCHI_SORT` arrays of
+/// `CompareAllDisconnectedOrigInchiToRevInChI`
+#[derive(Default, Clone)]
+struct FragSort {
+    sort: super::ichi::InChISort,
+    n1: i32,
+    n2: i32,
+}
+
+/// `CompareAllDisconnectedOrigInchiToRevInChI`: compares the fragments of the
+/// original InChI that were disconnected from the reconnected (metal)
+/// structure with the fragments of the restored reconnected structures; the
+/// bits go to `one_input.compare_inchi_flags[1]`. Returns 1 when the numbers
+/// of the fragments differ, or a negative error. (The C `qsort` is replaced
+/// by a stable sort.)
+pub fn compare_all_disconnected_orig_inchi_to_rev_inchi(
+    p_struct: &[[Vec<super::ichirvr2::StrFromInChI>; 2]; 2],
+    one_input: &mut InpInChI,
+    b_has_some_fixed_h: bool,
+) -> i32 {
+    use super::ichi::comp_inchi_taut2;
+    use super::ichiread::{b_inp_inchi_component_deleted, b_inp_inchi_component_exists};
+
+    one_input.compare_inchi_flags[1] = [0; 2];
+    // components that are not subject to disconnection
+    if one_input.n_num_components[INCHI_REC][TAUT_YES] == 0
+        && one_input.n_num_components[INCHI_REC][TAUT_NON] == 0
+    {
+        return 0;
+    }
+    let ncomp = |r: usize, m: usize| one_input.n_num_components[r][m];
+    let mut rem_d = ComponentRemProtons::default();
+    let mut rem_r = ComponentRemProtons::default();
+    let mut flags = [0u64; 2];
+    let num_components_d = ncomp(INCHI_BAS, TAUT_YES)
+        .max(ncomp(INCHI_BAS, TAUT_NON))
+        .max(0) as usize;
+    let num_components_r = ncomp(INCHI_REC, TAUT_YES)
+        .max(ncomp(INCHI_REC, TAUT_NON))
+        .max(0) as usize;
+    let first_mobile = |r: usize| -> usize {
+        if b_has_some_fixed_h {
+            usize::from(ncomp(r, TAUT_NON) == 0)
+        } else {
+            TAUT_YES
+        }
+    };
+    let exists = |o: &InpInChI, r: usize, m: usize, k: usize| {
+        b_inp_inchi_component_exists(o, r, m, k as i32)
+    };
+    // the mobile/fixed-H layer to use for the component k
+    let pick_layer = |o: &InpInChI, r: usize, m: usize, k: usize| -> Option<usize> {
+        if exists(o, r, m, k) {
+            Some(m)
+        } else if exists(o, r, TAUT_YES, k) {
+            Some(TAUT_YES)
+        } else {
+            None
+        }
+    };
+    let mut num_non_taut1 = 0;
+    let mut num_non_taut2 = 0;
+
+    // ---- original InChI ----
+    let mut num_fragments_d = 0;
+    let mut have_sep_protons_d = 0;
+    let mut have_sep_protons_r = 0;
+    {
+        let i_inchi = INCHI_BAS;
+        let i_mobile_h = first_mobile(i_inchi);
+        let np = &one_input.n_num_protons[i_inchi][TAUT_YES];
+        rem_d.n_num_removed_protons = i32::from(np.n_num_removed_protons);
+        for m in 0..3 {
+            rem_d.n_num_removed_isotopic_h[m] = i32::from(np.n_num_removed_isotopic_h[m]);
+        }
+        for k in 0..num_components_d {
+            let Some(b_mobile_h) = pick_layer(one_input, i_inchi, i_mobile_h, k) else {
+                continue; // component is missing
+            };
+            let n_link = one_input.p_inp_inchi[i_inchi][b_mobile_h][k].n_link;
+            if n_link < 0 {
+                // linked to the identical component in the Reconnected layer
+                if let Some(v) = &one_input.n_num_protons[INCHI_REC][TAUT_YES].p_num_protons {
+                    have_sep_protons_d += 1;
+                    let l = (-(1 + n_link)) as usize;
+                    rem_d.n_num_removed_protons += i32::from(v[l][0]);
+                    for m in 0..3 {
+                        rem_d.n_num_removed_isotopic_h[m] += i32::from(v[l][1 + m]);
+                    }
+                }
+                continue;
+            }
+            // component in the reconnected layer that was disconnected
+            num_non_taut2 += i32::from(b_mobile_h == TAUT_NON);
+            if let Some(v) = &one_input.n_num_protons[i_inchi][TAUT_YES].p_num_protons {
+                have_sep_protons_d += 1;
+                rem_d.n_num_removed_protons += i32::from(v[k][0]);
+                for m in 0..3 {
+                    rem_d.n_num_removed_isotopic_h[m] += i32::from(v[k][1 + m]);
+                }
+            }
+            num_fragments_d += 1;
+        }
+    }
+
+    // ---- InChI from the reconstructed reconnected structure ----
+    let mut num_fragments_r = 0;
+    let i_inchi = INCHI_REC;
+    let i_mobile_h = first_mobile(i_inchi);
+    let add_aux = |rem: &mut ComponentRemProtons, a: Option<&super::ichi::InChIAux>| {
+        if let Some(a) = a {
+            rem.n_num_removed_protons += i32::from(a.n_num_removed_protons);
+            for m in 0..3 {
+                rem.n_num_removed_isotopic_h[m] += i32::from(a.n_num_removed_isotopic_h[m]);
+            }
+        }
+    };
+    for k in 0..num_components_r {
+        let Some(b_mobile_h) = pick_layer(one_input, i_inchi, i_mobile_h, k) else {
+            continue; // deleted proton in the Mobile-H layer
+        };
+        let ps1 = &p_struct[i_inchi][b_mobile_h][k];
+        if one_input.p_inp_inchi[i_inchi][b_mobile_h][k].n_link > 0 {
+            // NOT DISCONNECTED: the same component is in the disconnected layer
+            if ps1.rev_inchi_component_exists(INCHI_BAS, TAUT_YES, 0) {
+                add_aux(
+                    &mut rem_r,
+                    ps1.rev_inchi.p_inchi_aux[INCHI_BAS]
+                        .first()
+                        .and_then(|c| c[TAUT_YES].as_ref()),
+                );
+            }
+            have_sep_protons_r += i32::from(ps1.rev_inchi_component_exists(INCHI_BAS, TAUT_NON, 0));
+            continue;
+        }
+        // WAS DISCONNECTED; check its fragments
+        let num_fragments = ps1.rev_inchi.num_components[INCHI_BAS].max(0) as usize;
+        let if_mobile_h = if b_has_some_fixed_h {
+            TAUT_NON
+        } else {
+            TAUT_YES
+        };
+        for ifk in 0..num_fragments {
+            let bf = if ps1.rev_inchi_component_exists(INCHI_BAS, if_mobile_h, ifk) {
+                if_mobile_h
+            } else if ps1.rev_inchi_component_exists(INCHI_BAS, TAUT_YES, ifk) {
+                TAUT_YES
+            } else {
+                continue; // fragment does not exist
+            };
+            num_non_taut1 += i32::from(bf == TAUT_NON);
+            have_sep_protons_r += i32::from(bf == TAUT_NON);
+            add_aux(
+                &mut rem_r,
+                ps1.rev_inchi.p_inchi_aux[INCHI_BAS]
+                    .get(ifk)
+                    .and_then(|c| c[TAUT_YES].as_ref()),
+            );
+            num_fragments_r += 1;
+        }
+    }
+    // the last reconstructed component may contain separate protons added
+    // by the reconstruction
+    if num_components_r > 0 {
+        let k = num_components_r - 1;
+        if let Some(ps1) = p_struct[i_inchi][i_mobile_h].get(k)
+            && i_mobile_h == TAUT_YES
+            && !b_has_some_fixed_h
+            && b_inp_inchi_component_deleted(one_input, i_inchi, i_mobile_h, k as i32)
+        {
+            for ifk in 0..ps1.rev_inchi.num_components[INCHI_BAS].max(0) as usize {
+                if !rev_component_deleted(ps1, INCHI_BAS, TAUT_YES, ifk) {
+                    continue;
+                }
+                add_aux(
+                    &mut rem_r,
+                    ps1.rev_inchi.p_inchi_aux[INCHI_BAS]
+                        .get(ifk)
+                        .and_then(|c| c[TAUT_YES].as_ref()),
+                );
+            }
+        }
+    }
+    let num_fragments_dr = num_fragments_d.max(num_fragments_r);
+    if num_fragments_dr == 0 {
+        return 0; // no component was disconnected
+    }
+    if num_fragments_d != num_fragments_r {
+        for i in 0..2 {
+            if one_input.n_num_components[INCHI_BAS][i] != 0 {
+                one_input.compare_inchi_flags[1][i] |= diff::PROBLEM;
+            }
+        }
+        return 1; // severe error
+    }
+    let ndr = num_fragments_dr as usize;
+    let mut sort1 = vec![FragSort::default(); ndr];
+    let mut sort2 = vec![FragSort::default(); ndr];
+
+    // the original InChI of the fragments
+    {
+        let i_inchi = INCHI_BAS;
+        let i_mobile_h = first_mobile(i_inchi);
+        let mut n = 0;
+        for k in 0..num_components_d {
+            let Some(b_mobile_h) = pick_layer(one_input, i_inchi, i_mobile_h, k) else {
+                continue;
+            };
+            if one_input.p_inp_inchi[i_inchi][b_mobile_h][k].n_link < 0 {
+                continue; // same as reconnected
+            }
+            let f = &mut sort2[n];
+            f.sort.p_inchi[b_mobile_h] =
+                Some(one_input.p_inp_inchi[i_inchi][b_mobile_h][k].clone());
+            if b_mobile_h == TAUT_NON
+                && (exists(one_input, i_inchi, TAUT_YES, k)
+                    || b_inp_inchi_component_deleted(one_input, i_inchi, TAUT_YES, k as i32))
+            {
+                f.sort.p_inchi[TAUT_YES] =
+                    Some(one_input.p_inp_inchi[i_inchi][TAUT_YES][k].clone());
+            }
+            // the last sort key is the number of removed protons
+            f.sort.ord_number = one_input.n_num_protons[i_inchi][TAUT_YES]
+                .p_num_protons
+                .as_ref()
+                .map_or(0, |v| v[k][0]);
+            f.n1 = k as i32;
+            f.n2 = -1;
+            n += 1;
+        }
+    }
+    // the fragments from the reconstructed structure
+    {
+        let i_inchi = INCHI_REC;
+        let i_mobile_h = first_mobile(i_inchi);
+        let mut n = 0;
+        for k in 0..num_components_r {
+            let Some(b_mobile_h) = pick_layer(one_input, i_inchi, i_mobile_h, k) else {
+                continue;
+            };
+            if one_input.p_inp_inchi[i_inchi][b_mobile_h][k].n_link > 0 {
+                continue; // same as disconnected
+            }
+            let ps1 = &p_struct[i_inchi][b_mobile_h][k];
+            let if_mobile_h = if b_has_some_fixed_h {
+                TAUT_NON
+            } else {
+                TAUT_YES
+            };
+            for i in 0..ps1.rev_inchi.num_components[INCHI_BAS].max(0) as usize {
+                let bf = if ps1.rev_inchi_component_exists(INCHI_BAS, if_mobile_h, i) {
+                    if_mobile_h
+                } else if ps1.rev_inchi_component_exists(INCHI_BAS, TAUT_YES, i) {
+                    TAUT_YES
+                } else {
+                    continue;
+                };
+                let slot = |m: usize| ps1.rev_inchi.p_inchi[INCHI_BAS][i][m].clone();
+                let f = &mut sort1[n];
+                f.sort.p_inchi[bf] = slot(bf);
+                if bf == TAUT_NON {
+                    f.sort.p_inchi[TAUT_YES] = slot(TAUT_YES);
+                    // remove Fixed-H InChI identical to Mobile-H, as for InpInChI
+                    if compare_reversed_inchi(
+                        f.sort.p_inchi[bf].as_ref(),
+                        f.sort.p_inchi[TAUT_YES].as_ref(),
+                        None,
+                        None,
+                    ) == 0
+                    {
+                        f.sort.p_inchi[bf] = None;
+                    } else {
+                        f.sort.ord_number = ps1.rev_inchi.p_inchi_aux[INCHI_BAS][i][TAUT_YES]
+                            .as_ref()
+                            .map_or(0, |a| a.n_num_removed_protons);
+                    }
+                }
+                f.n1 = k as i32;
+                f.n2 = i as i32;
+                n += 1;
+            }
+        }
+    }
+    // sort the fragments before comparing
+    let by = |a: &FragSort, b: &FragSort| comp_inchi_taut2(&a.sort, &b.sort).cmp(&0);
+    sort1.sort_by(by);
+    sort2.sort_by(by);
+    // compare fragments -- components present in the disconnected layer only
+    for i_component in 0..ndr {
+        let a = &sort1[i_component].sort;
+        let b = &sort2[i_component].sort;
+        compare_two_pairs_of_inchi(
+            [a.p_inchi[0].as_ref(), a.p_inchi[1].as_ref()],
+            [b.p_inchi[0].as_ref(), b.p_inchi[1].as_ref()],
+            &mut flags,
+        );
+    }
+    if b_has_some_fixed_h {
+        if have_sep_protons_d != 0 || have_sep_protons_r != 0 {
+            // for each component, compare the number of removed protons
+            'frag: for i_component in 0..ndr {
+                let mut iso1 = [0i16; 3];
+                let mut iso2 = [0i16; 3];
+                if sort1[i_component].sort.ord_number != sort2[i_component].sort.ord_number {
+                    flags[TAUT_YES] |= diff::MOBH_PROTONS;
+                }
+                // also compare the removed isotopic H
+                let k = sort2[i_component].n1 as usize;
+                if let Some(v) = &one_input.n_num_protons[INCHI_BAS][TAUT_YES].p_num_protons {
+                    iso2.copy_from_slice(&v[k][1..4]);
+                }
+                // removed protons info of the fragments of the restored structure
+                let k = sort1[i_component].n1 as usize;
+                let i = sort1[i_component].n2 as usize;
+                let i_inchi = INCHI_REC;
+                let i_mobile_h = first_mobile(i_inchi);
+                let Some(b_mobile_h) = pick_layer(one_input, i_inchi, i_mobile_h, k) else {
+                    if iso1 != iso2 {
+                        flags[TAUT_YES] |= diff::REM_ISO_H;
+                    }
+                    continue 'frag;
+                };
+                if one_input.p_inp_inchi[i_inchi][b_mobile_h][k].n_link != 0 {
+                    continue;
+                }
+                let ps1 = &p_struct[i_inchi][b_mobile_h][k];
+                let num_fragments = ps1.rev_inchi.num_components[INCHI_BAS].max(0) as usize;
+                let if_mobile_h = if b_has_some_fixed_h {
+                    TAUT_NON
+                } else {
+                    TAUT_YES
+                };
+                if i < num_fragments
+                    && (ps1.rev_inchi_component_exists(INCHI_BAS, if_mobile_h, i)
+                        || ps1.rev_inchi_component_exists(INCHI_BAS, TAUT_YES, i))
+                    && let Some(a) = ps1.rev_inchi.p_inchi_aux[INCHI_BAS][i][TAUT_YES].as_ref()
+                {
+                    iso1 = a.n_num_removed_isotopic_h;
+                }
+                if iso1 != iso2 {
+                    flags[TAUT_YES] |= diff::REM_ISO_H;
+                }
+            }
+        }
+    } else {
+        // compare the totals of removed protons and isotopic H
+        let np = &one_input.n_num_protons[INCHI_BAS][TAUT_YES];
+        if i32::from(np.n_num_removed_protons) != rem_r.n_num_removed_protons {
+            flags[TAUT_YES] |= diff::MOBH_PROTONS;
+        }
+        if (0..3)
+            .any(|m| i32::from(np.n_num_removed_isotopic_h[m]) != rem_r.n_num_removed_isotopic_h[m])
+        {
+            flags[TAUT_YES] |= diff::REM_ISO_H;
+        }
+    }
+    if (num_non_taut1 == 0) != (num_non_taut2 == 0) {
+        if num_non_taut1 != 0 {
+            // the restored structure has Fixed-H while the original has not
+            flags[TAUT_YES] |= diff::WRONG_TAUT;
+        } else {
+            // the original InChI has Fixed-H while the restored one has not
+            flags[TAUT_YES] |= diff::NO_TAUT;
+        }
+    }
+    for i in 0..2 {
+        one_input.compare_inchi_flags[1][i] |= flags[i];
+    }
+    // (the totals of the removed protons are compared after the flags have
+    // been stored, so the bits set here are not reported, as in C)
+    let _ = rem_d;
+    0
+}

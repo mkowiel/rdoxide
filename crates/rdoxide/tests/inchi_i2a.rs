@@ -11,7 +11,7 @@ use rdoxide::external::inchi::ichiread::*;
 use rdoxide::external::inchi::ichirvr2::StrFromInChI;
 use rdoxide::external::inchi::ichirvr7::{
     add_proton_and_iso_h_balance_to_mob_h_struct, all_inchi_to_structure,
-    compare_all_orig_inchi_to_rev_inchi,
+    compare_all_disconnected_orig_inchi_to_rev_inchi, compare_all_orig_inchi_to_rev_inchi,
 };
 use rdoxide::external::inchi::ichirvrs::set_up_srm;
 use rdoxide::external::inchi::runichi3::StructData;
@@ -147,6 +147,13 @@ fn restore_simple_inchi() {
         if d.compare_inchi_flags[0] != [0, 0] {
             bad.push(format!("{s}: compare flags {:?}", d.compare_inchi_flags[0]));
         }
+        // no reconnected layer: nothing to compare
+        assert_eq!(
+            compare_all_disconnected_orig_inchi_to_rev_inchi(&ps, &mut d, false),
+            0,
+            "{s}"
+        );
+        assert_eq!(d.compare_inchi_flags[1], [0, 0], "{s}");
         let comp = &ps[0][1][0];
         eprintln!(
             "{s}: errors {ne}, n_error {}, atoms {}, at2 {}, rev {}",
