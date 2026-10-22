@@ -4933,3 +4933,195 @@ pub fn alloc_bfs_queue(pq: &mut BfsQ, num_at: i32, min_ring_size: i32) -> i32 {
         }
     }
 }
+
+/// `MakeOneInChIOutOfStrFromINChI`: normalizes the structure `at2` restored
+/// from the InChI component and creates the InChI of it; the results are
+/// stored in `ps` (`p_one_inchi`, `p_one_inchi_aux`, `p_one_norm_data`,
+/// `one_ti`, ...). `at3` is the work copy of the structure.
+pub fn make_one_inchi_out_of_str_from_inchi(
+    ip: &super::ichiparm::InputParms,
+    ps: &mut super::ichirvr2::StrFromInChI,
+    at2: &[InpAtom],
+    at3: &mut Vec<InpAtom>,
+    i_component: i32,
+) -> i32 {
+    use super::ichi::InChIAux;
+    use super::ichimake::{InpAtomData, create_inchi};
+    use super::ichiparm::{REQ_MODE_BASIC, REQ_MODE_ISO, REQ_MODE_TAUT, TG_FLAG_H_ALREADY_REMOVED};
+    use super::ichirvr2::{StrFromInChI, copy_st_to_at};
+    use super::runichi::create_inp_atom_data;
+    use super::runichi3::{TG_FLAG_FOUND_ISOTOPIC_ATOM_DONE, TG_FLAG_FOUND_ISOTOPIC_H_DONE};
+    use super::strutil::{
+        fix_odd_things, num_hetero_atom_has_isotopic_h, set_connected_component_number,
+    };
+    let _: Option<&StrFromInChI> = None;
+    let mut taut_flags = ip.b_taut_flags | TG_FLAG_H_ALREADY_REMOVED;
+    let mut taut_flags_done = 0u64;
+    let len_at = (ps.num_atoms + ps.num_deleted_h) as usize;
+    let num_atoms = ps.num_atoms as usize;
+    let mut cur_inchi: [Option<InChI>; 2] = [None, None];
+    let mut cur_aux: [Option<InChIAux>; 2] = [None, None];
+    let mut inp_norm_data: [InpAtomData; 2] = Default::default();
+
+    // deallocate old results
+    ps.one_ti = TGroupInfo::default();
+    ps.p_one_inchi = [None, None];
+    ps.p_one_inchi_aux = [None, None];
+    ps.p_one_norm_data = [None, None];
+
+    at3.clear();
+    at3.extend_from_slice(&at2[..len_at]);
+    incr_zero_bonds_and_clear_endpts(at3, num_atoms, i_component + 1);
+    copy_st_to_at(at3, ps.st.as_deref(), num_atoms);
+    super::ichister::fix_unkn_0d_stereo_bonds(&mut at3[..num_atoms]);
+    let ret = super::ichister::reconcile_all_cml_bond_parities(&mut at3[..num_atoms], false);
+    if ret < 0 {
+        return ret;
+    }
+    fix_odd_things(&mut at3[..num_atoms], true, ip.b_fix_non_uniform_draw != 0);
+
+    taut_flags_done &= !(TG_FLAG_FOUND_ISOTOPIC_H_DONE | TG_FLAG_FOUND_ISOTOPIC_ATOM_DONE);
+    let iso = num_hetero_atom_has_isotopic_h(&at3[..num_atoms]);
+    if iso & 1 != 0 {
+        taut_flags_done |= TG_FLAG_FOUND_ISOTOPIC_H_DONE;
+    }
+    if iso & 2 != 0 {
+        taut_flags_done |= TG_FLAG_FOUND_ISOTOPIC_ATOM_DONE;
+    }
+
+    let removed_h = ps.num_deleted_h;
+    let mut num_bonds = 0;
+    let mut num_isotopic = 0;
+    for k in 0..2usize {
+        if ps.b_mobile_h == 0 || k as i32 == ps.b_mobile_h {
+            let mut alloc_mode = if k == 1 { REQ_MODE_TAUT } else { 0 };
+            if taut_flags_done & (TG_FLAG_FOUND_ISOTOPIC_H_DONE | TG_FLAG_FOUND_ISOTOPIC_ATOM_DONE)
+                != 0
+            {
+                alloc_mode |= ip.n_mode & REQ_MODE_ISO;
+            }
+            if (k == 0 && ip.n_mode & REQ_MODE_BASIC != 0)
+                || (k == 1 && ip.n_mode & REQ_MODE_TAUT != 0)
+            {
+                if let Some((p, nb, ni)) = super::strutil::alloc_inchi(at3, num_atoms, alloc_mode) {
+                    num_bonds = nb;
+                    num_isotopic = ni;
+                    cur_inchi[k] = Some(p);
+                }
+                cur_aux[k] = super::strutil::alloc_inchi_aux(num_atoms, num_isotopic, alloc_mode);
+                if let Some(a) = cur_aux[k].as_mut() {
+                    a.b_is_isotopic = num_isotopic as i32;
+                }
+                create_inp_atom_data(
+                    &mut inp_norm_data[k],
+                    num_atoms + removed_h as usize,
+                    k == 1,
+                );
+                inp_norm_data[k].num_removed_h = removed_h;
+            } else {
+                inp_norm_data[k] = InpAtomData::default();
+            }
+        } else {
+            inp_norm_data[k] = InpAtomData::default();
+        }
+    }
+    let _ = num_bonds;
+    let k = ps.b_mobile_h as usize;
+
+    let mut str_err = String::new();
+    let num_at = create_inchi(
+        &mut cur_inchi,
+        &mut cur_aux,
+        at3,
+        &mut inp_norm_data,
+        num_atoms + removed_h as usize,
+        ip.n_mode,
+        &mut taut_flags,
+        &mut taut_flags_done,
+        Some(&mut ps.one_ti),
+        &mut str_err,
+        ip,
+    );
+    set_connected_component_number(&mut at3[..num_atoms], (i_component + 1) as u16);
+
+    let mut ret = if num_at < 0 {
+        num_at
+    } else if let Some(c) = cur_inchi[k].as_ref().filter(|c| c.n_error_code != 0) {
+        c.n_error_code
+    } else if let Some(a) = cur_aux[k].as_ref().filter(|a| a.n_error_code != 0) {
+        a.n_error_code
+    } else {
+        0
+    };
+    if ret == 0 {
+        let mut b_mobile_h = ps.b_mobile_h as usize;
+        let n_non = cur_inchi[0].as_ref().map_or(0, |c| c.n_number_of_atoms);
+        let n_yes = cur_inchi[1].as_ref().map_or(0, |c| c.n_number_of_atoms);
+        if b_mobile_h == 0 && n_non == 0 && n_yes > 0 {
+            b_mobile_h = 1;
+        }
+        if let Some(c) = cur_inchi[1].as_ref() {
+            ps.n_charge_revrs = c.n_total_charge;
+        }
+        ps.p_one_inchi[0] = cur_inchi[b_mobile_h].take();
+        ps.p_one_inchi_aux[0] = cur_aux[b_mobile_h].take();
+        ps.n_one_inchi_b_mobile_h = b_mobile_h as i32;
+        ps.n_num_removed_protons = if ps.i_mobile_h == 1 {
+            ps.one_ti.tni.n_num_removed_protons
+        } else {
+            0
+        };
+
+        // set correct t-group numbers to endpoints
+        if ps.one_ti.num_t_groups > 0
+            && ps.one_ti.t_group.is_some()
+            && !ps.one_ti.n_endpoint_atom_number.is_empty()
+        {
+            let num_at_norm = inp_norm_data[1].num_at.max(0) as usize;
+            for a in inp_norm_data[1].at.iter_mut().take(num_at_norm) {
+                a.endpoint = 0;
+            }
+            let ti = &mut ps.one_ti;
+            let groups = ti.t_group.as_mut().unwrap();
+            for g in groups.iter_mut().take(ti.num_t_groups) {
+                let first = g.n_first_endpoint_at_no_pos as usize;
+                g.num[0] += g.num[1];
+                for kk in first..first + g.n_num_endpoints as usize {
+                    let at_no = ti.n_endpoint_atom_number[kk] as usize;
+                    inp_norm_data[1].at[at_no].endpoint = g.n_group_number;
+                }
+            }
+        }
+        ps.p_one_norm_data[0] = Some(std::mem::take(&mut inp_norm_data[b_mobile_h]));
+        if b_mobile_h == 0
+            && cur_inchi[1]
+                .as_ref()
+                .is_some_and(|c| c.n_number_of_atoms > 0)
+        {
+            ps.p_one_inchi[1] = cur_inchi[1].take();
+            ps.p_one_inchi_aux[1] = cur_aux[1].take();
+            ps.p_one_norm_data[1] = Some(std::mem::take(&mut inp_norm_data[1]));
+        }
+        ret = 0;
+    }
+    ret
+}
+
+/// `MakeOneInChIOutOfStrFromINChI2`: creates the structure from the BNS and
+/// then its InChI (see `make_one_inchi_out_of_str_from_inchi`)
+#[allow(clippy::too_many_arguments)]
+pub fn make_one_inchi_out_of_str_from_inchi2(
+    ip: &super::ichiparm::InputParms,
+    bns: &BnStruct,
+    ps: &mut super::ichirvr2::StrFromInChI,
+    at2: &mut Vec<InpAtom>,
+    at3: &mut Vec<InpAtom>,
+    p_va: &[ValAt],
+    tcg: &AllTcGroups,
+) -> i32 {
+    let r = super::ichirvr2::refresh_at2(ps, at2, bns, p_va, tcg);
+    if r < 0 {
+        return r;
+    }
+    make_one_inchi_out_of_str_from_inchi(ip, ps, at2, at3, tcg.i_component)
+}

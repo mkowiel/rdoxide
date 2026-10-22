@@ -99,6 +99,14 @@ pub struct StrFromInChI {
     pub p_one_inchi: [Option<InChI>; 2],
     /// `pOne_norm_data`: normalized restored structure
     pub p_one_norm_data: [Option<super::ichimake::InpAtomData>; 2],
+    /// `pOneINChI_Aux`
+    pub p_one_inchi_aux: [Option<super::ichi::InChIAux>; 2],
+    /// `nOneINChI_bMobileH`
+    pub n_one_inchi_b_mobile_h: i32,
+    /// `nNumRemovedProtons`
+    pub n_num_removed_protons: i32,
+    /// `nChargeRevrs`
+    pub n_charge_revrs: i32,
     /// `nAtno2Canon`
     pub n_atno2canon: [Vec<u16>; 2],
     /// `nCanon2Atno`
