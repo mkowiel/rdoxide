@@ -1092,6 +1092,35 @@ fn restoration_helpers_match_c() {
                                                     ps.srm.b_metal_add_flower
                                                 ));
                                                 ps.i_inchi_rec = 0;
+                                                for i in 0..n {
+                                                    if ps.at[i].valence == 3 {
+                                                        ps.at[i].sb_parity[0] = 1;
+                                                        ps.at[i].sb_parity[1] = 1;
+                                                        ps.at[i].sb_parity[2] = 0;
+                                                        ps.at[i].sb_ord[0] =
+                                                            if i % 3 == 1 { 1 } else { 0 };
+                                                        ps.at[i].sb_ord[1] =
+                                                            if i % 3 == 0 { 1 } else { 2 };
+                                                    }
+                                                }
+                                                let rcr = r4::check_and_refix_stereobonds(
+                                                    &mut b, &mut bd, &mut ps, &mut a2, &va, &g,
+                                                    &mut nr, &mut td, 4,
+                                                );
+                                                got.push(format!(
+                                                    "CR {rcr} {nr} {td} {} {} {}",
+                                                    b.tot_st_cap,
+                                                    b.tot_st_flow,
+                                                    sum(&b)
+                                                ));
+                                                for i in 0..n {
+                                                    if ps.at[i].valence == 3 {
+                                                        ps.at[i].sb_parity[0] = 0;
+                                                        ps.at[i].sb_parity[1] = 0;
+                                                        ps.at[i].sb_ord[0] = 0;
+                                                        ps.at[i].sb_ord[1] = 0;
+                                                    }
+                                                }
                                                 ps.fixed_h = None;
                                                 ps.i_mobile_h = 0;
                                                 ps.charge = 0;

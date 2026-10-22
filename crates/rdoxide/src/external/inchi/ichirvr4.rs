@@ -4,13 +4,18 @@
 //! Copyright (c) 2024 IUPAC and InChI Trust.
 //! Licensed under the MIT license (see LICENSES/InChI-MIT.txt).
 
-use super::ichi_bns::{BNS_EDGE_FORBIDDEN_TEST, BnData, BnStruct, NO_VERTEX, set_forbidden_edges};
+use super::ichi::InChI;
+use super::ichi_bns::{
+    BNS_EDGE_FORBIDDEN_MASK, BNS_EDGE_FORBIDDEN_TEST, BnData, BnStruct, NO_VERTEX,
+    set_forbidden_edges,
+};
 use super::ichimake::Icr;
 use super::ichiread::RI_ERR_PROGR;
 use super::ichirvr1::{
     BnsTestResult, CN_BITS_MNP, CN_LIST, EdgeList, add_to_edge_list, alloc_edge_list,
-    get_charge_flower_upper_edge, is_bns_vt_c_gr, remove_forbidden_bond_flow_bits,
-    remove_forbidden_edge_mask, run_bns_restore_once, run_bns_test_once, set_forbidden_edge_mask,
+    get_charge_flower_upper_edge, get_tgroup_info_from_inchi, is_bns_vt_c_gr,
+    remove_forbidden_bond_flow_bits, remove_forbidden_edge_mask, run_bns_restore_once,
+    run_bns_test_once, set_forbidden_edge_mask,
 };
 use super::ichirvr2::{StrFromInChI, refresh_at2};
 use super::ichirvr5::get_plus_minus_vertex;
@@ -1041,6 +1046,155 @@ pub fn salt_bonds_to_coord_bonds(
                 remove_forbidden_edge_mask(bns, &all_charge, forbidden_edge_mask);
             }
         }
+    }
+    ret
+}
+
+/// `FillOutExtraFixedHDataInChI`: allocates and fills the endpoint and
+/// fixed-H data of the Fixed-H structure from the input InChI (`p_inchi[0]`
+/// is the Fixed-H and `p_inchi[1]` the Mobile-H InChI of the component)
+pub fn fill_out_extra_fixed_h_data_inchi(
+    ps: &mut StrFromInChI,
+    p_inchi: [Option<&InChI>; 2],
+) -> i32 {
+    let n = ps.num_atoms as usize;
+    ps.endpoint = Some(vec![0; n]);
+    let fixed = ps.fixed_h.get_or_insert_with(|| vec![0; n]);
+    fixed.resize(n, 0);
+    get_tgroup_info_from_inchi(&mut ps.ti, None, ps.endpoint.as_deref_mut(), p_inchi[1]);
+    match p_inchi[0].and_then(|c| c.n_num_h_fixed.as_ref()) {
+        Some(src) => {
+            for (d, s) in fixed.iter_mut().zip(src.iter()) {
+                *d = *s;
+            }
+        }
+        None => fixed.fill(0),
+    }
+    0
+}
+
+/// `CheckAndRefixStereobonds`: finds A=X< where all bonds to X except A=X
+/// are marked as stereogenic; temporarily allows the stereobonds to change
+/// and makes the A=X bonds single
+#[allow(clippy::too_many_arguments)]
+pub fn check_and_refix_stereobonds(
+    bns: &mut BnStruct,
+    bd: &mut BnData,
+    ps: &mut StrFromInChI,
+    at2: &mut Vec<InpAtom>,
+    p_va: &[ValAt],
+    tcg: &AllTcGroups,
+    num_run_bns: &mut i32,
+    total_delta: &mut i32,
+    forbidden_edge_mask: i32,
+) -> i32 {
+    let stereo = i32::from(BNS_EDGE_FORBIDDEN_MASK);
+    let num_at = ps.num_atoms as usize;
+    let mask = forbidden_edge_mask as i8;
+    let r2 = refresh_at2(ps, at2, bns, p_va, tcg);
+    if r2 < 0 {
+        return 0;
+    }
+    // the atom has an A=X< double bond and exactly two stereo bonds
+    let wrong = |a: &InpAtom| -> Option<(usize, usize)> {
+        let (j1, j2) = (a.sb_ord[0] as usize, a.sb_ord[1] as usize);
+        (a.valence == 3
+            && i32::from(a.chem_bonds_valence) - i32::from(a.valence) == 1
+            && a.sb_parity[0] != 0
+            && a.sb_parity[1] != 0
+            && a.sb_parity[2] == 0
+            && j1 < a.bond_type.len()
+            && j2 < a.bond_type.len()
+            && (i32::from(a.bond_type[j1]) & BOND_TYPE_MASK) == BOND_TYPE_SINGLE
+            && (i32::from(a.bond_type[j2]) & BOND_TYPE_MASK) == BOND_TYPE_SINGLE
+            && j1 != j2)
+            .then_some((j1, j2))
+    };
+    let num_wrong = at2[..num_at].iter().filter(|a| wrong(a).is_some()).count() as i32;
+    if num_wrong == 0 {
+        return 0;
+    }
+    let num_fixed = bns.edge[..bns.num_bonds as usize]
+        .iter()
+        .filter(|e| i32::from(e.forbidden) & stereo != 0)
+        .count() as i32;
+    let mut carbon = EdgeList::default();
+    let mut fixed = EdgeList::default();
+    let mut wrong_edges = EdgeList::default();
+    let mut ret;
+    'body: {
+        ret = forbid_carbon_charge_edges(bns, tcg, &mut carbon, forbidden_edge_mask);
+        if ret < 0 {
+            break 'body;
+        }
+        ret = alloc_edge_list(&mut fixed, num_fixed);
+        if ret == 0 {
+            ret = alloc_edge_list(&mut wrong_edges, num_wrong);
+        }
+        if ret != 0 {
+            break 'body;
+        }
+        let mut i = 0;
+        while i < num_at && wrong_edges.num_edges < num_wrong {
+            if let Some((j1, j2)) = wrong(&at2[i]) {
+                let k = match j1 + j2 {
+                    1 => 2,
+                    2 => 1,
+                    3 => 0,
+                    _ => {
+                        ret = RI_ERR_PROGR;
+                        break 'body;
+                    }
+                };
+                let ne = bns.iedge[bns.vert[i].iedge + k];
+                let pe = ne as usize;
+                let v1 = bns.edge[pe].neighbor1 as usize;
+                let v2 = (bns.edge[pe].neighbor12 as usize) ^ v1;
+                if bns.edge[pe].flow == 0 {
+                    ret = RI_ERR_PROGR;
+                    break 'body;
+                }
+                bns.edge[pe].flow -= 1;
+                bns.edge[pe].forbidden |= mask;
+                bns.vert[v1].st_edge.flow -= 1;
+                bns.vert[v2].st_edge.flow -= 1;
+                bns.tot_st_flow -= 2;
+                ret = add_to_edge_list(&mut wrong_edges, ne, 0);
+                if ret != 0 {
+                    break 'body;
+                }
+            }
+            i += 1;
+        }
+        let mut i = 0;
+        while i < bns.num_bonds as usize && fixed.num_edges < num_fixed {
+            if i32::from(bns.edge[i].forbidden) & stereo != 0 {
+                bns.edge[i].forbidden &= !(stereo as i8);
+                fixed.pn_edges[fixed.num_edges as usize] = i as i32;
+                fixed.num_edges += 1;
+            }
+            i += 1;
+        }
+        let ret_bns = run_bns_restore_once(bns, bd);
+        *num_run_bns += 1;
+        if ret_bns < 0 {
+            break 'body;
+        }
+        if ret_bns > 0 {
+            *total_delta += ret_bns;
+        }
+        remove_forbidden_edge_mask(bns, &wrong_edges, forbidden_edge_mask);
+        remove_forbidden_edge_mask(bns, &carbon, forbidden_edge_mask);
+        set_forbidden_edge_mask(bns, &fixed, stereo);
+        let ret2 = run_bns_restore_once(bns, bd);
+        *num_run_bns += 1;
+        if ret2 < 0 {
+            break 'body;
+        }
+        if ret2 > 0 {
+            *total_delta += ret_bns;
+        }
+        ret = ret_bns;
     }
     ret
 }
