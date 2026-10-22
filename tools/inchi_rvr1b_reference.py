@@ -132,7 +132,7 @@ int main(void) {
                     else {
                         int r3 = AddTGroups2TCGBnStruct(b, &st, va, &g, xe);
                         printf("T %d\n", r3);
-                        int r4 = r3 < 0 ? 0 : AddCGroups2TCGBnStruct(b, &st, va, &g, xe);
+                        int r4 = r3 < 0 ? -1 : AddCGroups2TCGBnStruct(b, &st, va, &g, xe);
                         printf("Q %d %d\n", r4, nch);
                         printf("N %d %d %d %d %d %d %d %d %d %d %d\n", b->num_atoms, b->num_added_atoms, b->num_c_groups, b->num_t_groups, b->num_vertices, b->num_bonds, b->num_edges,
                                b->max_vertices, b->max_edges, b->max_iedges, b->tot_st_cap * 1000 + b->tot_st_flow);
@@ -211,6 +211,13 @@ int main(void) {
                                 int rec = EliminateChargeSeparationOnHeteroatoms(b, bd, &s3, at, a2, va, &g, &nr, &td, 4, (n & 1) ? 8 : 0);
                                 printf("EC %d %d %d %d %d\n", rec, nr, td, b->tot_st_cap, b->tot_st_flow);
                                 for (int i = 0; i < b->num_edges; i++) printf("j%d %d %d\n", i, b->edge[i].flow, b->edge[i].forbidden);
+                                nr = 0; td = 0;
+                                int rcy = RestoreCyanoGroup(b, bd, &s3, at, a2, va, &g, &nr, &td, 4);
+                                printf("CY %d %d %d %d %d\n", rcy, nr, td, b->tot_st_cap, b->tot_st_flow);
+                                for (int i = 0; i < b->num_edges; i++) printf("k%d %d %d\n", i, b->edge[i].flow, b->edge[i].forbidden);
+                                int ric = RestoreIsoCyanoGroup(b, bd, &s3, at, a2, va, &g, &nr, &td, 4);
+                                printf("IC %d %d %d %d %d\n", ric, nr, td, b->tot_st_cap, b->tot_st_flow);
+                                for (int i = 0; i < b->num_edges; i++) printf("l%d %d %d\n", i, b->edge[i].flow, b->edge[i].forbidden);
                             }
                             for (int i = 0; i < n; i++) at[i].bond_type[0] = 0;
                             IncrZeroBondsAndClearEndpts(at, n, 5);
@@ -452,10 +459,21 @@ def tmpl_case():
     return " ".join(parts)
 
 
+def cyano_case():
+    # N(-)=C=X with the N charge structure "MN" (cnList index 14)
+    x = R.choice([8, 8, 16, 7])
+    srm = [1, 0, 1, 1, 1, 1, 0, 16, 0]
+    parts = ["40 " + f"{R.choice([0, 2])} {R.choice([0, 1])} {R.choice([0, -1])} " + " ".join(map(str, srm)) + f" 3 0 {R.choice([-1, 0])}"]
+    parts.append(f"7 0 2 0 1 1 2 0 0 0 0 0 {R.choice([14, 14, 4, 0])} 0")
+    parts.append("6 0 4 0 2 0 2 2 2 0 0 0 0 0 0 0")
+    parts.append(f"{x} 0 2 0 1 1 2 0 0 0 0 0 0 0")
+    return " ".join(parts)
+
+
 def main():
     cases = []
-    for _ in range(3500):
-        cases += [atom_case(), cc_case(), tcg_case(), el_case(), bns_case(), bns_case(), pipe_case(), pipe_case(), pipe_case(), h_case(), h_case(), star_case(), tmpl_case(), tmpl_case()]
+    for _ in range(3000):
+        cases += [atom_case(), cc_case(), tcg_case(), el_case(), bns_case(), bns_case(), pipe_case(), pipe_case(), pipe_case(), h_case(), h_case(), star_case(), tmpl_case(), tmpl_case(), cyano_case(), cyano_case()]
     objs = ma.build_lib()
     with tempfile.TemporaryDirectory() as d:
         (Path(d) / "h.c").write_text(HARNESS)

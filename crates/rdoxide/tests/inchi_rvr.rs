@@ -487,7 +487,7 @@ fn restoration_helpers_match_c() {
                                 );
                                 got.push(format!("T {r3}"));
                                 let r4 = if r3 < 0 {
-                                    0
+                                    -1
                                 } else {
                                     add_cgroups_to_tcg_bn_struct(
                                         &mut b, &at, n, &s, &mut va, &mut g, xe,
@@ -785,6 +785,34 @@ fn restoration_helpers_match_c() {
                                         for i in 0..b.num_edges as usize {
                                             got.push(format!(
                                                 "j{i} {} {}",
+                                                b.edge[i].flow, b.edge[i].forbidden
+                                            ));
+                                        }
+                                        nr = 0;
+                                        td = 0;
+                                        let rcy =
+                                            rdoxide::external::inchi::ichirvr2::restore_cyano_group(
+                                                &mut b, &mut bd, &mut ps, &mut a2, &va, &g,
+                                                &mut nr, &mut td, 4,
+                                            );
+                                        got.push(format!(
+                                            "CY {rcy} {nr} {td} {} {}",
+                                            b.tot_st_cap, b.tot_st_flow
+                                        ));
+                                        for i in 0..b.num_edges as usize {
+                                            got.push(format!(
+                                                "k{i} {} {}",
+                                                b.edge[i].flow, b.edge[i].forbidden
+                                            ));
+                                        }
+                                        let ric = rdoxide::external::inchi::ichirvr2::restore_iso_cyano_group(&mut b, &mut bd, &mut ps, &mut a2, &va, &g, &mut nr, &mut td, 4);
+                                        got.push(format!(
+                                            "IC {ric} {nr} {td} {} {}",
+                                            b.tot_st_cap, b.tot_st_flow
+                                        ));
+                                        for i in 0..b.num_edges as usize {
+                                            got.push(format!(
+                                                "l{i} {} {}",
                                                 b.edge[i].flow, b.edge[i].forbidden
                                             ));
                                         }
