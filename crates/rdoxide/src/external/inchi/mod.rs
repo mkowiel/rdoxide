@@ -39,6 +39,7 @@ pub mod ichiread;
 pub mod ichiring;
 pub mod ichirvr1;
 pub mod ichirvr2;
+pub mod ichirvr3;
 pub mod ichirvr4;
 pub mod ichirvr5;
 pub mod ichirvrs;
