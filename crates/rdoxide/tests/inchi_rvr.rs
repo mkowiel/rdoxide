@@ -360,12 +360,13 @@ fn restoration_helpers_match_c() {
                     ));
                 }
             }
-            34 | 40 => {
-                let (xa, xe, coa) = if t[0] == 40 {
+            34 | 40 | 41 => {
+                let (xa, xe, coa) = if t[0] >= 40 {
                     (next(), next(), next())
                 } else {
                     (0, 0, 0)
                 };
+                let fsel = if t[0] == 41 { next() } else { 0 };
                 let s = Srm {
                     b_metal_add_flower: next(),
                     n_metal_min_bond_order: next(),
@@ -417,6 +418,13 @@ fn restoration_helpers_match_c() {
                     va[i].c_init_free_valences = next() as i8;
                     va[i].c_cn_list_index = next() as i8;
                     va[i].c_periodic_number = at[i].el_number;
+                    if t[0] == 41 {
+                        let mut row = 0;
+                        va[i].c_num_valence_electrons =
+                            get_sp_element_type(i32::from(at[i].el_number), &mut row) as i8;
+                        va[i].c_periodic_row_number = row as i8;
+                        va[i].c_num_valence_electrons -= 1;
+                    }
                     next();
                 }
                 let mut g = AllTcGroups {
@@ -470,7 +478,7 @@ fn restoration_helpers_match_c() {
                         let x = &g.p_tcg[i];
                         got.push(format!("u{i} {} {} {}", x.type_, x.ord_num, x.num_edges));
                     }
-                    if t[0] == 40 && r2 >= 0 {
+                    if t[0] >= 40 && r2 >= 0 {
                         match allocate_and_init_tcg_bn_struct(&mut at, n, &s, &va, &g, xa, xe, 1) {
                             None => got.push("NULL".into()),
                             Some((mut b, nch)) => {
@@ -567,6 +575,25 @@ fn restoration_helpers_match_c() {
                                     "Y {} {} {} {}",
                                     g.n_edge_plus, g.n_edge_minus, g.n_edge4charge, g.added_charge
                                 ));
+                                if r4 >= 0 && t[0] == 41 {
+                                    for j in 0..(at[0].valence as usize).min(4) {
+                                        if fsel >> j & 1 != 0 {
+                                            let ie = b.iedge[b.vert[0].iedge + j] as usize;
+                                            b.edge[ie].forbidden |= 4;
+                                        }
+                                    }
+                                    let nc = rdoxide::external::inchi::ichirvr2::adjust_tgroups_to_forbidden_edges2(&mut b, &at, &va, n, 4);
+                                    got.push(format!("A {nc} {} {}", b.tot_st_cap, b.tot_st_flow));
+                                    for i in 0..b.num_edges as usize {
+                                        got.push(format!(
+                                            "p{i} {} {}",
+                                            b.edge[i].flow, b.edge[i].forbidden
+                                        ));
+                                    }
+                                    for i in 0..b.num_vertices as usize {
+                                        got.push(format!("q{i} {}", b.vert[i].st_edge.flow));
+                                    }
+                                }
                                 if r4 >= 0 {
                                     for i in 0..b.num_edges {
                                         got.push(format!(

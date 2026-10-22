@@ -16,7 +16,9 @@ use super::ichi_bns::{
 use super::ichiread::{RI_ERR_PROGR, RI_ERR_SYNTAX};
 use super::ichirvr1::CN_LIST;
 use super::ichirvr1::{
-    bond_flow_maxcap_minorder, comp_cc_cand, get_tgroup_info_from_inchi, run_bns_restore_once,
+    EL_TYPE_C, EL_TYPE_MASK, EL_TYPE_N, EL_TYPE_O, EL_TYPE_OST, EL_TYPE_P, EL_TYPE_PT, EL_TYPE_S,
+    bond_flow_maxcap_minorder, comp_cc_cand, get_pva_atom_type, get_tgroup_info_from_inchi,
+    run_bns_restore_once,
 };
 use super::ichirvrs::{
     AllTcGroups, BNS_VT_C_POS, CN_BITS_SHIFT, CcCand, Srm, TGRF_MINUS_FIRST, ValAt,
@@ -28,12 +30,18 @@ use super::ichister::{
     b_can_atom_be_terminal_allene,
 };
 use super::ichitaut::TGroupInfo;
+use super::ichitaut::is_centerpoint_elem;
 use super::incomdef::RADICAL_SINGLET;
 use super::incomdef::{
     BOND_TYPE_ALTERN, BOND_TYPE_DOUBLE, BOND_TYPE_SINGLE, BOND_TYPE_TRIPLE, NUM_H_ISOTOPES,
 };
-use super::inpdef::{InpAtom, MAX_NUM_STEREO_ATOM_NEIGH, MAX_NUM_STEREO_BONDS};
-use super::util::{EL_NUMBER_H, get_element_chemical_symbol};
+use super::inpdef::{
+    BOND_TYPE_MASK, InpAtom, MAX_NUM_STEREO_ATOM_NEIGH, MAX_NUM_STEREO_BONDS, MAXVAL,
+};
+use super::util::{
+    EL_NUMBER_H, get_el_valence, get_element_chemical_symbol, get_endpoint_valence, is_el_a_metal,
+    n_no_metal_bonds_valence, n_no_metal_num_bonds,
+};
 
 /// `BOND_TYPE_STEREO`: `BOND_TYPE_SINGLE | BOND_MARK_STEREO`
 pub const BOND_TYPE_STEREO: i32 = BOND_TYPE_SINGLE | 0x10;
@@ -1389,4 +1397,921 @@ pub fn move_rad_to_atoms_add_charges(
         }
     }
     0
+}
+
+#[derive(Clone, Copy, Default)]
+#[allow(dead_code)]
+struct MobileGr {
+    group_number: u16,
+    atom_number: usize,
+    atom_type_pva: i32,
+    ineigh: usize,
+    bond_type: i32,
+    forbidden: i32,
+    endpoint_valence: i32,
+    num_bonds: i32,
+    bonds_valence: i32,
+    num_bonds_non_metal: i32,
+    bonds_valence_non_metal: i32,
+}
+
+#[derive(Clone, Copy, Default)]
+struct MGroups {
+    group_number: u16,
+    num: i32,
+}
+
+/// the edge to the t-group of an endpoint (`nTautGroupEdge - 1`); the C code
+/// reads before the edge array when the atom has none, here that case is skipped
+fn taut_edge(p_va: &[ValAt], atom: usize) -> Option<usize> {
+    let e = p_va[atom].n_taut_group_edge;
+    (e > 0).then(|| e as usize - 1)
+}
+
+/// `AdjustTgroupsToForbiddenEdges2`: the cases of the InChI Technical
+/// Manual, Table 5; returns the number of changes
+pub fn adjust_tgroups_to_forbidden_edges2(
+    bns: &mut BnStruct,
+    at: &[InpAtom],
+    p_va: &[ValAt],
+    num_atoms: usize,
+    forbidden_mask: i32,
+) -> i32 {
+    let inv_mask = !forbidden_mask;
+    let mut num_changes = 0;
+    // the edge `j` of the vertex `v`
+    fn ei(b: &BnStruct, v: usize, j: usize) -> usize {
+        b.iedge[b.vert[v].iedge + j] as usize
+    }
+    fn other(b: &BnStruct, e: usize, v: usize) -> usize {
+        b.edge[e].neighbor12 as usize ^ v
+    }
+    'atoms: for i in 0..num_atoms {
+        let a = &at[i];
+        let val0 = get_el_valence(i32::from(a.el_number), 0, 0);
+        let center_type = get_pva_atom_type(p_va, at, i, 0);
+        if a.chem_bonds_valence == a.valence
+            || a.num_h != 0
+            || a.endpoint != 0
+            || a.charge != 0
+            || a.radical != 0
+            || !is_centerpoint_elem(a.el_number)
+            || center_type == 0
+        {
+            continue;
+        }
+        let delta_val = i32::from(a.chem_bonds_valence) - val0;
+        if 2 > delta_val {
+            continue;
+        }
+        let bonds_valence_non_metal = n_no_metal_bonds_valence(at, i);
+        let delta_met = bonds_valence_non_metal - val0;
+        if 2 > delta_met {
+            continue;
+        }
+        let (
+            mut num_donors,
+            mut num_acceptors,
+            mut num_donor_endpoints,
+            mut num_acceptor_endpoints,
+        ) = (0, 0, 0, 0);
+        let (mut num_mgroups, mut num_diff_t_groups) = (0usize, 0);
+        let mut mgr: Vec<MobileGr> = Vec::new();
+        let mut mgs = [MGroups::default(); MAXVAL];
+        let (mut has_mobile_h, mut num_eql, mut num_dif, mut tg_number) = (0, 0, 0, 0u16);
+        let mut ind_forbidden: isize = -1;
+        let mut num_forbidden = 0;
+        let (mut num_n, mut num_o, mut num_p, mut num_s, mut num_ost) = (0, 0, 0, 0, 0);
+        let num_bonds_non_metal = n_no_metal_num_bonds(at, i);
+
+        for j in 0..a.valence as usize {
+            let neigh = a.neighbor[j] as usize;
+            let val = get_endpoint_valence(at[neigh].el_number);
+            let forbidden = i32::from(bns.edge[ei(bns, i, j)].forbidden);
+            let bond_type = i32::from(a.bond_type[j]) & BOND_TYPE_MASK;
+            let neigh_type = get_pva_atom_type(p_va, at, neigh, bond_type);
+            if forbidden == 0 && at[neigh].endpoint == 0 {
+                if is_el_a_metal(i32::from(at[neigh].el_number)) {
+                    continue;
+                }
+                match bond_type {
+                    BOND_TYPE_SINGLE => {
+                        if at[neigh].num_h == 0 && at[neigh].charge != -1 {
+                            continue;
+                        }
+                    }
+                    BOND_TYPE_DOUBLE => {
+                        if neigh_type == 0 {
+                            continue;
+                        }
+                    }
+                    _ => continue,
+                }
+            }
+            mgr.push(MobileGr {
+                atom_number: neigh,
+                ineigh: j,
+                bond_type,
+                group_number: at[neigh].endpoint,
+                endpoint_valence: val,
+                forbidden,
+                atom_type_pva: neigh_type,
+                num_bonds: i32::from(at[neigh].valence),
+                bonds_valence: i32::from(at[neigh].chem_bonds_valence),
+                num_bonds_non_metal: n_no_metal_num_bonds(at, neigh),
+                bonds_valence_non_metal: n_no_metal_bonds_valence(at, neigh),
+            });
+            if forbidden & forbidden_mask != 0 {
+                num_forbidden += 1;
+                ind_forbidden = mgr.len() as isize - 1;
+            }
+            let nb = &at[neigh];
+            num_o += i32::from(neigh_type & EL_TYPE_O != 0 && nb.valence == 1);
+            num_n += i32::from(
+                neigh_type & EL_TYPE_N != 0 && !(nb.valence == 3 && nb.chem_bonds_valence == 3),
+            );
+            num_s += i32::from(neigh_type & EL_TYPE_S != 0 && nb.valence == 1);
+            num_p += i32::from(
+                neigh_type & EL_TYPE_P != 0 && !(nb.valence == 3 && nb.chem_bonds_valence == 3),
+            );
+            num_ost += i32::from(neigh_type & EL_TYPE_OST != 0);
+            num_acceptors +=
+                i32::from(bond_type == BOND_TYPE_DOUBLE && neigh_type & EL_TYPE_PT != 0);
+            num_donors += i32::from(
+                bond_type == BOND_TYPE_SINGLE
+                    && neigh_type & EL_TYPE_PT != 0
+                    && (nb.num_h != 0 || nb.charge == -1 || nb.endpoint != 0),
+            );
+            if nb.endpoint != 0 {
+                num_acceptor_endpoints += i32::from(bond_type == BOND_TYPE_DOUBLE);
+                num_donor_endpoints += i32::from(bond_type == BOND_TYPE_SINGLE);
+                if tg_number == 0 {
+                    tg_number = nb.endpoint;
+                    num_eql = 1;
+                } else if tg_number == nb.endpoint {
+                    num_eql += 1;
+                } else {
+                    num_dif += 1;
+                }
+            } else if bond_type == BOND_TYPE_SINGLE && val != 0 {
+                has_mobile_h |= i32::from(nb.num_h != 0);
+            }
+            if nb.endpoint != 0 || neigh_type & EL_TYPE_PT != 0 {
+                let mut k = 0;
+                while k < num_mgroups {
+                    if mgs[k].group_number == nb.endpoint {
+                        mgs[k].num += 1;
+                        break;
+                    }
+                    k += 1;
+                }
+                if k == num_mgroups {
+                    mgs[k].group_number = nb.endpoint;
+                    mgs[k].num = 1;
+                    num_mgroups += 1;
+                    num_diff_t_groups += i32::from(nb.endpoint != 0);
+                }
+            }
+        }
+        let num_endpoints = mgr.len() as i32;
+        let _ = (num_p, num_donors);
+        if num_acceptors == 0
+            || num_donors == 0
+            || (num_eql == num_endpoints && num_forbidden == 0)
+            || (tg_number == 0 && has_mobile_h == 0)
+        {
+            continue;
+        }
+        let ne = mgr.len();
+
+        // case 5.1
+        'c51: {
+            if 3 == num_bonds_non_metal
+                && 4 == bonds_valence_non_metal
+                && center_type == EL_TYPE_C
+                && 2 == num_o
+                && 1 == num_n + num_s
+                && num_ost != 0
+                && 1 == num_forbidden
+                && 3 == num_eql
+            {
+                let (mut jxh, mut jo1, mut jo2, mut n) = (-1isize, -1isize, -1isize, 0);
+                for j in 0..ne {
+                    let m = &mgr[j];
+                    if m.atom_type_pva & (EL_TYPE_N | EL_TYPE_S) != 0
+                        && m.forbidden == forbidden_mask
+                        && m.bond_type == BOND_TYPE_SINGLE
+                        && jxh < 0
+                    {
+                        jxh = j as isize;
+                        n += 1;
+                    } else if m.atom_type_pva & EL_TYPE_MASK == EL_TYPE_O
+                        && m.num_bonds_non_metal == 1
+                        && m.forbidden == 0
+                    {
+                        if m.bond_type == BOND_TYPE_DOUBLE && jo1 < 0 {
+                            jo1 = j as isize;
+                            n += 1;
+                        } else if m.bond_type == BOND_TYPE_SINGLE && jo2 < 0 {
+                            jo2 = j as isize;
+                            n += 1;
+                        }
+                    }
+                }
+                if n != 3 {
+                    break 'c51;
+                }
+                let e = ei(bns, i, mgr[jxh as usize].ineigh);
+                let ev1 = ei(bns, i, mgr[jo1 as usize].ineigh);
+                let Some(ev2) = taut_edge(p_va, mgr[jxh as usize].atom_number) else {
+                    break 'c51;
+                };
+                if bns.edge[ev1].flow == 0 || bns.edge[ev2].flow == 0 {
+                    break 'c51;
+                }
+                bns.edge[e].flow += 1;
+                bns.edge[ev1].flow -= 1;
+                bns.edge[ev2].flow -= 1;
+                let v = other(bns, ev1, i);
+                bns.vert[v].st_edge.flow -= 1;
+                let v = other(bns, ev2, bns.edge[ev2].neighbor1 as usize);
+                bns.vert[v].st_edge.flow -= 1;
+                bns.tot_st_flow -= 2;
+                num_changes += 1;
+                continue 'atoms;
+            }
+        }
+        // case 5.2
+        'c52: {
+            if 3 == num_bonds_non_metal
+                && 5 == bonds_valence_non_metal
+                && center_type == EL_TYPE_N
+                && 2 == num_o
+                && 1 == num_n + num_s
+                && 1 == num_forbidden
+                && 3 == num_eql
+            {
+                let (mut jxh, mut jo1, mut jo2, mut n) = (-1isize, -1isize, -1isize, 0);
+                for j in 0..ne {
+                    let m = &mgr[j];
+                    if m.atom_type_pva & (EL_TYPE_N | EL_TYPE_S) != 0
+                        && m.forbidden == forbidden_mask
+                        && m.bond_type == BOND_TYPE_SINGLE
+                        && jxh < 0
+                    {
+                        jxh = j as isize;
+                        n += 1;
+                    } else if m.atom_type_pva & EL_TYPE_MASK == EL_TYPE_O
+                        && m.bond_type == BOND_TYPE_DOUBLE
+                        && m.num_bonds_non_metal == 1
+                        && m.forbidden == 0
+                    {
+                        if jo1 < 0 {
+                            jo1 = j as isize;
+                            n += 1;
+                        } else if jo2 < 0 {
+                            jo2 = j as isize;
+                            n += 1;
+                        }
+                    }
+                }
+                if n != 3 {
+                    break 'c52;
+                }
+                let e = ei(bns, i, mgr[jxh as usize].ineigh);
+                let ev1 = ei(bns, i, mgr[jo1 as usize].ineigh);
+                let Some(ev2) = taut_edge(p_va, mgr[jxh as usize].atom_number) else {
+                    break 'c52;
+                };
+                if bns.edge[ev1].flow == 0 || bns.edge[ev2].flow == 0 {
+                    break 'c52;
+                }
+                bns.edge[e].flow += 1;
+                bns.edge[ev1].flow -= 1;
+                bns.edge[ev2].flow -= 1;
+                let v = other(bns, ev1, i);
+                bns.vert[v].st_edge.flow -= 1;
+                let v = other(bns, ev2, bns.edge[ev2].neighbor1 as usize);
+                bns.vert[v].st_edge.flow -= 1;
+                bns.tot_st_flow -= 2;
+                num_changes += 1;
+                continue 'atoms;
+            }
+        }
+        // case 5.4
+        'c54: {
+            if 3 == num_bonds_non_metal
+                && 5 == bonds_valence_non_metal
+                && center_type & (EL_TYPE_N | EL_TYPE_P) != 0
+                && 1 == num_o + num_s
+                && 0 < num_n
+                && 2 == num_n + num_p
+                && 1 == num_forbidden
+                && num_o + num_s + num_n == num_eql
+            {
+                let (mut jo, mut jnh, mut jx, mut n) = (-1isize, -1isize, -1isize, 0);
+                for j in 0..ne {
+                    let m = &mgr[j];
+                    if m.atom_type_pva & (EL_TYPE_O | EL_TYPE_S) != 0
+                        && m.forbidden == forbidden_mask
+                        && m.bond_type == BOND_TYPE_DOUBLE
+                        && m.num_bonds_non_metal == 1
+                        && jo < 0
+                    {
+                        jo = j as isize;
+                        n += 1;
+                    } else if m.atom_type_pva & (EL_TYPE_N | EL_TYPE_P) != 0 && m.forbidden == 0 {
+                        if m.bond_type == BOND_TYPE_SINGLE
+                            && m.atom_type_pva & EL_TYPE_MASK == EL_TYPE_N
+                            && jnh < 0
+                        {
+                            jnh = j as isize;
+                            n += 1;
+                        } else if m.bond_type == BOND_TYPE_DOUBLE && jx < 0 {
+                            jx = j as isize;
+                            n += 1;
+                        }
+                    }
+                }
+                if n != 3 {
+                    break 'c54;
+                }
+                let e = ei(bns, i, mgr[jo as usize].ineigh);
+                let ev1 = ei(bns, i, mgr[jnh as usize].ineigh);
+                if bns.edge[e].flow == 0 {
+                    break 'c54;
+                }
+                bns.edge[e].flow -= 1;
+                bns.edge[ev1].flow += 1;
+                let v = other(bns, e, i);
+                bns.vert[v].st_edge.flow -= 1;
+                let v = other(bns, ev1, i);
+                bns.vert[v].st_edge.flow -= 1;
+                bns.tot_st_flow -= 2;
+                num_changes += 1;
+                continue 'atoms;
+            }
+        }
+        // case 5.6
+        'c56: {
+            if 2 == delta_met
+                && 4 == num_bonds_non_metal
+                && 5 == bonds_valence_non_metal
+                && 1 == num_forbidden
+                && 1 < num_eql
+                && num_dif == 0
+                && center_type & (EL_TYPE_N | EL_TYPE_P) != 0
+                && 1 <= num_n
+                && 2 <= num_n + num_o + num_s
+                && 1 == num_acceptor_endpoints
+                && 0 < num_donor_endpoints
+            {
+                let mut jn: isize = -1;
+                let mut jfix: Vec<usize> = Vec::new();
+                let mut n = 0;
+                for j in 0..ne {
+                    let m = &mgr[j];
+                    let neigh = m.atom_number;
+                    if m.bond_type == BOND_TYPE_DOUBLE
+                        && m.atom_type_pva & EL_TYPE_MASK == EL_TYPE_N
+                        && m.num_bonds_non_metal == 2
+                        && m.bonds_valence_non_metal == 3
+                        && at[neigh].endpoint != 0
+                        && at[neigh].num_h == 0
+                        && at[neigh].charge == 0
+                        && at[neigh].radical == 0
+                        && m.forbidden & forbidden_mask != 0
+                        && jn < 0
+                    {
+                        jn = j as isize;
+                        n += 1;
+                    } else if m.bond_type == BOND_TYPE_SINGLE && at[neigh].endpoint != 0 {
+                        if m.num_bonds > 1 {
+                            jfix.push(j);
+                        }
+                        n += 1;
+                    }
+                }
+                if jn < 0 || n < 2 || 1 + jfix.len() as i32 == n {
+                    break 'c56;
+                }
+                let e = ei(bns, i, mgr[jn as usize].ineigh);
+                if bns.edge[e].flow == 0 {
+                    break 'c56;
+                }
+                bns.edge[e].flow -= 1;
+                bns.vert[i].st_edge.flow -= 1;
+                let v = other(bns, e, i);
+                bns.vert[v].st_edge.flow -= 1;
+                bns.tot_st_flow -= 2;
+                for &jf in &jfix {
+                    let ev = ei(bns, i, mgr[jf].ineigh);
+                    bns.edge[ev].forbidden |= forbidden_mask as i8;
+                }
+                num_changes += 1;
+                continue 'atoms;
+            }
+        }
+        // case 5.7
+        'c57: {
+            if 3 == num_bonds_non_metal
+                && 4 == bonds_valence_non_metal
+                && center_type == EL_TYPE_S
+                && 2 == num_o + num_s
+                && 1 == num_ost
+                && 1 == num_n
+                && 1 == num_forbidden
+                && 3 == num_eql
+                && mgr[ind_forbidden as usize].bond_type == BOND_TYPE_SINGLE
+            {
+                let (mut jo, mut jnh, mut joh, mut n) = (-1isize, -1isize, -1isize, 0);
+                for j in 0..ne {
+                    let m = &mgr[j];
+                    if m.atom_type_pva & EL_TYPE_MASK == EL_TYPE_N
+                        && m.forbidden == forbidden_mask
+                        && m.bond_type == BOND_TYPE_SINGLE
+                        && m.num_bonds_non_metal <= 2
+                        && jnh < 0
+                    {
+                        jnh = j as isize;
+                        n += 1;
+                    } else if m.atom_type_pva & (EL_TYPE_O | EL_TYPE_S) != 0
+                        && m.forbidden == 0
+                        && m.num_bonds_non_metal == 1
+                    {
+                        if m.bond_type == BOND_TYPE_DOUBLE && jo < 0 {
+                            jo = j as isize;
+                            n += 1;
+                        } else if joh < 0 {
+                            joh = j as isize;
+                            n += 1;
+                        }
+                    }
+                }
+                if n != 3 {
+                    break 'c57;
+                }
+                let e = ei(bns, i, mgr[jnh as usize].ineigh);
+                let ev1 = ei(bns, i, mgr[jo as usize].ineigh);
+                let Some(ev2) = taut_edge(p_va, mgr[jnh as usize].atom_number) else {
+                    break 'c57;
+                };
+                if bns.edge[ev1].flow == 0 || bns.edge[ev2].flow == 0 {
+                    break 'c57;
+                }
+                bns.edge[e].flow += 1;
+                bns.edge[ev1].flow -= 1;
+                bns.edge[ev2].flow -= 1;
+                let v = other(bns, ev1, i);
+                bns.vert[v].st_edge.flow -= 1;
+                let v = other(bns, ev2, bns.edge[ev2].neighbor1 as usize);
+                bns.vert[v].st_edge.flow -= 1;
+                bns.tot_st_flow -= 2;
+                num_changes += 1;
+                continue 'atoms;
+            }
+        }
+        // case 5.9a
+        'c59a: {
+            if 3 == num_bonds_non_metal
+                && 4 == bonds_valence_non_metal
+                && center_type == EL_TYPE_S
+                && 1 == num_o + num_s
+                && num_ost == 0
+                && 1 <= num_n
+                && 1 == num_forbidden
+                && num_o + num_s + num_n == num_eql
+                && mgr[ind_forbidden as usize].bond_type == BOND_TYPE_SINGLE
+            {
+                let (mut jo, mut jnh) = (-1isize, -1isize);
+                for j in 0..ne {
+                    let m = &mgr[j];
+                    if m.atom_type_pva & (EL_TYPE_O | EL_TYPE_S) != 0
+                        && m.forbidden == forbidden_mask
+                        && m.bond_type == BOND_TYPE_DOUBLE
+                        && m.num_bonds_non_metal == 1
+                        && jo < 0
+                    {
+                        jo = j as isize;
+                    } else if m.atom_type_pva & EL_TYPE_MASK == EL_TYPE_N
+                        && m.forbidden == 0
+                        && m.bond_type == BOND_TYPE_SINGLE
+                        && jnh < 0
+                    {
+                        jnh = j as isize;
+                    }
+                }
+                if jo < 0 || jnh < 0 {
+                    break 'c59a;
+                }
+                let e = ei(bns, i, mgr[ind_forbidden as usize].ineigh);
+                if bns.edge[e].flow == 0 {
+                    break 'c59a;
+                }
+                bns.edge[e].flow -= 1;
+                let n1 = bns.edge[e].neighbor1 as usize;
+                let n12 = bns.edge[e].neighbor12 as usize;
+                bns.vert[n1].st_edge.flow -= 1;
+                bns.vert[n1 ^ n12].st_edge.flow -= 1;
+                bns.tot_st_flow -= 2;
+                num_changes += 1;
+                continue 'atoms;
+            }
+        }
+        // case 5.8b -> 9b
+        'c58b: {
+            if 3 == num_bonds_non_metal
+                && 4 == bonds_valence_non_metal
+                && center_type == EL_TYPE_S
+                && 0 == num_o + num_s
+                && 2 == num_n
+                && 0 == num_p
+                && num_ost == 0
+                && 1 == num_forbidden
+                && 1 == num_eql
+                && 0 == num_dif
+                && 1 == num_donor_endpoints
+                && 0 == num_acceptor_endpoints
+                && 1 == num_donors
+                && 1 == num_acceptors
+                && mgr[ind_forbidden as usize].bond_type == BOND_TYPE_SINGLE
+            {
+                let (mut jn, mut jnh, mut jx, mut n) = (-1isize, -1isize, -1isize, 0);
+                for j in 0..ne {
+                    let m = &mgr[j];
+                    if m.atom_type_pva & EL_TYPE_MASK == EL_TYPE_N
+                        && m.forbidden & forbidden_mask == 0
+                    {
+                        if m.bond_type == BOND_TYPE_DOUBLE
+                            && at[m.atom_number].endpoint == 0
+                            && jn < 0
+                        {
+                            jn = j as isize;
+                            n += 1;
+                        } else if m.bond_type == BOND_TYPE_SINGLE
+                            && m.num_bonds == 2
+                            && m.bonds_valence == 2
+                            && at[m.atom_number].endpoint != 0
+                            && jnh < 0
+                        {
+                            jnh = j as isize;
+                            n += 1;
+                        }
+                    } else if !(m.atom_type_pva & (EL_TYPE_N | EL_TYPE_P) != 0
+                        || (m.atom_type_pva & (EL_TYPE_O | EL_TYPE_S) != 0 && m.num_bonds > 1))
+                        && m.forbidden & forbidden_mask != 0
+                        && m.bond_type == BOND_TYPE_SINGLE
+                        && jx < 0
+                    {
+                        jx = j as isize;
+                        n += 1;
+                    }
+                }
+                if n != 3 {
+                    break 'c58b;
+                }
+                let Some(e) = taut_edge(p_va, mgr[jnh as usize].atom_number) else {
+                    break 'c58b;
+                };
+                if bns.edge[e].flow == 0 {
+                    break 'c58b;
+                }
+                bns.edge[e].flow -= 1;
+                let n1 = bns.edge[e].neighbor1 as usize;
+                let n12 = bns.edge[e].neighbor12 as usize;
+                bns.vert[n1].st_edge.flow -= 1;
+                bns.vert[n1 ^ n12].st_edge.flow -= 1;
+                bns.tot_st_flow -= 2;
+                bns.edge[e].forbidden |= forbidden_mask as i8;
+                num_changes += 1;
+                continue 'atoms;
+            }
+        }
+        // case 5.8c -> 9c
+        'c58c: {
+            if 3 == num_bonds_non_metal
+                && 4 == bonds_valence_non_metal
+                && center_type == EL_TYPE_S
+                && 0 == num_o + num_s
+                && 3 == num_n
+                && 0 == num_p
+                && 1 == num_forbidden
+                && 3 == num_eql
+                && 0 == num_dif
+                && 2 == num_donor_endpoints
+                && 1 == num_acceptor_endpoints
+                && 2 == num_donors
+                && 1 == num_acceptors
+                && mgr[ind_forbidden as usize].bond_type == BOND_TYPE_SINGLE
+            {
+                let (mut jn1, mut jn2, mut jx, mut n) = (-1isize, -1isize, -1isize, 0);
+                for j in 0..ne {
+                    let m = &mgr[j];
+                    if m.atom_type_pva & EL_TYPE_MASK == EL_TYPE_N
+                        && m.forbidden & forbidden_mask == 0
+                    {
+                        if m.bond_type == BOND_TYPE_DOUBLE
+                            && at[m.atom_number].endpoint != 0
+                            && jn1 < 0
+                        {
+                            jn1 = j as isize;
+                            n += 1;
+                        } else if m.bond_type == BOND_TYPE_SINGLE
+                            && m.num_bonds == 2
+                            && m.bonds_valence == 3
+                            && m.forbidden == forbidden_mask
+                            && at[m.atom_number].endpoint != 0
+                            && jn2 < 0
+                        {
+                            jn2 = j as isize;
+                            n += 1;
+                        } else if m.bond_type == BOND_TYPE_SINGLE
+                            && m.num_bonds <= 2
+                            && m.bonds_valence <= 3
+                            && at[m.atom_number].endpoint != 0
+                            && jx < 0
+                        {
+                            jx = j as isize;
+                            n += 1;
+                        }
+                    }
+                }
+                if n != 3 {
+                    break 'c58c;
+                }
+                let Some(e) = taut_edge(p_va, mgr[jn2 as usize].atom_number) else {
+                    break 'c58c;
+                };
+                if bns.edge[e].flow != 0 {
+                    break 'c58c;
+                }
+                let mut pv1 = bns.edge[e].neighbor1 as usize;
+                let mut pv2 = pv1 ^ bns.edge[e].neighbor12 as usize;
+                let (mut ie1, mut ie2) = (-1isize, -1isize);
+                let (mut ev1, mut ev2) = (0usize, 0usize);
+                for j in 0..bns.vert[pv1].num_adj_edges as usize {
+                    ev1 = ei(bns, pv1, j);
+                    if bns.edge[ev1].flow != 0 && bns.edge[ev1].forbidden == 0 {
+                        ie1 = ev1 as isize;
+                        pv1 = other(bns, ev1, pv1);
+                        break;
+                    }
+                }
+                for j in 0..bns.vert[pv2].num_adj_edges as usize {
+                    ev2 = ei(bns, pv2, j);
+                    if bns.edge[ev2].flow != 0 && bns.edge[ev2].forbidden == 0 {
+                        ie2 = ev2 as isize;
+                        pv2 = other(bns, ev2, pv2);
+                        break;
+                    }
+                }
+                if ie1 < 0 || ie2 < 0 {
+                    break 'c58c;
+                }
+                bns.edge[e].flow += 1;
+                bns.edge[e].forbidden |= forbidden_mask as i8;
+                bns.edge[ev1].flow -= 1;
+                bns.edge[ev2].flow -= 1;
+                bns.vert[pv1].st_edge.flow -= 1;
+                bns.vert[pv2].st_edge.flow -= 1;
+                bns.tot_st_flow -= 2;
+                num_changes += 1;
+                continue 'atoms;
+            }
+        }
+        // case 5.9b -> 8b
+        'c59b: {
+            if 3 == num_bonds_non_metal
+                && 4 == bonds_valence_non_metal
+                && center_type == EL_TYPE_S
+                && 0 == num_o + num_s
+                && 2 == num_n
+                && 0 == num_p
+                && 1 == num_forbidden
+                && 2 == num_eql
+                && 0 == num_dif
+                && 1 == num_donor_endpoints
+                && 1 == num_acceptor_endpoints
+                && 1 == num_donors
+                && 1 == num_acceptors
+                && mgr[ind_forbidden as usize].bond_type == BOND_TYPE_DOUBLE
+            {
+                let (mut jn1, mut jn2) = (-1isize, -1isize);
+                for j in 0..ne {
+                    let m = &mgr[j];
+                    if m.atom_type_pva & EL_TYPE_MASK == EL_TYPE_N {
+                        if m.bond_type == BOND_TYPE_DOUBLE
+                            && at[m.atom_number].endpoint != 0
+                            && m.forbidden == forbidden_mask
+                            && jn1 < 0
+                        {
+                            jn1 = j as isize;
+                        } else if m.bond_type == BOND_TYPE_SINGLE
+                            && m.num_bonds == 2
+                            && m.bonds_valence == 3
+                            && at[m.atom_number].endpoint != 0
+                            && m.forbidden & forbidden_mask == 0
+                            && jn2 < 0
+                        {
+                            jn2 = j as isize;
+                        }
+                    }
+                }
+                if jn1 < 0 || jn2 < 0 {
+                    break 'c59b;
+                }
+                let ev = ei(bns, i, mgr[jn1 as usize].ineigh);
+                let Some(e) = taut_edge(p_va, mgr[jn2 as usize].atom_number) else {
+                    break 'c59b;
+                };
+                if bns.edge[e].flow != 0 {
+                    break 'c59b;
+                }
+                let mut pv1 = bns.edge[e].neighbor1 as usize;
+                let mut pv2 = pv1 ^ bns.edge[e].neighbor12 as usize;
+                let (mut ie1, mut ie2) = (-1isize, -1isize);
+                let (mut ev1, mut ev2) = (0usize, 0usize);
+                bns.edge[ev].forbidden &= inv_mask as i8;
+                for j in 0..bns.vert[pv1].num_adj_edges as usize {
+                    ev1 = ei(bns, pv1, j);
+                    if bns.edge[ev1].flow != 0 && bns.edge[ev1].forbidden == 0 {
+                        ie1 = ev1 as isize;
+                        pv1 = other(bns, ev1, pv1);
+                        break;
+                    }
+                }
+                for j in 0..bns.vert[pv2].num_adj_edges as usize {
+                    ev2 = ei(bns, pv2, j);
+                    if bns.edge[ev2].flow != 0 && bns.edge[ev2].forbidden == 0 {
+                        ie2 = ev2 as isize;
+                        pv2 = other(bns, ev2, pv2);
+                        break;
+                    }
+                }
+                if ie1 < 0 || ie2 < 0 {
+                    bns.edge[ev].forbidden |= forbidden_mask as i8;
+                    break 'c59b;
+                }
+                bns.edge[e].flow += 1;
+                bns.edge[e].forbidden |= forbidden_mask as i8;
+                bns.edge[ev1].flow -= 1;
+                bns.edge[ev2].flow -= 1;
+                bns.vert[pv1].st_edge.flow -= 1;
+                bns.vert[pv2].st_edge.flow -= 1;
+                bns.tot_st_flow -= 2;
+                num_changes += 1;
+                continue 'atoms;
+            }
+        }
+        // case 5.9c -> 8c
+        'c59c: {
+            if 3 == num_bonds_non_metal
+                && 4 == bonds_valence_non_metal
+                && center_type == EL_TYPE_S
+                && 0 == num_o + num_s
+                && 3 == num_n
+                && 0 == num_p
+                && 0 == num_forbidden
+                && 2 == num_diff_t_groups
+                && 2 == num_mgroups
+                && 3 == num_eql + num_dif
+                && 2 == num_donor_endpoints
+                && 1 == num_acceptor_endpoints
+                && 2 == num_donors
+                && 1 == num_acceptors
+            {
+                let (mut jn1, mut jn2, mut jx, mut n) = (-1isize, -1isize, -1isize, 0);
+                // (sic) the C loop tests MGroups[k] with k, not j
+                let mut k: u16 = 0;
+                for _ in 0..num_mgroups {
+                    if 1 == mgs[k as usize].num && mgs[k as usize].group_number != 0 {
+                        k = mgs[k as usize].group_number;
+                        break;
+                    }
+                }
+                if k == 0 {
+                    break 'c59c;
+                }
+                for j in 0..ne {
+                    let m = &mgr[j];
+                    if m.atom_type_pva & EL_TYPE_MASK == EL_TYPE_N {
+                        let ep = at[m.atom_number].endpoint;
+                        if m.bond_type == BOND_TYPE_DOUBLE && ep != 0 && ep != k && jn1 < 0 {
+                            jn1 = j as isize;
+                            n += 1;
+                        } else if m.bond_type == BOND_TYPE_SINGLE
+                            && m.num_bonds == 2
+                            && m.bonds_valence == 2
+                            && ep == k
+                            && jn2 < 0
+                        {
+                            jn2 = j as isize;
+                            n += 1;
+                        } else if m.bond_type == BOND_TYPE_SINGLE
+                            && m.num_bonds <= 2
+                            && m.bonds_valence <= 3
+                            && ep != 0
+                            && ep != k
+                            && jx < 0
+                        {
+                            jx = j as isize;
+                            n += 1;
+                        }
+                    }
+                }
+                if n != 3 {
+                    break 'c59c;
+                }
+                let Some(e) = taut_edge(p_va, mgr[jn2 as usize].atom_number) else {
+                    break 'c59c;
+                };
+                if bns.edge[e].flow == 0 {
+                    break 'c59c;
+                }
+                bns.edge[e].flow -= 1;
+                let n1 = bns.edge[e].neighbor1 as usize;
+                let n12 = bns.edge[e].neighbor12 as usize;
+                bns.vert[n1].st_edge.flow -= 1;
+                bns.vert[n1 ^ n12].st_edge.flow -= 1;
+                bns.tot_st_flow -= 2;
+                bns.edge[e].forbidden |= forbidden_mask as i8;
+                num_changes += 1;
+                continue 'atoms;
+            }
+        }
+        // case 5.9d
+        if 3 == num_bonds_non_metal
+            && 4 == bonds_valence_non_metal
+            && center_type == EL_TYPE_S
+            && 0 == num_o + num_s
+            && 3 == num_n
+            && 0 == num_p
+            && 0 == num_forbidden
+            && 3 == num_mgroups
+            && 2 == num_diff_t_groups
+            && 2 == num_donor_endpoints
+            && 0 == num_acceptor_endpoints
+            && 2 == num_donors
+            && 1 == num_acceptors
+        {
+            let (mut jn1, mut jn2, mut jx, mut n) = (-1isize, -1isize, -1isize, 0);
+            for j in 0..ne {
+                let m = &mgr[j];
+                if m.atom_type_pva & EL_TYPE_MASK == EL_TYPE_N {
+                    if m.bond_type == BOND_TYPE_DOUBLE
+                        && at[m.atom_number].endpoint == 0
+                        && m.forbidden & forbidden_mask == 0
+                        && jn1 < 0
+                    {
+                        jn1 = j as isize;
+                        n += 1;
+                    } else if m.bond_type == BOND_TYPE_SINGLE
+                        && m.num_bonds == 2
+                        && m.bonds_valence <= 3
+                        && at[m.atom_number].endpoint != 0
+                        && m.forbidden & forbidden_mask == 0
+                    {
+                        if jn2 < 0 {
+                            jn2 = j as isize;
+                            n += 1;
+                        } else if jx < 0 {
+                            jx = j as isize;
+                            n += 1;
+                        }
+                    }
+                }
+            }
+            if n != 3 {
+                continue;
+            }
+            let ev = ei(bns, i, mgr[jn1 as usize].ineigh);
+            if bns.edge[ev].flow == 0 {
+                continue;
+            }
+            let Some(e1) = taut_edge(p_va, mgr[jn2 as usize].atom_number) else {
+                continue;
+            };
+            if bns.edge[e1].flow == 0 {
+                continue;
+            }
+            let Some(e2) = taut_edge(p_va, mgr[jx as usize].atom_number) else {
+                continue;
+            };
+            if bns.edge[e2].flow == 0 {
+                continue;
+            }
+            for e in [e1, e2] {
+                bns.edge[e].flow -= 1;
+                let n1 = bns.edge[e].neighbor1 as usize;
+                let n12 = bns.edge[e].neighbor12 as usize;
+                bns.vert[n1].st_edge.flow -= 1;
+                bns.vert[n1 ^ n12].st_edge.flow -= 1;
+                bns.tot_st_flow -= 2;
+                bns.edge[e].forbidden |= forbidden_mask as i8;
+                num_changes += 1;
+            }
+            bns.edge[ev].forbidden |= forbidden_mask as i8;
+        }
+    }
+    num_changes
 }

@@ -359,6 +359,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 243 | InChI port I11g: ichirvr2 RestoreAtomConnectionsSetStereo and stereo bond types (differential vs C) |
 | 244 | InChI port I11h: ichirvr2 CopyBnsToAtom (differential vs C) |
 | 245 | InChI port I11i: ichirvr2 MoveRadToAtomsAddCharges (differential vs C) |
+| 246 | InChI port I11j: ichirvr2 AdjustTgroupsToForbiddenEdges2 (differential vs C) |
 
 ## Python package files
 
@@ -786,3 +787,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-22 — Stage 243: InChI I11g — restoration of atoms and 0D stereo; no runtime effect, upstream_speed.html not regenerated
 * 2026-10-22 — Stage 244: InChI I11h — BNS result copied to atoms; no runtime effect, upstream_speed.html not regenerated
 * 2026-10-22 — Stage 245: InChI I11i — radicals moved to atoms with charges; no runtime effect, upstream_speed.html not regenerated
+* 2026-10-22 — Stage 246: InChI I11j — t-groups adjusted to forbidden edges; no runtime effect, upstream_speed.html not regenerated
