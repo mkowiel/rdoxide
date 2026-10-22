@@ -98,6 +98,15 @@ Progress is tracked in [STATUS.md](STATUS.md).
 
 ## Follow-ups after the InChI port (I12)
 
+Status 2026-10-22: the three non-conflicting nbWrap failures are fixed
+(`SetStereoGroups` ownership check, `AddConformer` of a conformer of the same
+molecule, `GetStringVectProp` returns a list). The remaining `nbWrap/rough_test.py`
+failures (tuple vs list, `OverflowError` vs `TypeError`, `SetQuery(None)`, ...)
+contradict the boost-python `Wrap/rough_test.py`, which expects the opposite and
+passes today; upstream builds only one of the two wrapper sets, so both cannot
+pass in one module. `testMaxMin.py` (py2 division), `UnitTestBitEnsemble.py`
+(`InitScoreTable` does not exist upstream either) are upstream-stale.
+
 Requested by the project owner; start only once the InChI port is finished.
 Upstream ratchet run of 2026-10-21 (1884/1987 passing) shows these failures:
 

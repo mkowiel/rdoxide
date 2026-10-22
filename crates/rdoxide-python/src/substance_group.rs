@@ -21,7 +21,7 @@ use crate::errors::{IntoPyResult, no_converter, to_py};
 use crate::geometry::PyPoint3D;
 use crate::mol::PyMol;
 use crate::props::impl_props;
-use crate::vects::{PyVectJ, PyVectStr};
+use crate::vects::PyVectJ;
 
 /// Where the group lives.
 #[derive(Debug)]
@@ -364,7 +364,7 @@ impl PySubstanceGroup {
             Some(RDValue::VecString(v)) => Ok(v.clone()),
             Some(_) => Err(bad_vect_cast(key)),
         })??;
-        PyVectStr::new_py(py, v)
+        Ok(v.into_pyobject(py)?.into_any().unbind())
     }
 }
 
