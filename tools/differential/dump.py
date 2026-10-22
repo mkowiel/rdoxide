@@ -965,9 +965,27 @@ def inchi_record(smi, options=""):
     return [inchi, retcode, message, aux, rdinchi.InchiToInchiKey(inchi)]
 
 
+def molfrominchi_record(smi):
+    """InChI -> molecule (rdinchi.InchiToMol): canonical SMILES, the InChI of the
+    restored molecule and the return code."""
+    from rdkit.Chem import rdinchi
+    m = Chem.MolFromSmiles(smi)
+    if m is None:
+        return None
+    inchi = rdinchi.MolToInchi(m, "")[0]
+    if not inchi:
+        return None
+    m2, retcode, message, _log = rdinchi.InchiToMol(inchi, True, True)
+    if m2 is None:
+        return [inchi, retcode, message, None, None]
+    return [inchi, retcode, message, Chem.MolToSmiles(m2), rdinchi.MolToInchi(m2, "")[0]]
+
+
 def dump(mode, smi):
     if mode == "inchi":
         return inchi_record(smi)
+    if mode == "molfrominchi":
+        return molfrominchi_record(smi)
     if mode == "standardize":
         return standardize_record(smi)
     if mode == "lipinski":
