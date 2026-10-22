@@ -392,6 +392,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 276 | | I12n | `ichirvr7`: `ConvertInChI2Struct` (tested on 5 InChI + a mismatch) | done | |
 | 277 | | I12o | `inchi_dll_c`: `CheckINCHI`, `ReadWriteInChI` (API path), `GetStructFromINCHI(Ex)`; 28 InChI round trip | done | |
 | 278 | InChI: `InchiToMol` (assignBondDirs, findAlternatingBonds, cleanUp), upstream `inchi.py` + `UnitTestInchi.py` in the ratchet | ✅ | 290/290 standard corpus InChI round-trip identical; 19 new upstream tests pass |
+| 279 | Python wrapper fixes from the nbWrap rough_test follow-ups (SetStereoGroups owner check, AddConformer borrow panic, GetStringVectProp list) | ✅ | ratchet 1903/1973 (+3); remaining nbWrap failures conflict with boost Wrap tests |
 
 ## Python package files
 
@@ -852,3 +853,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-22 — Stage 276: I12n: ConvertInChI2Struct
 * 2026-10-22 — Stage 277: I12o: GetStructFromINCHI
 * 2026-10-22 — Stage 278: I12p InchiToMol, inchi.py switched to upstream, UnitTestInchi in the ratchet (+19). upstream_speed.html not regenerated (InChI round).
+* 2026-10-22 — Stage 279: Wrapper fixes (+3 ratchet). Not a speed change: upstream_speed.html not regenerated.

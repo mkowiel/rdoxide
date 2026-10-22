@@ -1240,6 +1240,7 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::testSetBondDirFromStereo
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testSetBondStereoFromDirections
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testSetCoordsTerminalAtom
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testSetEnhancedStereoGroup
+Code/GraphMol/nbWrap/rough_test.py::TestCase::testSetEnhancedStereoGroupOwnershipCheck
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testSetQuery
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testSimpleAromaticity
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testSmartsParseParams
@@ -1249,6 +1250,7 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::testSmilesToAtom
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testSmilesWriteParams
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testSmilesWriteParamsForSMARTS
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testSplitMolByPDB
+Code/GraphMol/nbWrap/rough_test.py::TestCase::testSubstanceGroupProperties
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testSubstructMatchAtomProperties
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testSubstructMatchBondProperties
 Code/GraphMol/nbWrap/rough_test.py::TestCase::testSubstructMatchDMAP
@@ -1269,6 +1271,7 @@ Code/GraphMol/nbWrap/rough_test.py::TestCase::testXYZ
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test_DativeBondsToHaptic
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test_HapticBondsToDative
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test_blocklogs
+Code/GraphMol/nbWrap/rough_test.py::TestCase::test_conformer_lifetime
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test_get_set_positions
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test_get_set_positions_stride
 Code/GraphMol/nbWrap/rough_test.py::TestCase::test_github1631

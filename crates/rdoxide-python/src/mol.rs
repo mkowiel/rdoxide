@@ -334,13 +334,14 @@ impl PyMol {
     #[pyo3(name = "AddConformer", signature = (conf, assignId = false))]
     #[allow(non_snake_case)]
     fn add_conformer(
-        &mut self,
-        py: Python<'_>,
-        conf: PyRef<'_, PyConformer>,
+        slf: &Bound<'_, Self>,
+        conf: &Bound<'_, PyConformer>,
         assignId: bool,
     ) -> PyResult<u32> {
-        let c = conf.snapshot(py)?;
-        self.mol.add_conformer(c, assignId).py()
+        // the conformer may belong to this very molecule: copy it before
+        // borrowing the molecule mutably
+        let c = conf.borrow().snapshot(slf.py())?;
+        slf.borrow_mut().mol.add_conformer(c, assignId).py()
     }
 
     /// Get the conformer with a specified ID
@@ -812,6 +813,16 @@ impl PyRWMol {
         slf: &Bound<'_, Self>,
         stereo_groups: Vec<PyRef<'_, PyStereoGroup>>,
     ) -> PyResult<()> {
+        // groups created for (or taken from) another molecule cannot be used
+        for g in &stereo_groups {
+            if let Some(owner) = &g.mol {
+                if !owner.bind(slf.py()).is(slf) {
+                    return Err(pyo3::exceptions::PyValueError::new_err(
+                        "stereo group belongs to a different molecule",
+                    ));
+                }
+            }
+        }
         let groups = stereo_groups.iter().map(|g| g.group.clone()).collect();
         rw(slf).mol.set_stereo_groups(groups).py()
     }
