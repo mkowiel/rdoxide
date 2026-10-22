@@ -67,6 +67,31 @@ pub struct InpAtomStereo {
     pub sn_orig_at_num: [u16; MAX_NUM_STEREO_BONDS],
 }
 
+/// `REV_INCHI`: the `INChI` of the structure restored from an InChI
+#[derive(Debug, Clone, Default)]
+pub struct RevInChI {
+    /// `pINChI[iINCHI][component][bTaut]`
+    pub p_inchi: [super::runichi4::PInChI2; 2],
+    /// `pINChI_Aux[iINCHI][component][bTaut]`
+    pub p_inchi_aux: [super::runichi4::PInChIAux2; 2],
+    pub num_components: [i32; 2],
+    pub n_ret_val: i32,
+}
+
+impl StrFromInChI {
+    /// `bRevInchiComponentExists`
+    pub fn rev_inchi_component_exists(&self, i_inchi: usize, b_mobile_h: usize, k: usize) -> bool {
+        self.num_atoms != 0
+            && i_inchi < 2
+            && b_mobile_h < 2
+            && (k as i32) < self.rev_inchi.num_components[i_inchi]
+            && self.rev_inchi.p_inchi[i_inchi]
+                .get(k)
+                .and_then(|c| c[b_mobile_h].as_ref())
+                .is_some_and(|c| c.n_number_of_atoms > 0 && c.b_deleted == 0)
+    }
+}
+
 /// the used part of `StrFromINChI`: the structure restored from one InChI
 /// component
 #[derive(Debug, Clone, Default)]
@@ -115,6 +140,24 @@ pub struct StrFromInChI {
     pub n_canon2atno: [Vec<u16>; 2],
     /// `pbfsq`: work arrays of the ring search
     pub pbfsq: BfsQ,
+    /// `RevInChI`
+    pub rev_inchi: RevInChI,
+    /// `at2`: the most recently restored atoms of the component (used by the
+    /// functions over arrays of components)
+    pub at2: Vec<InpAtom>,
+    /// `nLink`: negative: same as the reconnected component -(n+1);
+    /// positive: the disconnected component n-1 is the same
+    pub n_link: i32,
+    /// `bPostProcessed`
+    pub b_post_processed: i32,
+    /// `nChargeInChI`
+    pub n_charge_inchi: i32,
+    /// `bDeleted`
+    pub b_deleted: i32,
+    /// `nRemovedProtonsByNormFromRevrs`
+    pub n_removed_protons_by_norm_from_revrs: i32,
+    /// `bFixedHExists`
+    pub b_fixed_h_exists: i32,
 }
 
 /// `CopyAt2St`
