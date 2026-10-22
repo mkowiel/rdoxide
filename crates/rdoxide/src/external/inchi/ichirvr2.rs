@@ -9,14 +9,17 @@
 #![allow(clippy::needless_late_init)]
 
 use super::ichi::{InChI, InChIStereo};
+use super::ichi_bns::{BNS_VERT_TYPE_TGROUP, BnStruct, NO_VERTEX};
 use super::ichiread::{RI_ERR_PROGR, RI_ERR_SYNTAX};
-use super::ichirvr1::get_tgroup_info_from_inchi;
+use super::ichirvr1::{bond_flow_maxcap_minorder, get_tgroup_info_from_inchi};
+use super::ichirvrs::{AllTcGroups, Srm, TGRF_MINUS_FIRST, ValAt};
 use super::ichister::{
     AB_PARITY_EVEN, AB_PARITY_ODD, MAX_CUMULENE_LEN, MAX_NUM_STEREO_BOND_NEIGH,
     MIN_NUM_STEREO_BOND_NEIGH, atom_parity_well_def, b_can_atom_be_middle_allene,
     b_can_atom_be_terminal_allene,
 };
 use super::ichitaut::TGroupInfo;
+use super::incomdef::RADICAL_SINGLET;
 use super::incomdef::{
     BOND_TYPE_ALTERN, BOND_TYPE_DOUBLE, BOND_TYPE_SINGLE, BOND_TYPE_TRIPLE, NUM_H_ISOTOPES,
 };
@@ -41,6 +44,8 @@ pub struct InpAtomStereo {
 /// component
 #[derive(Debug, Clone, Default)]
 pub struct StrFromInChI {
+    /// `pSrm`: the rules for the bonds to metal atoms
+    pub srm: Srm,
     /// length = `num_atoms + num_deleted_h`
     pub at: Vec<InpAtom>,
     pub st: Option<Vec<InpAtomStereo>>,
@@ -1084,5 +1089,111 @@ pub fn set_stereo_bond_types_from_0d_stereo(ps: &mut StrFromInChI, inchi: &InChI
             return RI_ERR_PROGR;
         }
     }
+    0
+}
+
+/// `CopyBnsToAtom`: copies the bond orders, charges, radicals and the
+/// tautomeric H and (-) of the solved BNS to the atoms of `ps`
+pub fn copy_bns_to_atom(
+    ps: &mut StrFromInChI,
+    bns: &BnStruct,
+    p_va: &[ValAt],
+    tcg: &AllTcGroups,
+    allow_zero_bond_order: bool,
+) -> i32 {
+    let num_at = ps.num_atoms as usize;
+    let srm = ps.srm;
+    let at = &mut ps.at;
+    for i in 0..num_at {
+        let pv = &bns.vert[i];
+        let mut chem_bonds_valence = 0;
+        for j in 0..at[i].valence as usize {
+            let pe = &bns.edge[bns.iedge[pv.iedge + j] as usize];
+            let (_, _, min_order, _) = bond_flow_maxcap_minorder(at, p_va, &srm, i, j);
+            let mut bond_order = pe.flow + min_order;
+            if !allow_zero_bond_order && bond_order == 0 {
+                bond_order = 1;
+            }
+            chem_bonds_valence += bond_order;
+            at[i].bond_type[j] = bond_order as u8;
+        }
+        at[i].chem_bonds_valence = chem_bonds_valence as i8;
+        at[i].charge = p_va[i].c_init_charge;
+        if p_va[i].n_c_minus_group_edge != 0 {
+            let pe = &bns.edge[p_va[i].n_c_minus_group_edge as usize - 1];
+            if pe.flow != 0 {
+                at[i].charge = at[i].charge.wrapping_sub(pe.flow as i8);
+            }
+        }
+        if p_va[i].n_c_plus_group_edge != 0 {
+            let pe = &bns.edge[p_va[i].n_c_plus_group_edge as usize - 1];
+            let c = pe.cap - pe.flow;
+            if c != 0 {
+                at[i].charge = at[i].charge.wrapping_add(c as i8);
+            }
+        }
+        if pv.st_edge.cap > pv.st_edge.flow {
+            at[i].radical = (RADICAL_SINGLET + (pv.st_edge.cap - pv.st_edge.flow)) as i8;
+        }
+    }
+    for i in 0..bns.num_t_groups as usize {
+        let g = &tcg.p_tcg[i];
+        let mut num_h = i32::from(g.tg_num_h);
+        let mut num_minus = i32::from(g.tg_num_minus);
+        let minus_first = g.tg_restore_flags & TGRF_MINUS_FIRST != 0;
+        let mut v_minus = NO_VERTEX;
+        let pv = &bns.vert[num_at + i];
+        if pv.type_ & BNS_VERT_TYPE_TGROUP == 0 {
+            return RI_ERR_PROGR;
+        }
+        if g.tg_set_minus > 0 && num_minus > 0 {
+            v_minus = i32::from(g.tg_set_minus) - 1;
+            num_minus -= 1;
+        }
+        let order: Vec<usize> = if minus_first {
+            (0..pv.num_adj_edges as usize).collect()
+        } else {
+            (0..pv.num_adj_edges as usize).rev().collect()
+        };
+        for j in order {
+            let pe = &bns.edge[bns.iedge[pv.iedge + j] as usize];
+            let v1 = pe.neighbor1 as usize;
+            let mut num_at_add = pe.flow;
+            if v1 as i32 == v_minus {
+                if num_at_add != 0 {
+                    at[v1].charge = -1;
+                    num_at_add -= 1;
+                } else {
+                    num_minus += 1;
+                }
+                v_minus = NO_VERTEX;
+            }
+            if num_at_add > 0 {
+                if num_minus != 0
+                    && at[v1].charge == 0
+                    && at[v1].valence == at[v1].chem_bonds_valence
+                {
+                    at[v1].charge -= 1;
+                    num_at_add -= 1;
+                    num_minus -= 1;
+                }
+                if num_at_add > 0 {
+                    at[v1].num_h = at[v1].num_h.wrapping_add(num_at_add as i8);
+                    num_h -= num_at_add;
+                }
+            }
+            at[v1].endpoint = (i + 1) as u16;
+        }
+        if num_h + num_minus != pv.st_edge.cap - pv.st_edge.flow
+            && (num_h != 0 || num_minus != 0 || v_minus != NO_VERTEX)
+        {
+            return RI_ERR_PROGR;
+        }
+    }
+    0
+}
+
+/// `CheckBnsConsistency` (a no-op in the library build: `TARGET_API_LIB`)
+pub fn check_bns_consistency() -> i32 {
     0
 }
