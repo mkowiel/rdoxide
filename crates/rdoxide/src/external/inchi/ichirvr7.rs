@@ -1765,3 +1765,246 @@ pub fn compare_all_disconnected_orig_inchi_to_rev_inchi(
     let _ = rem_d;
     0
 }
+
+/// the result of [`convert_inchi2_struct`]
+#[derive(Debug, Clone, Default)]
+pub struct ConvertedInChI {
+    /// 0 on success, a negative error or the number of the failed components
+    pub ret: i32,
+    /// `*num_errors` increments
+    pub num_errors: i32,
+    /// the merged restored atoms (`OneInput->atom`), explicit H at the end
+    pub atoms: Vec<super::inpdef::InpAtom>,
+    /// the message of the conversion (`szMessage`)
+    pub message: String,
+    /// `WarningFlags[disconnected/reconnected][TAUT_NUM]`
+    pub warning_flags: [[u64; 2]; 2],
+}
+
+/// `ConvertInChI2Struct` (library build): converts the input InChI read into
+/// `one_input` into the restored structure and the comparison message.
+/// `message` is the message accumulated so far (its length is
+/// `nInitLenMessage`); `b_req_non_taut` asks for the Fixed-H layer.
+#[allow(unused_assignments)]
+pub fn convert_inchi2_struct(
+    ip_inp: &super::ichiparm::InputParms,
+    one_input: &mut InpInChI,
+    message: &str,
+    b_req_non_taut: bool,
+    num_inp: i64,
+    polymer: Option<&super::mol2atom::OadPolymer>,
+) -> ConvertedInChI {
+    use super::ichiparm::{
+        INCHI_OUT_MISMATCH_AS_ERROR, REQ_MODE_CHIR_FLG_STEREO, REQ_MODE_ISO_STEREO,
+        REQ_MODE_RACEMIC_STEREO, REQ_MODE_RELATIVE_STEREO, REQ_MODE_SB_IGN_ALL_UU,
+        REQ_MODE_SC_IGN_ALL_UU, REQ_MODE_STEREO, TG_FLAG_ARSINE_STEREO, TG_FLAG_FIX_SP3_BUG,
+        TG_FLAG_PHOSPHINE_STEREO,
+    };
+    use super::ichiread::{RI_ERR_MISMATCH, RI_ERR_PROGR, detect_inp_inchi_creation_options};
+    use super::ichirvr2::StrFromInChI;
+    use super::ichirvrs::set_up_srm;
+    use super::runichi3::StructData;
+
+    const MAX_MSG_LEN: i32 = 512;
+    let msg_len = MAX_MSG_LEN;
+    let init_len = message.len();
+    let mut out = ConvertedInChI {
+        message: message.to_string(),
+        ..Default::default()
+    };
+    let mut ip = ip_inp.clone();
+    let mut sd = StructData::default();
+    let mut p_struct: [[Vec<StrFromInChI>; 2]; 2] = Default::default();
+    let srm = set_up_srm();
+    let mut b_has_some_fixed_h = false;
+    let mut b_has_metal = false;
+    let mut b_has_some_reconnected = false;
+    macro_rules! add_msg {
+        ($m:expr) => {{
+            let l = out.message.len();
+            add_one_msg(&mut out.message, l, msg_len, $m, Some("; "));
+        }};
+    }
+
+    'body: {
+        // eliminate Fixed-H InChI exactly the same as the Mobile-H ones
+        remove_fix_h_inchi_identical2_mob_h(one_input);
+        // recheck the layers after the elimination; get the stereo flags
+        match detect_inp_inchi_creation_options(one_input) {
+            Err(e) => {
+                out.ret = e;
+                add_msg!("Error in detecting input InChI options");
+                out.num_errors += 1;
+                break 'body;
+            }
+            Ok(o) => {
+                b_has_some_reconnected = o.has_reconnected;
+                b_has_metal = o.has_metal;
+                b_has_some_fixed_h = o.has_fixed_h;
+                ip.n_mode &= !(REQ_MODE_STEREO
+                    | REQ_MODE_ISO_STEREO
+                    | REQ_MODE_RELATIVE_STEREO
+                    | REQ_MODE_RACEMIC_STEREO
+                    | REQ_MODE_CHIR_FLG_STEREO
+                    | REQ_MODE_SB_IGN_ALL_UU
+                    | REQ_MODE_SC_IGN_ALL_UU);
+                ip.n_mode |= o.mode_flags_stereo;
+                ip.b_taut_flags &=
+                    !(TG_FLAG_PHOSPHINE_STEREO | TG_FLAG_ARSINE_STEREO | TG_FLAG_FIX_SP3_BUG);
+                ip.b_taut_flags |= o.taut_flags_stereo;
+            }
+        }
+        if b_has_some_fixed_h && !b_req_non_taut {
+            b_has_some_fixed_h = false;
+        }
+        // mark the Disconnected components identical to the Reconnected ones
+        mark_disconnected_identical_to_reconnected(one_input);
+        // the main conversion InChI -> structure for each component
+        let ret = all_inchi_to_structure(
+            &ip,
+            num_inp,
+            &srm,
+            b_has_some_fixed_h,
+            &mut p_struct,
+            one_input,
+            0,
+            polymer,
+        );
+        if ret != 0 {
+            // FIX_GAF_2019_1: a positive result is the number of errors
+            out.ret = if ret > 0 { RI_ERR_PROGR } else { ret };
+            out.num_errors += 1;
+            break 'body;
+        }
+        // fix the number of removed protons in case of Mobile-H
+        if one_input.n_num_protons[INCHI_BAS][TAUT_YES]
+            .p_num_protons
+            .is_none()
+            && one_input.n_num_protons[INCHI_REC][TAUT_YES]
+                .p_num_protons
+                .is_none()
+        {
+            let r = add_proton_and_iso_h_balance_to_mob_h_struct(
+                &ip,
+                &mut sd,
+                num_inp,
+                b_has_some_fixed_h,
+                &mut p_struct,
+                one_input,
+            );
+            if r < 0 {
+                out.ret = r;
+                add_msg!("Add/Remove protons error");
+                out.num_errors += 1;
+                break 'body;
+            }
+        }
+        // compare the InChI from the reversed structure to the input InChI
+        let r = compare_all_orig_inchi_to_rev_inchi(&p_struct, one_input, b_has_some_fixed_h);
+        if r < 0 {
+            out.ret = r;
+            add_msg!("InChI compare error");
+            out.num_errors += 1;
+            break 'body;
+        }
+        // compare the disconnected versions
+        let r = compare_all_disconnected_orig_inchi_to_rev_inchi(
+            &p_struct,
+            one_input,
+            b_has_some_fixed_h,
+        );
+        if r < 0 {
+            out.ret = r;
+            add_msg!("InChI compare2 error");
+            out.num_errors += 1;
+            break 'body;
+        }
+        out.warning_flags = one_input.compare_inchi_flags;
+        let (r, atoms) = merge_structure_components(&p_struct, one_input);
+        if r < 0 {
+            out.ret = r;
+            add_msg!("Merge Components error");
+            out.num_errors += 1;
+            break 'body;
+        }
+        out.atoms = atoms;
+        let mut retcomp = {
+            let l = out.message.len();
+            let _ = l;
+            fill_out_compare_message(&mut out.message, msg_len, one_input.compare_inchi_flags[0])
+        };
+        let mut retcomp1 = 0;
+        if one_input.compare_inchi_flags[1] != [0, 0] {
+            add_msg!("Disconnected: ");
+            retcomp1 = fill_out_compare_message(
+                &mut out.message,
+                msg_len,
+                one_input.compare_inchi_flags[1],
+            );
+        }
+        // add a metal warning
+        let len = out.message.len();
+        if b_has_metal && init_len < len {
+            const METAL: &str = " (Metal compound)";
+            out.message.insert_str(init_len, METAL);
+            let max = msg_len as usize - 1;
+            out.message.truncate(max);
+        }
+        retcomp = retcomp.min(retcomp1);
+        if retcomp < 0 && ip_inp.b_inchi_output_options2 & INCHI_OUT_MISMATCH_AS_ERROR != 0 {
+            out.ret = RI_ERR_MISMATCH;
+            out.num_errors += 1;
+            break 'body;
+        }
+        out.ret = 0;
+    }
+    // deallocate and report
+    if out.ret != 0 {
+        if out.ret < 0 {
+            if out.ret == super::ichierr::CT_USER_QUIT_ERR {
+                add_msg!("*Terminated by the user*");
+            } else {
+                add_msg!("*Conversion failed*");
+            }
+        } else {
+            add_msg!("*Conversion failed on component(s)");
+            for i_rec in 0..2 {
+                let start = if b_has_some_fixed_h {
+                    TAUT_NON
+                } else {
+                    TAUT_YES
+                };
+                for i_mob in start..2 {
+                    for (i_comp, c) in p_struct[i_rec][i_mob].iter().enumerate() {
+                        if c.n_error != 0 {
+                            let f = one_input.p_inp_inchi[i_rec][i_mob][i_comp]
+                                .sz_hill_formula
+                                .as_deref()
+                                .unwrap_or("???");
+                            let t = format!(
+                                " {}{}{}({:.96})",
+                                if !b_has_some_reconnected {
+                                    ""
+                                } else if i_rec != 0 {
+                                    "R"
+                                } else {
+                                    "D"
+                                },
+                                if b_has_some_fixed_h {
+                                    if i_mob != 0 { "M" } else { "F" }
+                                } else {
+                                    ""
+                                },
+                                i_comp + 1,
+                                f
+                            );
+                            let l = out.message.len();
+                            add_one_msg(&mut out.message, l, msg_len, &t, None);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    out
+}

@@ -12,6 +12,7 @@ use rdoxide::external::inchi::ichirvr2::StrFromInChI;
 use rdoxide::external::inchi::ichirvr7::{
     add_proton_and_iso_h_balance_to_mob_h_struct, all_inchi_to_structure,
     compare_all_disconnected_orig_inchi_to_rev_inchi, compare_all_orig_inchi_to_rev_inchi,
+    convert_inchi2_struct,
 };
 use rdoxide::external::inchi::ichirvrs::set_up_srm;
 use rdoxide::external::inchi::runichi3::StructData;
@@ -194,4 +195,32 @@ fn compare_reports_differences() {
     d.p_inp_inchi[0][1][0].n_num_h[0] += 1;
     assert!(compare_all_orig_inchi_to_rev_inchi(&ps, &mut d, false) >= 0);
     assert_ne!(d.compare_inchi_flags[0][1] & diff::POSITION_H, 0);
+}
+
+#[test]
+fn convert_inchi_to_structure() {
+    let ip = default_parms();
+    for (s, natoms) in [
+        ("InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3", 3),
+        ("InChI=1S/C6H6/c1-2-4-6-5-3-1/h1-6H", 6),
+        ("InChI=1S/C2H4O2/c1-2(3)4/h1H3,(H,3,4)", 4),
+        ("InChI=1S/H3N/h1H3/p+1", 1),
+        ("InChI=1S/C4H8/c1-3-4-2/h3-4H,1-2H3/b4-3+", 4),
+    ] {
+        let mut d = parse(s).unwrap();
+        let r = convert_inchi2_struct(&ip, &mut d, "", false, 1, None);
+        assert_eq!(r.ret, 0, "{s}: {}", r.message);
+        assert_eq!(r.message, "", "{s}");
+        assert_eq!(r.warning_flags, [[0; 2]; 2], "{s}");
+        assert_eq!(
+            r.atoms.iter().filter(|a| a.el_number != 1).count(),
+            natoms,
+            "{s}"
+        );
+    }
+    // a mismatching original InChI is reported in the message
+    let mut d = parse("InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3").unwrap();
+    d.p_inp_inchi[0][1][0].n_num_h[0] += 1;
+    let r = convert_inchi2_struct(&ip, &mut d, "", false, 1, None);
+    assert!(r.message.contains("Problems/mismatches"), "{}", r.message);
 }
