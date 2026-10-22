@@ -344,6 +344,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 228 | InChI port I10a: ichiread /q and /p layers, delimited numbers, segment reader, differential-tested on 9786 cases vs the C library |
 | 229 | InChI port I10b: ichiread ParseSegmentFormula differential-tested vs the C library (12686 reader cases); polymer molfiles end with an error instead of a panic |
 | 230 | InChI port I10c: ichiread ParseSegmentConnections (plain and compressed), differential-tested vs the C library |
+| 231 | InChI port I10d: ichiread ParseSegmentMobileH with tautomeric groups, differential-tested vs the C library |
 
 ## Python package files
 
@@ -756,3 +757,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-22 — Stage 228: I10a ichiread: charge/proton layers and segment reader differential-tested against C (9786 cases)
 * 2026-10-22 — Stage 229: I10b ichiread: formula layer differential-tested against C
 * 2026-10-22 — Stage 230: I10c ichiread: connection layer differential-tested against C
+* 2026-10-22 — Stage 231: I10d ichiread: hydrogen layer differential-tested against C

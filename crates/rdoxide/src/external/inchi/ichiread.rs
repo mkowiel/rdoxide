@@ -703,6 +703,8 @@ pub fn parse_segment_formula(
                 };
                 p_inp_inchi[b_mobile_h][ici].n_number_of_atoms = n_num_atoms_and_h;
                 // Pass 2.2 Store elements; this assumes no bridging H
+                p_inp_inchi[b_mobile_h][ici].n_atom =
+                    vec![0; n_num_atoms_and_h.max(0) as usize + 1];
                 let mut atoms: Vec<u8> = Vec::new();
                 if n_num_atoms > 0 {
                     for (el, m) in &items {
@@ -717,6 +719,7 @@ pub fn parse_segment_formula(
                             if atoms.len() as i32 >= n_num_atoms {
                                 return RI_ERR_PROGR;
                             }
+                            p_inp_inchi[b_mobile_h][ici].n_atom[atoms.len()] = el_number as u8;
                             atoms.push(el_number as u8);
                         }
                     }
@@ -1299,4 +1302,674 @@ pub fn parse_segment_connections(
         }
     };
     ret
+}
+
+/// `GetInChIFormulaNumH`: the number of H in the Hill formula including the
+/// bridging H; `Err` is the return code
+pub fn get_inchi_formula_num_h(inchi: &InChI) -> Result<i32, i32> {
+    let mut n = 0i32;
+    if let Some(f) = &inchi.sz_hill_formula {
+        let f = f.as_bytes();
+        let mut from = 0;
+        while let Some(h) = strchr(f, from, b'H') {
+            let p = h + 1;
+            let mut next = p;
+            if !lower(f, p) {
+                if is_digit(at(f, p)) {
+                    let (v, q) = strtol(f, p);
+                    let delta = v as i32;
+                    if !(0..=MAX_ATOMS).contains(&delta) {
+                        return Err(RI_ERR_SYNTAX);
+                    }
+                    n = n.wrapping_add(delta);
+                    next = q;
+                } else {
+                    n += 1;
+                }
+            }
+            from = next;
+        }
+    }
+    Ok(n)
+}
+
+/// `GetInChINumH`: the number of H of the connection table (immobile and
+/// bridging H and the H of the tautomeric groups); `Err` is the return code
+pub fn get_inchi_num_h(inchi: &InChI) -> Result<i32, i32> {
+    let mut n = 0i32;
+    for i in 0..inchi.n_number_of_atoms.max(0) as usize {
+        n += i32::from(inchi.n_atom.get(i).copied().unwrap_or(0) == 1);
+        n += i32::from(inchi.n_num_h.get(i).copied().unwrap_or(0));
+    }
+    if inchi.len_tautomer > 3 && !inchi.n_tautomer.is_empty() {
+        let len = inchi.len_tautomer;
+        let g = |j: usize| i32::from(inchi.n_tautomer.get(j).copied().unwrap_or(0));
+        let mut j: i32 = 0;
+        let n_groups = g(j as usize);
+        j += 1;
+        let mut i_group = 0;
+        while j < len && i_group < n_groups {
+            let group_len = g(j as usize) + 1;
+            n += g(j as usize + 1);
+            i_group += 1;
+            j += group_len;
+        }
+        if i_group != n_groups || j != len {
+            return Err(RI_ERR_PROGR);
+        }
+    }
+    if inchi.n_num_h_fixed.is_some() && (inchi.len_tautomer != 0 || !inchi.n_tautomer.is_empty()) {
+        return Err(RI_ERR_PROGR);
+    }
+    Ok(n)
+}
+
+const INCHI_T_NUM_MOVABLE: i32 = 2;
+
+/// `strspn(s + from, set)` end position
+fn strspn_end(s: &[u8], from: usize, set: &[u8]) -> usize {
+    let mut i = from;
+    while at(s, i) != 0 && set.contains(&s[i]) {
+        i += 1;
+    }
+    i
+}
+
+/// the H counts of the component `ic`: `nNum_H` or `nNum_H_fixed`
+fn num_h_mut(c: &mut InChI, mobile: usize) -> Option<&mut Vec<i8>> {
+    if mobile == TAUT_YES {
+        if c.n_num_h.is_empty() {
+            None
+        } else {
+            Some(&mut c.n_num_h)
+        }
+    } else {
+        c.n_num_h_fixed.as_mut()
+    }
+}
+
+fn set_num_h(c: &mut InChI, mobile: usize, from: i32, to: i32, num_h: i32, sum: &mut i32) -> bool {
+    if let Some(v) = num_h_mut(c, mobile) {
+        for i in from..=to {
+            let Ok(k) = usize::try_from(i - 1) else {
+                return false;
+            };
+            // the proton placeholder has two entries only; C writes past them
+            if k >= v.len() {
+                v.resize(k + 1, 0);
+            }
+            v[k] = num_h as i8;
+            *sum = sum.wrapping_add(num_h);
+        }
+    }
+    true
+}
+
+/// `ParseSegmentMobileH`: the `/h` layer (`s` starts at the `h`, or at
+/// whatever follows when the layer is missing)
+pub fn parse_segment_mobile_h(
+    s: &[u8],
+    b_mobile_h: usize,
+    p_inp_inchi: &mut [Vec<InChI>; 2],
+    pn_num_components: [i32; 2],
+    pb_abc: &mut i32,
+) -> i32 {
+    let alt = 1 - b_mobile_h;
+    let n_num_components = pn_num_components[b_mobile_h];
+
+    // number of immobile H is always allocated; immobile H are present in M layer only
+    for i in 0..n_num_components.max(0) as usize {
+        let Some(c) = p_inp_inchi[b_mobile_h].get(i) else {
+            return RI_ERR_SYNTAX;
+        };
+        let mut len = c.n_number_of_atoms;
+        let has_alt = b_mobile_h == TAUT_NON && (i as i32) < pn_num_components[alt];
+        if has_alt {
+            let alt_n = p_inp_inchi[alt][i].n_number_of_atoms;
+            if len < alt_n {
+                len = alt_n;
+                p_inp_inchi[b_mobile_h][i].n_num_h = Vec::new();
+            }
+        }
+        let len = (len + 1).max(0) as usize;
+        if p_inp_inchi[b_mobile_h][i].n_num_h.is_empty() {
+            p_inp_inchi[b_mobile_h][i].n_num_h = vec![0; len];
+        }
+        if has_alt {
+            // copy immobile H from the Mobile-H layer to the Fixed-H layer
+            let a = &mut p_inp_inchi[alt][i].n_num_h;
+            a.resize(len, 0);
+            let copy: Vec<i8> = (0..len)
+                .map(|k| if k + 1 < len { a[k] } else { 0 })
+                .collect();
+            p_inp_inchi[b_mobile_h][i].n_num_h = copy;
+        }
+    }
+
+    if at(s, 0) != b'h' {
+        return 0;
+    }
+
+    // Read Hydrogen info in 1 pass
+    let mut p_start = 1usize;
+    let mut i_component: i32 = 0;
+    loop {
+        let p_end = strchr(s, p_start, b';').unwrap_or(p_start + strlen(s, p_start));
+        let mpy_component: i32;
+        let mut p: usize;
+        if let Some(star) = strchr(s, p_start, b'*').filter(|&x| x < p_end) {
+            let (v, q) = strtol(s, p_start);
+            mpy_component = v as i32;
+            if !(0..=MAX_ATOMS).contains(&mpy_component) {
+                return RI_ERR_SYNTAX;
+            }
+            if star != q || !is_digit(at(s, p_start)) {
+                return RI_ERR_SYNTAX;
+            }
+            p = star + 1;
+        } else {
+            mpy_component = 1;
+            p = p_start;
+        }
+        p_start = p;
+        // Pass 1.1 parse a component
+        let ic = i_component as usize;
+        if ic >= p_inp_inchi[b_mobile_h].len() {
+            return RI_ERR_SYNTAX;
+        }
+        let mut num_ct_atoms = p_inp_inchi[b_mobile_h][ic].n_number_of_atoms;
+        if b_mobile_h == TAUT_NON && i_component < pn_num_components[alt] {
+            num_ct_atoms = p_inp_inchi[alt][ic].n_number_of_atoms;
+        }
+        if p < p_end && *pb_abc == -1 {
+            *pb_abc = i32::from(at(s, p) == b',' || upper(s, p));
+        }
+        let base: i64 = if *pb_abc == 1 { ALPHA_BASE } else { 10 };
+
+        // immobile H: locate the first tautomer group character
+        let t0 = if *pb_abc == 1 {
+            strchr(s, p, b',')
+        } else {
+            strchr(s, p, b'(')
+        };
+        if t0.is_some() && b_mobile_h == TAUT_NON {
+            return RI_ERR_SYNTAX;
+        }
+        let (t, p_taut) = match t0 {
+            Some(x) if x <= p_end => (Some(x), x),
+            _ => (None, p_end),
+        };
+        let mut i = 0;
+        while i < mpy_component && i_component + i < n_num_components {
+            let k = (i_component + i) as usize;
+            if b_mobile_h == TAUT_NON {
+                if p_inp_inchi[b_mobile_h][k].n_num_h_fixed.is_some() {
+                    return RI_ERR_PROGR;
+                }
+                let own_n = p_inp_inchi[b_mobile_h][k].n_number_of_atoms;
+                let in_alt = i_component + i < pn_num_components[alt];
+                let alt_n = if in_alt {
+                    p_inp_inchi[alt][k].n_number_of_atoms
+                } else {
+                    0
+                };
+                let len = if in_alt {
+                    own_n.max(alt_n) + 1
+                } else {
+                    own_n + 1
+                };
+                p_inp_inchi[b_mobile_h][k].n_num_h_fixed = Some(vec![0; len.max(0) as usize]);
+                if in_alt {
+                    let len2 = own_n.min(alt_n).max(0) as usize;
+                    let own_atoms = p_inp_inchi[b_mobile_h][k].n_atom.clone();
+                    if !own_atoms.is_empty() && len2 != 0 {
+                        let a: Vec<u8> = (0..len2)
+                            .map(|j| own_atoms.get(j).copied().unwrap_or(0))
+                            .collect();
+                        let b: Vec<u8> = (0..len2)
+                            .map(|j| p_inp_inchi[alt][k].n_atom.get(j).copied().unwrap_or(0))
+                            .collect();
+                        if a != b {
+                            return RI_ERR_SYNTAX;
+                        }
+                    }
+                    if own_n < alt_n {
+                        let alt_atoms = p_inp_inchi[alt][k].n_atom.clone();
+                        let mut na = vec![0u8; len.max(0) as usize];
+                        if len > 1 {
+                            for j in 0..(len - 1) as usize {
+                                na[j] = alt_atoms.get(j).copied().unwrap_or(0);
+                            }
+                        }
+                        p_inp_inchi[b_mobile_h][k].n_atom = na;
+                        p_inp_inchi[b_mobile_h][k].n_number_of_atoms = alt_n;
+                    }
+                }
+            }
+            i += 1;
+        }
+
+        let mut tg_alloc_len: i32 = 0;
+        let mut num_h_component: i32 = 0;
+        let mut num_taut_h_component: i32 = 0;
+        let mob = b_mobile_h;
+        if *pb_abc == 1 {
+            // read numbers of H: XnYn... or XYn...
+            p = p_start;
+            while p < p_taut {
+                if at(s, p) == 0 || !upper(s, p) {
+                    return RI_ERR_SYNTAX;
+                }
+                let (v, q) = inchi_strtol(s, p, base);
+                let cur_atom = v as u16;
+                let mut nxt_atom = cur_atom;
+                if cur_atom != 0 {
+                    p = q;
+                    if upper(s, p) {
+                        let (v, q) = inchi_strtol(s, p, base);
+                        nxt_atom = v as u16;
+                        if i32::from(nxt_atom) > MAX_ATOMS {
+                            return RI_ERR_SYNTAX;
+                        }
+                        p = q;
+                    }
+                }
+                if cur_atom > nxt_atom || i32::from(nxt_atom) > num_ct_atoms || p > p_taut {
+                    return RI_ERR_SYNTAX;
+                }
+                let (v, q) = strtol(s, p);
+                let num_h = v as i32;
+                if num_h == 0 || q > p_taut {
+                    return RI_ERR_SYNTAX;
+                }
+                p = q;
+                if !set_num_h(
+                    &mut p_inp_inchi[mob][ic],
+                    mob,
+                    i32::from(cur_atom),
+                    i32::from(nxt_atom),
+                    num_h,
+                    &mut num_h_component,
+                ) {
+                    return RI_ERR_SYNTAX;
+                }
+            }
+            if p != p_taut {
+                return RI_ERR_SYNTAX;
+            }
+        } else {
+            // read numbers of H: 1-2,3H2,4,5H3
+            p = p_start;
+            let set: &[u8] = if b_mobile_h == TAUT_NON {
+                b"0123456789hDHT-,;()*"
+            } else {
+                b"0123456789DHT-,;()*"
+            };
+            if at(s, strspn_end(s, 1, set)) != 0 {
+                return RI_ERR_SYNTAX;
+            }
+            while p < p_taut {
+                if at(s, p) == 0 || !is_digit(at(s, p)) {
+                    return RI_ERR_SYNTAX;
+                }
+                let mut h = p;
+                while at(s, h) != 0 && at(s, h) != b'H' && at(s, h) != b'h' {
+                    h += 1;
+                }
+                if at(s, h) == 0 || h >= p_taut {
+                    return RI_ERR_SYNTAX;
+                }
+                let mut num_h: i32 = match at(s, h) {
+                    b'H' => 1,
+                    b'h' => -1,
+                    _ => 0,
+                };
+                if num_h == 0 {
+                    return RI_ERR_SYNTAX;
+                }
+                let mut p1;
+                if is_digit(at(s, h + 1)) {
+                    let (v, e) = strtol(s, h + 1);
+                    num_h = num_h.wrapping_mul(v as i32);
+                    p1 = e;
+                } else {
+                    p1 = h + 1;
+                }
+                if at(s, p1) == b',' {
+                    p1 += 1;
+                }
+                while p < h {
+                    if at(s, p) == 0 || !is_digit(at(s, p)) {
+                        return RI_ERR_SYNTAX;
+                    }
+                    let (v, mut q) = strtol(s, p);
+                    let cur_atom = v as i32;
+                    let mut nxt_atom = cur_atom;
+                    if at(s, q) == b'-' {
+                        let (v2, q2) = strtol(s, q + 1);
+                        nxt_atom = v2 as i32;
+                        q = q2;
+                        if !(0..=MAX_ATOMS).contains(&nxt_atom) {
+                            return RI_ERR_SYNTAX;
+                        }
+                    }
+                    if cur_atom == 0
+                        || cur_atom > num_ct_atoms
+                        || nxt_atom < cur_atom
+                        || nxt_atom > num_ct_atoms
+                    {
+                        return RI_ERR_SYNTAX;
+                    }
+                    if !set_num_h(
+                        &mut p_inp_inchi[mob][ic],
+                        mob,
+                        cur_atom,
+                        nxt_atom,
+                        num_h,
+                        &mut num_h_component,
+                    ) {
+                        return RI_ERR_SYNTAX;
+                    }
+                    p = q;
+                    if at(s, p) == b',' {
+                        p += 1;
+                    }
+                }
+                if p == h {
+                    p = p1;
+                } else if p == p_taut {
+                    break;
+                } else {
+                    return RI_ERR_SYNTAX;
+                }
+            }
+        }
+
+        // tautomeric groups
+        let mut len_tautomer: i32 = 0;
+        if let Some(t) = t {
+            p = t;
+            let mut tg_pos_tautomer: i32;
+            let mut i_tgroup: i32 = 0;
+            let mut num_atoms: i32 = 0;
+            let alloc_taut = |p_inp: &mut [Vec<InChI>; 2], tg_alloc_len: i32| -> bool {
+                for i in 0..mpy_component {
+                    let k = (i_component + i) as usize;
+                    let Some(c) = p_inp[mob].get_mut(k) else {
+                        return false;
+                    };
+                    c.n_tautomer = vec![0; tg_alloc_len as usize + 1];
+                    c.len_tautomer = 0;
+                }
+                true
+            };
+            if *pb_abc == 1 {
+                if at(s, p) == b',' {
+                    p += 1;
+                } else {
+                    return RI_ERR_SYNTAX;
+                }
+                while p < p_end {
+                    if !is_digit(at(s, p)) {
+                        return RI_ERR_SYNTAX;
+                    }
+                    let (v, q) = strtol(s, p);
+                    let num_h = v as i32;
+                    if num_h == 0 || q > p_end {
+                        return RI_ERR_SYNTAX;
+                    }
+                    p = q;
+                    let mut num_minus = 0;
+                    if at(s, p) == b'-' {
+                        p += 1;
+                        if is_digit(at(s, p)) {
+                            let (v, q) = strtol(s, p);
+                            num_minus = v as i32;
+                            p = q;
+                        } else {
+                            num_minus = 1;
+                        }
+                    }
+                    if p >= p_end {
+                        return RI_ERR_SYNTAX;
+                    }
+                    if tg_alloc_len == 0 {
+                        tg_alloc_len = ((3 + INCHI_T_NUM_MOVABLE)
+                            * p_inp_inchi[mob][ic].n_number_of_atoms)
+                            / 2
+                            + 1;
+                        if !alloc_taut(p_inp_inchi, tg_alloc_len) {
+                            return RI_ERR_SYNTAX;
+                        }
+                        tg_pos_tautomer = 1;
+                    } else {
+                        tg_pos_tautomer = len_tautomer;
+                    }
+                    if tg_pos_tautomer + 3 >= tg_alloc_len {
+                        return RI_ERR_PROGR;
+                    }
+                    let c = &mut p_inp_inchi[mob][ic];
+                    c.n_tautomer[tg_pos_tautomer as usize + 1] = num_h as u16;
+                    c.n_tautomer[tg_pos_tautomer as usize + 2] = num_minus as u16;
+                    len_tautomer = tg_pos_tautomer + 3;
+                    num_taut_h_component = num_taut_h_component.wrapping_add(num_h);
+                    while p < p_end && upper(s, p) {
+                        let (v, q) = inchi_strtol(s, p, base);
+                        let val = v as i32;
+                        if len_tautomer >= tg_alloc_len || val > num_ct_atoms {
+                            return RI_ERR_PROGR;
+                        }
+                        num_atoms += 1;
+                        let c = &mut p_inp_inchi[mob][ic];
+                        c.n_tautomer[len_tautomer as usize] = val as u16;
+                        len_tautomer += 1;
+                        p = q;
+                    }
+                    if num_atoms == 0 || (p < p_end && !is_digit(at(s, p))) {
+                        return RI_ERR_PROGR;
+                    }
+                    i_tgroup += 1;
+                    let c = &mut p_inp_inchi[mob][ic];
+                    c.n_tautomer[tg_pos_tautomer as usize] =
+                        (len_tautomer - tg_pos_tautomer - 1) as u16;
+                    c.len_tautomer = len_tautomer;
+                }
+                if i_tgroup == 0 || p != p_end {
+                    return RI_ERR_SYNTAX;
+                }
+                p_inp_inchi[mob][ic].n_tautomer[0] = i_tgroup as u16;
+            } else {
+                let mut state: u8 = b')';
+                let (mut num_h, mut num_minus) = (-999i32, -999i32);
+                tg_pos_tautomer = -999;
+                while p < p_end {
+                    match at(s, p) {
+                        b'(' => {
+                            if state != b')' {
+                                return RI_ERR_SYNTAX;
+                            }
+                            state = b'(';
+                            p += 1;
+                            num_h = 0;
+                            num_minus = 0;
+                        }
+                        b')' => {
+                            if state != b'A' {
+                                return RI_ERR_SYNTAX;
+                            }
+                            if tg_alloc_len == 0 {
+                                return RI_ERR_SYNTAX;
+                            }
+                            i_tgroup += 1;
+                            state = b')';
+                            p += 1;
+                            let c = &mut p_inp_inchi[mob][ic];
+                            c.n_tautomer[tg_pos_tautomer as usize] =
+                                (len_tautomer - tg_pos_tautomer - 1) as u16;
+                            c.len_tautomer = len_tautomer;
+                        }
+                        b'H' => {
+                            if state != b'(' {
+                                return RI_ERR_SYNTAX;
+                            }
+                            state = b'H';
+                            p += 1;
+                            num_h = 1;
+                        }
+                        b'-' => {
+                            if state != b'N' && state != b'H' {
+                                return RI_ERR_SYNTAX;
+                            }
+                            state = b'-';
+                            p += 1;
+                            num_minus = 1;
+                        }
+                        b',' => match state {
+                            b'N' | b'H' | b'-' | b'M' => {
+                                if num_h <= 0 && num_minus <= 0 {
+                                    return RI_ERR_SYNTAX;
+                                }
+                                if tg_alloc_len == 0 {
+                                    tg_alloc_len = ((3 + INCHI_T_NUM_MOVABLE)
+                                        * p_inp_inchi[mob][ic].n_number_of_atoms)
+                                        / 2
+                                        + 1;
+                                    if !alloc_taut(p_inp_inchi, tg_alloc_len) {
+                                        return RI_ERR_SYNTAX;
+                                    }
+                                    tg_pos_tautomer = 1;
+                                } else {
+                                    tg_pos_tautomer = len_tautomer;
+                                }
+                                if tg_pos_tautomer + 3 >= tg_alloc_len {
+                                    return RI_ERR_PROGR;
+                                }
+                                let c = &mut p_inp_inchi[mob][ic];
+                                c.n_tautomer[tg_pos_tautomer as usize + 1] = num_h as u16;
+                                c.n_tautomer[tg_pos_tautomer as usize + 2] = num_minus as u16;
+                                len_tautomer = tg_pos_tautomer + 3;
+                                num_taut_h_component = num_taut_h_component.wrapping_add(num_h);
+                                state = b',';
+                                p += 1;
+                            }
+                            b'A' => {
+                                state = b',';
+                                p += 1;
+                            }
+                            _ => return RI_ERR_SYNTAX,
+                        },
+                        c if is_digit(c) => {
+                            let (v, q) = strtol(s, p);
+                            let val = v as i32;
+                            if val <= 0 {
+                                return RI_ERR_SYNTAX;
+                            }
+                            p = q;
+                            match state {
+                                b'H' => {
+                                    num_h = val;
+                                    state = b'N';
+                                }
+                                b'-' => {
+                                    num_minus = val;
+                                    state = b'M';
+                                }
+                                b',' => {
+                                    if len_tautomer >= tg_alloc_len || val > num_ct_atoms {
+                                        return RI_ERR_PROGR;
+                                    }
+                                    num_atoms += 1;
+                                    let c = &mut p_inp_inchi[mob][ic];
+                                    c.n_tautomer[len_tautomer as usize] = val as u16;
+                                    len_tautomer += 1;
+                                    state = b'A';
+                                }
+                                _ => return RI_ERR_SYNTAX,
+                            }
+                        }
+                        _ => return RI_ERR_SYNTAX,
+                    }
+                }
+                let _ = num_atoms;
+                if i_tgroup == 0 || state != b')' {
+                    return RI_ERR_SYNTAX;
+                }
+                p_inp_inchi[mob][ic].n_tautomer[0] = i_tgroup as u16;
+            }
+        }
+
+        // check num_H in components
+        let check = |c: &InChI| -> Result<(), i32> {
+            let f = get_inchi_formula_num_h(c)?;
+            let h = get_inchi_num_h(c)?;
+            if f != h + if b_mobile_h == TAUT_NON {
+                num_h_component
+            } else {
+                0
+            } {
+                return Err(RI_ERR_SYNTAX);
+            }
+            Ok(())
+        };
+        if let Err(r) = check(&p_inp_inchi[mob][ic]) {
+            return r;
+        }
+
+        // duplicate according to multiplication
+        let mut i = 1;
+        while i < mpy_component {
+            let k = i_component + i;
+            if k > n_num_components - 1 || k < 0 {
+                return RI_ERR_SYNTAX;
+            }
+            let k = k as usize;
+            let dn = p_inp_inchi[mob][k].n_number_of_atoms;
+            if dn <= 0 || dn > MAX_ATOMS {
+                return RI_ERR_SYNTAX;
+            }
+            let src_h: Option<Vec<i8>> =
+                num_h_mut(&mut p_inp_inchi[mob][ic], mob).map(|v| v.clone());
+            if let Some(src) = src_h {
+                if let Some(dst) = num_h_mut(&mut p_inp_inchi[mob][k], mob) {
+                    for j in 0..dn as usize {
+                        if let (Some(d), Some(sv)) = (dst.get_mut(j), src.get(j)) {
+                            *d = *sv;
+                        }
+                    }
+                }
+            }
+            let (src_t, src_len) = {
+                let c = &p_inp_inchi[mob][ic];
+                (c.n_tautomer.clone(), c.len_tautomer)
+            };
+            if !p_inp_inchi[mob][k].n_tautomer.is_empty() && !src_t.is_empty() && src_len != 0 {
+                let d = &mut p_inp_inchi[mob][k];
+                for j in 0..src_len as usize {
+                    if let (Some(x), Some(y)) = (d.n_tautomer.get_mut(j), src_t.get(j)) {
+                        *x = *y;
+                    }
+                }
+                d.len_tautomer = src_len;
+            }
+            if let Err(r) = check(&p_inp_inchi[mob][k]) {
+                return r;
+            }
+            i += 1;
+        }
+
+        // prepare for the next component
+        i_component += i;
+        if at(s, p_end) != 0 {
+            if i_component >= n_num_components {
+                return RI_ERR_SYNTAX;
+            }
+            p_start = p_end + 1;
+        } else {
+            break;
+        }
+    }
+    if n_num_components != i_component {
+        return RI_ERR_SYNTAX;
+    }
+    i_component + 1
 }

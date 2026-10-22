@@ -202,6 +202,83 @@ fn read_helpers_match_c() {
                     }
                 }
             }
+            "10" => {
+                let mut abc = p(1);
+                let hasfixed = p(2) == 1;
+                let b: Vec<Vec<u8>> = (3..8).map(|k| unhex(t[k])).collect();
+                let mut pp: [Vec<InChI>; 2] = [Vec::new(), Vec::new()];
+                let mut pn = [0i32; 2];
+                let mut na = IST_MOBILE_H_FORMULA;
+                let mut nb = 0;
+                let mut r = parse_segment_formula(&b[0], 1, &mut pp, &mut pn, &mut na);
+                got.push(format!("F1 {r} {}", pn[1]));
+                if r >= 0 {
+                    let mut v = std::mem::take(&mut pp[1]);
+                    r = parse_segment_connections(&b[1], &mut v, &mut pn[1], &mut abc, &mut nb);
+                    pp[1] = v;
+                    got.push(format!("C1 {r} {} {abc}", pn[1]));
+                }
+                if r >= 0 {
+                    r = parse_segment_mobile_h(&b[2], 1, &mut pp, pn, &mut abc);
+                    got.push(format!("H1 {r} {abc}"));
+                }
+                if r >= 0 && hasfixed {
+                    na = IST_FIXED_H_FORMULA;
+                    r = parse_segment_formula(&b[3], 0, &mut pp, &mut pn, &mut na);
+                    got.push(format!("F2 {r} {}", pn[0]));
+                    if r >= 0 {
+                        r = parse_segment_mobile_h(&b[4], 0, &mut pp, pn, &mut abc);
+                        got.push(format!("H2 {r} {abc}"));
+                    }
+                }
+                for m in [1usize, 0] {
+                    for i in 0..pn[m].max(0) as usize {
+                        let Some(c) = pp[m].get(i) else { break };
+                        let nat = c.n_number_of_atoms.max(0) as usize;
+                        let list = |v: &[i8]| -> String {
+                            if v.is_empty() {
+                                "NULL".to_string()
+                            } else {
+                                (0..=nat)
+                                    .map(|j| format!("{},", v.get(j).copied().unwrap_or(0)))
+                                    .collect()
+                            }
+                        };
+                        let atoms = if c.n_atom.is_empty() {
+                            "NULL".to_string()
+                        } else {
+                            (0..=nat)
+                                .map(|j| format!("{},", c.n_atom.get(j).copied().unwrap_or(0)))
+                                .collect()
+                        };
+                        let fixed = c.n_num_h_fixed.as_deref().map_or("NULL".to_string(), list);
+                        let taut = if c.n_tautomer.is_empty() {
+                            " NULL".to_string()
+                        } else {
+                            (0..=c.len_tautomer as usize)
+                                .map(|j| format!(" {}", c.n_tautomer.get(j).copied().unwrap_or(0)))
+                                .collect()
+                        };
+                        let ct = if c.n_conn_table.is_empty() {
+                            " NULL".to_string()
+                        } else {
+                            (0..=c.len_conn_table as usize)
+                                .map(|j| {
+                                    format!(" {}", c.n_conn_table.get(j).copied().unwrap_or(0))
+                                })
+                                .collect()
+                        };
+                        got.push(format!(
+                            "D{m}.{i} {} {} |{atoms} | {} | {fixed} | {} |{taut} | {} |{ct}",
+                            c.n_number_of_atoms,
+                            c.sz_hill_formula.as_deref().unwrap_or("NULL"),
+                            list(&c.n_num_h),
+                            c.len_tautomer,
+                            c.len_conn_table
+                        ));
+                    }
+                }
+            }
             "7" => {
                 let mut c = InChI::default();
                 let r = n_fill_out_proton_mobile_h(&mut c);
