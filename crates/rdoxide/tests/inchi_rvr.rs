@@ -9,7 +9,7 @@ use rdoxide::external::inchi::ichicano::TGSO_SYMM_IORDER;
 use rdoxide::external::inchi::ichiread::*;
 use rdoxide::external::inchi::ichirvr1::*;
 use rdoxide::external::inchi::ichirvrs::*;
-use rdoxide::external::inchi::ichitaut::TGroupInfo;
+use rdoxide::external::inchi::ichitaut::{TGroup, TGroupInfo};
 use rdoxide::external::inchi::inpdef::InpAtom;
 use rdoxide::external::inchi::util::is_el_a_metal;
 
@@ -357,6 +357,108 @@ fn restoration_helpers_match_c() {
                         x.edges_cap,
                         x.edges_flow
                     ));
+                }
+            }
+            34 => {
+                let s = Srm {
+                    b_metal_add_flower: next(),
+                    n_metal_min_bond_order: next(),
+                    n_metal_init_edge_flow: next(),
+                    n_metal_init_bond_order: next(),
+                    n_metal2_endpoint_min_bond_order: next(),
+                    n_metal2_endpoint_init_bond_order: next(),
+                    n_metal2_endpoint_init_edge_flow: next(),
+                    n_metal_max_charge_d: next(),
+                    b_fix_stereo_bonds: next(),
+                    ..Default::default()
+                };
+                let n = next() as usize;
+                let ng = next() as usize;
+                let tch = next();
+                let mut ti = TGroupInfo {
+                    num_t_groups: ng,
+                    ..Default::default()
+                };
+                let mut tgs = vec![TGroup::default(); ng + 1];
+                for (g, tg) in tgs.iter_mut().take(ng).enumerate() {
+                    tg.num[0] = next() as u16;
+                    tg.num[1] = next() as u16;
+                    tg.n_group_number = g as u16 + 1;
+                    tg.n_num_endpoints = next() as u16;
+                }
+                ti.t_group = Some(tgs);
+                let mut at = vec![InpAtom::default(); n + 1];
+                let mut va = vec![ValAt::default(); n + 1];
+                for i in 0..n {
+                    at[i].el_number = next() as u8;
+                    at[i].num_h = next() as i8;
+                    at[i].chem_bonds_valence = next() as i8;
+                    at[i].endpoint = next() as u16;
+                    let nb = next() as usize;
+                    at[i].valence = nb as i8;
+                    for q in 0..nb {
+                        at[i].neighbor[q] = next() as u16;
+                        at[i].bond_type[q] = next() as u8;
+                    }
+                    va[i].c_metal = next() as i8;
+                    va[i].c_num_bonds_to_metal = next() as i8;
+                    va[i].c_init_valence_to_metal = next() as i8;
+                    va[i].c_init_orig_valence_to_metal = next() as i8;
+                    va[i].c_init_free_valences = next() as i8;
+                    va[i].c_cn_list_index = next() as i8;
+                    va[i].c_periodic_number = at[i].el_number;
+                    next();
+                }
+                let mut g = AllTcGroups {
+                    n_group: [-1; NUM_TCGROUP_TYPES],
+                    total_charge: tch,
+                    ..Default::default()
+                };
+                let r = n_count_bns_sizes(&at, n, &ti, &va, &s, &mut g);
+                got.push(format!(
+                    "C {r} | {} {} {} {} {} {} {} {} {} {} | {} {}",
+                    g.num_atoms,
+                    g.num_bonds,
+                    g.num_tgroups,
+                    g.num_tgroup_edges,
+                    g.tgroup_charge,
+                    g.n_vertices,
+                    g.n_edges,
+                    g.num_metal_atoms,
+                    g.num_metal_bonds,
+                    g.total_electrons,
+                    g.total_electrons_metals,
+                    g.num_tc_groups
+                ));
+                for i in 0..g.num_tc_groups as usize {
+                    let x = &g.p_tcg[i];
+                    got.push(format!(
+                        "g{i} {} {} {} {} {} {} {} | {} {} 0 0",
+                        x.type_,
+                        x.ord_num,
+                        x.num_edges,
+                        x.st_cap,
+                        x.st_flow,
+                        x.edges_cap,
+                        x.edges_flow,
+                        x.tg_num_h,
+                        x.tg_num_minus
+                    ));
+                }
+                if r >= 0 {
+                    let r2 = n_add_super_c_groups(&mut g);
+                    let mut u = format!(
+                        "U {r2} {} {} {} |",
+                        g.n_vertices, g.n_edges, g.num_tc_groups
+                    );
+                    for k in 0..NUM_TCGROUP_TYPES {
+                        u.push_str(&format!(" {}", g.n_group[k]));
+                    }
+                    got.push(u);
+                    for i in 0..g.num_tc_groups as usize {
+                        let x = &g.p_tcg[i];
+                        got.push(format!("u{i} {} {} {}", x.type_, x.ord_num, x.num_edges));
+                    }
                 }
             }
             33 => {
