@@ -99,6 +99,7 @@ int main(void) {
                 for (int i = 0; i < nc[k]; i++) { int v; scanf("%d", &v); pp[k][i].nNumberOfAtoms = v; }
             }
             int sv[2][2] = { { 0, 0 }, { 0, 0 } };
+            REM_PROTONS rp[2]; memset(rp, 0, sizeof(rp));
             scanf("%d", &nseg);
             for (int g = 0; g < nseg; g++) {
                 int state; scanf("%d %s", &state, hx);
@@ -112,12 +113,19 @@ int main(void) {
                     r = ParseSegmentSp3(buf, mob, pp, nc, state, &abc); break;
                 case IST_MOBILE_H_SP3_M: case IST_FIXED_H_SP3_M: case IST_MOBILE_H_ISO_SP3_M: case IST_FIXED_H_ISO_SP3_M:
                     r = ParseSegmentSp3m(buf, mob, pp, nc, state); break;
+                case IST_MOBILE_H_ISO_ATOMS: case IST_FIXED_H_ISO_ATOMS:
+                    r = ParseSegmentIsoAtoms(buf, mob, pp, nc, state, &abc); break;
+                case IST_MOBILE_H_ISO_EXCH_H:
+                    r = ParseSegmentIsoExchgH(buf, mob, rp, nc, state, &abc); break;
+                case IST_FIXED_H_PERMUTATION: case IST_FIXED_H_ISO_PERMUTATION:
+                    r = ParseSegmentPerm(buf, mob, pp, nc, state, &abc); break;
                 default:
                     r = ParseSegmentSp3s(buf, mob, pp, sv, nc, state); break;
                 }
                 printf("R %d %d %d %d %d %d\n", state, r, abc, sv[0][0], sv[0][1], sv[1][0] * 10 + sv[1][1]);
                 if (r < 0) break;
             }
+            printf("P %d %d %d\n", rp[1].nNumRemovedIsotopicH[0], rp[1].nNumRemovedIsotopicH[1], rp[1].nNumRemovedIsotopicH[2]);
             for (int k = 0; k < 2; k++) for (int i = 0; i < nc[k]; i++) { printf("C%d.%d ", k, i); dump_inchi(&pp[k][i]); }
         } else if (t == 12) {
             int ty, bto, bfrom, hasfrom;
@@ -144,9 +152,9 @@ def hx(b):
 
 ST = {
     "mob": dict(b=5, t=6, m=7, s=8),
-    "mobi": dict(b=12, t=13, m=14, s=15),
-    "fix": dict(b=20, t=21, m=22, s=23),
-    "fixi": dict(b=28, t=29, m=30, s=31),
+    "mobi": dict(b=12, t=13, m=14, s=15, i=10, h=11),
+    "fix": dict(b=20, t=21, m=22, s=23, o=24),
+    "fixi": dict(b=28, t=29, m=30, s=31, i=26, o=32),
 }
 
 
@@ -223,6 +231,64 @@ def mutate(s):
     return "".join(c)
 
 
+def gen_iso_items(n, abc):
+    k = R.randrange(0, min(n, 5) + 1)
+    atoms = sorted(R.sample(range(1, n + 1), min(k, n)))
+    out = []
+    for a in atoms:
+        if abc:
+            iso = R.choice([0, 0, 1, -1, 2, -3, 12])
+            cnt = "".join(c + (str(R.choice([2, 3, 10])) if R.random() < 0.3 else "") for c in R.sample("tdh", R.randrange(0, 4)))
+            out.append(abcnum(a) + str(iso) + cnt)
+        else:
+            iso = R.choice(["", "", "+1", "-1", "+2", "-3", "+0", "-0", "+12"])
+            cnt = "".join(c + (str(R.choice([2, 3, 10])) if R.random() < 0.3 else "") for c in R.sample("TDH", R.randrange(0, 4)))
+            out.append(f"{a}{iso}{cnt}")
+    return "".join(out) if abc else ",".join(out)
+
+
+def gen_iso(atoms, mode, abc):
+    n = len(atoms)
+    abbr = "me" if mode == "fixi" else ""
+    groups = []
+    i = 0
+    while i < n:
+        left = n - i
+        r = R.random()
+        if abbr and r < 0.35:
+            cnt = R.randrange(1, left + 1)
+            groups.append((R.choice(["", str(cnt)]) if cnt == 1 else str(cnt)) + R.choice(abbr))
+            i += cnt
+        elif r < 0.55 and left > 1:
+            cnt = R.randrange(2, left + 1)
+            groups.append(f"{cnt}*" + gen_iso_items(atoms[i], abc))
+            i += cnt
+        else:
+            groups.append(gen_iso_items(atoms[i], abc))
+            i += 1
+    return "i" + ";".join(groups)
+
+
+def gen_exchg(abc):
+    if abc:
+        parts = [f"{R.choice([1, 2, 5, 12])}{c}" for c in "tdh" if R.random() < 0.5]
+        return "h" + "".join(parts)
+    return "h" + "".join(c + R.choice(["", "", "2", "7"]) for c in "TDH" if R.random() < 0.5)
+
+
+def gen_perm(n, abc):
+    comps = list(range(1, n + 1))
+    R.shuffle(comps)
+    cycles = []
+    while len(comps) >= 2 and R.random() < 0.8:
+        k = R.randrange(2, min(len(comps), 4) + 1)
+        cycles.append(comps[:k])
+        comps = comps[k:]
+    if abc:
+        return "o" + "".join("(" + "".join(abcnum(c) for c in cy) + ")" for cy in cycles)
+    return "o" + "".join("(" + ",".join(map(str, cy)) + ")" for cy in cycles)
+
+
 def gen_m(n, present=True):
     if not present:
         return R.choice(["", "x"])
@@ -257,10 +323,23 @@ def seq_case():
     for mode, _ in modes:
         tgt = 1 if mode.startswith("mob") else 0
         a = atom_lists[tgt] or atoms
-        for kind in ["b", "t", "m", "s"]:
+        kinds = ["b", "t", "m", "s"]
+        if mode == "mobi":
+            kinds = ["i", "h"] + kinds
+        elif mode == "fix":
+            kinds = kinds + ["o"]
+        elif mode == "fixi":
+            kinds = ["i"] + kinds + ["o"]
+        for kind in kinds:
             if R.random() < 0.2:
                 continue
-            if kind in "bt":
+            if kind == "i":
+                s = gen_iso(a, mode, abc)
+            elif kind == "h":
+                s = gen_exchg(abc)
+            elif kind == "o":
+                s = gen_perm(len(a), abc)
+            elif kind in "bt":
                 s = gen_layer(kind, a, mode, abc)
                 if R.random() < 0.08:
                     s = kind

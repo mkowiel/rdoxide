@@ -463,6 +463,7 @@ fn stereo_layers_match_c() {
                     }
                 }
                 let mut sv = [[0i32; 2]; 2];
+                let mut rp = [RemProtons::default(), RemProtons::default()];
                 let nseg = p(k);
                 k += 1;
                 for _ in 0..nseg {
@@ -483,6 +484,15 @@ fn stereo_layers_match_c() {
                         | IST_FIXED_H_SP3_M
                         | IST_MOBILE_H_ISO_SP3_M
                         | IST_FIXED_H_ISO_SP3_M => parse_segment_sp3m(&s, mob, &mut pp, nc, state),
+                        IST_MOBILE_H_ISO_ATOMS | IST_FIXED_H_ISO_ATOMS => {
+                            parse_segment_iso_atoms(&s, mob, &mut pp, nc, state, &mut abc)
+                        }
+                        IST_MOBILE_H_ISO_EXCH_H => {
+                            parse_segment_iso_exchg_h(&s, mob, &mut rp, state, &mut abc)
+                        }
+                        IST_FIXED_H_PERMUTATION | IST_FIXED_H_ISO_PERMUTATION => {
+                            parse_segment_perm(&s, mob, &mut pp, nc, state, &mut abc)
+                        }
                         _ => parse_segment_sp3s(&s, mob, &mut pp, &mut sv, nc, state),
                     };
                     got.push(format!(
@@ -495,6 +505,8 @@ fn stereo_layers_match_c() {
                         break;
                     }
                 }
+                let h = rp[1].n_num_removed_isotopic_h;
+                got.push(format!("P {} {} {}", h[0], h[1], h[2]));
                 for m in 0..2 {
                     for i in 0..nc[m] as usize {
                         got.push(format!("C{m}.{i} {}", dump_inchi(&pp[m][i])));
