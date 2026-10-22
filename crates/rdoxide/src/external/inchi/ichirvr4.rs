@@ -2590,3 +2590,282 @@ pub fn run_bns_restore1(
     ps.at2 = at2;
     ret
 }
+
+/// `RestoreAtomMakeBNS`: creates the BNS of the component, restores bonds
+/// and charges (`RunBnsRestore1`) and stores the restored structure in
+/// `ps.at2`. `p_inchi` are the Fixed-H (or only) and Mobile-H `INChI`.
+pub fn restore_atom_make_bns(
+    ip: &super::ichiparm::InputParms,
+    ps: &mut StrFromInChI,
+    i_component: i32,
+    i_at_no_offset: i32,
+    p_inchi: [Option<&InChI>; 2],
+) -> i32 {
+    use super::ichi_bns::{BN_MAX_ALTP, allocate_and_init_bn_data};
+    use super::ichiread::TAUT_NON;
+    use super::ichiring::is_bond_in_nmax_memb_ring;
+    use super::ichirvr1::{
+        BfsQ, add_cgroups_to_tcg_bn_struct, add_tgroups_to_tcg_bn_struct, alloc_bfs_queue,
+        allocate_and_init_tcg_bn_struct, fill_outp_struct_endpoint_from_inchi,
+        get_atom_restore_info, get_sp_element_type, make_one_inchi_out_of_str_from_inchi,
+        n_add_super_c_groups, n_count_bns_sizes,
+    };
+    use super::ichirvrs::{NUM_TCGROUP_TYPES, TCG_NONE, TREAT_ATOM_AS_METAL};
+    use super::util::is_el_a_metal;
+
+    let Some(inchi0) = p_inchi[0] else {
+        return RI_ERR_PROGR;
+    };
+    let mut tcg = AllTcGroups {
+        n_group: [TCG_NONE; NUM_TCGROUP_TYPES],
+        i_component,
+        i_at_no_offset,
+        ..Default::default()
+    };
+    let num_at = ps.num_atoms as usize;
+    if num_at == 1 {
+        // single atom: no bonds to restore
+        ps.at[0].charge = inchi0.n_total_charge as i8;
+        ps.at2 = ps.at.clone();
+        let mut at3 = Vec::new();
+        let at2 = ps.at2.clone();
+        let ret = make_one_inchi_out_of_str_from_inchi(ip, ps, &at2, &mut at3, tcg.i_component);
+        ps.p_one_inchi = [None, None];
+        ps.p_one_inchi_aux = [None, None];
+        ps.p_one_norm_data = [None, None];
+        return ret;
+    }
+    let mut ret;
+    let mut p_va = vec![ValAt::default(); num_at];
+    tcg.total_charge = inchi0.n_total_charge;
+    let mut bq = BfsQ::default();
+    ret = alloc_bfs_queue(&mut bq, num_at as i32, 0);
+    if ret < 0 {
+        return ret;
+    }
+    if ps.i_mobile_h == TAUT_NON as i32
+        && let Some(i1) = p_inchi[1]
+        && i1.n_number_of_atoms > 1
+    {
+        ret = fill_outp_struct_endpoint_from_inchi(i1, &mut ps.endpoint);
+        if ret != 0 {
+            return ret;
+        }
+    }
+    let stereo_removes_metal = ps.srm.b_stereo_removes_metal_flag != 0;
+    // mark metal atoms; find min ring sizes for atoms that have 2 bonds
+    for i in 0..num_at {
+        let mut row = 0;
+        let a = &ps.at[i];
+        p_va[i].c_num_valence_electrons =
+            get_sp_element_type(i32::from(a.el_number), &mut row) as i8;
+        p_va[i].c_periodic_row_number = row as i8;
+        p_va[i].c_periodic_number = a.el_number;
+        p_va[i].c_num_valence_electrons -= 1;
+        if is_el_a_metal(i32::from(a.el_number)) {
+            p_va[i].c_metal = if stereo_removes_metal {
+                i8::from(!(a.p_parity != 0 || a.sb_parity[0] != 0))
+            } else {
+                1
+            };
+        }
+        if a.valence == 2 && a.num_h == 0 {
+            let q = bq.q.as_mut().expect("queue allocated");
+            p_va[i].c_min_ring_size = is_bond_in_nmax_memb_ring(
+                &ps.at,
+                i,
+                0,
+                q,
+                &mut bq.n_atom_level,
+                &mut bq.c_source,
+                99,
+            ) as i8;
+        } else {
+            p_va[i].c_min_ring_size = 0;
+        }
+    }
+    let mut treat_more_atoms_as_metals = 0;
+    let mut second_pass_new_metals = false;
+    loop {
+        // set valences for the first time; find ChargeValence structures
+        for i in 0..num_at {
+            p_va[i].c_init_free_valences = 0;
+            let srm = ps.srm;
+            ret = get_atom_restore_info(
+                &mut ps.at,
+                i,
+                &mut p_va,
+                &srm,
+                ps.b_mobile_h,
+                ps.endpoint.as_deref(),
+            );
+            if ret < 0 {
+                return ret;
+            }
+            if ret == TREAT_ATOM_AS_METAL && !second_pass_new_metals && p_va[i].c_metal == 0 {
+                let a = &ps.at[i];
+                p_va[i].c_metal = if stereo_removes_metal {
+                    i8::from(!(a.p_parity != 0 || a.sb_parity[0] != 0))
+                } else {
+                    1
+                };
+                if p_va[i].c_metal != 0 {
+                    treat_more_atoms_as_metals += 1;
+                }
+            }
+            tcg.charge_on_atoms += i32::from(p_va[i].c_init_charge);
+        }
+        if treat_more_atoms_as_metals != 0 && !second_pass_new_metals {
+            for v in p_va.iter_mut() {
+                tcg.charge_on_atoms -= i32::from(v.c_init_charge);
+                // clear all members except five
+                *v = ValAt {
+                    c_metal: v.c_metal,
+                    c_min_ring_size: v.c_min_ring_size,
+                    c_num_valence_electrons: v.c_num_valence_electrons,
+                    c_periodic_row_number: v.c_periodic_row_number,
+                    c_periodic_number: v.c_periodic_number,
+                    ..Default::default()
+                };
+            }
+            second_pass_new_metals = true;
+            continue;
+        }
+        break;
+    }
+    ps.pbfsq = bq;
+    let result = (|| {
+        let srm = ps.srm;
+        // count atoms, bonds, additional edges and vertices
+        let ret = n_count_bns_sizes(&ps.at, num_at, &ps.ti, &p_va, &srm, &mut tcg);
+        if ret < 0 {
+            return ret;
+        }
+        let ret = n_add_super_c_groups(&mut tcg);
+        if ret < 0 {
+            return ret;
+        }
+        let (n_max_add_atoms, n_max_add_edges) = (2, 2);
+        let Some((mut bns, _)) = allocate_and_init_tcg_bn_struct(
+            &mut ps.at,
+            num_at,
+            &srm,
+            &p_va,
+            &tcg,
+            n_max_add_atoms,
+            n_max_add_edges,
+            BN_MAX_ALTP as i32,
+        ) else {
+            return super::ichierr::BNS_OUT_OF_RAM;
+        };
+        let ret = add_tgroups_to_tcg_bn_struct(
+            &mut bns,
+            &ps.at,
+            num_at,
+            &mut p_va,
+            &mut tcg,
+            n_max_add_edges,
+        );
+        if ret < 0 {
+            return ret;
+        }
+        let ret = add_cgroups_to_tcg_bn_struct(
+            &mut bns,
+            &ps.at,
+            num_at,
+            &srm,
+            &mut p_va,
+            &mut tcg,
+            n_max_add_edges,
+        );
+        if ret < 0 {
+            return ret;
+        }
+        let mut bd = allocate_and_init_bn_data(bns.max_vertices + bns.max_vertices / 2);
+        // restore bonds & charges
+        let mut ret = run_bns_restore1(ip, &mut bns, &mut bd, ps, &mut p_va, &mut tcg, p_inchi);
+        if ret < 0 {
+            return ret;
+        }
+        // create the final structure in ps.at2
+        let orig = ps.at.clone();
+        ps.at = orig.clone();
+        let ret2 = super::ichirvr2::copy_bns_to_atom(ps, &bns, &p_va, &tcg, true);
+        ps.at2 = std::mem::replace(&mut ps.at, orig);
+        if ret2 < 0 {
+            ret = ret2;
+        }
+        ret
+    })();
+    ps.pbfsq = BfsQ::default();
+    result
+}
+
+/// `OneInChI2Atom`: restores one component of the InChI as the structure
+/// `ps.at2` and creates its InChI (`ps.rev_inchi`)
+#[allow(clippy::too_many_arguments)]
+pub fn one_inchi2_atom(
+    ip_inp: &super::ichiparm::InputParms,
+    sd: &mut super::runichi3::StructData,
+    num_inp: i64,
+    ps: &mut StrFromInChI,
+    i_component: i32,
+    i_at_no_offset: i32,
+    b_has_some_fixed_h: bool,
+    p_inchi: [Option<&InChI>; 2],
+) -> i32 {
+    use super::ichiparm::REQ_MODE_BASIC;
+    use super::ichiread::{INCHI_REC, TAUT_YES};
+    use super::ichirvr2::{
+        restore_atom_connections_set_stereo, set_stereo_bond_types_from_0d_stereo,
+    };
+
+    let mut ip = ip_inp.clone();
+    sd.str_err_struct.clear();
+    let Some(inchi0) = p_inchi[0] else {
+        return RI_ERR_PROGR;
+    };
+    let ret =
+        restore_atom_connections_set_stereo(ps, i_component, i_at_no_offset, inchi0, p_inchi[1]);
+    if ret < 0 {
+        return ret;
+    }
+    let ret = set_stereo_bond_types_from_0d_stereo(ps, inchi0);
+    if ret < 0 {
+        return ret;
+    }
+    let n = ps.num_atoms as usize;
+    let ret = super::ichister::reconcile_all_cml_bond_parities(&mut ps.at[..n], false);
+    if ret < 0 {
+        return ret;
+    }
+    // main InChI restore function
+    let ret = restore_atom_make_bns(&ip, ps, i_component, i_at_no_offset, p_inchi);
+    if ret < 0 {
+        return ret;
+    }
+    if num_inp >= ip.first_struct_number {
+        if b_has_some_fixed_h
+            && ps.i_inchi_rec as usize == INCHI_REC
+            && ps.i_mobile_h == TAUT_YES as i32
+            && ps.b_fixed_h_exists == 0
+            && ip.n_mode & REQ_MODE_BASIC == 0
+        {
+            // reconnected components without Fixed-H layer may produce
+            // 'tautomeric' fragments like Cl(-)
+            ip.n_mode |= REQ_MODE_BASIC;
+        }
+        let mut at2 = ps.at2.clone();
+        let ret = super::ichirvr1::make_inchi_out_of_str_from_inchi2(
+            &ip,
+            sd,
+            ps,
+            &mut at2,
+            i_component,
+            num_inp,
+        );
+        ps.at2 = at2;
+        return ret;
+    }
+    ret
+}
