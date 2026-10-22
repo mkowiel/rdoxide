@@ -376,6 +376,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 260 | InChI port I11x: ichirvr1 MakeOneInChIOutOfStrFromINChI, MakeOneInChIOutOfStrFromINChI2 |
 | 261 | InChI port I11y: ichirvr3 FixFixedHRestoredStructure, FillTgDiffHChgFH, bHas_N_V |
 | 262 | InChI port I11z: ichirvr5 FixMobileHRestoredStructure, bIsUnsatCarbonInASmallRing |
+| 263 | InChI port I12a: ichirvr7 AddOneMsg, FillOutCompareMessage, RemoveFixHInChIIdentical2MobH, MarkDisconectedIdenticalToReconnected |
 
 ## Python package files
 
@@ -820,3 +821,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-22 — Stage 260: InChI I11x — one-component InChI of a restored structure; no runtime effect, upstream_speed.html not regenerated
 * 2026-10-22 — Stage 261: InChI I11y — Fixed-H restoration fixes (cases 01-25); no runtime effect, upstream_speed.html not regenerated
 * 2026-10-22 — Stage 262: InChI I11z — Mobile-H restoration fixes (cases 01-07); no runtime effect, upstream_speed.html not regenerated
+* 2026-10-22 — Stage 263: InChI I12a — comparison messages and component helpers; no runtime effect, upstream_speed.html not regenerated
