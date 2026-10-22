@@ -148,6 +148,28 @@ int main(void) {
                         for (int i = 0; i < n; i++) printf("W%d %d %d %d %d | %d %d\n", i, va[i].nCMinusGroupEdge, va[i].nCPlusGroupEdge, va[i].nMetalGroupEdge, va[i].nTautGroupEdge, at[i].bond_type[0], at[i].valence ? at[i].bond_type[at[i].valence - 1] : 0);
                         for (int i = 0; i < g.num_tc_groups; i++) printf("X%d %d %d %d %d %d %d %d %d\n", i, g.pTCG[i].nVertexNumber, g.pTCG[i].nForwardEdge, g.pTCG[i].nBackwardEdge, g.pTCG[i].st_cap, g.pTCG[i].st_flow, g.pTCG[i].edges_cap, g.pTCG[i].edges_flow, g.pTCG[i].num_edges);
                         printf("Y %d %d %d %d\n", g.nEdgePlus, g.nEdgeMinus, g.nEdge4charge, g.added_charge);
+                        if (r4 >= 0) {
+                            for (int i = 0; i < b->num_edges; i++) printf("U%d %d\n", i, GetChargeFlowerUpperEdge(b, va, i));
+                            EDGE_LIST el; memset(&el, 0, sizeof(el));
+                            for (int i = 0; i < b->num_edges; i += 2) AddToEdgeList(&el, i, 4);
+                            SetForbiddenEdgeMask(b, &el, 2);
+                            printf("F"); for (int i = 0; i < b->num_edges; i++) printf(" %d", b->edge[i].forbidden); printf("\n");
+                            RemoveForbiddenEdgeMask(b, &el, 1);
+                            printf("F"); for (int i = 0; i < b->num_edges; i++) printf(" %d", b->edge[i].forbidden); printf("\n");
+                            RemoveForbiddenBondFlowBits(b, 2);
+                            printf("F"); for (int i = 0; i < b->num_edges; i++) printf(" %d", b->edge[i].forbidden); printf("\n");
+                            BN_DATA *bd = AllocateAndInitBnData(b->max_vertices);
+                            Vertex vf, vl; int pl, dh = -7, dc = -7, nv = -7;
+                            int rt = RunBnsTestOnce(b, bd, va, &vf, &vl, &pl, &dh, &dc, &nv);
+                            printf("R %d %d %d %d %d %d %d\n", rt, vf, vl, pl, dh, dc, nv);
+                            int rr = RunBnsRestoreOnce(b, bd, va, &g);
+                            printf("S %d %d %d\n", rr, b->tot_st_cap, b->tot_st_flow);
+                            for (int i = 0; i < b->num_edges; i++) printf("e%d %d %d\n", i, b->edge[i].flow, b->edge[i].cap);
+                            for (int i = 0; i < b->num_vertices; i++) printf("v%d %d %d\n", i, b->vert[i].st_edge.flow, b->vert[i].st_edge.cap);
+                            for (int i = 0; i < n; i++) at[i].bond_type[0] = 0;
+                            IncrZeroBondsAndClearEndpts(at, n, 5);
+                            for (int i = 0; i < n; i++) printf("z%d %d %d %d %d\n", i, at[i].endpoint, at[i].component, at[i].chem_bonds_valence, at[i].bond_type[0]);
+                        }
                     }
                 }
             }
