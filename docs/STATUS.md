@@ -892,5 +892,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-22 — Stage 282: Ratchet files + FreeChemicalFeature kwargs (+13). No speed change: upstream_speed.html not regenerated.
 * 2026-10-22 — Stage 283: PandasTools (+23). Pure Python: speed report regenerated separately (PR 404).
 * 2026-10-22 — Stage 284: Compat shims for nb/boost test conflicts (+13). Not a speed change.
-
 * 2026-10-22 — Stage 285: serialization flag on, TautomerQuery pickles (ratchet +10). Pure Python/IO: upstream_speed.html not regenerated.
