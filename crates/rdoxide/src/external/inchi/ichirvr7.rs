@@ -1190,3 +1190,189 @@ pub fn add_proton_and_iso_h_balance_to_mob_h_struct(
     }
     ret
 }
+
+/// `COMPONENT_REM_PROTONS`: removed protons and exchangeable isotopic H
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ComponentRemProtons {
+    pub n_num_removed_protons: i32,
+    pub n_num_removed_isotopic_h: [i32; 3],
+}
+
+/// `CompareOneOrigInchiToRevInChI`: compares the original InChI of one
+/// component (`p_inchi[0]`; `p_inchi[1]` the Mobile-H one for the Fixed-H
+/// request) with the InChI created from the restored structure; the
+/// difference bits are added to `flags[b_mobile_h]` (or `flags[TAUT_YES]`),
+/// the protons removed from the restored Mobile-H layers are returned in
+/// `cur_removed`.
+pub fn compare_one_orig_inchi_to_rev_inchi(
+    ps: &super::ichirvr2::StrFromInChI,
+    p_inchi: [Option<&InChI>; 2],
+    b_mobile_h: usize,
+    cur_removed: &mut ComponentRemProtons,
+    flags: &mut [u64; 2],
+) -> i32 {
+    use super::runichi3::{IS_OKAY, IS_WARNING};
+
+    let ret = ps.rev_inchi.n_ret_val;
+    if ret != IS_OKAY && ret != IS_WARNING {
+        flags[b_mobile_h] |= diff::STR2INCHI_ERR;
+        return 0; // C returns `err`, which is 0 here
+    }
+    // i0, b0: requested Rec/Disconnected and Mobile/Fixed-H;
+    // i, b: what the InChI created out of the restored structure has
+    let mut i = ps.i_inchi as usize;
+    let i0 = i;
+    let mut b = ps.i_mobile_h as usize;
+    let b0 = b;
+    let rev = &ps.rev_inchi;
+    if i == INCHI_REC && rev.num_components[i] == 0 {
+        i = INCHI_BAS;
+    }
+    let slot = |i: usize, k: usize, b: usize| rev.p_inchi[i].get(k).and_then(|c| c[b].as_ref());
+    if b == TAUT_NON && !slot(i, 0, b).is_some_and(|c| c.n_number_of_atoms != 0) {
+        b = TAUT_YES;
+    }
+    if ps.b_deleted != 0 && p_inchi[0].is_none_or(|c| c.b_deleted != 0) {
+        return 0;
+    }
+    if !rev.p_inchi[i].is_empty()
+        && ((rev.num_components[i] > 1 && !slot(i, 1, b).is_some_and(|c| c.b_deleted != 0))
+            || rev.num_components[i] < 1)
+    {
+        flags[b_mobile_h] |= diff::COMP_NUMBER;
+    }
+    if b != b0 || b != b_mobile_h || b0 != b_mobile_h || i > i0 {
+        // do not print messages about TAUT_YES instead of TAUT_NON
+        flags[b_mobile_h] |= diff::COMP_HLAYER;
+    }
+    if rev.num_components[i] != 0 && !rev.p_inchi[i].is_empty() {
+        // '0' in [i][0][b] is the first component
+        let mut cmp = 0;
+        if b == TAUT_YES
+            && slot(i, 0, b).is_some_and(|c| c.b_deleted != 0)
+            && p_inchi[0].is_none_or(|c| c.b_deleted != 0)
+        {
+            // the 1st component is made out of proton(s) and the input
+            // component is missing or also a proton
+        } else {
+            cmp = compare_reversed_inchi3(slot(i, 0, b), p_inchi[0], None, None);
+            flags[b_mobile_h] |= cmp;
+        }
+        let _ = cmp;
+        if b == b0 && b == TAUT_NON {
+            if slot(i, 0, TAUT_YES).is_some_and(|c| c.b_deleted == 0)
+                || p_inchi[1].is_some_and(|c| c.b_deleted == 0)
+            {
+                // in addition to fixed-H also compare the mobile-H InChI
+                flags[TAUT_YES] |=
+                    compare_reversed_inchi3(slot(i, 0, TAUT_YES), p_inchi[1], None, None);
+            }
+            // compare removed H
+            let aux0 = rev.p_inchi_aux[i]
+                .first()
+                .and_then(|c| c[TAUT_YES].as_ref())
+                .map_or(0, |a| i32::from(a.n_num_removed_protons));
+            if ps.n_num_removed_protons_mobh_inchi != aux0 {
+                flags[TAUT_YES] |= diff::MOBH_PROTONS;
+            }
+        }
+        *cur_removed = ComponentRemProtons::default();
+        for k in 0..rev.num_components[i].max(0) as usize {
+            let deleted = slot(i, k, TAUT_YES).is_some_and(|c| c.b_deleted != 0);
+            if k == 0 || deleted {
+                // protons of the 1st component; the others only if they are deleted protons
+                if let Some(a) = rev.p_inchi_aux[i].get(k).and_then(|c| c[TAUT_YES].as_ref()) {
+                    cur_removed.n_num_removed_protons += i32::from(a.n_num_removed_protons);
+                    for j in 0..3 {
+                        cur_removed.n_num_removed_isotopic_h[j] +=
+                            i32::from(a.n_num_removed_isotopic_h[j]);
+                    }
+                }
+            }
+        }
+    }
+    0
+}
+
+/// `CompareAllOrigInchiToRevInChI`: compares all components of the input
+/// InChI (the Fixed-H layer when requested and present) with the InChI of
+/// the restored structures; the bits go to `one_input.compare_inchi_flags[0]`
+pub fn compare_all_orig_inchi_to_rev_inchi(
+    p_struct: &[[Vec<super::ichirvr2::StrFromInChI>; 2]; 2],
+    one_input: &mut InpInChI,
+    b_req_non_taut: bool,
+) -> i32 {
+    one_input.compare_inchi_flags[0] = [0; 2];
+    let mut total = ComponentRemProtons::default();
+    // do we have reconnected InChI?
+    let mut i_inchi_rec = INCHI_REC;
+    if one_input.n_num_components[i_inchi_rec][TAUT_YES] == 0
+        && one_input.n_num_components[i_inchi_rec][TAUT_NON] == 0
+    {
+        i_inchi_rec = INCHI_BAS;
+    }
+    // do we have Mobile or Fixed-H?
+    let mut i_mobile_h = TAUT_NON;
+    if one_input.n_num_components[i_inchi_rec][TAUT_NON] == 0 || !b_req_non_taut {
+        i_mobile_h = TAUT_YES;
+    }
+    let num_components = one_input.n_num_components[i_inchi_rec][i_mobile_h].max(0) as usize;
+    let mut ret = 0;
+    for i_component in 0..num_components {
+        let mut b_mobile_h = i_mobile_h;
+        let mut p_inchi: [Option<&InChI>; 2] = [None, None];
+        let cur = &one_input.p_inp_inchi[i_inchi_rec][b_mobile_h][i_component];
+        if cur.n_number_of_atoms != 0 && cur.b_deleted == 0 {
+            // the requested InChI layer exists
+            p_inchi[0] = Some(cur);
+            if b_mobile_h == TAUT_NON {
+                p_inchi[1] = one_input.p_inp_inchi[i_inchi_rec][TAUT_YES].get(i_component);
+            }
+        } else if b_mobile_h == TAUT_NON {
+            let m = &one_input.p_inp_inchi[i_inchi_rec][TAUT_YES][i_component];
+            if m.n_number_of_atoms != 0 && m.b_deleted == 0 {
+                // only Mobile-H is available
+                b_mobile_h = TAUT_YES;
+                p_inchi[0] = Some(m);
+            }
+        }
+        let mut flags = [0u64; 2];
+        let mut cur_removed = ComponentRemProtons::default();
+        ret = compare_one_orig_inchi_to_rev_inchi(
+            &p_struct[i_inchi_rec][b_mobile_h][i_component],
+            p_inchi,
+            b_mobile_h,
+            &mut cur_removed,
+            &mut flags,
+        );
+        if ret < 0 {
+            return ret;
+        }
+        total.n_num_removed_protons += cur_removed.n_num_removed_protons;
+        for i in 0..3 {
+            total.n_num_removed_isotopic_h[i] += cur_removed.n_num_removed_isotopic_h[i];
+        }
+        for i in 0..2 {
+            one_input.compare_inchi_flags[0][i] |= flags[i];
+        }
+    }
+    if i_mobile_h == TAUT_YES {
+        let np = &one_input.n_num_protons[i_inchi_rec][i_mobile_h];
+        if np.p_num_protons.is_some() {
+            // in Mobile-H case proton balances are split between components
+            ret = super::ichiread::RI_ERR_PROGR;
+        } else {
+            // removed protons in the original and the restored InChI
+            if total.n_num_removed_protons != i32::from(np.n_num_removed_protons) {
+                one_input.compare_inchi_flags[0][TAUT_YES] |= diff::MOBH_PROTONS;
+            }
+            let iso = one_input.n_num_protons[i_inchi_rec][TAUT_YES].n_num_removed_isotopic_h;
+            for i in 0..3 {
+                if total.n_num_removed_isotopic_h[i] != i32::from(iso[i]) {
+                    one_input.compare_inchi_flags[0][TAUT_YES] |= diff::MOB_ISO_H;
+                }
+            }
+        }
+    }
+    ret
+}
