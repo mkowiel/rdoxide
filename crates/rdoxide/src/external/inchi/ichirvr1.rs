@@ -7,8 +7,12 @@
 //! Licensed under the MIT license (see LICENSES/InChI-MIT.txt).
 
 use super::ichi::InChI;
-use super::ichi_bns::BNS_VERT_TYPE_ATOM;
+use super::ichi_bns::{
+    BNS_VERT_TYPE_ATOM, BNS_VERT_TYPE_AUX, BNS_VERT_TYPE_C_GROUP, BNS_VERT_TYPE_METAL_GR,
+    BNS_VERT_TYPE_TEMP, BNS_VERT_TYPE_TGROUP,
+};
 use super::ichicano::{T_GROUP_HDR_LEN, TGSO_SYMM_IORDER};
+use super::ichierr::BNS_PROGRAM_ERR;
 use super::ichiread::{NO_VALUE_INT, RI_ERR_ALLOC, RI_ERR_PROGR};
 use super::ichirvrs::*;
 use super::ichisort::insertions_sort;
@@ -3030,4 +3034,296 @@ pub fn remove_from_edge_list_by_value(e: &mut EdgeList, iedge: i32) -> i32 {
         }
     }
     n
+}
+
+// ---------------------------------------------------------------------------
+// Sizes of the BNS and the super c-groups
+
+const MAX_CN_VAL: usize = 3;
+
+fn is_bns_vt_c_gr(x: u16) -> bool {
+    x & BNS_VT_C_POS_ALL == BNS_VERT_TYPE_C_GROUP
+}
+fn is_bns_vt_m_gr(x: u16) -> bool {
+    x == BNS_VERT_TYPE_METAL_GR
+}
+fn is_bns_vt_chrg_struct(x: u16) -> bool {
+    x & BNS_VERT_TYPE_AUX != 0 && x & BNS_VERT_TYPE_TEMP != 0
+}
+
+/// `nCountBnsSizes`: fills the totals and registers the t- and c-groups;
+/// returns 0, a negative error or (as the C code does) a positive group
+/// number left by the last registration
+pub fn n_count_bns_sizes(
+    at: &[InpAtom],
+    num_at: usize,
+    ti: &TGroupInfo,
+    p_va: &[ValAt],
+    srm: &Srm,
+    tcg: &mut AllTcGroups,
+) -> i32 {
+    let (mut n_bonds, mut n_other_edges, mut n_vertices) = (0i32, 0i32, 0i32);
+    let (mut n_tgroup_edges, mut n_tgroup_edges_from_tg, mut n_tot_neg_charge) = (0i32, 0i32, 0i32);
+    let mut ret = 0;
+    for i in 0..num_at {
+        tcg.num_metal_atoms += i32::from(p_va[i].c_metal != 0);
+        tcg.num_metal_bonds += i32::from(p_va[i].c_num_bonds_to_metal);
+        tcg.total_electrons += i32::from(at[i].el_number);
+        tcg.total_electrons_metals += if p_va[i].c_metal != 0 {
+            i32::from(at[i].el_number)
+        } else {
+            0
+        };
+    }
+    tcg.total_electrons -= tcg.total_charge;
+    tcg.num_metal_bonds /= 2;
+
+    if let Some(tgs) = ti.t_group.as_ref() {
+        for g in tgs.iter().take(ti.num_t_groups) {
+            ret = register_tc_group(
+                tcg,
+                i32::from(BNS_VERT_TYPE_TGROUP),
+                i32::from(g.n_group_number),
+                i32::from(g.num[0]),
+                0,
+                0,
+                0,
+                i32::from(g.n_num_endpoints),
+            );
+            if ret < 0 {
+                return ret;
+            }
+            n_other_edges += i32::from(g.n_num_endpoints);
+            n_tgroup_edges_from_tg += i32::from(g.n_num_endpoints);
+            n_tot_neg_charge += i32::from(g.num[1]);
+            if ret > 0 {
+                let j = ret as usize - 1;
+                tcg.p_tcg[j].tg_num_h = (i32::from(g.num[0]) - i32::from(g.num[1])) as i16;
+                tcg.p_tcg[j].tg_num_minus = g.num[1] as i16;
+            }
+        }
+    }
+
+    let mut b_metal_atoms = false;
+    loop {
+        for i in 0..num_at {
+            n_bonds += i32::from(at[i].valence);
+            if p_va[i].c_cn_list_index != 0 {
+                let cl = &CN_LIST[p_va[i].c_cn_list_index as usize - 1];
+                let (len, bits, p_cn) = (cl.len as usize, cl.bits, cl.p_cn);
+                if (bits != CN_BITS_ME) != !b_metal_atoms {
+                    continue;
+                }
+                for j in 0..len {
+                    let ty = p_cn[j].v.type_;
+                    let mut k = 0;
+                    while k < MAX_CN_VAL && p_cn[j].e[k].neigh != 0 {
+                        n_other_edges += 1;
+                        let n = p_cn[j].e[k].neigh as usize - 1;
+                        let neigh_type = p_cn[n].v.type_;
+                        let e = &p_cn[j].e[k];
+                        let md = srm.n_metal_max_charge_d;
+                        let cap = if !b_metal_atoms {
+                            i32::from(e.cap)
+                        } else if e.cap != 0 {
+                            md
+                        } else {
+                            0
+                        };
+                        let flow = if !b_metal_atoms {
+                            i32::from(e.flow)
+                        } else if e.flow != 0 {
+                            md
+                        } else {
+                            0
+                        };
+                        for t in [neigh_type, ty] {
+                            if is_bns_vt_c_gr(t) {
+                                ret = register_tc_group(tcg, i32::from(t), 0, 0, 0, cap, flow, 1);
+                                if ret < 0 {
+                                    return ret;
+                                }
+                                if ret > 0 {
+                                    ret = register_tc_group(tcg, i32::from(t), 0, 0, 0, 0, 0, 1);
+                                    if ret < 0 {
+                                        return ret;
+                                    }
+                                    n_other_edges += 1;
+                                }
+                            }
+                        }
+                        k += 1;
+                    }
+                    if ty & BNS_VERT_TYPE_ATOM != 0 {
+                        continue;
+                    }
+                    if is_bns_vt_chrg_struct(ty) {
+                        n_vertices += 1;
+                        continue;
+                    }
+                    if srm.b_metal_add_flower != 0 && is_bns_vt_m_gr(ty) {
+                        let (needs, _, _, edge_cap, edge_flow) =
+                            atom_stcap_stflow(at, p_va, srm, i);
+                        if needs == 0 {
+                            return RI_ERR_PROGR;
+                        }
+                        let t = i32::from(ty);
+                        ret = register_tc_group(tcg, t, 0, 0, 0, edge_cap, edge_flow, 1);
+                        if ret < 0 {
+                            return ret;
+                        }
+                        n_other_edges += 1;
+                        if ret > 0 {
+                            ret = register_tc_group(tcg, t, 0, 0, 0, 0, 0, 2);
+                            if ret < 0 {
+                                return ret;
+                            }
+                            for (ord, ne) in [(1, 3), (2, 3), (3, 2)] {
+                                ret = register_tc_group(tcg, t, ord, 0, 0, 0, 0, ne);
+                                if ret <= 0 {
+                                    return if ret == 0 { RI_ERR_PROGR } else { ret };
+                                }
+                            }
+                            n_vertices += 4;
+                            n_other_edges += 5;
+                        }
+                        continue;
+                    }
+                    n_vertices += 1;
+                    if !is_bns_vt_c_gr(ty) {
+                        return RI_ERR_PROGR;
+                    }
+                    let md = srm.n_metal_max_charge_d;
+                    let v = &p_cn[j].v;
+                    let cap = if !b_metal_atoms {
+                        i32::from(v.cap)
+                    } else if v.cap != 0 {
+                        md
+                    } else {
+                        0
+                    };
+                    let flow = if !b_metal_atoms {
+                        i32::from(v.flow)
+                    } else if v.flow != 0 {
+                        md
+                    } else {
+                        0
+                    };
+                    ret = register_tc_group(tcg, i32::from(ty), 0, cap, flow, 0, 0, 0);
+                    if ret < 0 {
+                        return ret;
+                    }
+                }
+            }
+            if at[i].endpoint != 0 {
+                let edge_cap = n_taut_endpoint_edge_cap(at, p_va, i);
+                n_tgroup_edges += 1;
+                if edge_cap < 0 {
+                    return edge_cap;
+                }
+                ret = register_tc_group(
+                    tcg,
+                    i32::from(BNS_VERT_TYPE_TGROUP),
+                    i32::from(at[i].endpoint),
+                    0,
+                    0,
+                    edge_cap,
+                    0,
+                    0,
+                );
+                if ret < 0 {
+                    return ret;
+                }
+            }
+        }
+        if !b_metal_atoms && tcg.num_metal_atoms != 0 {
+            b_metal_atoms = true;
+            n_bonds = 0;
+            continue;
+        }
+        break;
+    }
+
+    n_bonds /= 2;
+    tcg.num_atoms = num_at as i32;
+    tcg.num_bonds = n_bonds;
+    tcg.num_tgroups = ti.num_t_groups as i32;
+    tcg.num_tgroup_edges = n_tgroup_edges;
+    tcg.tgroup_charge = -n_tot_neg_charge;
+    if ret >= 0 && n_tgroup_edges_from_tg != n_tgroup_edges {
+        ret = BNS_PROGRAM_ERR;
+    }
+    n_vertices += num_at as i32;
+    n_vertices += ti.num_t_groups as i32;
+    n_bonds += n_other_edges;
+    tcg.n_vertices = n_vertices;
+    tcg.n_edges = n_bonds;
+    ret
+}
+
+/// `nAddSuperCGroups`
+pub fn n_add_super_c_groups(tcg: &mut AllTcGroups) -> i32 {
+    for i in 0..tcg.num_tc_groups as usize {
+        let ty = tcg.p_tcg[i].type_ as u16;
+        if ty & BNS_VERT_TYPE_TGROUP != 0 {
+            continue;
+        }
+        if is_bns_vt_c_gr(ty) || is_bns_vt_m_gr(ty) {
+            let k = match ty {
+                BNS_VT_C_POS => TCG_PLUS0,
+                BNS_VT_C_NEG => TCG_MINUS0,
+                BNS_VT_C_POS_C => TCG_PLUS_C0,
+                BNS_VT_C_NEG_C => TCG_MINUS_C0,
+                BNS_VT_C_POS_M => TCG_PLUS_M0,
+                BNS_VT_C_NEG_M => TCG_MINUS_M0,
+                BNS_VT_M_GROUP => match tcg.p_tcg[i].ord_num {
+                    0 => TCG_ME_FLOWER0,
+                    1 => TCG_ME_FLOWER1,
+                    2 => TCG_ME_FLOWER2,
+                    3 => TCG_ME_FLOWER3,
+                    _ => return RI_ERR_PROGR,
+                },
+                _ => return RI_ERR_PROGR,
+            } as usize;
+            if tcg.n_group[k] >= 0 || (tcg.p_tcg[i].ord_num != 0 && !is_bns_vt_m_gr(ty)) {
+                return RI_ERR_PROGR;
+            }
+            tcg.n_group[k] = i as i32;
+        }
+    }
+    // (+) supergroup
+    let n = [TCG_PLUS0, TCG_PLUS_C0, TCG_PLUS_M0]
+        .iter()
+        .filter(|&&g| tcg.n_group[g as usize] >= 0)
+        .count() as i32;
+    if n != 0 {
+        let ret = register_tc_group(tcg, i32::from(BNS_VT_C_POS_ALL), 0, 0, 0, 0, 0, 1 + n);
+        if ret <= 0 {
+            return if ret == 0 { RI_ERR_PROGR } else { ret };
+        }
+        tcg.n_group[TCG_PLUS as usize] = ret - 1;
+        tcg.n_vertices += 2;
+        tcg.n_edges += 1 + n;
+    }
+    // (-) supergroup
+    let n = [TCG_MINUS0, TCG_MINUS_C0, TCG_MINUS_M0]
+        .iter()
+        .filter(|&&g| tcg.n_group[g as usize] >= 0)
+        .count() as i32;
+    if n != 0 {
+        let ret = register_tc_group(tcg, i32::from(BNS_VT_C_NEG_ALL), 0, 0, 0, 0, 0, 1 + n);
+        if ret < 0 {
+            return ret;
+        }
+        tcg.n_group[TCG_MINUS as usize] = ret - 1;
+        tcg.n_vertices += 2;
+        tcg.n_edges += 1 + n;
+    }
+    let n = i32::from(tcg.n_group[TCG_MINUS as usize] >= 0)
+        + i32::from(tcg.n_group[TCG_PLUS as usize] >= 0);
+    if n != 0 {
+        tcg.n_vertices += 1;
+        tcg.n_edges += n;
+    }
+    0
 }

@@ -83,6 +83,44 @@ int main(void) {
                 printf("r%d %d %d %d\n", i, r, g.num_tc_groups, g.max_tc_groups);
             }
             for (int i = 0; i < g.num_tc_groups; i++) printf("g%d %d %d %d %d %d %d %d\n", i, g.pTCG[i].type, g.pTCG[i].ord_num, g.pTCG[i].num_edges, g.pTCG[i].st_cap, g.pTCG[i].st_flow, g.pTCG[i].edges_cap, g.pTCG[i].edges_flow);
+        } else if (t == 34) {
+            SRM s;
+            scanf("%d %d %d %d %d %d %d %d %d", &s.bMetalAddFlower, &s.nMetalMinBondOrder, &s.nMetalInitEdgeFlow, &s.nMetalInitBondOrder,
+                  &s.nMetal2EndpointMinBondOrder, &s.nMetal2EndpointInitBondOrder, &s.nMetal2EndpointInitEdgeFlow, &s.nMetalMaxCharge_D, &s.bFixStereoBonds);
+            int n, ng, tch; scanf("%d %d %d", &n, &ng, &tch);
+            T_GROUP_INFO ti; memset(&ti, 0, sizeof(ti));
+            ti.num_t_groups = ng;
+            ti.t_group = calloc(ng + 1, sizeof(T_GROUP));
+            for (int g = 0; g < ng; g++) {
+                int a, b, ne; scanf("%d %d %d", &a, &b, &ne);
+                ti.t_group[g].num[0] = a; ti.t_group[g].num[1] = b; ti.t_group[g].nGroupNumber = g + 1; ti.t_group[g].nNumEndpoints = ne;
+            }
+            inp_ATOM *at = calloc(n + 1, sizeof(inp_ATOM));
+            VAL_AT *va = calloc(n + 1, sizeof(VAL_AT));
+            for (int i = 0; i < n; i++) {
+                int el, nh, cbv, e, nb, nsb, v[7];
+                scanf("%d %d %d %d %d", &el, &nh, &cbv, &e, &nb);
+                at[i].el_number = el; at[i].num_H = nh; at[i].chem_bonds_valence = cbv; at[i].endpoint = e; at[i].valence = nb;
+                for (int k = 0; k < nb; k++) { int nn, bt; scanf("%d %d", &nn, &bt); at[i].neighbor[k] = nn; at[i].bond_type[k] = bt; }
+                for (int k = 0; k < 7; k++) scanf("%d", &v[k]);
+                va[i].cMetal = v[0]; va[i].cNumBondsToMetal = v[1]; va[i].cInitValenceToMetal = v[2]; va[i].cInitOrigValenceToMetal = v[3];
+                va[i].cInitFreeValences = v[4]; va[i].cnListIndex = v[5]; va[i].cPeriodicNumber = el;
+            }
+            ALL_TC_GROUPS g; memset(&g, 0, sizeof(g));
+            for (int k = 0; k < NUM_TCGROUP_TYPES; k++) g.nGroup[k] = -1;
+            g.total_charge = tch;
+            int r = nCountBnsSizes(at, n, 0, 0, &ti, va, &s, &g);
+            printf("C %d | %d %d %d %d %d %d %d %d %d %d | %d %d\n", r, g.num_atoms, g.num_bonds, g.num_tgroups, g.num_tgroup_edges, g.tgroup_charge,
+                   g.nVertices, g.nEdges, g.num_metal_atoms, g.num_metal_bonds, g.total_electrons, g.total_electrons_metals, g.num_tc_groups);
+            for (int i = 0; i < g.num_tc_groups; i++) printf("g%d %d %d %d %d %d %d %d | %d %d %d %d\n", i, g.pTCG[i].type, g.pTCG[i].ord_num, g.pTCG[i].num_edges, g.pTCG[i].st_cap, g.pTCG[i].st_flow, g.pTCG[i].edges_cap, g.pTCG[i].edges_flow,
+                   g.pTCG[i].tg_num_H, g.pTCG[i].tg_num_Minus, 0, 0);
+            if (r >= 0) {
+                int r2 = nAddSuperCGroups(&g);
+                printf("U %d %d %d %d |", r2, g.nVertices, g.nEdges, g.num_tc_groups);
+                for (int k = 0; k < NUM_TCGROUP_TYPES; k++) printf(" %d", g.nGroup[k]);
+                printf("\n");
+                for (int i = 0; i < g.num_tc_groups; i++) printf("u%d %d %d %d\n", i, g.pTCG[i].type, g.pTCG[i].ord_num, g.pTCG[i].num_edges);
+            }
         } else if (t == 33) {
             EDGE_LIST e; memset(&e, 0, sizeof(e));
             int m; scanf("%d", &m);
@@ -155,10 +193,40 @@ def el_case():
     return f"33 {m} " + " ".join(ops)
 
 
+def bns_case():
+    n = R.randrange(1, 6)
+    ng = R.choice([0, 0, 1, 2, 3])
+    adj = [[] for _ in range(n)]
+    edges = {}
+    for i in range(1, n):
+        edges[(R.randrange(0, i), i)] = R.choice([1, 1, 2, 3])
+    for (i, j), b in edges.items():
+        adj[i].append((j, b))
+        adj[j].append((i, b))
+    srm = [R.choice([0, 1, 1]), R.choice([0, 1]), R.choice([0, 1]), R.choice([0, 1, 2]), R.choice([0, 1]), R.choice([0, 1, 2]),
+           R.choice([0, 1]), R.choice([0, 16]), 0]
+    eps = [R.choice([0, 0, 0] + list(range(1, ng + 1))) for _ in range(n)]
+    cnt = [sum(1 for e in eps if e == g) for g in range(1, ng + 1)]
+    if R.random() < 0.7:
+        tgs = [(R.randrange(0, 4), R.randrange(0, 3), cnt[g]) for g in range(ng)]
+    else:
+        tgs = [(R.randrange(0, 4), R.randrange(0, 3), R.randrange(0, 4)) for _ in range(ng)]
+    parts = ["34 " + " ".join(map(str, srm)) + f" {n} {ng} {R.choice([-1, 0, 0, 1, 2])}"]
+    for a, b, ne in tgs:
+        parts.append(f"{a} {b} {ne}")
+    for i in range(n):
+        el = R.choice(ELS)
+        va = [R.choice([0, 0, 1]), R.choice([0, 1, 2]), R.choice([0, 1]), R.choice([0, 1, 2]), R.choice([0, 0, 1, 2]),
+              R.choice([0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18])]
+        parts.append(f"{el} {R.choice([0, 1, 2])} {R.randrange(0, 5)} {eps[i]} {len(adj[i])} " + " ".join(f"{j} {b}" for j, b in adj[i])
+                     + " " + " ".join(map(str, va)) + " 0")
+    return " ".join(parts)
+
+
 def main():
     cases = []
     for _ in range(15000):
-        cases += [atom_case(), cc_case(), tcg_case(), el_case()]
+        cases += [atom_case(), cc_case(), tcg_case(), el_case(), bns_case(), bns_case()]
     objs = ma.build_lib()
     with tempfile.TemporaryDirectory() as d:
         (Path(d) / "h.c").write_text(HARNESS)
