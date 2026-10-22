@@ -256,6 +256,42 @@ int main(void) {
                                     int rfh = RemoveRadFromMobileHEndpointFixH(b, bd, &s3, at, a2, va, &g, &nr, &td, 4);
                                     printf("FH %d %d %d %d %d %d\n", rfh, nr, td, b->tot_st_cap, b->tot_st_flow, ne);
                                     for (int i = 0; i < b->num_edges; i++) printf("V%d %d %d\n", i, b->edge[i].flow, b->edge[i].forbidden);
+                                    {
+                                        EDGE_LIST nl; AllocEdgeList(&nl, EDGE_LIST_CLEAR);
+                                        int rn = ForbidNintrogenPlus2BondsInSmallRings(b, a2, n, va, 6, &g, &nl, 4);
+                                        long long chk = 0; for (int q = 0; q < b->num_edges; q++) chk = (chk + (long long)(b->edge[q].flow * 31 + b->edge[q].forbidden) * (q + 1)) % 1000000007LL;
+                                        printf("FN %d %d %lld\n", rn, nl.num_edges, chk);
+                                        RemoveForbiddenEdgeMask(b, &nl, 4);
+                                        AllocEdgeList(&nl, EDGE_LIST_FREE);
+                                        inp_ATOM *atf = calloc(n + 1, sizeof(inp_ATOM)), *atn = calloc(n + 1, sizeof(inp_ATOM));
+                                        for (int pass = 0; pass < 3; pass++) {
+                                            memcpy(atf, a2, n * sizeof(inp_ATOM)); memcpy(atn, a2, n * sizeof(inp_ATOM));
+                                            int rr = 0;
+                                            if (pass == 0) {
+                                                for (int i = 0; i < n; i++) {
+                                                    if (i % 2 == 0 && atf[i].num_H > 0) atf[i].num_H--;
+                                                    for (int j = 0; j < atf[i].valence; j++) if ((i + j) & 1) {
+                                                        int bt = atf[i].bond_type[j], m = bt & BOND_TYPE_MASK;
+                                                        if (m == 1) atf[i].bond_type[j] = bt + 1; else if (m == 2 || m == 3) atf[i].bond_type[j] = bt - 1;
+                                                    }
+                                                }
+                                                rr = FixLessHydrogenInFormula(b, bd, &s3, at, a2, atf, va, &g, &nr, &td, 4);
+                                            } else if (pass == 1) {
+                                                for (int i = 0; i < n; i++) if (a2[i].charge == -1) { atf[i].charge = 0; atf[i].num_H = a2[i].num_H + 1; }
+                                                s3.bMobileH = n & 1;
+                                                rr = FixMoreHydrogenInFormula(b, bd, &s3, at, a2, atf, va, &g, &nr, &td, 4);
+                                            } else {
+                                                ICR icr; memset(&icr, 0, sizeof(icr));
+                                                for (int i = 0; i < n && i < 32; i++) icr.endp_in1_only[icr.num_endp_in1_only++] = i + 1;
+                                                for (int i = 0; i < n; i++) atn[i].endpoint = 1;
+                                                rr = FixRemoveExtraTautEndpoints(b, bd, &s3, at, a2, atf, atn, va, &g, &icr, &nr, &td, 4);
+                                            }
+                                            chk = 0; for (int q = 0; q < b->num_edges; q++) chk = (chk + (long long)(b->edge[q].flow * 31 + b->edge[q].forbidden) * (q + 1)) % 1000000007LL;
+                                            int cf = 0; for (int i = 0; i < n; i++) cf += a2[i].cFlags;
+                                            printf("FX%d %d %d %d %d %d %lld\n", pass, rr, nr, td, b->tot_st_flow, cf, chk);
+                                        }
+                                        free(atf); free(atn);
+                                    }
                                     s3.endpoint = NULL; s3.ti.t_group = NULL; free(epl); free(epf);
                                 }
                             }
