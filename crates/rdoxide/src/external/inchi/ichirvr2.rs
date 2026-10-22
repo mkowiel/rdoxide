@@ -155,6 +155,8 @@ pub struct StrFromInChI {
     /// `nLink`: negative: same as the reconnected component -(n+1);
     /// positive: the disconnected component n-1 is the same
     pub n_link: i32,
+    /// `nError`: the error of the conversion of the component
+    pub n_error: i32,
     /// `bPostProcessed`
     pub b_post_processed: i32,
     /// `nChargeInChI`

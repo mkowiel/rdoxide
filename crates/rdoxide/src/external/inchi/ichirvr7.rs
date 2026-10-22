@@ -913,3 +913,93 @@ pub fn merge_structure_components(
     }
     (0, at)
 }
+
+/// `AllInchiToStructure`: converts all the components of the input InChI
+/// (disconnected/reconnected, Mobile-H/Fixed-H) into structures
+/// `p_struct[iInchiRec][bMobileH][k]`. Conversion errors of the single
+/// components are stored in `n_error` and counted. Returns the number of
+/// the errors or a negative fatal error.
+#[allow(clippy::too_many_arguments)]
+pub fn all_inchi_to_structure(
+    ip_inp: &super::ichiparm::InputParms,
+    num_inp: i64,
+    srm: &super::ichirvrs::Srm,
+    b_has_some_fixed_h: bool,
+    p_struct: &mut [[Vec<super::ichirvr2::StrFromInChI>; 2]; 2],
+    one_input: &mut InpInChI,
+    num_inp_actual: i64,
+    polymer: Option<&super::mol2atom::OadPolymer>,
+) -> i32 {
+    use super::ichiparm::REQ_MODE_BASIC;
+    use super::ichirvr2::StrFromInChI;
+    use super::runichi3::StructData;
+
+    let mut ip = ip_inp.clone();
+    let mut sd = StructData::default();
+    let mut num_err = 0;
+    for i_inchi_rec in 0..2 {
+        for i_mobile_h in 0..2 {
+            let cur_num_comp = one_input.n_num_components[i_inchi_rec][i_mobile_h];
+            if cur_num_comp == 0 {
+                continue;
+            }
+            p_struct[i_inchi_rec][i_mobile_h] =
+                vec![StrFromInChI::default(); cur_num_comp as usize];
+            // set conversion mode
+            let cur_flag = (if i_mobile_h != 0 { 0 } else { I2A_FLAG_FIXEDH })
+                | (if i_inchi_rec != 0 { I2A_FLAG_RECMET } else { 0 });
+            if i_mobile_h != 0 {
+                ip.n_mode &= !REQ_MODE_BASIC;
+            } else {
+                ip.n_mode |= REQ_MODE_BASIC;
+            }
+            // InChI --> structure conversion for all components except duplicated
+            let mut at_no_offset = 0;
+            for k in 0..cur_num_comp as usize {
+                let c = &one_input.p_inp_inchi[i_inchi_rec][i_mobile_h][k];
+                if (i_mobile_h == 0 && c.n_number_of_atoms == 0) || c.b_deleted != 0 || c.n_link < 0
+                {
+                    // no structure out of an unavailable Fixed-H InChI or out
+                    // of the one present in the Reconnected layer
+                    p_struct[i_inchi_rec][i_mobile_h][k].n_link = c.n_link;
+                    p_struct[i_inchi_rec][i_mobile_h][k].b_deleted = c.b_deleted;
+                    continue;
+                }
+                if b_has_some_fixed_h
+                    && i_mobile_h != 0
+                    && k < one_input.n_num_components[i_inchi_rec][TAUT_NON] as usize
+                    && one_input.p_inp_inchi[i_inchi_rec][TAUT_NON][k].n_number_of_atoms != 0
+                {
+                    continue; // Fixed-H exists: do not process Mobile-H
+                }
+                let ps = &mut p_struct[i_inchi_rec][i_mobile_h][k];
+                ps.srm = *srm;
+                ps.i_inchi_rec = i_inchi_rec as i8;
+                ps.i_mobile_h = i_mobile_h as i32;
+                let ret = inchi2_atom(
+                    &ip,
+                    &mut sd,
+                    num_inp,
+                    ps,
+                    k,
+                    at_no_offset,
+                    cur_flag,
+                    b_has_some_fixed_h,
+                    one_input,
+                    num_inp_actual,
+                    polymer,
+                );
+                ps.n_link = one_input.p_inp_inchi[i_inchi_rec][i_mobile_h][k].n_link;
+                if ret < 0 {
+                    if ret == super::ichierr::CT_USER_QUIT_ERR {
+                        return ret;
+                    }
+                    ps.n_error = ret;
+                    num_err += 1; // errors are ignored for now, as in C
+                }
+                at_no_offset += one_input.p_inp_inchi[i_inchi_rec][i_mobile_h][k].n_number_of_atoms;
+            }
+        }
+    }
+    num_err
+}
