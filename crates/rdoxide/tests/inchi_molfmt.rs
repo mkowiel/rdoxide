@@ -757,3 +757,91 @@ fn molfile_text_to_inchi_matches_c() {
         assert_eq!(got.as_slice(), want.as_slice(), "case {ci}: {}", c["in"]);
     }
 }
+
+#[test]
+fn get_inchi_matches_c() {
+    use rdoxide::external::inchi::inchi_dll::{InchiAtom, InchiInput, get_inchi, get_std_inchi};
+    use rdoxide::external::inchi::readinch::InchiStereo0D;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_getinchi.json")).unwrap();
+    let h = |s: &Option<String>| match s {
+        None => "-".to_string(),
+        Some(t) if t.is_empty() => "=".to_string(),
+        Some(t) => hex(t.as_bytes()),
+    };
+    for (ci, c) in data.as_array().unwrap().iter().enumerate() {
+        let mut t = c["in"].as_str().unwrap().split_whitespace();
+        let std = t.next().unwrap() == "1";
+        let use_opt = t.next().unwrap() == "1";
+        let opt_hex = t.next().unwrap();
+        let n: usize = t.next().unwrap().parse().unwrap();
+        let ns: usize = t.next().unwrap().parse().unwrap();
+        let options = use_opt.then(|| {
+            if opt_hex == "=" {
+                String::new()
+            } else {
+                String::from_utf8(unhex(opt_hex)).unwrap()
+            }
+        });
+        let mut atom = Vec::new();
+        for _ in 0..n {
+            let mut a = InchiAtom::default();
+            let el = unhex(&t.next().unwrap()[1..]);
+            for (k, b) in el.iter().enumerate() {
+                a.elname[k] = *b;
+            }
+            a.x = t.next().unwrap().parse().unwrap();
+            a.y = t.next().unwrap().parse().unwrap();
+            a.z = t.next().unwrap().parse().unwrap();
+            a.num_bonds = t.next().unwrap().parse().unwrap();
+            a.isotopic_mass = t.next().unwrap().parse::<i32>().unwrap() as i16;
+            a.radical = t.next().unwrap().parse::<i32>().unwrap() as i8;
+            a.charge = t.next().unwrap().parse::<i32>().unwrap() as i8;
+            for k in 0..4 {
+                a.num_iso_h[k] = t.next().unwrap().parse::<i32>().unwrap() as i8;
+            }
+            for j in 0..a.num_bonds.max(0) as usize {
+                a.neighbor[j] = t.next().unwrap().parse::<i32>().unwrap() as i16;
+                a.bond_type[j] = t.next().unwrap().parse::<i32>().unwrap() as i8;
+                a.bond_stereo[j] = t.next().unwrap().parse::<i32>().unwrap() as i8;
+            }
+            atom.push(a);
+        }
+        let mut stereo_0d = Vec::new();
+        for _ in 0..ns {
+            let mut v = || t.next().unwrap().parse::<i32>().unwrap();
+            let (ty, p, cen) = (v(), v(), v());
+            let nb = [v() as i16, v() as i16, v() as i16, v() as i16];
+            stereo_0d.push(InchiStereo0D {
+                neighbor: nb,
+                central_atom: cen as i16,
+                type_: ty as i8,
+                parity: p as i8,
+            });
+        }
+        let inp = InchiInput {
+            atom,
+            stereo_0d,
+            options,
+        };
+        let (ret, out) = if std {
+            get_std_inchi(&inp)
+        } else {
+            get_inchi(&inp)
+        };
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        let got = [
+            format!("R {ret}"),
+            format!("I {}", h(&out.sz_inchi)),
+            format!("X {}", h(&out.sz_aux_info)),
+            format!("M {}", h(&out.sz_message)),
+            format!("L {}", h(&out.sz_log)),
+        ];
+        assert_eq!(got.as_slice(), want.as_slice(), "case {ci}: {}", c["in"]);
+    }
+}

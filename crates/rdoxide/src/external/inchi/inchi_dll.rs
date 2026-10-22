@@ -99,7 +99,7 @@ impl InchiAtom {
 }
 
 /// `MOL_COORD`: three 10-character numbers
-pub type MolCoord = [u8; 30];
+pub use super::ichiprt1::MolCoord;
 
 const MIN_BOND_LENGTH: f64 = 1.0e-6;
 /// `SINGLET_IS_TRIPLET`
@@ -589,7 +589,7 @@ pub fn extract_atoms_and_bonds(
 ) -> (Vec<InpAtom>, i32, i32, Vec<MolCoord>) {
     let n = ati.len();
     let mut at = vec![InpAtom::default(); n];
-    let mut sz_coord = vec![[0u8; 30]; n.max(1)];
+    let mut sz_coord = vec![[0u8; super::ichiprt1::MOL_COORD_LEN]; n.max(1)];
     let mut n_dim = 0;
     let mut n_num_bonds = 0;
     for a1 in 0..n {
@@ -768,4 +768,270 @@ pub fn inp_atom_0d_to_inchi_atom(at: &[InpAtom]) -> (i32, Vec<InchiAtom>, Vec<In
         }
     }
     (ret, atom, stereo_0d)
+}
+
+// ---------------------------------------------------------------------------
+// GetINCHI / GetStdINCHI
+
+use super::ichi_io::{
+    INCHI_IOS_TYPE_STRING, INCHI_STRBUF_INITIAL_SIZE, INCHI_STRBUF_SIZE_INCREMENT, InchiIosString,
+    InchiIostream, IosFile, inchi_ios_eprint, inchi_ios_init, inchi_strbuf_init,
+};
+use super::ichiparm::{
+    FLAG_SET_INP_AT_CHIRAL, FLAG_SET_INP_AT_NONCHIRAL, INCHI_MAX_NUM_ARG, INCHI_OUT_SAVEOPT,
+    INCHI_OUT_STDINCHI, InputParms, REQ_MODE_BASIC, REQ_MODE_CHIR_FLG_STEREO,
+    REQ_MODE_DIFF_UU_STEREO, REQ_MODE_RACEMIC_STEREO, REQ_MODE_RELATIVE_STEREO,
+    REQ_MODE_SB_IGN_ALL_UU, REQ_MODE_SC_IGN_ALL_UU, REQ_MODE_STEREO, TG_FLAG_1_5_TAUT,
+    TG_FLAG_KETO_ENOL_TAUT, TG_FLAG_RECONNECT_COORD, parse_options_string, print_input_parms,
+    read_command_line_parms,
+};
+use super::ichister::{AB_PARITY_UNDF, AB_PARITY_UNKN};
+use super::inchi_dll_b::{InchiOutput, copy_corrected_log_tail, produce_generation_output};
+use super::readinch::extract_0d_parities;
+use super::runichi::process_one_structure_ex;
+use super::runichi2::{LOG_MASK_NO_WARN, treat_errors_in_read_the_structure};
+use super::runichi3::{IS_EOF, IS_ERROR, IS_FATAL, IS_OKAY, IS_SKIP, IS_WARNING, StructData};
+use super::strutil::OrigAtomData;
+
+/// `inchi_Input`
+#[derive(Debug, Clone, Default)]
+pub struct InchiInput {
+    pub atom: Vec<InchiAtom>,
+    pub stereo_0d: Vec<InchiStereo0D>,
+    pub options: Option<String>,
+}
+
+/// `ExtractOneStructure` without polymer and V3000 data
+pub fn extract_one_structure(
+    sd: &mut StructData,
+    ip: &mut InputParms,
+    inp: &InchiInput,
+    log: &mut InchiIostream,
+    orig: &mut OrigAtomData,
+    num_inp: &mut i64,
+) -> i32 {
+    let v_ab_parity_unknown = if ip.n_mode & REQ_MODE_DIFF_UU_STEREO != 0 {
+        AB_PARITY_UNKN
+    } else {
+        AB_PARITY_UNDF
+    };
+    *orig = OrigAtomData::default();
+    let n = inp.atom.len();
+    let max_num_at = if ip.b_large_molecules != 0 {
+        32766
+    } else {
+        1024
+    };
+    'body: {
+        if n == 0 {
+            add_error_message(&mut sd.str_err_struct, "Empty structure");
+            sd.n_struct_read_error = 98;
+            break 'body;
+        }
+        if n >= max_num_at {
+            add_error_message(
+                &mut sd.str_err_struct,
+                "Too many atoms [did you forget 'LargeMolecules' switch?]",
+            );
+            sd.n_struct_read_error = 70;
+            break 'body;
+        }
+        let (mut at, n_dim, n_bonds, sz_coord) = extract_atoms_and_bonds(
+            &inp.atom,
+            ip.b_do_not_add_h != 0,
+            &mut sd.str_err_struct,
+            &mut sd.n_struct_read_error,
+        );
+        if sd.n_struct_read_error != 0 {
+            break 'body;
+        }
+        extract_0d_parities(
+            &mut at,
+            &inp.stereo_0d,
+            &mut sd.str_err_struct,
+            &mut sd.n_struct_read_error,
+            v_ab_parity_unknown,
+        );
+        if sd.n_struct_read_error != 0 {
+            break 'body;
+        }
+        orig.at = at;
+        orig.num_dimensions = n_dim;
+        orig.num_inp_atoms = n;
+        orig.num_inp_bonds = n_bonds;
+        orig.sz_coord = Some(sz_coord);
+
+        // chiral flag
+        let (chiral, nonchiral) = (
+            super::mol2atom::FLAG_INP_AT_CHIRAL as i32,
+            super::mol2atom::FLAG_INP_AT_NONCHIRAL as i32,
+        );
+        if ip.n_mode & REQ_MODE_CHIR_FLG_STEREO != 0 && ip.n_mode & REQ_MODE_STEREO != 0 {
+            if ip.b_chiral_flag & FLAG_SET_INP_AT_CHIRAL != 0 {
+                ip.n_mode &= !(REQ_MODE_RELATIVE_STEREO | REQ_MODE_RACEMIC_STEREO);
+                sd.b_chiral_flag &= !nonchiral;
+                sd.b_chiral_flag |= chiral;
+            } else {
+                ip.n_mode &= !REQ_MODE_RACEMIC_STEREO;
+                ip.n_mode |= REQ_MODE_RELATIVE_STEREO;
+                sd.b_chiral_flag &= !chiral;
+                sd.b_chiral_flag |= nonchiral;
+            }
+        } else if ip.b_chiral_flag & FLAG_SET_INP_AT_CHIRAL != 0 {
+            sd.b_chiral_flag &= !nonchiral;
+            sd.b_chiral_flag |= chiral;
+        } else if ip.b_chiral_flag & FLAG_SET_INP_AT_NONCHIRAL != 0 {
+            sd.b_chiral_flag &= !chiral;
+            sd.b_chiral_flag |= nonchiral;
+        }
+        *num_inp += 1;
+    }
+    treat_errors_in_read_the_structure(sd, ip, LOG_MASK_NO_WARN, log, orig, *num_inp)
+}
+
+/// `GetINCHI1`: `enforce_std_format` is the `GetStdINCHI` mode. Structures
+/// with polymer data and the usage text (given for an empty input without
+/// options; it contains the build date) are not supported: the usage case
+/// returns `inchi_Ret_EOF` with no log.
+fn get_inchi1(inp: &InchiInput, enforce_std_format: bool) -> (i32, InchiOutput) {
+    let mut out = InchiOutput::default();
+    let mut sd = StructData::default();
+    let mut ip = InputParms::default();
+    let mut orig = OrigAtomData::default();
+    let mut prep = [OrigAtomData::default(), OrigAtomData::default()];
+    let mut out_file = InchiIostream::default();
+    let mut log = InchiIostream::default();
+    let mut strbuf = InchiIosString::default();
+    let mut num_inp: i64 = 0;
+    inchi_ios_init(&mut out_file, INCHI_IOS_TYPE_STRING, IosFile::None);
+    inchi_ios_init(&mut log, INCHI_IOS_TYPE_STRING, IosFile::None);
+
+    let mut n_ret;
+    let mut translate_only = false;
+    'main: {
+        let argv: Vec<Vec<u8>> = match &inp.options {
+            Some(o) => parse_options_string(o.as_bytes(), INCHI_MAX_NUM_ARG),
+            None => vec![Vec::new()],
+        };
+        let help = (argv.len() == 1 && inp.atom.is_empty())
+            || (argv.len() == 2
+                && argv[1].first() == Some(&b'-')
+                && (&argv[1][1..] == b"?" || argv[1][1..].eq_ignore_ascii_case(b"help")));
+        if help {
+            n_ret = IS_EOF;
+            translate_only = true;
+            break 'main;
+        }
+        let argv_str: Vec<String> = argv
+            .iter()
+            .map(|a| String::from_utf8_lossy(a).into_owned())
+            .collect();
+        let argv_ref: Vec<&str> = argv_str.iter().map(String::as_str).collect();
+        let n_ret1 = read_command_line_parms(&argv_ref, &mut ip, true, &mut log);
+        ip.b_no_struct_labels = 1;
+        if n_ret1 < 0 {
+            n_ret = IS_FATAL;
+            break 'main;
+        }
+        if enforce_std_format {
+            ip.b_inchi_output_options &= !INCHI_OUT_SAVEOPT;
+            ip.b_taut_flags &= !TG_FLAG_RECONNECT_COORD;
+            ip.n_mode &= !REQ_MODE_BASIC;
+            if ip.n_mode & REQ_MODE_RELATIVE_STEREO != 0 {
+                ip.n_mode &= !(REQ_MODE_RACEMIC_STEREO
+                    | REQ_MODE_RELATIVE_STEREO
+                    | REQ_MODE_CHIR_FLG_STEREO);
+            }
+            if ip.n_mode & REQ_MODE_RACEMIC_STEREO != 0 {
+                ip.n_mode &= !(REQ_MODE_RACEMIC_STEREO
+                    | REQ_MODE_RELATIVE_STEREO
+                    | REQ_MODE_CHIR_FLG_STEREO);
+            }
+            if ip.n_mode & REQ_MODE_CHIR_FLG_STEREO != 0 {
+                ip.n_mode &= !(REQ_MODE_RACEMIC_STEREO
+                    | REQ_MODE_RELATIVE_STEREO
+                    | REQ_MODE_CHIR_FLG_STEREO);
+            }
+            ip.n_mode &= !REQ_MODE_DIFF_UU_STEREO;
+            if ip.n_mode & (REQ_MODE_SB_IGN_ALL_UU | REQ_MODE_SC_IGN_ALL_UU) == 0 {
+                ip.n_mode |= REQ_MODE_SB_IGN_ALL_UU | REQ_MODE_SC_IGN_ALL_UU;
+            }
+            ip.b_taut_flags &= !(TG_FLAG_KETO_ENOL_TAUT | TG_FLAG_1_5_TAUT);
+            ip.b_inchi_output_options |= INCHI_OUT_STDINCHI;
+            ip.b_inchi_output_options &= !INCHI_OUT_SAVEOPT;
+        }
+        print_input_parms(&mut log, &ip);
+        inchi_strbuf_init(
+            &mut strbuf,
+            INCHI_STRBUF_INITIAL_SIZE,
+            INCHI_STRBUF_SIZE_INCREMENT,
+        );
+        if ip.last_struct_number != 0 && num_inp >= ip.last_struct_number {
+            n_ret = IS_EOF;
+            break 'main;
+        }
+        n_ret = extract_one_structure(&mut sd, &mut ip, inp, &mut log, &mut orig, &mut num_inp);
+        if n_ret == IS_FATAL || n_ret == IS_EOF || n_ret == IS_ERROR {
+            break 'main;
+        }
+        let n_ret1 = process_one_structure_ex(
+            &mut sd,
+            &ip,
+            &mut log,
+            &mut out_file,
+            &mut strbuf,
+            &mut orig,
+            &mut prep,
+            num_inp,
+        );
+        n_ret = n_ret.max(n_ret1);
+    }
+    if !translate_only {
+        produce_generation_output(&mut out, &sd, &ip, &mut log, &mut out_file);
+    } else {
+        copy_corrected_log_tail(&mut out, &mut log);
+    }
+    let code = match n_ret {
+        IS_SKIP => -2,
+        IS_EOF => -1,
+        IS_OKAY => 0,
+        IS_WARNING => 1,
+        IS_ERROR => 2,
+        IS_FATAL => 3,
+        _ => 4,
+    };
+    let _ = inchi_ios_eprint;
+    (code, out)
+}
+
+/// `input_erroneously_contains_pseudoatoms` (which, as in C, looks at the
+/// first atom only)
+fn pseudoatoms_message(inp: &InchiInput) -> Option<InchiOutput> {
+    for _ in 0..inp.atom.len() {
+        let e = &inp.atom[0].elname;
+        let len = e.iter().position(|&c| c == 0).unwrap_or(e.len());
+        if &e[..len] == b"Zz" || &e[..len] == b"*" {
+            return Some(InchiOutput {
+                sz_message: Some("Unsupported in this mode element '*'".to_string()),
+                ..Default::default()
+            });
+        }
+    }
+    None
+}
+
+/// `GetINCHI`
+pub fn get_inchi(inp: &InchiInput) -> (i32, InchiOutput) {
+    if let Some(o) = pseudoatoms_message(inp) {
+        return (IS_ERROR, o);
+    }
+    get_inchi1(inp, false)
+}
+
+/// `GetStdINCHI`
+pub fn get_std_inchi(inp: &InchiInput) -> (i32, InchiOutput) {
+    if let Some(o) = pseudoatoms_message(inp) {
+        return (IS_ERROR, o);
+    }
+    get_inchi1(inp, true)
 }

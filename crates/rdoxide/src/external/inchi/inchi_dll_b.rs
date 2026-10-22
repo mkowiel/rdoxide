@@ -51,7 +51,7 @@ fn text(b: &[u8]) -> String {
 
 /// `copy_corrected_log_tail`: strips the trailing LFs of the log and cuts it
 /// at the first ` structure #`
-fn copy_corrected_log_tail(out: &mut InchiOutput, log: &mut InchiIostream) {
+pub(crate) fn copy_corrected_log_tail(out: &mut InchiOutput, log: &mut InchiIostream) {
     let used = log.s.n_used_length.max(0) as usize;
     let Some(p) = log.s.p_str.as_mut() else {
         return;
@@ -74,7 +74,7 @@ fn copy_corrected_log_tail(out: &mut InchiOutput, log: &mut InchiIostream) {
 }
 
 /// `produce_generation_output`
-fn produce_generation_output(
+pub(crate) fn produce_generation_output(
     out: &mut InchiOutput,
     sd: &StructData,
     ip: &InputParms,

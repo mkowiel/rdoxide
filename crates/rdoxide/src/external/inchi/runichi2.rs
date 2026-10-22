@@ -22,6 +22,12 @@ use super::runichi::create_inp_atom_data;
 use super::runichi3::{IS_EOF, IS_ERROR, IS_FATAL, IS_OKAY, IS_SKIP, IS_WARNING, StructData};
 use super::strutil::{OrigAtomData, extract_connected_component};
 
+pub const LOG_MASK_WARN: u32 = 1;
+pub const LOG_MASK_ERR: u32 = 2;
+pub const LOG_MASK_FATAL: u32 = 4;
+pub const LOG_MASK_ALL: u32 = 7;
+pub const LOG_MASK_NO_WARN: u32 = 6;
+
 /// `GetOneComponent`: extracts the component `i` (from 0) of `orig` into
 /// `inp_cur_data`; returns `sd.n_error_type`. (The structure labels of the
 /// log line are empty: the library API reads no SDfile labels.)
@@ -63,12 +69,13 @@ pub fn get_one_component(
     sd.n_error_type
 }
 
-/// `TreatErrorsInReadTheStructure` with `nLogMask == LOG_MASK_ALL` (the
+/// `TreatErrorsInReadTheStructure` (the
 /// problem-file copies are not modelled); `num_inp` is the number of the
 /// structure.
 pub fn treat_errors_in_read_the_structure(
     sd: &mut StructData,
     ip: &InputParms,
+    log_mask: u32,
     log: &mut InchiIostream,
     orig: &OrigAtomData,
     num_inp: i64,
@@ -107,7 +114,7 @@ pub fn treat_errors_in_read_the_structure(
             &sd.str_err_struct,
             orig.num_inp_atoms,
         );
-        if sd.n_error_type == IS_FATAL {
+        if sd.n_error_type == IS_FATAL && log_mask & LOG_MASK_FATAL != 0 {
             inchi_ios_eprint(
                 Some(log),
                 &format!(
@@ -116,7 +123,7 @@ pub fn treat_errors_in_read_the_structure(
                 ),
             );
         }
-        if sd.n_error_type == IS_ERROR {
+        if sd.n_error_type == IS_ERROR && log_mask & LOG_MASK_ERR != 0 {
             inchi_ios_eprint(
                 Some(log),
                 &format!(
@@ -132,7 +139,7 @@ pub fn treat_errors_in_read_the_structure(
                 ),
             );
         }
-        if sd.n_error_type == IS_WARNING {
+        if sd.n_error_type == IS_WARNING && log_mask & LOG_MASK_WARN != 0 {
             inchi_ios_eprint(
                 Some(log),
                 &format!(
@@ -237,7 +244,7 @@ pub fn get_one_structure(
         } else {
             *num_inp += 1;
         }
-        n_ret = treat_errors_in_read_the_structure(sd, ip, log, orig, *num_inp);
+        n_ret = treat_errors_in_read_the_structure(sd, ip, LOG_MASK_ALL, log, orig, *num_inp);
     }
     if n_ret == IS_EOF {
         *num_inp -= 1;
