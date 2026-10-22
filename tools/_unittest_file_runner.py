@@ -9,6 +9,33 @@ import unittest
 from pathlib import Path
 
 
+def run_pytest_functions(path: str, results: dict) -> None:
+    """Files with pytest-style `test_*` functions (no unittest cases)."""
+    try:
+        import pytest
+    except ImportError:
+        return
+
+    class Plugin:
+        def pytest_runtest_logreport(self, report):
+            tail = report.nodeid.split("::", 1)[-1]
+            key = f"pytest::{tail}"
+            if report.when == "call":
+                if report.passed:
+                    results[key] = ["passed", ""]
+                elif report.skipped:
+                    results[key] = ["skipped", str(report.longrepr)[-200:]]
+                else:
+                    results[key] = ["failed", str(report.longrepr)[-2000:]]
+            elif report.failed:
+                results[key] = ["failed", str(report.longrepr)[-2000:]]
+            elif report.skipped:
+                results[key] = ["skipped", ""]
+
+    pytest.main(["-q", "-p", "no:cacheprovider", "--rootdir", str(Path(path).parent), path],
+                plugins=[Plugin()])
+
+
 def main(path: str, out: str) -> None:
     # upstream's tests import `rdkit`; rdoxide's package is `rdoxide`
     sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -54,7 +81,13 @@ def main(path: str, out: str) -> None:
             def addUnexpectedSuccess(self, test):
                 results[self._id(test)] = ["failed", "unexpected success"]
 
-        suite.run(Collector())
+        if suite.countTestCases():
+            suite.run(Collector())
+        else:
+            run_pytest_functions(path, results)
+            if not results:
+                # a script without test cases: importing it without error is the test
+                results["<script>"] = ["passed", ""]
     with open(out, "w") as fh:
         json.dump(results, fh)
 

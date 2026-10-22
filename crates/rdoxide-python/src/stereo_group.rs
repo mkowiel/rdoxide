@@ -88,15 +88,26 @@ impl PyStereoGroup {
 
 /// creates a StereoGroup associated with a molecule from a list of atom Ids
 #[pyfunction]
-#[pyo3(name = "CreateStereoGroup", signature = (stereoGroupType, mol, atomIds = Vec::new(), bondIds = Vec::new(), readId = 0))]
+#[pyo3(name = "CreateStereoGroup", signature = (stereoGroupType, mol, atomIds = None, bondIds = None, readId = 0))]
 #[allow(non_snake_case)]
 pub fn create_stereo_group(
     stereoGroupType: &Bound<'_, PyAny>,
     mol: &Bound<'_, PyMol>,
-    atomIds: Vec<u32>,
-    bondIds: Vec<u32>,
+    atomIds: Option<&Bound<'_, PyAny>>,
+    bondIds: Option<&Bound<'_, PyAny>>,
     readId: u32,
 ) -> PyResult<PyStereoGroup> {
+    // non-numeric indices: TypeError in Boost.Python, RuntimeError in nanobind
+    let ids = |v: Option<&Bound<'_, PyAny>>| -> PyResult<Vec<u32>> {
+        match v {
+            None => Ok(Vec::new()),
+            Some(v) => v
+                .extract::<Vec<u32>>()
+                .map_err(|e| crate::compat::runtime_type_error(mol.py(), e.to_string())),
+        }
+    };
+    let atomIds = ids(atomIds)?;
+    let bondIds = ids(bondIds)?;
     let t: StereoGroupType = PyStereoGroupType::extract(stereoGroupType)?;
     if atomIds.is_empty() && bondIds.is_empty() {
         return Err(PyValueError::new_err(
