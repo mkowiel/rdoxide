@@ -195,6 +195,13 @@ int main(void) {
                                 for (int i = 0; i < b->num_vertices; i++) printf("m%d %d %d\n", i, b->vert[i].st_edge.cap, b->vert[i].st_edge.flow);
                                 for (int i = 0; i < b->num_edges; i++) printf("f%d %d %d\n", i, b->edge[i].flow, b->edge[i].forbidden);
                                 for (int i = 0; i < n; i++) printf("c%d %d %d %d %d\n", i, va[i].cInitCharge, a2[i].valence, a2[i].chem_bonds_valence, a2[i].charge);
+                                int rra = RearrangePlusMinusEdgesFlow(b, bd, va, &g, 4);
+                                printf("RA %d %d %d\n", rra, b->tot_st_cap, b->tot_st_flow);
+                                for (int i = 0; i < b->num_edges; i++) printf("g%d %d %d\n", i, b->edge[i].flow, b->edge[i].forbidden);
+                                int nr = 0, td = 0;
+                                int riz = IncrementZeroOrderBondsToHeteroat(b, bd, &s3, at, a2, va, &g, &nr, &td, 4);
+                                printf("IZ %d %d %d %d %d\n", riz, nr, td, b->tot_st_cap, b->tot_st_flow);
+                                for (int i = 0; i < b->num_edges; i++) printf("h%d %d %d\n", i, b->edge[i].flow, b->edge[i].forbidden);
                             }
                             for (int i = 0; i < n; i++) at[i].bond_type[0] = 0;
                             IncrZeroBondsAndClearEndpts(at, n, 5);

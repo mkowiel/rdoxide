@@ -731,6 +731,29 @@ fn restoration_helpers_match_c() {
                                                 va[i].c_init_charge, v, cb, ch
                                             ));
                                         }
+                                        let rra = rdoxide::external::inchi::ichirvr2::rearrange_plus_minus_edges_flow(&mut b, &mut bd, &va, 4);
+                                        got.push(format!(
+                                            "RA {rra} {} {}",
+                                            b.tot_st_cap, b.tot_st_flow
+                                        ));
+                                        for i in 0..b.num_edges as usize {
+                                            got.push(format!(
+                                                "g{i} {} {}",
+                                                b.edge[i].flow, b.edge[i].forbidden
+                                            ));
+                                        }
+                                        let (mut nr, mut td) = (0, 0);
+                                        let riz = rdoxide::external::inchi::ichirvr2::increment_zero_order_bonds_to_heteroat(&mut b, &mut bd, &mut ps, &mut a2, &va, &g, &mut nr, &mut td, 4);
+                                        got.push(format!(
+                                            "IZ {riz} {nr} {td} {} {}",
+                                            b.tot_st_cap, b.tot_st_flow
+                                        ));
+                                        for i in 0..b.num_edges as usize {
+                                            got.push(format!(
+                                                "h{i} {} {}",
+                                                b.edge[i].flow, b.edge[i].forbidden
+                                            ));
+                                        }
                                     }
                                     for a in at.iter_mut().take(n) {
                                         a.bond_type[0] = 0;

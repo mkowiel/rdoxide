@@ -16,12 +16,14 @@ use super::ichi_bns::{
 use super::ichiread::{RI_ERR_PROGR, RI_ERR_SYNTAX};
 use super::ichirvr1::CN_LIST;
 use super::ichirvr1::{
-    EL_TYPE_C, EL_TYPE_MASK, EL_TYPE_N, EL_TYPE_O, EL_TYPE_OST, EL_TYPE_P, EL_TYPE_PT, EL_TYPE_S,
-    bond_flow_maxcap_minorder, comp_cc_cand, get_pva_atom_type, get_tgroup_info_from_inchi,
-    run_bns_restore_once,
+    BnsTestResult, EL_TYPE_C, EL_TYPE_MASK, EL_TYPE_N, EL_TYPE_O, EL_TYPE_OST, EL_TYPE_P,
+    EL_TYPE_PT, EL_TYPE_S, EdgeList, add_to_edge_list, alloc_edge_list, bond_flow_maxcap_minorder,
+    comp_cc_cand, get_pva_atom_type, get_tgroup_info_from_inchi, remove_forbidden_edge_mask,
+    run_bns_restore_once, run_bns_test_once,
 };
+use super::ichirvr4::forbid_carbon_charge_edges;
 use super::ichirvrs::{
-    AllTcGroups, BNS_VT_C_POS, CN_BITS_SHIFT, CcCand, Srm, TGRF_MINUS_FIRST, ValAt,
+    AllTcGroups, BNS_VT_C_POS, CN_BITS_SHIFT, CcCand, Srm, TCG_ME_FLOWER0, TGRF_MINUS_FIRST, ValAt,
 };
 use super::ichisort::insertions_sort;
 use super::ichister::{
@@ -2314,4 +2316,264 @@ pub fn adjust_tgroups_to_forbidden_edges2(
         }
     }
     num_changes
+}
+
+/// `RearrangePlusMinusEdgesFlow`: replaces the ambiguous neutral
+/// (+)flow=0, (-)flow=1 by (+)flow=1, (-)flow=0 and fixes the charges
+pub fn rearrange_plus_minus_edges_flow(
+    bns: &mut BnStruct,
+    bd: &mut BnData,
+    p_va: &[ValAt],
+    forbidden_edge_mask: i32,
+) -> i32 {
+    let num_atoms = bns.num_atoms as usize;
+    let mask = forbidden_edge_mask as i8;
+    let mut num_found = 0;
+    let mut num_tot = 0;
+    for va in &p_va[..num_atoms] {
+        let e_minus = va.n_c_minus_group_edge - 1;
+        let e_plus = va.n_c_plus_group_edge - 1;
+        num_tot += i32::from(e_minus >= 0) + i32::from(e_plus >= 0);
+        if e_minus >= 0 && e_plus >= 0 {
+            let p = &bns.edge[e_plus as usize];
+            let m = &bns.edge[e_minus as usize];
+            if m.flow > 0 && p.cap - p.flow > 0 {
+                num_found += 1;
+            }
+        }
+    }
+    if num_found == 0 {
+        return 0;
+    }
+    let mut fixed = EdgeList::default();
+    let ret = alloc_edge_list(&mut fixed, num_tot + bns.num_bonds);
+    if ret != 0 {
+        return ret;
+    }
+    for va in &p_va[..num_atoms] {
+        let e_minus = va.n_c_minus_group_edge - 1;
+        let e_plus = va.n_c_plus_group_edge - 1;
+        if e_minus >= 0 && e_plus >= 0 {
+            let (k1, k2) = (
+                bns.edge[e_minus as usize].flow,
+                bns.edge[e_plus as usize].cap - bns.edge[e_plus as usize].flow,
+            );
+            if k1 > 0 && k2 > 0 {
+                let v1 = bns.edge[e_minus as usize].neighbor1 as usize;
+                let v2 = bns.edge[e_minus as usize].neighbor12 as usize ^ v1;
+                let delta = k1.min(k2);
+                bns.edge[e_minus as usize].flow -= delta;
+                bns.vert[v1].st_edge.flow -= delta;
+                bns.vert[v2].st_edge.flow -= delta;
+                bns.tot_st_flow -= 2 * delta;
+            }
+            bns.edge[e_plus as usize].forbidden |= mask;
+            bns.edge[e_minus as usize].forbidden |= mask;
+            for e in [e_minus, e_plus] {
+                let r = add_to_edge_list(&mut fixed, e, 0);
+                if r != 0 {
+                    return r;
+                }
+            }
+        } else if e_minus >= 0 {
+            bns.edge[e_minus as usize].forbidden |= mask;
+            let r = add_to_edge_list(&mut fixed, e_minus, 0);
+            if r != 0 {
+                return r;
+            }
+        } else if e_plus >= 0 {
+            bns.edge[e_plus as usize].forbidden |= mask;
+            let r = add_to_edge_list(&mut fixed, e_plus, 0);
+            if r != 0 {
+                return r;
+            }
+        }
+    }
+    for i in 0..bns.num_bonds as usize {
+        bns.edge[i].forbidden |= mask;
+        let r = add_to_edge_list(&mut fixed, i as i32, 0);
+        if r != 0 {
+            return r;
+        }
+    }
+    let ret = run_bns_restore_once(bns, bd);
+    remove_forbidden_edge_mask(bns, &fixed, forbidden_edge_mask);
+    if ret < 0 {
+        return ret;
+    }
+    ret
+}
+
+/// `IncrementZeroOrderBondsToHeteroat`: returns the number of changes;
+/// `num_run_bns` and `total_delta` are incremented
+#[allow(clippy::too_many_arguments)]
+pub fn increment_zero_order_bonds_to_heteroat(
+    bns: &mut BnStruct,
+    bd: &mut BnData,
+    ps: &mut StrFromInChI,
+    at2: &mut Vec<InpAtom>,
+    p_va: &[ValAt],
+    tcg: &AllTcGroups,
+    num_run_bns: &mut i32,
+    total_delta: &mut i32,
+    forbidden_edge_mask: i32,
+) -> i32 {
+    const FIX_BOND_ADD_ALLOC: i32 = 128;
+    let num_at = ps.num_atoms as usize;
+    let len_at = (ps.num_atoms + ps.num_deleted_h) as usize;
+    let mask = forbidden_edge_mask as i8;
+    let mut carbon_edges = EdgeList::default();
+    let mut fixed = EdgeList::default();
+    let mut num_changes = 0;
+    let mut fixed_carbon_charges = false;
+    let mut res = BnsTestResult::default();
+
+    let ret = (|| -> i32 {
+        let k = tcg.n_group[TCG_ME_FLOWER0 as usize];
+        if tcg.num_metal_atoms == 0 || k < 0 || tcg.p_tcg[k as usize].n_vertex_number < 0 {
+            return 0;
+        }
+        let v_me_flower0 = tcg.p_tcg[k as usize].n_vertex_number as usize;
+        let refresh = |ps: &mut StrFromInChI, at2: &mut Vec<InpAtom>, bns: &BnStruct| -> i32 {
+            at2.clear();
+            at2.extend_from_slice(&ps.at[..len_at]);
+            std::mem::swap(&mut ps.at, at2);
+            let r = copy_bns_to_atom(ps, bns, p_va, tcg, true);
+            std::mem::swap(&mut ps.at, at2);
+            r
+        };
+        let r = refresh(ps, at2, bns);
+        if r < 0 {
+            return r;
+        }
+        for i in 0..num_at {
+            if p_va[i].c_metal == 0 || p_va[i].n_metal_group_edge <= 0 {
+                continue;
+            }
+            let pe_me_flower = (p_va[i].n_metal_group_edge - 1) as usize;
+            if v_me_flower0 != (bns.edge[pe_me_flower].neighbor12 as usize ^ i) {
+                return RI_ERR_PROGR;
+            }
+            let mut v_neigh_neigh = 0usize;
+            let mut pe_neigh_neigh = 0usize;
+            for j in 0..at2[i].valence as usize {
+                if bns.edge[pe_me_flower].flow == 0 {
+                    break;
+                }
+                if i32::from(at2[i].bond_type[j]) & BOND_TYPE_MASK != 0 {
+                    continue;
+                }
+                if !fixed_carbon_charges {
+                    let r = forbid_carbon_charge_edges(
+                        bns,
+                        tcg,
+                        &mut carbon_edges,
+                        forbidden_edge_mask,
+                    );
+                    if r < 0 {
+                        return r;
+                    }
+                    fixed_carbon_charges = true;
+                }
+                let pe_zero = bns.iedge[bns.vert[i].iedge + j] as usize;
+                if bns.edge[pe_zero].flow != 0 {
+                    return RI_ERR_PROGR;
+                }
+                for k in 0..at2[i].valence as usize {
+                    let pe = bns.iedge[bns.vert[i].iedge + k] as usize;
+                    if bns.edge[pe].flow == 1 && bns.edge[pe].forbidden & mask == 0 {
+                        let r = add_to_edge_list(&mut fixed, pe as i32, FIX_BOND_ADD_ALLOC);
+                        if r != 0 {
+                            return r;
+                        }
+                        bns.edge[pe].forbidden |= mask;
+                    }
+                }
+                for k in 0..num_at {
+                    if p_va[k].c_metal == 0
+                        && p_va[k].c_num_valence_electrons == 5
+                        && at2[k].valence == 2
+                        && at2[k].num_h == 0
+                        && p_va[k].c_min_ring_size <= 6
+                        && p_va[k].n_c_plus_group_edge > 0
+                    {
+                        let pe = (p_va[k].n_c_plus_group_edge - 1) as usize;
+                        if bns.edge[pe].flow == 1 && bns.edge[pe].forbidden & mask == 0 {
+                            let r = add_to_edge_list(&mut fixed, pe as i32, FIX_BOND_ADD_ALLOC);
+                            if r != 0 {
+                                return r;
+                            }
+                            bns.edge[pe].forbidden |= mask;
+                        }
+                    }
+                }
+                let v_neigh = at2[i].neighbor[j] as usize;
+                let mut found = false;
+                let mut k = bns.vert[v_neigh].num_adj_edges as isize - 1;
+                while k >= 0 {
+                    let pe = bns.iedge[bns.vert[v_neigh].iedge + k as usize] as usize;
+                    if bns.edge[pe].flow != 0 {
+                        let vnm = bns.edge[pe].neighbor12 as usize ^ v_neigh;
+                        if vnm != i && vnm != v_me_flower0 {
+                            pe_neigh_neigh = pe;
+                            v_neigh_neigh = vnm;
+                            found = true;
+                            break;
+                        }
+                    }
+                    k -= 1;
+                }
+                if !found {
+                    continue;
+                }
+                bns.edge[pe_zero].flow += 1;
+                bns.edge[pe_zero].forbidden |= mask;
+                bns.edge[pe_me_flower].flow -= 1;
+                bns.edge[pe_neigh_neigh].flow -= 1;
+                bns.vert[v_me_flower0].st_edge.flow -= 1;
+                bns.vert[v_neigh_neigh].st_edge.flow -= 1;
+                bns.tot_st_flow -= 2;
+                let mut success = 0;
+                let mut ret = run_bns_test_once(bns, bd, p_va, &mut res);
+                let vnn = v_neigh_neigh as i32;
+                if ret == 1
+                    && ((res.v_last == v_me_flower0 as i32 && res.v_first == vnn)
+                        || (res.v_last == vnn && res.v_first == v_me_flower0 as i32))
+                    && res.delta_charge.abs() <= 2
+                {
+                    ret = run_bns_restore_once(bns, bd);
+                    if ret > 0 {
+                        *num_run_bns += 1;
+                        *total_delta += ret;
+                        num_changes += 1;
+                        success = ret;
+                    }
+                    let r = add_to_edge_list(&mut fixed, pe_zero as i32, FIX_BOND_ADD_ALLOC);
+                    if r != 0 {
+                        return r;
+                    }
+                } else {
+                    bns.edge[pe_zero].flow -= 1;
+                    bns.edge[pe_zero].forbidden &= !mask;
+                    bns.edge[pe_me_flower].flow += 1;
+                    bns.edge[pe_neigh_neigh].flow += 1;
+                    bns.vert[v_me_flower0].st_edge.flow += 1;
+                    bns.vert[v_neigh_neigh].st_edge.flow += 1;
+                    bns.tot_st_flow += 2;
+                }
+                remove_forbidden_edge_mask(bns, &fixed, forbidden_edge_mask);
+                fixed.num_edges = 0;
+                if success != 0 {
+                    let r = refresh(ps, at2, bns);
+                    if r < 0 {
+                        return r;
+                    }
+                }
+            }
+        }
+        num_changes
+    })();
+    remove_forbidden_edge_mask(bns, &carbon_edges, forbidden_edge_mask);
+    remove_forbidden_edge_mask(bns, &fixed, forbidden_edge_mask);
+    ret
 }
