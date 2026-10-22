@@ -395,6 +395,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 279 | Python wrapper fixes from the nbWrap rough_test follow-ups (SetStereoGroups owner check, AddConformer borrow panic, GetStringVectProp list) | ✅ | ratchet 1903/1973 (+3); remaining nbWrap failures conflict with boost Wrap tests |
 | 280 | `Chem.MolKey` copied from upstream (InchiInfo works on the InChI port; MolKey itself needs AvalonTools) | ✅ | ratchet +10 (UnitTestMolKey 10/15, the rest need Avalon) |
 | 281 | InChI: differential `GetStructFromINCHI` vs the C library (1576 InChI identical) and a fix in `RunBnsRestore1` | ✅ | non-standard corpus InChI round-trip 519/527 (rest are KET/15T, refused by C too) |
+| 282 | Ratchet extended with upstream testFeatures.py, DistGeom rough_test.py and VLib NodeLib tests; `FreeChemicalFeature` keyword arguments | ✅ | ratchet +13 |
 
 ## Python package files
 
@@ -858,3 +859,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-22 — Stage 279: Wrapper fixes (+3 ratchet). Not a speed change: upstream_speed.html not regenerated.
 * 2026-10-22 — Stage 280: MolKey package; ratchet +10. Pure Python, no speed change: upstream_speed.html not regenerated.
 * 2026-10-22 — Stage 281: I12q GetStructFromINCHI vs C 1576/1576; RunBnsRestore1 H fix. No speed change: upstream_speed.html not regenerated.
+* 2026-10-22 — Stage 282: Ratchet files + FreeChemicalFeature kwargs (+13). No speed change: upstream_speed.html not regenerated.
