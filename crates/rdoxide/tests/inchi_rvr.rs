@@ -1065,6 +1065,33 @@ fn restoration_helpers_match_c() {
                                                     b.tot_st_flow,
                                                     sum(&b)
                                                 ));
+                                                ps.i_inchi_rec = 1;
+                                                let rsb = r4::salt_bonds_to_coord_bonds(
+                                                    &mut b, &mut bd, &mut ps, &mut a2, &mut va, &g,
+                                                    &mut nr, &mut td, 4,
+                                                );
+                                                let mut chk = 0i64;
+                                                for q in 0..b.num_edges as usize {
+                                                    chk = (chk
+                                                        + (i64::from(b.edge[q].flow) * 31
+                                                            + i64::from(b.edge[q].forbidden)
+                                                            + i64::from(b.edge[q].cap) * 7)
+                                                            * (q as i64 + 1))
+                                                        % 1_000_000_007;
+                                                }
+                                                let ci: i32 = (0..n)
+                                                    .map(|i| {
+                                                        i32::from(va[i].c_init_charge)
+                                                            * (i as i32 + 1)
+                                                    })
+                                                    .sum();
+                                                got.push(format!(
+                                                    "SB {rsb} {nr} {td} {} {} {ci} {} {chk}",
+                                                    b.tot_st_cap,
+                                                    b.tot_st_flow,
+                                                    ps.srm.b_metal_add_flower
+                                                ));
+                                                ps.i_inchi_rec = 0;
                                                 ps.fixed_h = None;
                                                 ps.i_mobile_h = 0;
                                                 ps.charge = 0;
