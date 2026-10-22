@@ -1003,3 +1003,190 @@ pub fn all_inchi_to_structure(
     }
     num_err
 }
+
+/// `AddProtonAndIsoHBalanceToMobHStruct`: when no Fixed-H layer exists, adds
+/// the proton and isotopic exchangeable proton balance of the input InChI to
+/// the restored Mobile-H components (the InChI of the changed components is
+/// recalculated). Returns a negative error or the result of the last call.
+pub fn add_proton_and_iso_h_balance_to_mob_h_struct(
+    ip: &super::ichiparm::InputParms,
+    sd: &mut super::runichi3::StructData,
+    num_inp: i64,
+    b_has_some_fixed_h: bool,
+    p_struct: &mut [[Vec<super::ichirvr2::StrFromInChI>; 2]; 2],
+    one_input: &InpInChI,
+) -> i32 {
+    use super::ichiread::{NO_VALUE_INT, b_inp_inchi_component_exists};
+    use super::ichirvr4::{add_rem_iso_protons_in_restr_struct, add_rem_protons_in_restr_struct};
+
+    if b_has_some_fixed_h {
+        return 0;
+    }
+    // protons removed by the normalization from the original structure
+    let mut to_be_removed = [0i32; 2];
+    let mut to_be_removed_iso = [[0i16; 3]; 2];
+    for i in 0..2 {
+        let p = &one_input.n_num_protons[i][TAUT_YES];
+        to_be_removed[i] = i32::from(p.n_num_removed_protons);
+        to_be_removed_iso[i] = p.n_num_removed_isotopic_h;
+    }
+    // the protons added/removed by the normalization of the restored
+    // structure might have been added by the structure restore
+    for i_inchi_rec in 0..2 {
+        for k in 0..one_input.n_num_components[i_inchi_rec][TAUT_YES].max(0) as usize {
+            if !b_inp_inchi_component_exists(one_input, i_inchi_rec, TAUT_YES, k as i32) {
+                continue;
+            }
+            let mut removed_by_norm_from_revrs = 0;
+            let mut removed_by_revrs = 0;
+            let n_link = p_struct[i_inchi_rec][TAUT_YES][k].n_link;
+            if i_inchi_rec == INCHI_REC || n_link >= 0 {
+                let ps = &mut p_struct[i_inchi_rec][TAUT_YES][k];
+                let revr = ps.rev_inchi.p_inchi[i_inchi_rec].first();
+                let charge_revrs = revr.map_or(NO_VALUE_INT, |r| {
+                    r[TAUT_YES]
+                        .as_ref()
+                        .map_or(NO_VALUE_INT, |c| c.n_total_charge)
+                });
+                let charge_inchi = one_input.p_inp_inchi[i_inchi_rec][TAUT_YES][k].n_total_charge;
+                if let Some(a) = ps.rev_inchi.p_inchi_aux[i_inchi_rec].first() {
+                    removed_by_norm_from_revrs = a[TAUT_YES]
+                        .as_ref()
+                        .map_or(0, |a| i32::from(a.n_num_removed_protons));
+                }
+                removed_by_revrs = ps.n_num_removed_protons_by_revrs;
+                ps.n_charge_revrs = charge_revrs;
+                ps.n_charge_inchi = charge_inchi;
+            } else {
+                let k1 = -(1 + n_link);
+                if k1 >= 0 {
+                    let k1 = k1 as usize;
+                    // as in C: the INCHI_BAS slot of the reconnected structure
+                    let (charge_revrs, aux) = {
+                        let r = &p_struct[INCHI_REC][TAUT_YES][k1];
+                        (
+                            r.rev_inchi.p_inchi[INCHI_BAS]
+                                .first()
+                                .map_or(NO_VALUE_INT, |x| {
+                                    x[TAUT_YES]
+                                        .as_ref()
+                                        .map_or(NO_VALUE_INT, |c| c.n_total_charge)
+                                }),
+                            r.rev_inchi.p_inchi_aux[INCHI_BAS].first().map(|a| {
+                                a[TAUT_YES]
+                                    .as_ref()
+                                    .map_or(0, |a| i32::from(a.n_num_removed_protons))
+                            }),
+                        )
+                    };
+                    let charge_inchi =
+                        one_input.p_inp_inchi[INCHI_REC][TAUT_YES][k1].n_total_charge;
+                    if let Some(a) = aux {
+                        removed_by_norm_from_revrs = a;
+                    }
+                    // this component is the same as in the reconnected layer
+                    removed_by_revrs =
+                        p_struct[INCHI_REC][TAUT_YES][k1].n_num_removed_protons_by_revrs;
+                    let t = &mut p_struct[i_inchi_rec][TAUT_YES][k1];
+                    t.n_charge_revrs = charge_revrs;
+                    t.n_charge_inchi = charge_inchi;
+                }
+            }
+            let _ = removed_by_revrs;
+            // protons to add = balance in the InChI - protons known to be
+            // removed by the normalization from the reconstructed structure
+            to_be_removed[i_inchi_rec] -= removed_by_norm_from_revrs;
+            p_struct[i_inchi_rec][TAUT_YES][k].n_removed_protons_by_norm_from_revrs =
+                removed_by_norm_from_revrs;
+        }
+    }
+    // the fixed-H layer is missing: add the proton balance to the components
+    let mut delta_from_disconnected = 0;
+    let mut iso_delta_from_disconnected = [0i16; 3];
+    let mut ret = 0;
+    for i_inchi_rec in [INCHI_REC, INCHI_BAS] {
+        let has_rec_mob_h =
+            i_inchi_rec == INCHI_BAS && one_input.n_num_components[INCHI_REC][TAUT_YES] != 0;
+        if i_inchi_rec == INCHI_BAS {
+            // second pass: the common structures have been changed
+            to_be_removed[INCHI_BAS] += delta_from_disconnected;
+        }
+        let (bas, rec) = p_struct.split_at_mut(1);
+        let (ps, ps_r) = if i_inchi_rec == INCHI_BAS {
+            (&mut bas[0][TAUT_YES], Some(&rec[0][TAUT_YES]))
+        } else {
+            (&mut rec[0][TAUT_YES], None)
+        };
+        let n = one_input.n_num_components[i_inchi_rec][TAUT_YES];
+        let mut delta = 0;
+        ret = add_rem_protons_in_restr_struct(
+            ip,
+            sd,
+            num_inp,
+            b_has_some_fixed_h,
+            &mut ps[..n.max(0) as usize],
+            if has_rec_mob_h {
+                ps_r.map(|r| &r[..])
+            } else {
+                None
+            },
+            if has_rec_mob_h {
+                one_input.n_num_components[INCHI_REC][TAUT_YES].max(0) as usize
+            } else {
+                0
+            },
+            &mut to_be_removed[i_inchi_rec],
+            (i_inchi_rec == INCHI_REC).then_some(&mut delta),
+        );
+        if i_inchi_rec == INCHI_REC {
+            delta_from_disconnected = delta;
+        }
+        if ret < 0 {
+            return ret;
+        }
+    }
+    // the same for the isotopic exchangeable protons
+    for i_inchi_rec in [INCHI_REC, INCHI_BAS] {
+        let has_rec_mob_h =
+            i_inchi_rec == INCHI_BAS && one_input.n_num_components[INCHI_REC][TAUT_YES] != 0;
+        if i_inchi_rec == INCHI_BAS {
+            for k in 0..3 {
+                to_be_removed_iso[INCHI_BAS][k] += iso_delta_from_disconnected[k];
+            }
+        }
+        let (bas, rec) = p_struct.split_at_mut(1);
+        let (ps, ps_r) = if i_inchi_rec == INCHI_BAS {
+            (&mut bas[0][TAUT_YES], Some(&rec[0][TAUT_YES]))
+        } else {
+            (&mut rec[0][TAUT_YES], None)
+        };
+        let n = one_input.n_num_components[i_inchi_rec][TAUT_YES];
+        let mut delta = [0i16; 3];
+        ret = add_rem_iso_protons_in_restr_struct(
+            ip,
+            sd,
+            num_inp,
+            b_has_some_fixed_h,
+            &mut ps[..n.max(0) as usize],
+            if has_rec_mob_h {
+                ps_r.map(|r| &r[..])
+            } else {
+                None
+            },
+            if has_rec_mob_h {
+                one_input.n_num_components[INCHI_REC][TAUT_YES].max(0) as usize
+            } else {
+                0
+            },
+            &mut to_be_removed_iso[i_inchi_rec],
+            (i_inchi_rec == INCHI_REC).then_some(&mut delta),
+        );
+        if i_inchi_rec == INCHI_REC {
+            iso_delta_from_disconnected = delta;
+        }
+        if ret < 0 {
+            return ret;
+        }
+    }
+    ret
+}

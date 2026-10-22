@@ -9,8 +9,11 @@ use rdoxide::external::inchi::ichi_io::{
 use rdoxide::external::inchi::ichiparm::{InputParms, read_command_line_parms};
 use rdoxide::external::inchi::ichiread::*;
 use rdoxide::external::inchi::ichirvr2::StrFromInChI;
-use rdoxide::external::inchi::ichirvr7::all_inchi_to_structure;
+use rdoxide::external::inchi::ichirvr7::{
+    add_proton_and_iso_h_balance_to_mob_h_struct, all_inchi_to_structure,
+};
 use rdoxide::external::inchi::ichirvrs::set_up_srm;
+use rdoxide::external::inchi::runichi3::StructData;
 
 fn parse(s: &str) -> Option<InpInChI> {
     let mut ios = InchiIostream::default();
@@ -58,7 +61,13 @@ fn sig(c: &rdoxide::external::inchi::ichi::InChI) -> String {
         &c.n_atom[..na],
         &c.n_conn_table[..c.len_conn_table as usize],
         &c.n_num_h[..na],
-        &c.n_tautomer[..c.len_tautomer as usize],
+        // a lone 0 (no t-groups) is how a recalculated structure with added
+        // protons stores an empty t-group list
+        c.n_tautomer[..c.len_tautomer as usize]
+            .iter()
+            .copied()
+            .filter(|_| c.len_tautomer > 1)
+            .collect::<Vec<_>>(),
         st(&c.stereo),
         st(&c.stereo_isotopic)
     )
@@ -122,6 +131,16 @@ fn restore_simple_inchi() {
         let mut ps: [[Vec<StrFromInChI>; 2]; 2] = Default::default();
         let ne = all_inchi_to_structure(&ip, 1, &srm, false, &mut ps, &mut d, 1, None);
         assert!(ne >= 0, "{s}: fatal {ne}");
+        // no Fixed-H layer: the proton balance is added to the Mobile-H structures
+        let rb = add_proton_and_iso_h_balance_to_mob_h_struct(
+            &ip,
+            &mut StructData::default(),
+            1,
+            false,
+            &mut ps,
+            &d,
+        );
+        assert!(rb >= 0, "{s}: balance {rb}");
         let comp = &ps[0][1][0];
         eprintln!(
             "{s}: errors {ne}, n_error {}, atoms {}, at2 {}, rev {}",
