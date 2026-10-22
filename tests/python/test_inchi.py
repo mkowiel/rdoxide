@@ -52,7 +52,7 @@ def test_mol_to_inchi():
     assert code in (0, 1)
     assert aux.startswith("AuxInfo=1/1/")
     inchi, code, msg, log, aux = rdinchi.MolToInchi(m, options="/FixedH")
-    assert inchi.startswith("InChI=1/C2H3O2/")
+    assert inchi.endswith("/fC2H3O2/q-1")
     assert rdinchi.MolToInchiKey(m) == "QTBSBXVTEAMEQO-UHFFFAOYSA-M"
 
 
