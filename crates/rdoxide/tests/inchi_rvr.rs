@@ -902,6 +902,21 @@ fn restoration_helpers_match_c() {
                                             ));
                                         }
                                         {
+                                            let rmc = rdoxide::external::inchi::ichirvr2::move_charge_to_make_centerpoints(&mut b, &mut bd, &mut ps, &mut a2, &va, &g, &mut nr, &mut td, 4);
+                                            let mut chk = 0i64;
+                                            for i in 0..b.num_edges as usize {
+                                                chk = (chk
+                                                    + (i64::from(b.edge[i].flow) * 31
+                                                        + i64::from(b.edge[i].forbidden))
+                                                        * (i as i64 + 1))
+                                                    % 1_000_000_007;
+                                            }
+                                            got.push(format!(
+                                                "MC {rmc} {nr} {td} {} {} {chk}",
+                                                b.tot_st_cap, b.tot_st_flow
+                                            ));
+                                        }
+                                        {
                                             let eps: Vec<u16> = (0..n)
                                                 .filter(|&i| at[i].endpoint != 0)
                                                 .map(|i| i as u16)

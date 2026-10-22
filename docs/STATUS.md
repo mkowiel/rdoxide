@@ -367,6 +367,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 251 | InChI port I11o: EliminateNitrogen5Val3Bonds, Convert_SIV_to_SVI, PlusFromDB_N_DB_O_to_Metal |
 | 252 | InChI port I11p: MoveMobileHToAvoidFixedBonds, RemoveRadFromMobileHEndpoint |
 | 253 | InChI port I11q: RemoveRadFromMobileHEndpointFixH |
+| 254 | InChI port I11r: MoveChargeToMakeCenerpoints — ichirvr2 complete |
 
 ## Python package files
 
@@ -802,3 +803,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-22 — Stage 251: InChI I11o — N(V)/S(IV)/NO-to-metal charge fixes; no runtime effect, upstream_speed.html not regenerated
 * 2026-10-22 — Stage 252: InChI I11p — mobile-H bond avoidance and radical removal; no runtime effect, upstream_speed.html not regenerated
 * 2026-10-22 — Stage 253: InChI I11q — Fixed-H endpoint radical removal; no runtime effect, upstream_speed.html not regenerated
+* 2026-10-22 — Stage 254: InChI I11r — centerpoint charge move, ichirvr2 complete; no runtime effect, upstream_speed.html not regenerated

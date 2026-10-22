@@ -240,6 +240,12 @@ int main(void) {
                                 printf("RR %d %d %d %d %d\n", rx, nr, td, b->tot_st_cap, b->tot_st_flow);
                                 for (int i = 0; i < b->num_edges; i++) printf("y%d %d %d\n", i, b->edge[i].flow, b->edge[i].forbidden);
                                 {
+                                    int rmc = MoveChargeToMakeCenerpoints(b, bd, &s3, at, a2, va, &g, &nr, &td, 4);
+                                    long long chk = 0;
+                                    for (int i = 0; i < b->num_edges; i++) chk = (chk + (long long)(b->edge[i].flow * 31 + b->edge[i].forbidden) * (i + 1)) % 1000000007LL;
+                                    printf("MC %d %d %d %d %d %lld\n", rmc, nr, td, b->tot_st_cap, b->tot_st_flow, chk);
+                                }
+                                {
                                     T_GROUP tgx; memset(&tgx, 0, sizeof(tgx));
                                     AT_NUMB *epl = calloc(n + 1, sizeof(AT_NUMB)), *epf = calloc(n + 1, sizeof(AT_NUMB));
                                     int ne = 0;
