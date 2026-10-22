@@ -299,6 +299,12 @@ int main(void) {
                                         int rms2 = MakeSingleBondsMetal2ChargedHeteroat(b, bd, &s3, at, a2, va, &g, &nr, &td, 4);
                                         chk = 0; for (int q = 0; q < b->num_edges; q++) chk = (chk + (long long)(b->edge[q].flow * 31 + b->edge[q].forbidden) * (q + 1)) % 1000000007LL;
                                         printf("MS %d %d %d %d %d %lld\n", rms2, nr, td, b->tot_st_cap, b->tot_st_flow, chk);
+                                        s3.iInchiRec = 1;
+                                        int rsb = SaltBondsToCoordBonds(b, bd, &s3, at, a2, va, &g, &nr, &td, 4);
+                                        chk = 0; for (int q = 0; q < b->num_edges; q++) chk = (chk + (long long)(b->edge[q].flow * 31 + b->edge[q].forbidden + b->edge[q].cap * 7) * (q + 1)) % 1000000007LL;
+                                        ci = 0; for (int i = 0; i < n; i++) ci += va[i].cInitCharge * (i + 1);
+                                        printf("SB %d %d %d %d %d %d %d %lld\n", rsb, nr, td, b->tot_st_cap, b->tot_st_flow, ci, s.bMetalAddFlower, chk);
+                                        s3.iInchiRec = 0;
                                         free(s3.fixed_H); s3.fixed_H = NULL; s3.iMobileH = 0; s3.charge = 0;
                                         free(atf); free(atn);
                                     }

@@ -83,6 +83,8 @@ pub struct StrFromInChI {
     pub b_isotopic: i8,
     /// `nNumRemovedProtonsMobHInChI`
     pub n_num_removed_protons_mobh_inchi: i32,
+    /// `iInchiRec`: `INCHI_BAS` (0) for the basic InChI
+    pub i_inchi_rec: i8,
     /// `bMobileH`
     pub b_mobile_h: i32,
     /// `iMobileH`: `TAUT_NON` (0) for the Fixed-H structure

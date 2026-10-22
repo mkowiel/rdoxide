@@ -370,6 +370,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 254 | InChI port I11r: MoveChargeToMakeCenerpoints — ichirvr2 complete |
 | 255 | InChI port I11s: ichirvr4 FixLess/MoreHydrogenInFormula, FixRemoveExtraTautEndpoints, ForbidNintrogenPlus2BondsInSmallRings |
 | 256 | InChI port I11t: ichirvr4 MoveChargeToRemoveCenerpoints, MakeSingleBondsMetal2ChargedHeteroat |
+| 257 | InChI port I11u: SaltBondsToCoordBonds, GetPlusMinusVertex (new module ichirvr5) |
 
 ## Python package files
 
@@ -808,3 +809,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-22 — Stage 254: InChI I11r — centerpoint charge move, ichirvr2 complete; no runtime effect, upstream_speed.html not regenerated
 * 2026-10-22 — Stage 255: InChI I11s — ichirvr4 formula/endpoint fixes; no runtime effect, upstream_speed.html not regenerated
 * 2026-10-22 — Stage 256: InChI I11t — centerpoint charge removal, metal single bonds; no runtime effect, upstream_speed.html not regenerated
+* 2026-10-22 — Stage 257: InChI I11u — salt to coordination bonds; no runtime effect, upstream_speed.html not regenerated
