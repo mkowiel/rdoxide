@@ -2373,3 +2373,220 @@ fn normalize_and_compare_body(
         forbidden_stereo_edge_mask,
     )
 }
+
+/// `RunBnsRestore1`: solves the BNS of the restored structure and then
+/// applies, in order, all the restore-fixing functions; at the end the
+/// structure is normalized and compared with the input InChI. The restored
+/// structure `at2` is stored in `ps.at2`. `bHasSomeFixedH` is not used by
+/// the ported functions.
+#[allow(clippy::too_many_arguments)]
+pub fn run_bns_restore1(
+    ip: &super::ichiparm::InputParms,
+    bns: &mut BnStruct,
+    bd: &mut BnData,
+    ps: &mut StrFromInChI,
+    p_va: &mut [ValAt],
+    tcg: &mut AllTcGroups,
+    p_inchi: [Option<&InChI>; 2],
+) -> i32 {
+    use super::ichi_bns::{BNS_EDGE_FORBIDDEN_MASK, BNS_EDGE_FORBIDDEN_TEMP};
+    use super::ichirvr1::{remove_forbidden_edge_mask, run_bns_restore_once};
+    use super::ichirvr2 as r2;
+
+    let temp = i32::from(BNS_EDGE_FORBIDDEN_TEMP);
+    let mut num_run_bns = 0;
+    let mut total_delta = 0;
+    let num_at = ps.num_atoms as usize;
+    let at = ps.at.clone();
+    let mut at2: Vec<InpAtom> = vec![InpAtom::default(); at.len()];
+    let mut at3: Vec<InpAtom> = Vec::new();
+    let mut carbon_charge_edges = EdgeList::default();
+    let metal_carbon_edges = EdgeList::default();
+    let mut n_plus2_bonds_edges = EdgeList::default();
+    let mut ret: i32;
+    // run the BNS once with the edges of the list forbidden
+    macro_rules! run_once {
+        ($l:lifetime, $list:expr) => {{
+            ret = run_bns_restore_once(bns, bd);
+            num_run_bns += 1;
+            if ret < 0 {
+                break $l;
+            }
+            total_delta += ret;
+            remove_forbidden_edge_mask(bns, &$list, temp);
+            $list.num_edges = 0;
+        }};
+    }
+    macro_rules! step {
+        ($l:lifetime, $e:expr) => {{
+            ret = $e;
+            if ret < 0 {
+                break $l;
+            }
+        }};
+    }
+    'body: {
+        ret = if ps.i_mobile_h == 0 {
+            fill_out_extra_fixed_h_data_inchi(ps, p_inchi)
+        } else {
+            0
+        };
+        if ret != 0 {
+            break 'body;
+        }
+        step!('body, forbid_carbon_charge_edges(
+            bns,
+            tcg,
+            &mut carbon_charge_edges,
+            temp
+        ));
+        // KEEP_METAL_EDGE_FLOW is 0: ForbidMetalCarbonEdges is compiled out
+        for ring in [6, 8] {
+            step!('body, forbid_nitrogen_plus2_bonds_in_small_rings(
+                bns,
+                &at,
+                num_at,
+                p_va,
+                ring,
+                &mut n_plus2_bonds_edges,
+                temp
+            ));
+            if n_plus2_bonds_edges.num_edges != 0 {
+                run_once!('body, n_plus2_bonds_edges);
+            }
+        }
+        if carbon_charge_edges.num_edges > 0 {
+            run_once!('body, carbon_charge_edges);
+        }
+        if metal_carbon_edges.num_edges > 0 {
+            unreachable!("no metal-carbon edges are forbidden");
+        }
+        // allow changing any charges
+        ret = run_bns_restore_once(bns, bd);
+        num_run_bns += 1;
+        if ret < 0 {
+            break 'body;
+        }
+        total_delta += ret;
+        // move unfulfilled radicals from the charge structure to atoms
+        step!('body, r2::move_rad_to_atoms_add_charges(
+            bns, bd, ps, &mut at2, p_va, tcg, temp
+        ));
+        // restore inconsistencies
+        step!('body, r2::rearrange_plus_minus_edges_flow(bns, bd, p_va, temp));
+        step!('body, r2::increment_zero_order_bonds_to_heteroat(
+            bns,
+            bd,
+            ps,
+            &mut at2,
+            p_va,
+            tcg,
+            &mut num_run_bns,
+            &mut total_delta,
+            temp
+        ));
+        // MOVE_CHARGES_FROM_HETEREO_TO_METAL is 0
+        macro_rules! fixer {
+            ($l:lifetime, $f:path) => {
+                step!(
+                    $l,
+                    $f(
+                        bns,
+                        bd,
+                        ps,
+                        &mut at2,
+                        p_va,
+                        tcg,
+                        &mut num_run_bns,
+                        &mut total_delta,
+                        temp
+                    )
+                )
+            };
+        }
+        fixer!('body, r2::move_plus_from_s2_diamino_carbon);
+        step!('body, r2::eliminate_charge_separation_on_heteroatoms(
+            bns,
+            bd,
+            ps,
+            &mut at2,
+            p_va,
+            tcg,
+            &mut num_run_bns,
+            &mut total_delta,
+            temp,
+            0
+        ));
+        if ret != 0 {
+            // charge separation remains; allow changes of stereobonds in a ring
+            step!('body, r2::eliminate_charge_separation_on_heteroatoms(
+                bns,
+                bd,
+                ps,
+                &mut at2,
+                p_va,
+                tcg,
+                &mut num_run_bns,
+                &mut total_delta,
+                temp,
+                i32::from(BNS_EDGE_FORBIDDEN_MASK)
+            ));
+        }
+        fixer!('body, r2::restore_nnn_group);
+        fixer!('body, r2::fix_metal_nminus_ominus);
+        fixer!('body, r2::restore_cyano_group);
+        fixer!('body, r2::restore_iso_cyano_group);
+        fixer!('body, r2::eliminate_nitrogen5_val3_bonds);
+        fixer!('body, r2::convert_siv_to_svi);
+        fixer!('body, r2::plus_from_db_n_db_o_to_metal);
+        fixer!('body, r2::move_mobile_h_to_avoid_fixed_bonds);
+        if ps.i_mobile_h == 0 {
+            fixer!('body, r2::remove_rad_from_mobile_h_endpoint_fix_h);
+        } else {
+            fixer!('body, r2::remove_rad_from_mobile_h_endpoint);
+        }
+        fixer!('body, make_single_bonds_metal2_charged_heteroat);
+        fixer!('body, r2::move_charge_to_make_centerpoints);
+        step!('body, move_charge_to_remove_centerpoints(
+            bns,
+            bd,
+            ps,
+            &mut at2,
+            p_va,
+            tcg,
+            &mut num_run_bns,
+            &mut total_delta,
+            temp
+        ));
+        fixer!('body, check_and_refix_stereobonds);
+        step!('body, salt_bonds_to_coord_bonds(
+            bns,
+            bd,
+            ps,
+            &mut at2,
+            p_va,
+            tcg,
+            &mut num_run_bns,
+            &mut total_delta,
+            temp
+        ));
+        step!('body, normalize_and_compare(
+            ip,
+            bns,
+            bd,
+            ps,
+            &mut at2,
+            &mut at3,
+            p_va,
+            tcg,
+            p_inchi,
+            &mut num_run_bns,
+            &mut total_delta,
+            temp,
+            i32::from(BNS_EDGE_FORBIDDEN_MASK)
+        ));
+    }
+    ps.at = at;
+    ps.at2 = at2;
+    ret
+}
