@@ -341,6 +341,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 225 | InChI port I9f: molfile text to InChI string pipeline (option parsing, GetOneStructure, ProcessOneStructureEx, output assembly), differential-tested on 2990 molfiles vs the C library |
 | 226 | InChI port I9g: GetINCHI/GetStdINCHI (ExtractOneStructure, option summary log), differential-tested on 2998 inchi_Input structures vs the C library |
 | 227 | InChI port I9h: MolToInchi, MolBlockToInchi and MolToInchiKey wired to the InChI port, exact on the 539-record official-RDKit corpus |
+| 228 | InChI port I10a: ichiread /q and /p layers, delimited numbers, segment reader, differential-tested on 9786 cases vs the C library |
 
 ## Python package files
 
@@ -750,3 +751,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-22 — Stage 225: I9f inchi_dll_b: MakeINCHIFromMolfileText differential-tested against C (2990 cases)
 * 2026-10-22 — Stage 226: I9g GetINCHI/GetStdINCHI differential-tested against C (2998 cases)
 * 2026-10-22 — Stage 227: I9h MolToInchi/MolBlockToInchi/MolToInchiKey exact against the official RDKit corpus (539 records)
+* 2026-10-22 — Stage 228: I10a ichiread: charge/proton layers and segment reader differential-tested against C (9786 cases)

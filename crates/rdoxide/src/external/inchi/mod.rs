@@ -35,6 +35,7 @@ pub mod ichiparm;
 pub mod ichiprt1;
 pub mod ichiprt2;
 pub mod ichiprt3;
+pub mod ichiread;
 pub mod ichiring;
 pub mod ichisort;
 pub mod ichister;
