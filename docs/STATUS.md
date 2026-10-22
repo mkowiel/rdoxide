@@ -356,6 +356,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 240 | InChI port I11d: AllocateAndInitTCGBnStruct, AddTGroups2/AddCGroups2TCGBnStruct, metal flower (differential vs C) |
 | 241 | InChI port I11e: EvaluateChargeChanges, RunBnsTestOnce/RestoreOnce, charge flower edge (differential vs C) |
 | 242 | InChI port I11f: explicit terminal H connect/disconnect (differential vs C) |
+| 243 | InChI port I11g: ichirvr2 RestoreAtomConnectionsSetStereo and stereo bond types (differential vs C) |
 
 ## Python package files
 
@@ -780,3 +781,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-22 — Stage 240: InChI I11d — BNS building for the restoration; no runtime effect, upstream_speed.html not regenerated
 * 2026-10-22 — Stage 241: InChI I11e — BNS runs and charge evaluation; no runtime effect, upstream_speed.html not regenerated
 * 2026-10-22 — Stage 242: InChI I11f — explicit H connect/disconnect; no runtime effect, upstream_speed.html not regenerated
+* 2026-10-22 — Stage 243: InChI I11g — restoration of atoms and 0D stereo; no runtime effect, upstream_speed.html not regenerated

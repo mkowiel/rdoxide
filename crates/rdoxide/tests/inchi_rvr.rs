@@ -745,3 +745,156 @@ fn restoration_helpers_match_c() {
         }
     }
 }
+
+#[test]
+fn restore_atom_connections_matches_c() {
+    use rdoxide::external::inchi::ichirvr2::*;
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_rvr2.json")).unwrap();
+    for (ci, c) in data.as_array().unwrap().iter().enumerate() {
+        let inp = c["in"].as_str().unwrap();
+        let t: Vec<&str> = inp.split(' ').collect();
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        let mode: i32 = t[1].parse().unwrap();
+        let bytes = unhex(t[2]);
+        let mut ios = InchiIostream::default();
+        inchi_ios_init(&mut ios, INCHI_IOS_TYPE_STRING, IosFile::None);
+        ios.s.n_used_length = bytes.len() as i32;
+        ios.s.p_str = Some(bytes);
+        ios.s.n_ptr = 0;
+        let mut line = SegmLine::default();
+        let mut pstr = None;
+        let (mut state, mut nerr) = (-77, -9);
+        let mut d = InpInChI::default();
+        let (mut stdf, mut hso, mut bits) = (-5, -5, 0u8);
+        let r = inchi_line2data(
+            &mut ios, &mut line, &mut pstr, &mut state, &mut nerr, &mut d, true, 0, &mut stdf,
+            &mut hso, &mut bits,
+        );
+        let ok = (r == RI_ERR_EOL || r == RI_ERR_EOF)
+            && nerr == 0
+            && d.n_num_components[0][0] + d.n_num_components[0][1] != 0;
+        let mut got = vec![format!("R {}", i32::from(ok))];
+        if ok {
+            for a in 0..2 {
+                for b in 0..2 {
+                    for i in 0..d.n_num_components[a][b].max(0) as usize {
+                        let Some(comp) = d.p_inp_inchi[a][b].get(i) else {
+                            break;
+                        };
+                        if comp.n_number_of_atoms == 0 {
+                            continue;
+                        }
+                        let mob = if mode & 1 != 0
+                            && b == 0
+                            && (i as i32) < d.n_num_components[a][1]
+                            && d.p_inp_inchi[a][1]
+                                .get(i)
+                                .is_some_and(|m| m.n_number_of_atoms != 0)
+                        {
+                            d.p_inp_inchi[a][1].get(i)
+                        } else {
+                            None
+                        };
+                        let mut s = StrFromInChI::default();
+                        let rr = restore_atom_connections_set_stereo(
+                            &mut s,
+                            i as i32,
+                            if mode & 2 != 0 { 5 } else { 0 },
+                            comp,
+                            mob,
+                        );
+                        got.push(format!("G{a}{b}.{i} {rr}"));
+                        if rr > 0 {
+                            let r2 = set_stereo_bond_types_from_0d_stereo(&mut s, comp);
+                            got.push(format!("B {r2}"));
+                            let tot = (s.num_atoms + s.num_deleted_h) as usize;
+                            got.push(format!(
+                                "N {} {} {} {} {}",
+                                s.num_atoms,
+                                s.num_deleted_h,
+                                s.charge,
+                                s.b_isotopic,
+                                s.ti.num_t_groups
+                            ));
+                            for (k, x) in s.at.iter().enumerate().take(tot) {
+                                let mut l = format!(
+                                    "a{k} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} |",
+                                    x.el_number,
+                                    x.elname_str(),
+                                    x.orig_at_number,
+                                    x.orig_compt_at_numb,
+                                    x.component,
+                                    x.num_h,
+                                    x.valence,
+                                    x.chem_bonds_valence,
+                                    x.at_type,
+                                    x.endpoint,
+                                    x.iso_atw_diff,
+                                    x.num_iso_h[0],
+                                    x.num_iso_h[1],
+                                    x.num_iso_h[2],
+                                    x.p_parity
+                                );
+                                for q in 0..x.valence as usize {
+                                    l.push_str(&format!(" {},{}", x.neighbor[q], x.bond_type[q]));
+                                }
+                                l.push_str(" |");
+                                for q in 0..4 {
+                                    l.push_str(&format!(" {}", x.p_orig_at_num[q]));
+                                }
+                                l.push_str(" |");
+                                for q in 0..3 {
+                                    l.push_str(&format!(
+                                        " {},{},{},{}",
+                                        x.sb_parity[q],
+                                        x.sb_ord[q],
+                                        x.sn_ord[q],
+                                        x.sn_orig_at_num[q]
+                                    ));
+                                }
+                                got.push(l);
+                            }
+                            if let Some(st) = &s.st {
+                                for (k, x) in st.iter().enumerate().take(s.num_atoms as usize) {
+                                    let mut l = format!("s{k} {} |", x.p_parity);
+                                    for q in 0..4 {
+                                        l.push_str(&format!(" {}", x.p_orig_at_num[q]));
+                                    }
+                                    l.push_str(" |");
+                                    for q in 0..3 {
+                                        l.push_str(&format!(
+                                            " {},{},{},{}",
+                                            x.sb_parity[q],
+                                            x.sb_ord[q],
+                                            x.sn_ord[q],
+                                            x.sn_orig_at_num[q]
+                                        ));
+                                    }
+                                    got.push(l);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if got != want {
+            let dd = got
+                .iter()
+                .zip(&want)
+                .position(|(a, b)| a != *b)
+                .unwrap_or(got.len().min(want.len()));
+            panic!(
+                "case {ci}: {inp}\nline {dd}: got {:?}\n want {:?}",
+                got.get(dd),
+                want.get(dd)
+            );
+        }
+    }
+}
