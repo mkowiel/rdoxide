@@ -42,6 +42,7 @@ pub mod ichirvr2;
 pub mod ichirvr3;
 pub mod ichirvr4;
 pub mod ichirvr5;
+pub mod ichirvr6;
 pub mod ichirvr7;
 pub mod ichirvrs;
 pub mod ichisort;
