@@ -373,6 +373,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 257 | InChI port I11u: SaltBondsToCoordBonds, GetPlusMinusVertex (new module ichirvr5) |
 | 258 | InChI port I11v: ichirvr4 CheckAndRefixStereobonds, FillOutExtraFixedHDataInChI |
 | 259 | InChI port I11w: ichirvr4 FillOutCMP2FHINCHI, FillOutCMP2MHINCHI |
+| 260 | InChI port I11x: ichirvr1 MakeOneInChIOutOfStrFromINChI, MakeOneInChIOutOfStrFromINChI2 |
 
 ## Python package files
 
@@ -814,3 +815,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-22 — Stage 257: InChI I11u — salt to coordination bonds; no runtime effect, upstream_speed.html not regenerated
 * 2026-10-22 — Stage 258: InChI I11v — stereobond refix, fixed-H data; no runtime effect, upstream_speed.html not regenerated
 * 2026-10-22 — Stage 259: InChI I11w — fixed-/mobile-H comparison of restored structures; no runtime effect, upstream_speed.html not regenerated
+* 2026-10-22 — Stage 260: InChI I11x — one-component InChI of a restored structure; no runtime effect, upstream_speed.html not regenerated
