@@ -10,7 +10,6 @@
 
 use std::path::PathBuf;
 
-use rdoxide::RDKitError;
 use rdoxide::external::inchi::{InchiKeyCheck, check_inchikey, get_std_inchikey_from_std_inchi};
 use rdoxide::external::inchi_api::{
     ExtraInchiReturnValues, get_inchi_version, inchi_to_inchi_key, inchi_to_mol,
@@ -110,8 +109,11 @@ fn mol_to_inchi_matches_rdkit() {
 }
 
 #[test]
-fn inchi_to_mol_not_ported_yet() {
+fn inchi_to_mol_methane() {
     let mut rv = ExtraInchiReturnValues::default();
-    let res = inchi_to_mol("InChI=1S/CH4/h1H4", &mut rv, true, true);
-    assert!(matches!(res, Err(RDKitError::NotImplemented(_))));
+    let m = inchi_to_mol("InChI=1S/CH4/h1H4", &mut rv, true, true)
+        .unwrap()
+        .unwrap();
+    assert_eq!(m.num_atoms(), 1);
+    assert_eq!(rv.return_code, 0);
 }

@@ -8,18 +8,15 @@
 //! LICENSES/RDKit-ChemReactions-Novartis-BSD-3-Clause.txt, the same Novartis
 //! license text).
 //!
-//! Status: [`inchi_to_inchi_key`], [`get_inchi_version`], [`mol_to_inchi`],
-//! [`mol_block_to_inchi`] and [`mol_to_inchi_key`] are complete (structures
-//! without polymer data). [`inchi_to_mol`] needs the structure restoration
-//! pipeline, which is not ported yet; it returns
-//! [`RDKitError::NotImplemented`] (see `docs/INCHI_PORT.md`).
+//! Status: everything but the polymer data (`/z` layer) and the AuxInfo
+//! reader is complete; [`inchi_to_mol`] is in [`crate::external::inchi_to_mol`].
 
+use crate::Result;
 use crate::external::inchi::inchi_dll::{InchiInput as InchiLibInput, get_inchi};
 use crate::external::inchi::inchi_dll_b::{InchiOutput, make_inchi_from_molfile_text};
 use crate::external::inchi::{self, InchiKeyError};
 use crate::external::inchi_input::{fix_option_symbol, mol_to_inchi_input};
 use crate::graphmol::romol::{ROMol, RWMol};
-use crate::{RDKitError, Result};
 
 /// `ExtraInchiReturnValues`: the extra outputs of the InChI API calls.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -34,22 +31,14 @@ pub struct ExtraInchiReturnValues {
     pub aux_info: String,
 }
 
-fn not_ported(what: &str) -> RDKitError {
-    RDKitError::NotImplemented(format!(
-        "{what} is not available in rdoxide yet: the InChI library port \
-         (InChI {}) only covers InChIKey generation so far",
-        inchi::CURRENT_VER
-    ))
-}
-
 /// `InchiToMol`: a molecule from a (standard or non-standard) InChI string.
 pub fn inchi_to_mol(
-    _inchi: &str,
-    _rv: &mut ExtraInchiReturnValues,
-    _sanitize: bool,
-    _remove_hs: bool,
+    inchi: &str,
+    rv: &mut ExtraInchiReturnValues,
+    sanitize: bool,
+    remove_hs: bool,
 ) -> Result<Option<RWMol>> {
-    Err(not_ported("InchiToMol"))
+    crate::external::inchi_to_mol::inchi_to_mol(inchi, rv, sanitize, remove_hs)
 }
 
 /// `MolToInchi`: the InChI of a molecule. `options` is the space-delimited

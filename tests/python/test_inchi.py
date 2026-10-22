@@ -36,9 +36,9 @@ def test_inchi_to_inchi_key_logs_errors(capfd):
 
 
 def test_module_surface():
-    # like RDKit built without InChI support until MolToInchi/MolFromInchi are ported
-    assert Chem.INCHI_AVAILABLE is False and inchi.INCHI_AVAILABLE is False
-    assert not hasattr(inchi, "MolToInchi")
+    assert Chem.INCHI_AVAILABLE is True and inchi.INCHI_AVAILABLE is True
+    for name in ("MolToInchi", "MolFromInchi", "MolFromInchiAndAuxInfo", "MolToInchiKey"):
+        assert callable(getattr(inchi, name))
     assert issubclass(Chem.InchiReadWriteError, Exception)
     for name in ("InchiToMol", "MolToInchi", "MolBlockToInchi", "InchiToInchiKey", "MolToInchiKey",
                  "GetInchiVersion"):
@@ -63,6 +63,9 @@ def test_mol_block_to_inchi():
     assert code == 0
 
 
-def test_inchi_to_mol_not_ported():
-    with pytest.raises(NotImplementedError):
-        rdinchi.InchiToMol("InChI=1S/CH4/h1H4", sanitize=True, removeHs=True)
+def test_inchi_to_mol():
+    m, code, msg, log = rdinchi.InchiToMol("InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3", True, True)
+    assert code == 0 and Chem.MolToSmiles(m) == "CCO"
+    m = Chem.MolFromInchi("InChI=1S/C3H7NO2/c1-2(4)3(5)6/h2H,4H2,1H3,(H,5,6)/t2-/m0/s1")
+    assert Chem.MolToSmiles(m) == "C[C@H](N)C(=O)O"
+    assert Chem.MolFromInchi("not an inchi") is None
