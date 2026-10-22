@@ -41,3 +41,6 @@ rdkit/VLib/UnitTest*.py
 Code/Numerics/Alignment/Wrap/testAlignment.py
 rdkit/Chem/UnitTestInchi.py
 rdkit/Chem/MolKey/UnitTestMolKey.py
+Code/ChemicalFeatures/Wrap/testFeatures.py
+Code/DistGeom/Wrap/rough_test.py
+rdkit/VLib/NodeLib/UnitTestNodeLib.py

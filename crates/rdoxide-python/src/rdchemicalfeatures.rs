@@ -34,8 +34,24 @@ impl PyFreeChemicalFeature {
     /// `FreeChemicalFeature(family, loc)` or
     /// `FreeChemicalFeature(family, type, loc, id=-1)`
     #[new]
-    #[pyo3(signature = (*args))]
-    fn new(args: &Bound<'_, PyTuple>) -> PyResult<Self> {
+    #[pyo3(signature = (*args, **kwargs))]
+    fn new(args: &Bound<'_, PyTuple>, kwargs: Option<&Bound<'_, PyDict>>) -> PyResult<Self> {
+        // keyword form: family, type, loc, id (as in the boost signature)
+        let merged;
+        let args = match kwargs {
+            Some(kw) if !kw.is_empty() => {
+                let mut items: Vec<Bound<'_, PyAny>> = args.iter().collect();
+                for name in ["family", "type", "loc", "id"].iter().skip(items.len()) {
+                    match kw.get_item(name)? {
+                        Some(v) => items.push(v),
+                        None => break,
+                    }
+                }
+                merged = PyTuple::new(args.py(), items)?;
+                &merged
+            }
+            _ => args,
+        };
         let point =
             |obj: Bound<'_, PyAny>| -> PyResult<_> { Ok(obj.extract::<PyRef<'_, PyPoint3D>>()?.p) };
         let feat = match args.len() {

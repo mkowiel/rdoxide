@@ -3,6 +3,8 @@
 <<<<<<< HEAD
 =======
 >>>>>>> origin/main
+Code/ChemicalFeatures/Wrap/testFeatures.py::TestCase::testBasic
+Code/ChemicalFeatures/Wrap/testFeatures.py::TestCase::testPickle
 Code/DataManip/MetricMatrixCalc/Wrap/testMatricCalc.py::TestCase::test0DistsArray
 Code/DataManip/MetricMatrixCalc/Wrap/testMatricCalc.py::TestCase::test2DistListList
 Code/DataManip/MetricMatrixCalc/Wrap/testMatricCalc.py::TestCase::test3Compare
@@ -58,6 +60,12 @@ Code/DataStructs/Wrap/testSparseIntVect.py::TestCase::test6BulkDice
 Code/DataStructs/Wrap/testSparseIntVect.py::TestCase::test6BulkTversky
 Code/DataStructs/Wrap/testSparseIntVect.py::TestCase::test7ToList
 Code/DataStructs/Wrap/testSparseIntVect.py::TestCase::testPickle1
+Code/DistGeom/Wrap/rough_test.py::TestCase::test1SmoothPass
+Code/DistGeom/Wrap/rough_test.py::TestCase::test2SmoothFail
+Code/DistGeom/Wrap/rough_test.py::TestCase::test3SmoothPass
+Code/DistGeom/Wrap/rough_test.py::TestCase::test4Embed
+Code/DistGeom/Wrap/rough_test.py::TestCase::test5EmbedFail
+Code/DistGeom/Wrap/rough_test.py::TestCase::test6EmbedConstraints
 Code/ForceField/Wrap/testConstraints.py::TestCase::testMMFFAngleConstraints
 Code/ForceField/Wrap/testConstraints.py::TestCase::testMMFFDistanceConstraints
 Code/ForceField/Wrap/testConstraints.py::TestCase::testMMFFFixedAtoms
@@ -1908,6 +1916,11 @@ rdkit/UnitTestLogging.py::TestWrapLogs::testDebug
 rdkit/UnitTestLogging.py::TestWrapLogs::testError
 rdkit/UnitTestLogging.py::TestWrapLogs::testInfo
 rdkit/UnitTestLogging.py::TestWrapLogs::testWarning
+rdkit/VLib/NodeLib/UnitTestNodeLib.py::DocTestCase::runTest
+rdkit/VLib/NodeLib/UnitTestNodeLib.py::Test_NodeLib::test_SmartsMolFilter
+rdkit/VLib/NodeLib/UnitTestNodeLib.py::Test_NodeLib::test_SmartsRemover
+rdkit/VLib/NodeLib/UnitTestNodeLib.py::Test_NodeLib::test_SmilesDupeFilter
+rdkit/VLib/NodeLib/UnitTestNodeLib.py::Test_NodeLib::test_SmilesOutput
 rdkit/VLib/UnitTestVLib.py::DocTestCase::runTest
 rdkit/VLib/UnitTestVLib.py::Test_VLib::test_FilterNode
 rdkit/VLib/UnitTestVLib.py::Test_VLib::test_OutputNode
