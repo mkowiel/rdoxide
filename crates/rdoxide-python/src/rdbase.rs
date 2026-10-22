@@ -290,7 +290,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // its nanobind code paths.
     m.add("_wrapperType", "nanobind")?;
     m.add("_serializationEnabled", true)?;
-    m.add("_iostreamsEnabled", false)?;
+    m.add("_iostreamsEnabled", true)?;
     m.add("_multithreadedEnabled", true)?;
     m.add_function(wrap_pyfunction!(version, m)?)?;
     m.add_function(wrap_pyfunction!(get_max_threads, m)?)?;

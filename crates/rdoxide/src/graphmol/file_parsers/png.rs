@@ -70,7 +70,7 @@ fn fpe(msg: &str) -> RDKitError {
 }
 
 /// `augmentTagName`
-fn augment_tag_name(tag: &str) -> String {
+pub fn augment_tag_name(tag: &str) -> String {
     format!("{tag} rdkit {RDKIT_VERSION}")
 }
 

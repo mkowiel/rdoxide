@@ -120,13 +120,13 @@ fn parser_params(params: Option<&Bound<'_, PyAny>>) -> PyResult<SmilesParserPara
 }
 
 /// `std::ifstream` + `BadFileException` for the readers
-fn read_input(path: &str) -> PyResult<Vec<u8>> {
+pub(crate) fn read_input(path: &str) -> PyResult<Vec<u8>> {
     std::fs::read(path).map_err(|_| to_py(RDKitError::BadFile(format!("Bad input file {path}"))))
 }
 
 /// The bytes of a file the writers read through a stream that is never
 /// checked: a missing file is an empty PNG.
-fn read_unchecked(path: &str) -> Vec<u8> {
+pub(crate) fn read_unchecked(path: &str) -> Vec<u8> {
     std::fs::read(path).unwrap_or_default()
 }
 

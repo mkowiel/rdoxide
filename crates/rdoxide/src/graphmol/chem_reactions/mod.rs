@@ -16,6 +16,7 @@ pub mod enumerate;
 pub mod fingerprints;
 pub mod mdl;
 pub mod pickler;
+pub mod png;
 pub mod preprocess;
 pub mod runner;
 pub mod sanitize;

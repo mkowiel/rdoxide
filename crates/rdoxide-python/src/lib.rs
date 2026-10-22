@@ -36,6 +36,7 @@ mod rdchem_stereo_info;
 mod rdchemicalfeatures;
 mod rdchemreactions;
 mod rdchemreactions_enumerate;
+mod rdchemreactions_png;
 mod rdcip_labeler;
 mod rdclustering;
 mod rddepictor;
