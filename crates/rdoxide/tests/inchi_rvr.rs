@@ -901,6 +901,39 @@ fn restoration_helpers_match_c() {
                                                 b.edge[i].flow, b.edge[i].forbidden
                                             ));
                                         }
+                                        {
+                                            let eps: Vec<u16> = (0..n)
+                                                .filter(|&i| at[i].endpoint != 0)
+                                                .map(|i| i as u16)
+                                                .collect();
+                                            let ne = eps.len();
+                                            ps.ti.t_group = Some(vec![
+                                                rdoxide::external::inchi::ichitaut::TGroup {
+                                                    n_num_endpoints: ne as u16,
+                                                    ..Default::default()
+                                                },
+                                            ]);
+                                            ps.ti.num_t_groups = usize::from(ne != 0);
+                                            ps.ti.n_num_endpoints = ne as i32;
+                                            ps.ti.n_endpoint_atom_number = eps;
+                                            ps.endpoint = Some(
+                                                (0..n).map(|i| at[i].endpoint as u16).collect(),
+                                            );
+                                            ps.i_mobile_h = 0;
+                                            let rfh = rdoxide::external::inchi::ichirvr2::remove_rad_from_mobile_h_endpoint_fix_h(&mut b, &mut bd, &mut ps, &mut a2, &va, &g, &mut nr, &mut td, 4);
+                                            got.push(format!(
+                                                "FH {rfh} {nr} {td} {} {} {ne}",
+                                                b.tot_st_cap, b.tot_st_flow
+                                            ));
+                                            for i in 0..b.num_edges as usize {
+                                                got.push(format!(
+                                                    "V{i} {} {}",
+                                                    b.edge[i].flow, b.edge[i].forbidden
+                                                ));
+                                            }
+                                            ps.endpoint = None;
+                                            ps.ti.t_group = None;
+                                        }
                                     }
                                     for a in at.iter_mut().take(n) {
                                         a.bond_type[0] = 0;
