@@ -5125,3 +5125,97 @@ pub fn make_one_inchi_out_of_str_from_inchi2(
     }
     make_one_inchi_out_of_str_from_inchi(ip, ps, at2, at3, tcg.i_component)
 }
+
+/// `MakeInChIOutOfStrFromINChI2`: creates the `INChI` of the restored
+/// structure `at2` (all components, as `ProcessOneStructure` does) and
+/// stores it in `ps.rev_inchi`; `at2` gets the explicit H connected. Returns
+/// a negative error, 0 (OK) or 1 (warning).
+#[allow(clippy::too_many_arguments)]
+pub fn make_inchi_out_of_str_from_inchi2(
+    ip_inp: &super::ichiparm::InputParms,
+    sd_inp: &mut super::runichi3::StructData,
+    ps: &mut super::ichirvr2::StrFromInChI,
+    at2: &mut [InpAtom],
+    i_component: i32,
+    num_inp: i64,
+) -> i32 {
+    use super::ichi_io::{InchiIosString, InchiIostream};
+    use super::ichiparm::INCHI_OUT_NO_AUX_INFO;
+    use super::runichi::{InchiArrays, process_one_structure_arrays};
+    use super::runichi3::{IS_ERROR, IS_FATAL, IS_OKAY, IS_WARNING, StructData};
+    use super::strutil::OrigAtomData;
+
+    let mut ip = ip_inp.clone();
+    ip.b_display = 0;
+    ip.b_display_composite_results = 0;
+    ip.b_display_each_component_inchi = 0;
+    ip.b_display_if_restore_warnings = 0;
+    ip.b_inchi_output_options = INCHI_OUT_NO_AUX_INFO;
+    let mut sd = StructData::default();
+    let mut orig = OrigAtomData::default();
+    let mut prep = [OrigAtomData::default(), OrigAtomData::default()];
+    ps.rev_inchi.p_inchi = Default::default();
+    ps.rev_inchi.p_inchi_aux = Default::default();
+
+    let n = ps.num_atoms as usize;
+    let len = n + ps.num_deleted_h as usize;
+    super::ichirvr2::copy_st_to_at(at2, ps.st.as_deref(), n);
+    let ret = connect_disconnected_h(at2, n, ps.num_deleted_h as usize);
+    if ret < 0 {
+        return ret;
+    }
+    let num_inp_atoms = ret as usize;
+    incr_zero_bonds(at2, n, i_component + 1);
+    let r = super::ichister::reconcile_all_cml_bond_parities(&mut at2[..num_inp_atoms], false);
+    if r < 0 {
+        return r;
+    }
+    orig.at = at2[..len].to_vec();
+    orig.num_inp_atoms = num_inp_atoms;
+    clear_endpts(&mut orig.at, n);
+    if super::ichister::fix_unkn_0d_stereo_bonds(&mut orig.at[..n]) != 0 {
+        let r = super::ichister::reconcile_all_cml_bond_parities(&mut at2[..num_inp_atoms], false);
+        if r < 0 {
+            return r;
+        }
+    }
+
+    let mut log = InchiIostream::default();
+    let mut out = InchiIostream::default();
+    let mut strbuf = InchiIosString::default();
+    let mut arrays: InchiArrays = Default::default();
+    let r = process_one_structure_arrays(
+        &mut sd,
+        &ip,
+        &mut log,
+        &mut out,
+        &mut strbuf,
+        &mut orig,
+        &mut prep,
+        num_inp,
+        Some(&mut arrays),
+    );
+    (ps.rev_inchi.p_inchi, ps.rev_inchi.p_inchi_aux) = arrays;
+    ps.rev_inchi.num_components = [sd.num_components[0], sd.num_components[1]];
+    sd_inp.str_err_struct = sd.str_err_struct.clone();
+    ps.rev_inchi.n_ret_val = r;
+    let ret = match r {
+        IS_ERROR | IS_FATAL => RI_ERR_PROGR,
+        IS_OKAY => 0,
+        IS_WARNING => 1,
+        _ => RI_ERR_PROGR,
+    };
+    // save total charge from Mobile-H layer
+    ps.n_charge_revrs = 0;
+    if ret >= 0 {
+        for rec in [1usize, 0] {
+            if ps.rev_inchi_component_exists(rec, 1, 0) {
+                ps.n_charge_revrs = ps.rev_inchi.p_inchi[rec][0][1]
+                    .as_ref()
+                    .map_or(0, |c| c.n_total_charge);
+                break;
+            }
+        }
+    }
+    ret
+}

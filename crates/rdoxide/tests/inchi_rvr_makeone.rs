@@ -4,9 +4,12 @@
 
 use rdoxide::external::inchi::ichi::InChI;
 use rdoxide::external::inchi::ichiparm::InputParms;
-use rdoxide::external::inchi::ichirvr1::make_one_inchi_out_of_str_from_inchi;
+use rdoxide::external::inchi::ichirvr1::{
+    make_inchi_out_of_str_from_inchi2, make_one_inchi_out_of_str_from_inchi,
+};
 use rdoxide::external::inchi::ichirvr2::StrFromInChI;
 use rdoxide::external::inchi::inpdef::InpAtom;
+use rdoxide::external::inchi::runichi3::StructData;
 
 fn dump_inchi(k: usize, p: &Option<InChI>) -> Vec<String> {
     let Some(p) = p else {
@@ -70,6 +73,7 @@ fn make_one_inchi_matches_c() {
     let data: serde_json::Value =
         serde_json::from_str(include_str!("../../../tests/data/inchi_rvr_makeone.json")).unwrap();
     let mut n_ok = 0;
+    let (mut n_whole, mut n_diff) = (0, 0);
     for case in data.as_array().unwrap() {
         let input = case["in"].as_str().unwrap();
         let want: Vec<&str> = case["out"]
@@ -182,6 +186,34 @@ fn make_one_inchi_matches_c() {
         }
         assert_eq!(got, want, "case: {input}");
         n_ok += i32::from(ret == 0);
+        // the whole-structure InChI of the same restored structure must agree
+        // with the one-component InChI
+        if ret == 0 && ps.n_one_inchi_b_mobile_h == 1 {
+            let mut ps2 = StrFromInChI {
+                num_atoms: n as i32,
+                b_mobile_h: bmob,
+                i_mobile_h: imob,
+                ..Default::default()
+            };
+            let mut at2c = at2.clone();
+            let mut sd = StructData::default();
+            let r = make_inchi_out_of_str_from_inchi2(&ip, &mut sd, &mut ps2, &mut at2c, 0, 1);
+            if r >= 0
+                && ps2.rev_inchi.num_components[0] == 1
+                && ps2.rev_inchi_component_exists(0, 1, 0)
+            {
+                let rev = ps2.rev_inchi.p_inchi[0][0][1].as_ref().unwrap();
+                let one = ps.p_one_inchi[0].as_ref().unwrap();
+                n_whole += 1;
+                if rev.sz_hill_formula != one.sz_hill_formula
+                    || rev.n_total_charge != one.n_total_charge
+                {
+                    n_diff += 1;
+                }
+            }
+        }
     }
-    eprintln!("cases with result: {n_ok}");
+    eprintln!("cases with result: {n_ok}, whole-structure InChI: {n_whole}, differ: {n_diff}");
+    assert!(n_whole > 0);
+    assert_eq!(n_diff, 0);
 }

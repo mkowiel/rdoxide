@@ -1700,3 +1700,292 @@ pub fn fill_out_extra_fixed_h_data_restr(ps: &mut StrFromInChI) -> i32 {
     }
     0
 }
+
+/// `MakeProtonComponent`: creates a component of `num_prot` bare protons;
+/// returns their number (0 if nothing was created)
+pub fn make_proton_component(ps: &mut StrFromInChI, num_prot: i32) -> i32 {
+    if num_prot <= 0 {
+        return 0;
+    }
+    let mut at = vec![InpAtom::default(); num_prot as usize];
+    for (i, a) in at.iter_mut().enumerate() {
+        a.elname[0] = b'H';
+        a.el_number = 1;
+        a.orig_at_number = i as u16 + 1;
+        a.charge = 1;
+    }
+    ps.at2 = at.clone();
+    ps.at = at;
+    ps.b_deleted = 0;
+    ps.num_atoms = num_prot;
+    ps.b_mobile_h = 1;
+    ps.i_mobile_h = 1;
+    num_prot
+}
+
+/// the recalculation of the InChI of a component after its protons changed
+/// (the common part of `AddRemProtonsInRestrStruct` and
+/// `AddRemIsoProtonsInRestrStruct`)
+fn recalc_component(
+    ip: &mut crate::external::inchi::ichiparm::InputParms,
+    sd: &mut crate::external::inchi::runichi3::StructData,
+    ps: &mut StrFromInChI,
+    has_some_fixed_h: bool,
+    num_inp: i64,
+) -> i32 {
+    use super::ichiparm::REQ_MODE_BASIC;
+    use super::ichirvr1::make_inchi_out_of_str_from_inchi2;
+    ps.rev_inchi.p_inchi = Default::default();
+    ps.rev_inchi.p_inchi_aux = Default::default();
+    ps.rev_inchi.num_components = [0, 0];
+    let n_mode = ip.n_mode;
+    if has_some_fixed_h
+        && ps.i_inchi_rec == 1
+        && ps.i_mobile_h == 1
+        && ps.b_fixed_h_exists == 0
+        && ip.n_mode & REQ_MODE_BASIC == 0
+    {
+        ip.n_mode |= REQ_MODE_BASIC;
+    }
+    let mut at2 = std::mem::take(&mut ps.at2);
+    let ret = make_inchi_out_of_str_from_inchi2(ip, sd, ps, &mut at2, 0, num_inp);
+    ps.at2 = at2;
+    ip.n_mode = n_mode;
+    ret
+}
+
+/// the (normalization flags, number of t-groups) of the Aux InChI of the
+/// first restored component
+fn rev_aux_info(ps: &StrFromInChI, iso: bool) -> (u64, i32) {
+    let has = |q: usize| {
+        ps.rev_inchi.p_inchi_aux[q]
+            .first()
+            .and_then(|c| c[1].as_ref())
+    };
+    let q = if iso {
+        usize::from(has(1).is_some_and(|a| a.n_number_of_atoms != 0))
+    } else {
+        usize::from(ps.rev_inchi_component_exists(1, 1, 0))
+    };
+    has(q).map_or((0, 0), |a| {
+        (a.b_normalization_flags, a.n_number_of_t_groups)
+    })
+}
+
+/// the check of the component links shared by the two functions; `Err` when
+/// the structure is inconsistent, `Ok(true)` when the component has already
+/// been processed as a reconnected one
+fn check_link(
+    ps: &[StrFromInChI],
+    i_comp: usize,
+    ps_r: Option<&[StrFromInChI]>,
+    num_r: usize,
+) -> Result<bool, i32> {
+    if ps[i_comp].n_link < 0 && num_r > 0 {
+        let q = (-(ps[i_comp].n_link + 1)) as usize;
+        match ps_r {
+            Some(r) if q < num_r && r[q].n_link == i_comp as i32 + 1 => Ok(true),
+            _ => Err(RI_ERR_PROGR),
+        }
+    } else {
+        Ok(false)
+    }
+}
+
+/// `AddRemProtonsInRestrStruct`: adds or removes protons in the components
+/// of the restored structure to match the proton balance of the original
+/// InChI; returns the number of the changed components or a negative error
+#[allow(clippy::too_many_arguments)]
+pub fn add_rem_protons_in_restr_struct(
+    ip_inp: &crate::external::inchi::ichiparm::InputParms,
+    sd: &mut crate::external::inchi::runichi3::StructData,
+    num_inp: i64,
+    has_some_fixed_h: bool,
+    ps: &mut [StrFromInChI],
+    ps_r: Option<&[StrFromInChI]>,
+    num_components_r: usize,
+    protons_to_be_removed: &mut i32,
+    recmet_change_balance: Option<&mut i32>,
+) -> i32 {
+    use super::ichi_bns::add_remove_protons_restr;
+    use super::ichirvr1::{connect_disconnected_h, disconnected_connected_h};
+    let mut num_prot = *protons_to_be_removed;
+    if num_prot == 0 {
+        return 0;
+    }
+    let mut ip = ip_inp.clone();
+    let (mut delta_recmet_prot, mut num_changed, mut num_deleted_components) = (0, 0, 0);
+    let mut ret = 0;
+    let num_components = ps.len();
+    'body: {
+        let mut i_comp = 0;
+        while i_comp < num_components && num_prot != 0 {
+            let ic = i_comp;
+            i_comp += 1;
+            match check_link(ps, ic, ps_r, num_components_r) {
+                Err(e) => {
+                    ret = e;
+                    break 'body;
+                }
+                Ok(true) => continue,
+                Ok(false) => {}
+            }
+            let num_atoms = ps[ic].num_atoms;
+            let num_deleted_h = ps[ic].num_deleted_h;
+            let accumulate = ps[ic].n_link > 0 && num_components_r == 0;
+            let (charge_revrs, charge_inchi) = (ps[ic].n_charge_revrs, ps[ic].n_charge_inchi);
+            num_deleted_components += i32::from(ps[ic].b_deleted != 0);
+            if ps[ic].at2.is_empty() || num_atoms == 0 {
+                continue;
+            }
+            let (flags, num_tg) = rev_aux_info(&ps[ic], false);
+            let added_by_revrs = -ps[ic].n_num_removed_protons_by_revrs;
+            ret = disconnected_connected_h(
+                &mut ps[ic].at2,
+                num_atoms as usize,
+                num_deleted_h as usize,
+            );
+            if ret < 0 {
+                break 'body;
+            }
+            let num_prot_prev = num_prot;
+            ret = add_remove_protons_restr(
+                &mut ps[ic].at2,
+                num_atoms,
+                &mut num_prot,
+                added_by_revrs,
+                flags,
+                num_tg,
+                charge_revrs,
+                charge_inchi,
+            );
+            ps[ic].b_post_processed = ret;
+            num_changed += i32::from(ret > 0);
+            if ret < 0 {
+                break 'body;
+            }
+            if ret > 0 {
+                ret = recalc_component(&mut ip, sd, &mut ps[ic], has_some_fixed_h, num_inp);
+                if ret < 0 {
+                    break 'body;
+                }
+            } else {
+                ret = connect_disconnected_h(
+                    &mut ps[ic].at2,
+                    num_atoms as usize,
+                    num_deleted_h as usize,
+                );
+                if ret < 0 {
+                    break 'body;
+                }
+            }
+            if accumulate && recmet_change_balance.is_some() {
+                delta_recmet_prot += num_prot - num_prot_prev;
+            }
+        }
+        if num_components > 0 {
+            let ic = num_components - 1;
+            if !has_some_fixed_h
+                && num_prot > 0
+                && num_deleted_components == 1
+                && ps[ic].b_deleted != 0
+            {
+                let num_prot_prev = num_prot;
+                if make_proton_component(&mut ps[ic], num_prot) == 0 {
+                    break 'body;
+                }
+                num_changed += 1;
+                num_prot = 0;
+                ret = recalc_component(&mut ip, sd, &mut ps[ic], has_some_fixed_h, num_inp);
+                if ret < 0 {
+                    break 'body;
+                }
+                let accumulate = ps[ic].n_link > 0 && num_components_r == 0;
+                if accumulate && recmet_change_balance.is_some() {
+                    delta_recmet_prot += num_prot - num_prot_prev;
+                }
+            }
+        }
+        *protons_to_be_removed = num_prot;
+        if let Some(b) = recmet_change_balance {
+            *b = delta_recmet_prot;
+        }
+    }
+    if ret < 0 { ret } else { num_changed }
+}
+
+/// `AddRemIsoProtonsInRestrStruct`: as [`add_rem_protons_in_restr_struct`]
+/// for the isotopic exchangeable protons
+#[allow(clippy::too_many_arguments)]
+pub fn add_rem_iso_protons_in_restr_struct(
+    ip_inp: &crate::external::inchi::ichiparm::InputParms,
+    sd: &mut crate::external::inchi::runichi3::StructData,
+    num_inp: i64,
+    has_some_fixed_h: bool,
+    ps: &mut [StrFromInChI],
+    ps_r: Option<&[StrFromInChI]>,
+    num_components_r: usize,
+    proton_balance: &mut [i16; 3],
+    recmet_change_balance: Option<&mut [i16; 3]>,
+) -> i32 {
+    use super::ichi_bns::add_remove_iso_protons_restr;
+    use super::ichirvr1::disconnected_connected_h;
+    let mut num_prot = *proton_balance;
+    if num_prot.iter().all(|&x| x == 0) {
+        return 0;
+    }
+    let mut ip = ip_inp.clone();
+    let mut delta_recmet_prot = [0i16; 3];
+    let mut num_changed = 0;
+    let mut ret = 0;
+    'body: {
+        for ic in 0..ps.len() {
+            match check_link(ps, ic, ps_r, num_components_r) {
+                Err(e) => {
+                    ret = e;
+                    break 'body;
+                }
+                Ok(true) => continue,
+                Ok(false) => {}
+            }
+            let num_atoms = ps[ic].num_atoms;
+            let num_deleted_h = ps[ic].num_deleted_h;
+            let accumulate = ps[ic].n_link > 0 && num_components_r == 0;
+            if ps[ic].at2.is_empty() || num_atoms == 0 {
+                continue;
+            }
+            let (_, num_tg) = rev_aux_info(&ps[ic], true);
+            let prev = num_prot;
+            ret = add_remove_iso_protons_restr(&mut ps[ic].at2, num_atoms, &mut num_prot, num_tg);
+            ps[ic].b_post_processed |= ret;
+            num_changed += i32::from(ret > 0);
+            if ret < 0 {
+                break 'body;
+            }
+            if ret > 0 {
+                ret = disconnected_connected_h(
+                    &mut ps[ic].at2,
+                    num_atoms as usize,
+                    num_deleted_h as usize,
+                );
+                if ret < 0 {
+                    break 'body;
+                }
+                ret = recalc_component(&mut ip, sd, &mut ps[ic], has_some_fixed_h, num_inp);
+                if ret < 0 {
+                    break 'body;
+                }
+            }
+            if accumulate {
+                for k in 0..3 {
+                    delta_recmet_prot[k] += num_prot[k] - prev[k];
+                }
+            }
+        }
+        *proton_balance = num_prot;
+        if let Some(b) = recmet_change_balance {
+            *b = delta_recmet_prot;
+        }
+    }
+    if ret < 0 { ret } else { num_changed }
+}

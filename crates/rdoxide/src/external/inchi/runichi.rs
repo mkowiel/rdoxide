@@ -21,7 +21,7 @@ use super::runichi3::{
     INCHI_BAS, IS_ERROR, IS_FATAL, StructData, TG_FLAG_FOUND_ISOTOPIC_ATOM_DONE,
     TG_FLAG_FOUND_ISOTOPIC_H_DONE,
 };
-use super::runichi4::get_processing_warnings_one_component_inchi;
+use super::runichi4::{PInChI2, PInChIAux2, get_processing_warnings_one_component_inchi};
 use super::strutil::OrigAtomData;
 use super::strutil::{alloc_inchi, alloc_inchi_aux, set_connected_component_number};
 
@@ -391,6 +391,27 @@ pub fn process_one_structure(
     prep: &mut [OrigAtomData; 2],
     num_inp: i64,
 ) -> i32 {
+    process_one_structure_arrays(sd, ip, log, out_file, strbuf, orig, prep, num_inp, None)
+}
+
+/// the `INChI` and `INChI_Aux` arrays returned by `ProcessOneStructure`
+/// (`pINChI[iINChI][component][bTaut]`)
+pub type InchiArrays = ([PInChI2; 2], [PInChIAux2; 2]);
+
+/// `ProcessOneStructure` that also hands out the `INChI` arrays (the
+/// `pINChI`, `pINChI_Aux` arguments of C)
+#[allow(clippy::too_many_arguments)]
+pub fn process_one_structure_arrays(
+    sd: &mut StructData,
+    ip: &InputParms,
+    log: &mut InchiIostream,
+    out_file: &mut InchiIostream,
+    strbuf: &mut InchiIosString,
+    orig: &mut OrigAtomData,
+    prep: &mut [OrigAtomData; 2],
+    num_inp: i64,
+    out_arrays: Option<&mut InchiArrays>,
+) -> i32 {
     use super::ichierr::add_error_message;
     use super::ichiparm::{
         REQ_MODE_RACEMIC_STEREO, REQ_MODE_RELATIVE_STEREO, REQ_MODE_STEREO, TG_FLAG_RECONNECT_COORD,
@@ -398,8 +419,7 @@ pub fn process_one_structure(
     use super::ichiprt1::{FLAG_INP_AT_CHIRAL, OrigStruct, OutputInput, orig_struct_fill_out};
     use super::runichi3::{INCHI_REC, IS_FATAL, TG_FLAG_DISCONNECT_COORD_DONE};
     use super::runichi4::{
-        PInChI2, PInChIAux2, SortPrintParams, is_struct_chiral, sort_and_print_inchi,
-        treat_create_inchi_warning,
+        SortPrintParams, is_struct_chiral, sort_and_print_inchi, treat_create_inchi_warning,
     };
 
     let mut n_ret = 0;
@@ -518,6 +538,9 @@ pub fn process_one_structure(
         sd.taut_flags[1] = taut_flags[1];
         sd.taut_flags_done[0] = taut_flags_done[0];
         sd.taut_flags_done[1] = taut_flags_done[1];
+    }
+    if let Some(o) = out_arrays {
+        *o = (pinchi, pinchi_aux);
     }
     n_ret
 }

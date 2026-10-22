@@ -378,6 +378,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 262 | InChI port I11z: ichirvr5 FixMobileHRestoredStructure, bIsUnsatCarbonInASmallRing |
 | 263 | InChI port I12a: ichirvr7 AddOneMsg, FillOutCompareMessage, RemoveFixHInChIIdentical2MobH, MarkDisconectedIdenticalToReconnected |
 | 264 | InChI port I12b: ichirvr7 CompareReversedINChI3, CompareReversedStereoINChI3, CompareTwoPairsOfInChI |
+| 265 | InChI port I12c: ichirvr1 MakeInChIOutOfStrFromINChI2; ichirvr4 MakeProtonComponent, AddRemProtonsInRestrStruct, AddRemIsoProtonsInRestrStruct |
 
 ## Python package files
 
@@ -824,3 +825,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-22 — Stage 262: InChI I11z — Mobile-H restoration fixes (cases 01-07); no runtime effect, upstream_speed.html not regenerated
 * 2026-10-22 — Stage 263: InChI I12a — comparison messages and component helpers; no runtime effect, upstream_speed.html not regenerated
 * 2026-10-22 — Stage 264: InChI I12b — InChI comparison with INCHIDIFF bits; no runtime effect, upstream_speed.html not regenerated
+* 2026-10-22 — Stage 265: InChI I12c — whole-structure InChI of a restored structure and proton balance functions; no runtime effect, upstream_speed.html not regenerated
