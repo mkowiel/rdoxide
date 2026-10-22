@@ -114,6 +114,9 @@ pub struct StrFromInChI {
     pub b_mobile_h: i32,
     /// `iMobileH`: `TAUT_NON` (0) for the Fixed-H structure
     pub i_mobile_h: i32,
+    /// `n_zy`, `n_pzz`: the polymer Zy / Zz counts of the input
+    pub n_zy: i32,
+    pub n_pzz: i32,
     /// `fixed_H`: the atoms with the fixed H of the Fixed-H InChI
     pub fixed_h: Option<Vec<i8>>,
     /// `endpoint`: the endpoints of the original Fixed-H InChI

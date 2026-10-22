@@ -1989,3 +1989,387 @@ pub fn add_rem_iso_protons_in_restr_struct(
     }
     if ret < 0 { ret } else { num_changed }
 }
+
+/// `at_prep` of `MakeOneInChIOutOfStrFromINChI`: the preprocessed atoms
+fn at_prep_of(ps: &StrFromInChI) -> Option<Vec<InpAtom>> {
+    let d0 = ps.p_one_norm_data[0].as_ref()?;
+    if d0.b_taut_preprocessed != 0
+        && let Some(f) = &d0.at_fixed_bonds
+    {
+        return Some(f.clone());
+    }
+    if ps.i_mobile_h == 0
+        && let Some(d1) = &ps.p_one_norm_data[1]
+        && d1.b_taut_preprocessed != 0
+    {
+        return d1.at_fixed_bonds.clone();
+    }
+    None
+}
+
+/// `NormalizeAndCompare`: creates the InChI of the restored structure,
+/// compares it with the original one and runs the fixing functions
+/// (formula H, extra t-group endpoints, Fixed-H, Mobile-H, stereo). The
+/// results of the restored structure in `ps` are freed on exit. Returns the
+/// last result of the fixing functions or a negative error.
+#[allow(clippy::too_many_arguments)]
+pub fn normalize_and_compare(
+    ip: &super::ichiparm::InputParms,
+    bns: &mut BnStruct,
+    bd: &mut BnData,
+    ps: &mut StrFromInChI,
+    at2: &mut Vec<InpAtom>,
+    at3: &mut Vec<InpAtom>,
+    p_va: &[ValAt],
+    tcg: &mut AllTcGroups,
+    p_inchi: [Option<&InChI>; 2],
+    num_run_bns: &mut i32,
+    total_delta: &mut i32,
+    forbidden_edge_mask: i32,
+    forbidden_stereo_edge_mask: i32,
+) -> i32 {
+    let ret = normalize_and_compare_body(
+        ip,
+        bns,
+        bd,
+        ps,
+        at2,
+        at3,
+        p_va,
+        tcg,
+        p_inchi,
+        num_run_bns,
+        total_delta,
+        forbidden_edge_mask,
+        forbidden_stereo_edge_mask,
+    );
+    ps.p_one_inchi = [None, None];
+    ps.p_one_inchi_aux = [None, None];
+    ps.p_one_norm_data = [None, None];
+    ps.one_ti = Default::default();
+    ret
+}
+
+fn exists_inchi(c: Option<&InChI>) -> bool {
+    c.is_some_and(|c| c.n_number_of_atoms != 0 && c.b_deleted == 0)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn normalize_and_compare_body(
+    ip: &super::ichiparm::InputParms,
+    bns: &mut BnStruct,
+    bd: &mut BnData,
+    ps: &mut StrFromInChI,
+    at2: &mut Vec<InpAtom>,
+    at3: &mut Vec<InpAtom>,
+    p_va: &[ValAt],
+    tcg: &mut AllTcGroups,
+    p_inchi: [Option<&InChI>; 2],
+    num_run_bns: &mut i32,
+    total_delta: &mut i32,
+    forbidden_edge_mask: i32,
+    forbidden_stereo_edge_mask: i32,
+) -> i32 {
+    use super::ichimake::{
+        IDIF_EXTRA_TG_ENDP, IDIF_LESS_H, IDIF_MORE_H, IDIF_PROBLEM, compare_reversed_inchi2,
+    };
+    use super::ichiread::{TAUT_NON, TAUT_YES};
+
+    let taut_non = TAUT_NON as i32;
+    let make = |bns: &BnStruct,
+                ps: &mut StrFromInChI,
+                at2: &mut Vec<InpAtom>,
+                at3: &mut Vec<InpAtom>,
+                tcg: &AllTcGroups| {
+        super::ichirvr1::make_one_inchi_out_of_str_from_inchi2(ip, bns, ps, at2, at3, p_va, tcg)
+    };
+    let mut ret = make(bns, ps, at2, at3, tcg);
+    if ret < 0 {
+        return ret;
+    }
+    let i_orig = if ps.b_mobile_h == taut_non && exists_inchi(p_inchi[1]) {
+        1
+    } else {
+        0
+    };
+    let mut i_revr = if ps.b_mobile_h == taut_non && exists_inchi(ps.p_one_inchi[1].as_ref()) {
+        1
+    } else {
+        0
+    };
+    // non-polymer Zz to Zy
+    if ps.n_zy != 0
+        && ps.n_pzz != 0
+        && let Some(f) = ps.p_one_inchi[i_revr]
+            .as_ref()
+            .and_then(|c| c.sz_hill_formula.clone())
+    {
+        use super::ichi_io::{
+            InchiIosString, inchi_strbuf_close, inchi_strbuf_init, inchi_strbuf_printf,
+        };
+        let mut strbuf = InchiIosString::default();
+        let len0 = f.len() as i32;
+        if inchi_strbuf_init(&mut strbuf, len0 + 1, len0 + 1) > 0 {
+            inchi_strbuf_printf(&mut strbuf, &f);
+        }
+        super::ichiprt1::merge_zz_in_hill_formula(&mut strbuf);
+        let merged = strbuf.p_str.as_ref().map(|p| {
+            let n = p.iter().position(|&c| c == 0).unwrap_or(p.len());
+            String::from_utf8_lossy(&p[..n]).into_owned()
+        });
+        inchi_strbuf_close(&mut strbuf);
+        if let Some(m) = merged
+            && let Some(c) = ps.p_one_inchi[i_revr].as_mut()
+        {
+            c.sz_hill_formula = Some(m);
+        }
+    }
+    // compare
+    let mut icr = Icr::default();
+    if ps.i_mobile_h == taut_non {
+        ret = fill_out_extra_fixed_h_data_restr(ps);
+        if ret != 0 {
+            return ret;
+        }
+    }
+    let compare = |ps: &StrFromInChI, ir: usize, icr: &mut Icr| -> i32 {
+        compare_reversed_inchi2(
+            ps.p_one_inchi[ir].as_ref(),
+            p_inchi[i_orig],
+            ps.p_one_inchi_aux[ir].as_ref(),
+            None,
+            icr,
+        ) as i32
+    };
+    let mut cmp = compare(ps, i_revr, &mut icr);
+    if cmp & IDIF_PROBLEM != 0 {
+        return RI_ERR_PROGR;
+    }
+    // re-creates the InChI and compares it again; Err(ret) = exit
+    let remake = |bns: &BnStruct,
+                  ps: &mut StrFromInChI,
+                  at2: &mut Vec<InpAtom>,
+                  at3: &mut Vec<InpAtom>,
+                  tcg: &AllTcGroups,
+                  i_revr: &mut usize,
+                  icr: &mut Icr|
+     -> Result<(i32, i32), i32> {
+        let r = make(bns, ps, at2, at3, tcg);
+        if r < 0 {
+            return Err(r);
+        }
+        *i_revr = if ps.b_mobile_h == taut_non && exists_inchi(ps.p_one_inchi[1].as_ref()) {
+            1
+        } else {
+            0
+        };
+        if ps.i_mobile_h == taut_non {
+            let r = fill_out_extra_fixed_h_data_restr(ps);
+            if r != 0 {
+                return Err(r);
+            }
+        }
+        Ok((r, compare(ps, *i_revr, icr)))
+    };
+    // InChI from restored structure has LESS hydrogen atoms
+    let mut delta_cur = icr.tot_num_h2 - icr.tot_num_h1;
+    if cmp & IDIF_LESS_H != 0 && at_prep_of(ps).is_some() && delta_cur > 0 {
+        loop {
+            let atp = at_prep_of(ps).unwrap_or_default();
+            let at = ps.at.clone();
+            ret = fix_less_hydrogen_in_formula(
+                bns,
+                bd,
+                ps,
+                &at,
+                at2,
+                &atp,
+                p_va,
+                num_run_bns,
+                total_delta,
+                forbidden_edge_mask,
+            );
+            if ret < 0 {
+                return ret;
+            }
+            if ret == 0 {
+                break;
+            }
+            match remake(bns, ps, at2, at3, tcg, &mut i_revr, &mut icr) {
+                Err(r) => return r,
+                Ok((_, c)) => cmp = c,
+            }
+            let delta_prev = delta_cur;
+            delta_cur = icr.tot_num_h2 - icr.tot_num_h1;
+            if !(cmp & IDIF_LESS_H != 0
+                && at_prep_of(ps).is_some()
+                && delta_cur != 0
+                && delta_cur < delta_prev)
+            {
+                break;
+            }
+        }
+    }
+    // MORE hydrogen atoms
+    delta_cur = icr.tot_num_h1 - icr.tot_num_h2;
+    if cmp & IDIF_MORE_H != 0 && at_prep_of(ps).is_some() && delta_cur > 0 {
+        loop {
+            let atp = at_prep_of(ps).unwrap_or_default();
+            let at = ps.at.clone();
+            ret = fix_more_hydrogen_in_formula(
+                bns,
+                bd,
+                ps,
+                &at,
+                at2,
+                &atp,
+                p_va,
+                num_run_bns,
+                total_delta,
+                forbidden_edge_mask,
+            );
+            if ret < 0 {
+                return ret;
+            }
+            if ret == 0 {
+                break;
+            }
+            match remake(bns, ps, at2, at3, tcg, &mut i_revr, &mut icr) {
+                Err(r) => return r,
+                Ok((_, c)) => cmp = c,
+            }
+            let delta_prev = delta_cur;
+            delta_cur = icr.tot_num_h1 - icr.tot_num_h2;
+            if !(cmp & IDIF_MORE_H != 0
+                && at_prep_of(ps).is_some()
+                && delta_cur != 0
+                && delta_cur < delta_prev)
+            {
+                break;
+            }
+        }
+    }
+    // non-taut atoms normalized to tautomeric endpoints
+    delta_cur = icr.endp_in1_only.len() as i32;
+    if cmp & IDIF_EXTRA_TG_ENDP != 0 && ps.p_one_norm_data[0].is_some() && delta_cur > 0 {
+        loop {
+            let atn = ps.p_one_norm_data[0]
+                .as_ref()
+                .map(|d| d.at.clone())
+                .unwrap_or_default();
+            ret = fix_remove_extra_taut_endpoints(
+                bns,
+                bd,
+                ps,
+                at2,
+                &atn,
+                p_va,
+                &icr,
+                num_run_bns,
+                total_delta,
+                forbidden_edge_mask,
+            );
+            if ret < 0 {
+                return ret;
+            }
+            if ret == 0 {
+                break;
+            }
+            match remake(bns, ps, at2, at3, tcg, &mut i_revr, &mut icr) {
+                Err(r) => return r,
+                Ok((_, c)) => cmp = c,
+            }
+            let delta_prev = delta_cur;
+            delta_cur = icr.endp_in1_only.len() as i32;
+            if !(cmp & IDIF_EXTRA_TG_ENDP != 0
+                && ps.p_one_norm_data[0].is_some()
+                && delta_cur != 0
+                && delta_cur < delta_prev)
+            {
+                break;
+            }
+        }
+    }
+    // Fixed-H
+    if ps.b_mobile_h == taut_non {
+        let mut num_tries = 0;
+        loop {
+            ret = super::ichirvr3::fix_fixed_h_restored_structure(
+                ip,
+                bns,
+                bd,
+                ps,
+                at2,
+                at3,
+                p_va,
+                tcg,
+                p_inchi,
+                forbidden_edge_mask,
+                forbidden_stereo_edge_mask,
+            );
+            if ret < 0 {
+                return ret;
+            }
+            let again = num_tries < 2 && ret > 0;
+            num_tries += 1;
+            if !again {
+                break;
+            }
+        }
+    }
+    if ps.b_mobile_h == TAUT_YES as i32 {
+        ret = super::ichirvr5::fix_mobile_h_restored_structure(
+            ip,
+            bns,
+            bd,
+            ps,
+            at2,
+            at3,
+            p_va,
+            tcg,
+            p_inchi,
+            forbidden_edge_mask,
+            forbidden_stereo_edge_mask,
+        );
+        if ret < 0 {
+            return ret;
+        }
+    }
+    // stereo; the comparisons are redone by FixRestoredStructureStereo
+    let c1 = compare_reversed_inchi2(
+        ps.p_one_inchi[0].as_ref(),
+        p_inchi[0],
+        ps.p_one_inchi_aux[0].as_ref(),
+        None,
+        &mut icr,
+    ) as i32;
+    if c1 & IDIF_PROBLEM != 0 {
+        return RI_ERR_PROGR;
+    }
+    let mut icr2 = Icr::default();
+    if i_revr != 0 || i_orig != 0 {
+        compare_reversed_inchi2(
+            ps.p_one_inchi[i_revr].as_ref(),
+            p_inchi[i_orig],
+            ps.p_one_inchi_aux[i_revr].as_ref(),
+            None,
+            &mut icr2,
+        );
+    }
+    super::ichirvr6::fix_restored_structure_stereo(
+        ip,
+        bns,
+        bd,
+        ps,
+        at2,
+        at3,
+        p_va,
+        tcg,
+        p_inchi,
+        &mut icr,
+        &mut icr2,
+        num_run_bns,
+        forbidden_edge_mask,
+        forbidden_stereo_edge_mask,
+    )
+}

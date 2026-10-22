@@ -380,6 +380,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 264 | InChI port I12b: ichirvr7 CompareReversedINChI3, CompareReversedStereoINChI3, CompareTwoPairsOfInChI |
 | 265 | InChI port I12c: ichirvr1 MakeInChIOutOfStrFromINChI2; ichirvr4 MakeProtonComponent, AddRemProtonsInRestrStruct, AddRemIsoProtonsInRestrStruct |
 | 266 | | I12d | `ichirvr6`: `FixRestoredStructureStereo` (cases 01-06; compiled only) | done | |
+| 267 | | I12e | `ichirvr4`: `NormalizeAndCompare` (compiled only) | done | |
 
 ## Python package files
 
@@ -828,3 +829,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-22 — Stage 264: InChI I12b — InChI comparison with INCHIDIFF bits; no runtime effect, upstream_speed.html not regenerated
 * 2026-10-22 — Stage 265: InChI I12c — whole-structure InChI of a restored structure and proton balance functions; no runtime effect, upstream_speed.html not regenerated
 * 2026-10-22 — Stage 266: I12d: FixRestoredStructureStereo
+* 2026-10-22 — Stage 267: I12e: NormalizeAndCompare
