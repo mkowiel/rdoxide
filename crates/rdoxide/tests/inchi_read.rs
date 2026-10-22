@@ -754,3 +754,124 @@ fn inchi_line2data_matches_c() {
         );
     }
 }
+
+#[test]
+fn restoration_preparation_matches_c() {
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_read5.json")).unwrap();
+    for (ci, c) in data.as_array().unwrap().iter().enumerate() {
+        let inp = c["in"].as_str().unwrap();
+        let t: Vec<&str> = inp.split(' ').collect();
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        assert_eq!(t[0], "15");
+        let mode: u64 = t[1].parse().unwrap();
+        let req_non_taut = t[2] == "1";
+        let req_stereo = t[3] == "1";
+        let bytes = unhex(t[5]);
+        let mut ios = InchiIostream::default();
+        inchi_ios_init(&mut ios, INCHI_IOS_TYPE_STRING, IosFile::None);
+        ios.s.n_used_length = bytes.len() as i32;
+        ios.s.p_str = Some(bytes);
+        ios.s.n_ptr = 0;
+        let mut line = SegmLine::default();
+        let mut pstr = None;
+        let mut state = -77;
+        let mut nerr = -9;
+        let mut d = InpInChI::default();
+        let (mut stdf, mut hso, mut bits) = (-5, -5, 0u8);
+        let r = inchi_line2data(
+            &mut ios, &mut line, &mut pstr, &mut state, &mut nerr, &mut d, true, mode, &mut stdf,
+            &mut hso, &mut bits,
+        );
+        let mut got = vec![format!("R {r} {state} {nerr}")];
+        let ok = (r == RI_ERR_EOL || r == RI_ERR_EOF)
+            && nerr == 0
+            && d.n_num_components[0][0] + d.n_num_components[0][1] != 0;
+        if ok {
+            let (r2, numc, mp) = set_protons_and_xchg_iso_h(
+                true,
+                true,
+                req_non_taut,
+                req_non_taut,
+                req_stereo,
+                &mut d,
+            );
+            got.push(format!(
+                "SP {r2} {} {} {} {}",
+                numc[0], numc[1], mp[0], mp[1]
+            ));
+            if r2 >= 0 {
+                remove_fix_h_inchi_identical2_mob_h(&mut d);
+                match detect_inp_inchi_creation_options(&d) {
+                    Ok(o) => got.push(format!(
+                        "D 0 {} {} {} {} {}",
+                        i32::from(o.has_reconnected),
+                        i32::from(o.has_metal),
+                        i32::from(o.has_fixed_h),
+                        o.mode_flags_stereo,
+                        o.taut_flags_stereo
+                    )),
+                    Err(e) => got.push(format!("D {e} 0 0 0 0 0")),
+                }
+                got.push(format!(
+                    "M {}",
+                    mark_disconnected_identical_to_reconnected(&mut d)
+                ));
+            }
+        }
+        got.push(format!(
+            "N {} {} {} {}",
+            d.n_num_components[0][0],
+            d.n_num_components[0][1],
+            d.n_num_components[1][0],
+            d.n_num_components[1][1]
+        ));
+        for a in 0..2 {
+            for b in 0..2 {
+                let p = &d.n_num_protons[a][b];
+                let mut l = format!(
+                    "P{a}{b} {} {} {} {} |",
+                    p.n_num_removed_protons,
+                    p.n_num_removed_isotopic_h[0],
+                    p.n_num_removed_isotopic_h[1],
+                    p.n_num_removed_isotopic_h[2]
+                );
+                match &p.p_num_protons {
+                    Some(v) => {
+                        let n2 = d.n_num_components[a][0]
+                            .max(d.n_num_components[a][1])
+                            .max(0) as usize;
+                        for q in 0..n2 {
+                            let e = v.get(q).copied().unwrap_or([0; 4]);
+                            l.push_str(&format!(" {},{},{},{}", e[0], e[1], e[2], e[3]));
+                        }
+                    }
+                    None => l.push_str(" NULL"),
+                }
+                got.push(l);
+            }
+        }
+        for a in 0..2 {
+            for b in 0..2 {
+                for i in 0..d.n_num_components[a][b].max(0) as usize {
+                    let Some(comp) = d.p_inp_inchi[a][b].get(i) else {
+                        break;
+                    };
+                    got.push(format!("C{a}{b}.{i} {}", dump_full(comp)));
+                    got.push(format!("L{a}{b}.{i} {}", comp.n_link));
+                }
+            }
+        }
+        assert_eq!(
+            got,
+            want,
+            "case {ci}: {}",
+            String::from_utf8_lossy(&unhex(t[5]))
+        );
+    }
+}
