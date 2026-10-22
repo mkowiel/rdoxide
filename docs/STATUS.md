@@ -357,6 +357,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 241 | InChI port I11e: EvaluateChargeChanges, RunBnsTestOnce/RestoreOnce, charge flower edge (differential vs C) |
 | 242 | InChI port I11f: explicit terminal H connect/disconnect (differential vs C) |
 | 243 | InChI port I11g: ichirvr2 RestoreAtomConnectionsSetStereo and stereo bond types (differential vs C) |
+| 244 | InChI port I11h: ichirvr2 CopyBnsToAtom (differential vs C) |
 
 ## Python package files
 
@@ -782,3 +783,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-22 — Stage 241: InChI I11e — BNS runs and charge evaluation; no runtime effect, upstream_speed.html not regenerated
 * 2026-10-22 — Stage 242: InChI I11f — explicit H connect/disconnect; no runtime effect, upstream_speed.html not regenerated
 * 2026-10-22 — Stage 243: InChI I11g — restoration of atoms and 0D stereo; no runtime effect, upstream_speed.html not regenerated
+* 2026-10-22 — Stage 244: InChI I11h — BNS result copied to atoms; no runtime effect, upstream_speed.html not regenerated

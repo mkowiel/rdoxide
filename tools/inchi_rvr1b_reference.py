@@ -166,6 +166,19 @@ int main(void) {
                             printf("S %d %d %d\n", rr, b->tot_st_cap, b->tot_st_flow);
                             for (int i = 0; i < b->num_edges; i++) printf("e%d %d %d\n", i, b->edge[i].flow, b->edge[i].cap);
                             for (int i = 0; i < b->num_vertices; i++) printf("v%d %d %d\n", i, b->vert[i].st_edge.flow, b->vert[i].st_edge.cap);
+                            for (int zz = 0; zz < 2; zz++) {
+                                inp_ATOM *ac = calloc(n + 1, sizeof(inp_ATOM));
+                                memcpy(ac, at, n * sizeof(inp_ATOM));
+                                for (int i = 0; i < g.num_tc_groups && i < b->num_t_groups; i++) { g.pTCG[i].tg_RestoreFlags = (n + i) & 1; g.pTCG[i].tg_set_Minus = (n * 3 + i) % (n + 2); }
+                                StrFromINChI s2; memset(&s2, 0, sizeof(s2)); s2.at = ac; s2.num_atoms = n; s2.pSrm = &s;
+                                int rc = CopyBnsToAtom(&s2, b, va, &g, zz);
+                                printf("K%d %d\n", zz, rc);
+                                for (int i = 0; i < n; i++) {
+                                    printf("k%d %d %d %d %d %d %d |", i, ac[i].charge, ac[i].radical, ac[i].num_H, ac[i].endpoint, ac[i].chem_bonds_valence, ac[i].valence);
+                                    for (int q = 0; q < ac[i].valence; q++) printf(" %d", ac[i].bond_type[q]);
+                                    printf("\n");
+                                }
+                            }
                             for (int i = 0; i < n; i++) at[i].bond_type[0] = 0;
                             IncrZeroBondsAndClearEndpts(at, n, 5);
                             for (int i = 0; i < n; i++) printf("z%d %d %d %d %d\n", i, at[i].endpoint, at[i].component, at[i].chem_bonds_valence, at[i].bond_type[0]);

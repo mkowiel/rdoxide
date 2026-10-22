@@ -622,6 +622,45 @@ fn restoration_helpers_match_c() {
                                             b.vert[i].st_edge.flow, b.vert[i].st_edge.cap
                                         ));
                                     }
+                                    for zz in 0..2 {
+                                        let mut ps =
+                                            rdoxide::external::inchi::ichirvr2::StrFromInChI {
+                                                at: at.clone(),
+                                                num_atoms: n as i32,
+                                                srm: s,
+                                                ..Default::default()
+                                            };
+                                        for i in 0..(g.num_tc_groups.min(b.num_t_groups)) as usize {
+                                            g.p_tcg[i].tg_restore_flags = ((n + i) & 1) as i16;
+                                            g.p_tcg[i].tg_set_minus =
+                                                ((n * 3 + i) % (n + 2)) as i16;
+                                        }
+                                        let rc =
+                                            rdoxide::external::inchi::ichirvr2::copy_bns_to_atom(
+                                                &mut ps,
+                                                &b,
+                                                &va,
+                                                &g,
+                                                zz == 1,
+                                            );
+                                        got.push(format!("K{zz} {rc}"));
+                                        for i in 0..n {
+                                            let x = &ps.at[i];
+                                            let mut l = format!(
+                                                "k{i} {} {} {} {} {} {} |",
+                                                x.charge,
+                                                x.radical,
+                                                x.num_h,
+                                                x.endpoint,
+                                                x.chem_bonds_valence,
+                                                x.valence
+                                            );
+                                            for q in 0..x.valence as usize {
+                                                l.push_str(&format!(" {}", x.bond_type[q]));
+                                            }
+                                            got.push(l);
+                                        }
+                                    }
                                     for a in at.iter_mut().take(n) {
                                         a.bond_type[0] = 0;
                                     }
