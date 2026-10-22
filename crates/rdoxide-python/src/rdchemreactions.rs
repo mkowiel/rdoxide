@@ -1519,6 +1519,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_reactions_from_cdxml_file, m)?)?;
     m.add_function(wrap_pyfunction!(py_reactions_from_cdxml_block, m)?)?;
     crate::rdchemreactions_enumerate::init(m)?;
+    crate::rdchemreactions_png::init(m)?;
     add_enum(m, FINGERPRINT_TYPE, &fingerprint_type_members(), None)?;
     m.add_class::<PyReactionFingerprintParams>()?;
     m.add_function(wrap_pyfunction!(py_create_difference_fingerprint, m)?)?;

@@ -173,6 +173,7 @@ Code/GraphMol/ChemReactions/Wrap/testReactionWrapper.py::TestCase::testPreproces
 Code/GraphMol/ChemReactions/Wrap/testReactionWrapper.py::TestCase::testProperties
 Code/GraphMol/ChemReactions/Wrap/testReactionWrapper.py::TestCase::testReactionFromSmiles
 Code/GraphMol/ChemReactions/Wrap/testReactionWrapper.py::TestCase::testRoundTripException
+Code/GraphMol/ChemReactions/Wrap/testReactionWrapper.py::TestCase::test_PNGMetadata
 Code/GraphMol/ChemReactions/Wrap/testSanitize.py::TestCase::test_github_4162
 Code/GraphMol/ChemReactions/Wrap/testSanitize.py::TestCase::test_only_aromatize_if_possible
 Code/GraphMol/ChemReactions/Wrap/testSanitize.py::TestCase::test_sanitize
