@@ -233,6 +233,12 @@ int main(void) {
                                 int rt = PlusFromDB_N_DB_O_to_Metal(b, bd, &s3, at, a2, va, &g, &nr, &td, 4);
                                 printf("PM %d %d %d %d %d\n", rt, nr, td, b->tot_st_cap, b->tot_st_flow);
                                 for (int i = 0; i < b->num_edges; i++) printf("u%d %d %d\n", i, b->edge[i].flow, b->edge[i].forbidden);
+                                int rv = MoveMobileHToAvoidFixedBonds(b, bd, &s3, at, a2, va, &g, &nr, &td, 4);
+                                printf("MM %d %d %d %d %d\n", rv, nr, td, b->tot_st_cap, b->tot_st_flow);
+                                for (int i = 0; i < b->num_edges; i++) printf("w%d %d %d\n", i, b->edge[i].flow, b->edge[i].forbidden);
+                                int rx = RemoveRadFromMobileHEndpoint(b, bd, &s3, at, a2, va, &g, &nr, &td, 4);
+                                printf("RR %d %d %d %d %d\n", rx, nr, td, b->tot_st_cap, b->tot_st_flow);
+                                for (int i = 0; i < b->num_edges; i++) printf("y%d %d %d\n", i, b->edge[i].flow, b->edge[i].forbidden);
                             }
                             for (int i = 0; i < n; i++) at[i].bond_type[0] = 0;
                             IncrZeroBondsAndClearEndpts(at, n, 5);
