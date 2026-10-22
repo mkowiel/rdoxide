@@ -8,11 +8,20 @@
 
 use super::ichi::InChI;
 use super::ichi_bns::{
+    BN_MAX_ALTP, BNS_ADD_EDGES, BNS_ADD_SUPER_TGROUP, BNS_EDGE_FORBIDDEN_MASK,
+    BNS_VERT_TYPE_C_NEGATIVE, BNS_VERT_TYPE_ENDPOINT, BnStruct, BnsAltPath, BnsEdge, BnsVertex,
+    EDGE_FLOW_MASK, EDGE_FLOW_ST_MASK, I_ALTP_END_ATOM, I_ALTP_FLOW, I_ALTP_HDR_LEN,
+    I_ALTP_MAX_LEN, I_ALTP_PATH_LEN, I_ALTP_START_ATOM, MAX_BOND_EDGE_CAP, NO_VERTEX,
+    NUM_KINDS_OF_GROUPS,
+};
+use super::ichi_bns::{
     BNS_VERT_TYPE_ATOM, BNS_VERT_TYPE_AUX, BNS_VERT_TYPE_C_GROUP, BNS_VERT_TYPE_METAL_GR,
     BNS_VERT_TYPE_TEMP, BNS_VERT_TYPE_TGROUP,
 };
 use super::ichicano::{T_GROUP_HDR_LEN, TGSO_SYMM_IORDER};
-use super::ichierr::BNS_PROGRAM_ERR;
+use super::ichierr::{
+    BNS_BOND_ERR, BNS_CPOINT_ERR, BNS_PROGRAM_ERR, BNS_VERT_EDGE_OVFL, is_bns_error,
+};
 use super::ichiread::{NO_VALUE_INT, RI_ERR_ALLOC, RI_ERR_PROGR};
 use super::ichirvrs::*;
 use super::ichisort::insertions_sort;
@@ -3326,4 +3335,1012 @@ pub fn n_add_super_c_groups(tcg: &mut AllTcGroups) -> i32 {
         tcg.n_edges += n;
     }
     0
+}
+
+// ---------------------------------------------------------------------------
+// Building the BNS: t-groups, metal flower, super c-groups
+
+const MAX_TGROUP_EDGE_CAP: i32 = 2;
+
+/// `ConnectTwoVertices` on the vertices `ip1`, `ip2` and the edge `ie`
+pub fn connect_two_vertices(
+    p: &mut BnStruct,
+    ip1: usize,
+    ip2: usize,
+    ie: usize,
+    clear_edge: bool,
+) -> i32 {
+    let (v1, v2) = (p.vert[ip1], p.vert[ip2]);
+    if ip1 as i32 >= p.max_vertices
+        || ip2 as i32 >= p.max_vertices
+        || ie as i32 >= p.max_edges
+        || v1.iedge + v1.max_adj_edges as usize > p.max_iedges as usize
+        || v2.iedge + v2.max_adj_edges as usize > p.max_iedges as usize
+        || v1.num_adj_edges >= v1.max_adj_edges
+        || v2.num_adj_edges >= v2.max_adj_edges
+    {
+        return BNS_VERT_EDGE_OVFL;
+    }
+    if clear_edge {
+        p.edge[ie] = BnsEdge::default();
+    } else if p.edge[ie].neighbor1 != 0 || p.edge[ie].neighbor12 != 0 {
+        return BNS_PROGRAM_ERR;
+    }
+    p.edge[ie].neighbor1 = ip1.min(ip2) as u16;
+    p.edge[ie].neighbor12 = (ip1 ^ ip2) as u16;
+    let (n1, n2) = (v1.num_adj_edges, v2.num_adj_edges);
+    p.iedge[v1.iedge + n1 as usize] = ie as i32;
+    p.iedge[v2.iedge + n2 as usize] = ie as i32;
+    p.edge[ie].neigh_ord[usize::from(ip1 > ip2)] = n1;
+    p.vert[ip1].num_adj_edges += 1;
+    p.edge[ie].neigh_ord[usize::from(ip1 < ip2)] = n2;
+    p.vert[ip2].num_adj_edges += 1;
+    0
+}
+
+/// `AddTGroups2TCGBnStruct`
+pub fn add_tgroups_to_tcg_bn_struct(
+    bns: &mut BnStruct,
+    at: &[InpAtom],
+    num_atoms: usize,
+    p_va: &mut [ValAt],
+    tcg: &mut AllTcGroups,
+    max_add_edges: i32,
+) -> i32 {
+    let mut ret = 0;
+    if tcg.num_tgroups == 0 {
+        return ret;
+    }
+    let num_tg = tcg.num_tgroups as usize;
+    let mut num_edges = bns.num_edges;
+    let num_vertices = bns.num_vertices;
+    if num_vertices + num_tg as i32 >= bns.max_vertices
+        || num_edges + tcg.num_tgroup_edges >= bns.max_edges
+    {
+        return BNS_VERT_EDGE_OVFL;
+    }
+    let mut max_tg_number = 0;
+    let mut i = 0usize;
+    while i < tcg.num_tc_groups as usize {
+        if tcg.p_tcg[i].type_ & i32::from(BNS_VERT_TYPE_TGROUP) != 0 {
+            let k = tcg.p_tcg[i].ord_num;
+            if k <= 0 || k > tcg.num_tc_groups || k != max_tg_number + 1 {
+                return BNS_CPOINT_ERR;
+            }
+            max_tg_number = k;
+        } else {
+            break;
+        }
+        i += 1;
+    }
+    if i != num_tg {
+        return BNS_CPOINT_ERR;
+    }
+    let nv = num_vertices as usize;
+    for v in &mut bns.vert[nv..nv + max_tg_number as usize] {
+        *v = BnsVertex::default();
+    }
+    let mut prev = nv - 1;
+    let mut tot_st_cap = 0;
+    for i in 0..num_tg {
+        let cur = nv + tcg.p_tcg[i].ord_num as usize - 1;
+        let (piedge, pmax) = (bns.vert[prev].iedge, bns.vert[prev].max_adj_edges);
+        let g = tcg.p_tcg[i];
+        let v = &mut bns.vert[cur];
+        v.iedge = piedge + pmax as usize;
+        v.max_adj_edges = (g.num_edges + max_add_edges + BNS_ADD_SUPER_TGROUP) as u16;
+        v.num_adj_edges = 0;
+        v.st_edge.flow = 0;
+        v.st_edge.flow0 = 0;
+        v.st_edge.cap = g.st_cap;
+        v.st_edge.cap0 = g.st_cap;
+        tot_st_cap += g.st_cap;
+        v.type_ = g.type_ as u16;
+        tcg.p_tcg[i].n_vertex_number = cur as i32;
+        prev = cur;
+    }
+    for endpoint in 0..num_atoms {
+        if at[endpoint].endpoint == 0 {
+            continue;
+        }
+        let fictpoint = at[endpoint].endpoint as usize + nv - 1;
+        if fictpoint as i32 >= bns.max_vertices
+            || num_edges >= bns.max_edges
+            || bns.vert[fictpoint].num_adj_edges >= bns.vert[fictpoint].max_adj_edges
+            || bns.vert[endpoint].num_adj_edges >= bns.vert[endpoint].max_adj_edges
+        {
+            ret = BNS_VERT_EDGE_OVFL;
+            break;
+        }
+        bns.vert[endpoint].type_ |= BNS_VERT_TYPE_ENDPOINT;
+        let ne = num_edges as usize;
+        let st = bns.vert[endpoint].st_edge;
+        let e = &mut bns.edge[ne];
+        e.cap = (st.cap - st.flow).clamp(0, MAX_TGROUP_EDGE_CAP);
+        e.flow = 0;
+        e.pass = 0;
+        // RESET_EDGE_FORBIDDEN_MASK is 0 in ichirvrs.h: the mask is not applied
+        ret = connect_two_vertices(bns, endpoint, fictpoint, ne, false);
+        if is_bns_error(ret) {
+            break;
+        }
+        num_edges += 1;
+        let e = &mut bns.edge[ne];
+        e.cap0 = e.cap;
+        e.flow0 = e.flow;
+        p_va[endpoint].n_taut_group_edge = num_edges;
+    }
+    bns.num_edges = num_edges;
+    bns.num_vertices += max_tg_number;
+    bns.num_t_groups = num_tg as i32;
+    bns.tot_st_cap += tot_st_cap;
+    ret
+}
+
+/// `AddRadicalToMetal`
+pub fn add_radical_to_metal(
+    tot_st_cap: &mut i32,
+    srm: &Srm,
+    bns: &mut BnStruct,
+    tcg: &AllTcGroups,
+) -> i32 {
+    let ig = [
+        tcg.n_group[TCG_ME_FLOWER0 as usize],
+        tcg.n_group[TCG_ME_FLOWER1 as usize],
+        tcg.n_group[TCG_ME_FLOWER2 as usize],
+        tcg.n_group[TCG_ME_FLOWER3 as usize],
+    ];
+    let n = ig.iter().filter(|&&g| g >= 0).count();
+    if tcg.num_metal_atoms != 0 && srm.b_metal_add_flower != 0 && *tot_st_cap % 2 != 0 && n == 4 {
+        let v3 = tcg.p_tcg[ig[3] as usize].n_vertex_number as usize;
+        bns.vert[v3].st_edge.cap += 1;
+        bns.vert[v3].st_edge.cap0 += 1;
+        *tot_st_cap += 1;
+        return 1;
+    }
+    0
+}
+
+/// `SetEdgeCapFlow`
+pub fn set_edge_cap_flow(e: &mut BnsEdge, cap: i32, flow: i32) {
+    e.cap = cap;
+    e.cap0 = cap;
+    e.flow = flow;
+    e.flow0 = flow;
+}
+
+/// `AddStCapFlow`
+pub fn add_st_cap_flow(
+    v: &mut BnsVertex,
+    tot_st_flow: &mut i32,
+    tot_st_cap: &mut i32,
+    cap: i32,
+    flow: i32,
+) {
+    v.st_edge.flow += flow;
+    *tot_st_flow += flow;
+    v.st_edge.cap += cap;
+    *tot_st_cap += cap;
+    v.st_edge.flow0 = v.st_edge.flow;
+    v.st_edge.cap0 = v.st_edge.cap;
+}
+
+/// `SetStCapFlow`
+pub fn set_st_cap_flow(
+    v: &mut BnsVertex,
+    tot_st_flow: &mut i32,
+    tot_st_cap: &mut i32,
+    cap: i32,
+    flow: i32,
+) {
+    *tot_st_flow += flow - v.st_edge.flow;
+    v.st_edge.flow = flow;
+    *tot_st_cap += cap - v.st_edge.cap;
+    v.st_edge.cap = cap;
+    v.st_edge.flow0 = v.st_edge.flow;
+    v.st_edge.cap0 = v.st_edge.cap;
+}
+
+/// `AddEdgeFlow`: edge `e01`, source vertex `src`, destination `dst`
+pub fn add_edge_flow(
+    edge_cap: i32,
+    edge_flow: i32,
+    bns: &mut BnStruct,
+    e01: usize,
+    src: usize,
+    dst: usize,
+    tot_st_cap: &mut i32,
+    tot_st_flow: &mut i32,
+) -> i32 {
+    let e = bns.edge[e01];
+    let (d, s) = (bns.vert[dst].st_edge, bns.vert[src].st_edge);
+    if e.cap < 0 || edge_cap < 0 || e.cap + edge_cap >= EDGE_FLOW_MASK {
+        return BNS_PROGRAM_ERR;
+    }
+    if d.cap < 0
+        || d.cap + edge_cap >= EDGE_FLOW_ST_MASK
+        || d.flow < 0
+        || d.flow + edge_flow >= EDGE_FLOW_ST_MASK
+        || s.cap < 0
+        || s.flow < 0
+        || s.flow + edge_flow >= EDGE_FLOW_ST_MASK
+    {
+        return BNS_PROGRAM_ERR;
+    }
+    let e = &mut bns.edge[e01];
+    e.cap += edge_cap;
+    e.flow += edge_flow;
+    e.cap0 = e.cap;
+    e.flow0 = e.flow;
+    let v = &mut bns.vert[dst].st_edge;
+    v.cap += edge_cap;
+    v.cap0 = v.cap;
+    *tot_st_cap += edge_cap;
+    v.flow += edge_flow;
+    v.flow0 = v.flow;
+    *tot_st_flow += edge_flow;
+    let v = &mut bns.vert[src].st_edge;
+    v.flow += edge_flow;
+    v.flow0 = v.flow;
+    *tot_st_flow += edge_flow;
+    0
+}
+
+/// `ConnectMetalFlower`
+pub fn connect_metal_flower(
+    _pcur_num_vertices: &mut i32,
+    pcur_num_edges: &mut i32,
+    tot_st_cap: &mut i32,
+    tot_st_flow: &mut i32,
+    srm: &Srm,
+    bns: &mut BnStruct,
+    tcg: &AllTcGroups,
+) -> i32 {
+    let ig = [
+        tcg.n_group[TCG_ME_FLOWER0 as usize],
+        tcg.n_group[TCG_ME_FLOWER1 as usize],
+        tcg.n_group[TCG_ME_FLOWER2 as usize],
+        tcg.n_group[TCG_ME_FLOWER3 as usize],
+    ];
+    let n = ig.iter().filter(|&&g| g >= 0).count();
+    if n == 0 {
+        return 0;
+    }
+    if n != 4 {
+        return RI_ERR_PROGR;
+    }
+    let vg: Vec<usize> = ig
+        .iter()
+        .map(|&g| tcg.p_tcg[g as usize].n_vertex_number as usize)
+        .collect();
+    let (g0, g1, g2, g3) = (vg[0], vg[1], vg[2], vg[3]);
+    let mut cur_num_edges = *pcur_num_edges;
+    let (mut c, mut f) = (0, 0);
+    for i in 0..bns.vert[g0].num_adj_edges as usize {
+        let e = &bns.edge[bns.iedge[bns.vert[g0].iedge + i] as usize];
+        c += e.cap;
+        f += e.flow;
+    }
+    let t0 = &tcg.p_tcg[ig[0] as usize];
+    if !is_bns_vt_m_gr(t0.type_ as u16)
+        && (t0.edges_cap != bns.vert[g0].st_edge.cap || t0.edges_flow != bns.vert[g0].st_edge.flow)
+    {
+        return RI_ERR_PROGR;
+    }
+    if t0.edges_cap != c || t0.edges_flow != f {
+        return RI_ERR_PROGR;
+    }
+    let ia = cur_num_edges as usize;
+    let ib = ia + 1;
+    let id = ia + 2;
+    let ix = ia + 3;
+    let iy = ia + 4;
+    cur_num_edges += 5;
+    for (a, b, e) in [
+        (g0, g1, ib),
+        (g0, g2, ia),
+        (g1, g2, id),
+        (g1, g3, iy),
+        (g2, g3, ix),
+    ] {
+        let ret = connect_two_vertices(bns, a, b, e, true);
+        if is_bns_error(ret) {
+            return ret;
+        }
+    }
+    let dc = c % 2;
+    c /= 2;
+    let df = f % 2;
+    f /= 2;
+    let d = srm.n_metal_flower_param_d;
+    let c0 = 2 * c + 2 * d + dc;
+    let c1 = c + 2 * d + dc - df;
+    let c2 = c + 2 * d;
+    let c3 = 0;
+    let (ca, fa) = (c + 2 * d, c + d - f);
+    let (cb, fb) = (c + 2 * d + dc, c + d + dc - (f + df));
+    let (cd, fd) = (c + 2 * d, f + d);
+    let (cx, fx, cy, fy) = (d, 0, d, 0);
+    for v in [c0, c1, c2, c3] {
+        if v >= EDGE_FLOW_ST_MASK {
+            return BNS_PROGRAM_ERR;
+        }
+    }
+    for (g, cc) in [(g0, c0), (g1, c1), (g2, c2), (g3, c3)] {
+        set_st_cap_flow(&mut bns.vert[g], tot_st_flow, tot_st_cap, cc, cc);
+    }
+    set_edge_cap_flow(&mut bns.edge[ia], ca, fa);
+    set_edge_cap_flow(&mut bns.edge[ib], cb, fb);
+    set_edge_cap_flow(&mut bns.edge[id], cd, fd);
+    set_edge_cap_flow(&mut bns.edge[ix], cx, fx);
+    set_edge_cap_flow(&mut bns.edge[iy], cy, fy);
+    *pcur_num_edges = cur_num_edges;
+    0
+}
+
+/// `ConnectSuperCGroup`; returns the number of connected groups or an error
+#[allow(clippy::too_many_arguments)]
+pub fn connect_super_c_group(
+    n_super_c_group: i32,
+    n_add_groups: &[i32],
+    pcur_num_vertices: &mut i32,
+    pcur_num_edges: &mut i32,
+    tot_st_cap: &mut i32,
+    tot_st_flow: &mut i32,
+    bns: &mut BnStruct,
+    tcg: &mut AllTcGroups,
+) -> i32 {
+    let (i1, fst) = if n_super_c_group >= 0 {
+        let i1 = tcg.n_group[n_super_c_group as usize];
+        if i1 < 0 {
+            return 0;
+        }
+        (i1, 0usize)
+    } else {
+        (-1, 1usize)
+    };
+    let num_groups = n_add_groups
+        .iter()
+        .filter(|&&g| {
+            let x = tcg.n_group[g as usize];
+            x >= 0 && x != i1
+        })
+        .count();
+    if num_groups < 1 {
+        return 0;
+    }
+    let mut cur_num_vertices = *pcur_num_vertices;
+    let mut cur_num_edges = *pcur_num_edges;
+    let mut ix = vec![0i32; num_groups + 1];
+    let mut jx = vec![0usize; num_groups + 1];
+    let mut e0x = vec![0usize; num_groups + 1];
+
+    let j0 = cur_num_vertices as usize;
+    let (piedge, pmax) = (bns.vert[j0 - 1].iedge, bns.vert[j0 - 1].max_adj_edges);
+    bns.vert[j0].iedge = piedge + pmax as usize;
+    bns.vert[j0].max_adj_edges = (num_groups as i32 + 1 + BNS_ADD_EDGES) as u16;
+    bns.vert[j0].num_adj_edges = 0;
+    bns.vert[j0].type_ = BNS_VT_YVCONNECTOR;
+    cur_num_vertices += 1;
+
+    if fst == 0 {
+        ix[0] = i1;
+        jx[0] = tcg.p_tcg[i1 as usize].n_vertex_number as usize;
+    }
+    let mut j = 1;
+    for &g in n_add_groups {
+        let x = tcg.n_group[g as usize];
+        if x >= 0 && x != i1 {
+            ix[j] = x;
+            jx[j] = tcg.p_tcg[x as usize].n_vertex_number as usize;
+            j += 1;
+        }
+    }
+    for i in fst..=num_groups {
+        e0x[i] = cur_num_edges as usize;
+        let ret = connect_two_vertices(bns, j0, jx[i], cur_num_edges as usize, true);
+        if is_bns_error(ret) {
+            return ret;
+        }
+        if i != 0 {
+            tcg.p_tcg[ix[i] as usize].n_forward_edge = cur_num_edges;
+        } else {
+            tcg.p_tcg[ix[i] as usize].n_backward_edge = cur_num_edges;
+        }
+        cur_num_edges += 1;
+    }
+    for i in 1..=num_groups {
+        let g = tcg.p_tcg[ix[i] as usize];
+        let n_delta = g.st_cap - g.edges_cap;
+        let edge_cap = g.edges_cap + n_delta;
+        let edge_flow = g.edges_cap - g.edges_flow;
+        let ret = add_edge_flow(
+            edge_cap,
+            edge_flow,
+            bns,
+            e0x[i],
+            jx[i],
+            j0,
+            tot_st_cap,
+            tot_st_flow,
+        );
+        if is_bns_error(ret) {
+            return ret;
+        }
+    }
+    if fst == 0 {
+        let st = bns.vert[j0].st_edge;
+        let (edge_cap, edge_flow) = (st.cap, st.cap - st.flow);
+        let ret = add_edge_flow(
+            edge_cap,
+            edge_flow,
+            bns,
+            e0x[0],
+            j0,
+            jx[0],
+            tot_st_cap,
+            tot_st_flow,
+        );
+        if is_bns_error(ret) {
+            return ret;
+        }
+        let g = &mut tcg.p_tcg[ix[0] as usize];
+        g.edges_cap += edge_cap;
+        g.edges_flow += edge_flow;
+        g.st_cap += edge_cap;
+        g.st_flow += edge_flow;
+    } else {
+        let st = &mut bns.vert[j0].st_edge;
+        *tot_st_cap += st.flow - st.cap;
+        st.cap += st.flow - st.cap;
+        st.cap0 = st.cap;
+    }
+    *pcur_num_vertices = cur_num_vertices;
+    *pcur_num_edges = cur_num_edges;
+    num_groups as i32
+}
+
+/// `AddCGroups2TCGBnStruct`: adds the charge-group vertices, the
+/// ChargeStruct of every c-point, the metal flower and the (+)/(-) connections
+pub fn add_cgroups_to_tcg_bn_struct(
+    bns: &mut BnStruct,
+    at: &[InpAtom],
+    num_atoms: usize,
+    srm: &Srm,
+    p_va: &mut [ValAt],
+    tcg: &mut AllTcGroups,
+    max_add_edges: i32,
+) -> i32 {
+    let num_cg = tcg.num_tc_groups - tcg.num_tgroups;
+    let fst_cg_vertex = bns.num_vertices;
+    let fst_cg_group = tcg.num_tgroups as usize;
+    let num_vertices = bns.num_vertices;
+    let num_edges = bns.num_edges;
+    if num_cg <= 0 {
+        return 0;
+    }
+    let md = srm.n_metal_max_charge_d;
+    if num_vertices >= bns.max_vertices {
+        return BNS_VERT_EDGE_OVFL;
+    }
+    for v in &mut bns.vert[num_vertices as usize..bns.max_vertices as usize] {
+        *v = BnsVertex::default();
+    }
+    let mut tot_st_cap = bns.tot_st_cap;
+    let mut tot_st_flow = bns.tot_st_flow;
+    let mut prev = fst_cg_vertex as usize - 1;
+    for i in 0..num_cg as usize {
+        let cur = prev + 1;
+        let (piedge, pmax) = (bns.vert[prev].iedge, bns.vert[prev].max_adj_edges);
+        let g = tcg.p_tcg[i + fst_cg_group];
+        let v = &mut bns.vert[cur];
+        v.iedge = piedge + pmax as usize;
+        v.max_adj_edges = (g.num_edges + max_add_edges) as u16;
+        v.num_adj_edges = 0;
+        v.st_edge.flow += g.st_flow;
+        tot_st_flow += g.st_flow;
+        v.st_edge.cap += g.st_cap;
+        tot_st_cap += g.st_cap;
+        v.st_edge.flow0 = v.st_edge.flow;
+        v.st_edge.cap0 = v.st_edge.cap;
+        v.type_ = g.type_ as u16;
+        tcg.p_tcg[i + fst_cg_group].n_vertex_number = cur as i32;
+        prev = cur;
+    }
+    let mut cur_num_vertices = prev as i32 + 1;
+    let mut cur_num_edges = num_edges;
+
+    for c_point in 0..num_atoms {
+        let k = p_va[c_point].c_cn_list_index as usize;
+        if k == 0 {
+            continue;
+        }
+        let cl = &CN_LIST[k - 1];
+        let (p_cn, cn_len, b_metal) = (cl.p_cn, cl.len as usize, cl.bits == CN_BITS_ME);
+        let base = prev;
+        let sc = |x: i8| -> i32 {
+            if !b_metal {
+                i32::from(x)
+            } else if x != 0 {
+                md
+            } else {
+                0
+            }
+        };
+        for i1 in 0..cn_len {
+            if !is_bns_vt_chrg_struct(p_cn[i1].v.type_) {
+                continue;
+            }
+            let cur = base + i1;
+            let (piedge, pmax) = (bns.vert[prev].iedge, bns.vert[prev].max_adj_edges);
+            let v = &mut bns.vert[cur];
+            v.iedge = piedge + pmax as usize;
+            v.max_adj_edges = p_cn[i1].v.valence as u16;
+            v.num_adj_edges = 0;
+            add_st_cap_flow(
+                v,
+                &mut tot_st_flow,
+                &mut tot_st_cap,
+                sc(p_cn[i1].v.cap),
+                sc(p_cn[i1].v.flow),
+            );
+            v.type_ = p_cn[i1].v.type_;
+            prev = cur;
+            cur_num_vertices = cur as i32 + 1;
+            if (bns.vert[cur].iedge + bns.vert[cur].max_adj_edges as usize) as i32 >= bns.max_iedges
+            {
+                return BNS_VERT_EDGE_OVFL;
+            }
+            if cur_num_vertices >= bns.max_vertices {
+                return BNS_VERT_EDGE_OVFL;
+            }
+        }
+        for i1 in 0..cn_len {
+            // find the vertex of the ChargeStruct node `i`
+            let find = |bns: &mut BnStruct,
+                        tcg: &AllTcGroups,
+                        i: usize,
+                        tot_st_flow: &mut i32,
+                        tot_st_cap: &mut i32|
+             -> Result<Option<usize>, i32> {
+                let t = p_cn[i].v.type_;
+                if t & BNS_VERT_TYPE_ATOM != 0 {
+                    add_st_cap_flow(
+                        &mut bns.vert[c_point],
+                        tot_st_flow,
+                        tot_st_cap,
+                        sc(p_cn[i].v.cap),
+                        sc(p_cn[i].v.flow),
+                    );
+                    Ok(Some(c_point))
+                } else if is_bns_vt_c_gr(t) {
+                    let mut found = None;
+                    for j in 0..num_cg as usize {
+                        if t == bns.vert[fst_cg_vertex as usize + j].type_ {
+                            found = Some(j);
+                            break;
+                        }
+                    }
+                    if let Some(j) = found {
+                        let g = &tcg.p_tcg[j + fst_cg_group];
+                        if g.type_ != i32::from(t) || g.ord_num != 0 {
+                            return Err(RI_ERR_PROGR);
+                        }
+                        Ok(Some(fst_cg_vertex as usize + j))
+                    } else {
+                        Ok(None)
+                    }
+                } else if is_bns_vt_m_gr(t) {
+                    let k = tcg.n_group[TCG_ME_FLOWER0 as usize];
+                    if k < 0
+                        || tcg.p_tcg[k as usize].type_ != i32::from(t)
+                        || tcg.p_tcg[k as usize].ord_num != 0
+                        || srm.b_metal_add_flower == 0
+                    {
+                        return Err(RI_ERR_PROGR);
+                    }
+                    Ok(Some(tcg.p_tcg[k as usize].n_vertex_number as usize))
+                } else if is_bns_vt_chrg_struct(t) {
+                    Ok(Some(base + i))
+                } else {
+                    Ok(None)
+                }
+            };
+            let pv1 = match find(bns, tcg, i1, &mut tot_st_flow, &mut tot_st_cap) {
+                Ok(Some(v)) => v,
+                Ok(None) => return BNS_BOND_ERR,
+                Err(e) => return e,
+            };
+            let mut k = 0;
+            while k < MAX_CN_VAL && p_cn[i1].e[k].neigh != 0 {
+                let i2 = p_cn[i1].e[k].neigh as usize - 1;
+                let pv2 = match find(bns, tcg, i2, &mut tot_st_flow, &mut tot_st_cap) {
+                    Ok(Some(v)) => v,
+                    Ok(None) => return BNS_BOND_ERR,
+                    Err(e) => return e,
+                };
+                if pv1 == pv2 {
+                    return BNS_BOND_ERR;
+                }
+                let ne = cur_num_edges as usize;
+                let (t1, t2) = (p_cn[i1].v.type_, p_cn[i2].v.type_);
+                if (is_bns_vt_m_gr(t1) && t2 & BNS_VERT_TYPE_ATOM != 0)
+                    || (is_bns_vt_m_gr(t2) && t1 & BNS_VERT_TYPE_ATOM != 0)
+                {
+                    let (needs, _, _, ecap, eflow) = atom_stcap_stflow(at, p_va, srm, c_point);
+                    bns.edge[ne].cap = ecap;
+                    bns.edge[ne].flow = eflow;
+                    if needs == 0 {
+                        return RI_ERR_PROGR;
+                    }
+                    p_va[c_point].n_metal_group_edge = cur_num_edges + 1;
+                    let ef = bns.edge[ne].flow;
+                    let free = i32::from(p_va[c_point].c_init_free_valences);
+                    let st = &mut bns.vert[c_point].st_edge;
+                    st.flow += ef;
+                    st.cap += ef + free;
+                    st.flow0 = st.flow;
+                    st.cap0 = st.cap;
+                    tot_st_flow += ef;
+                    tot_st_cap += ef + free;
+                } else {
+                    bns.edge[ne].cap = sc(p_cn[i1].e[k].cap);
+                    bns.edge[ne].flow = sc(p_cn[i1].e[k].flow);
+                }
+                bns.edge[ne].forbidden = if p_cn[i1].e[k].b_forbidden_edge != 0 {
+                    BNS_EDGE_FORBIDDEN_MASK
+                } else {
+                    0
+                };
+                bns.edge[ne].pass = 0;
+                if bns.vert[pv1].num_adj_edges >= bns.vert[pv1].max_adj_edges
+                    || bns.vert[pv2].num_adj_edges >= bns.vert[pv2].max_adj_edges
+                    || cur_num_edges >= bns.max_edges
+                {
+                    return BNS_VERT_EDGE_OVFL;
+                }
+                let ret = connect_two_vertices(bns, pv1, pv2, ne, false);
+                if is_bns_error(ret) {
+                    return ret;
+                }
+                bns.edge[ne].cap0 = bns.edge[ne].cap;
+                bns.edge[ne].flow0 = bns.edge[ne].flow;
+                let (y1, y2) = (bns.vert[pv1].type_, bns.vert[pv2].type_);
+                let ty = if is_bns_vt_c_gr(y1) {
+                    y1
+                } else if is_bns_vt_c_gr(y2) {
+                    y2
+                } else {
+                    0
+                };
+                if ty != 0 {
+                    if ty & BNS_VERT_TYPE_C_NEGATIVE != 0 {
+                        p_va[c_point].n_c_minus_group_edge = cur_num_edges + 1;
+                    } else {
+                        p_va[c_point].n_c_plus_group_edge = cur_num_edges + 1;
+                    }
+                }
+                cur_num_edges += 1;
+                k += 1;
+            }
+        }
+    }
+
+    // pass 2
+    for c_point in 0..num_atoms {
+        let st_cap = bns.vert[c_point].st_edge.cap;
+        for k in 0..bns.vert[c_point].num_adj_edges as usize {
+            let ie = bns.iedge[bns.vert[c_point].iedge + k] as usize;
+            let c_neigh = (bns.edge[ie].neighbor12 as usize) ^ c_point;
+            if c_neigh > c_point || bns.vert[c_neigh].type_ & BNS_VERT_TYPE_ATOM == 0 {
+                continue;
+            }
+            let st_cap2 = bns.vert[c_neigh].st_edge.cap;
+            let mut max_edge_flow = st_cap.min(st_cap2);
+            if (srm.b_metal_add_flower != 0
+                && srm.n_metal_min_bond_order == 0
+                && p_va[c_point].c_metal != 0
+                && p_va[c_point].c_num_bonds_to_metal != 0)
+                || (p_va[c_neigh].c_metal != 0 && p_va[c_neigh].c_num_bonds_to_metal != 0)
+            {
+                max_edge_flow = max_edge_flow.min(MAX_BOND_EDGE_CAP + 1);
+            } else {
+                max_edge_flow = max_edge_flow.min(MAX_BOND_EDGE_CAP);
+            }
+            if i32::from(at[c_point].bond_type[k]) == BOND_TYPE_SINGLE {
+                bns.edge[ie].cap = max_edge_flow;
+                bns.edge[ie].cap0 = max_edge_flow;
+            }
+        }
+    }
+
+    let mut ret = connect_metal_flower(
+        &mut cur_num_vertices,
+        &mut cur_num_edges,
+        &mut tot_st_cap,
+        &mut tot_st_flow,
+        srm,
+        bns,
+        tcg,
+    );
+    if ret < 0 {
+        return ret;
+    }
+    connect_super_c_group(
+        TCG_PLUS,
+        &[TCG_PLUS0, TCG_PLUS_C0, TCG_PLUS_M0],
+        &mut cur_num_vertices,
+        &mut cur_num_edges,
+        &mut tot_st_cap,
+        &mut tot_st_flow,
+        bns,
+        tcg,
+    );
+    connect_super_c_group(
+        TCG_MINUS,
+        &[TCG_MINUS0, TCG_MINUS_C0, TCG_MINUS_M0],
+        &mut cur_num_vertices,
+        &mut cur_num_edges,
+        &mut tot_st_cap,
+        &mut tot_st_flow,
+        bns,
+        tcg,
+    );
+    let ret3 = connect_super_c_group(
+        -1,
+        &[TCG_PLUS, TCG_MINUS],
+        &mut cur_num_vertices,
+        &mut cur_num_edges,
+        &mut tot_st_cap,
+        &mut tot_st_flow,
+        bns,
+        tcg,
+    );
+    let cg_charge = tcg.total_charge - tcg.tgroup_charge - tcg.charge_on_atoms;
+    ret = 1;
+    if ret3 > 0 {
+        let vpm = cur_num_vertices as usize - 1;
+        let n = i32::from(tcg.n_group[TCG_PLUS as usize] >= 0);
+        let k = i32::from(tcg.n_group[TCG_MINUS as usize] >= 0);
+        let (mut e_plus, mut e_minus): (Option<usize>, Option<usize>) = (None, None);
+        let adj = bns.vert[vpm].num_adj_edges;
+        let i0 = bns.vert[vpm].iedge;
+        if adj == 2 && k + n == 2 {
+            e_plus = Some(bns.iedge[i0] as usize);
+            e_minus = Some(bns.iedge[i0 + 1] as usize);
+        } else if adj == 1 && k + n == 1 {
+            if tcg.n_group[TCG_PLUS as usize] >= 0 {
+                e_plus = Some(bns.iedge[i0] as usize);
+            } else if tcg.n_group[TCG_MINUS as usize] >= 0 {
+                e_minus = Some(bns.iedge[i0] as usize);
+            }
+        } else if k + n != 0 {
+            return BNS_BOND_ERR;
+        }
+        let v_plus = e_plus.map(|e| bns.edge[e].neighbor12 as usize ^ vpm);
+        let v_minus = e_minus.map(|e| bns.edge[e].neighbor12 as usize ^ vpm);
+        let p_vert = v_plus.or(v_minus);
+        let p_edge = e_plus.or(e_minus);
+        if let Some(e) = e_minus {
+            tcg.n_edge_minus = e as i32;
+        }
+        if let Some(e) = e_plus {
+            tcg.n_edge_plus = e as i32;
+        }
+        if let Some(e) = p_edge {
+            tcg.n_edge4charge = e as i32;
+        }
+        if let (Some(v), Some(e)) = (p_vert, p_edge) {
+            if cg_charge > 0 {
+                let st = &mut bns.vert[vpm].st_edge;
+                st.cap += cg_charge;
+                tot_st_cap += cg_charge;
+                st.cap0 = st.cap;
+            }
+            if cg_charge < 0 {
+                let st = &mut bns.vert[v].st_edge;
+                st.cap -= cg_charge;
+                tot_st_cap -= cg_charge;
+                st.cap0 = st.cap;
+                let ed = &mut bns.edge[e];
+                if ed.cap - ed.flow + cg_charge < 0 {
+                    ed.cap = ed.flow - cg_charge;
+                }
+            }
+            tcg.added_charge = cg_charge;
+        }
+        if cg_charge == 0 || (p_vert.is_some() && p_edge.is_some()) {
+            ret = 2;
+        }
+    }
+    add_radical_to_metal(&mut tot_st_cap, srm, bns, tcg);
+    bns.num_edges = cur_num_edges;
+    bns.num_vertices = cur_num_vertices;
+    bns.num_c_groups = num_cg;
+    bns.tot_st_cap = tot_st_cap;
+    bns.tot_st_flow = tot_st_flow;
+    ret
+}
+
+/// `nNumEdgesToCnVertex`
+pub fn n_num_edges_to_cn_vertex(p_cn: &[CNode], len: usize, v: usize) -> i32 {
+    let v1 = v as i32 + 1;
+    let mut n = 0;
+    for (i, node) in p_cn.iter().enumerate().take(len) {
+        let mut j = 0;
+        while j < MAX_CN_VAL && node.e[j].neigh != 0 {
+            n += i32::from(i == v || i32::from(node.e[j].neigh) == v1);
+            j += 1;
+        }
+    }
+    n
+}
+
+/// `AllocateAndInitTCGBnStruct`: the BNS with the atom vertices and the bond
+/// edges, sized for the t- and c-groups; `None` when the sizes do not fit.
+/// Returns also the number of bonds made single.
+pub fn allocate_and_init_tcg_bn_struct(
+    at: &mut [InpAtom],
+    num_atoms: usize,
+    srm: &Srm,
+    p_va: &[ValAt],
+    tcg: &AllTcGroups,
+    n_max_add_atoms: i32,
+    n_max_add_edges: i32,
+    max_altp: i32,
+) -> Option<(BnStruct, i32)> {
+    let max_vertices = tcg.n_vertices + n_max_add_atoms;
+    let num_bonds = tcg.num_bonds;
+    let num_edges = tcg.n_edges;
+    let max_edges = num_edges + (n_max_add_edges + NUM_KINDS_OF_GROUPS) * max_vertices;
+    let max_iedges = 2 * max_edges + tcg.n_add_iedges;
+    let mut len_alt_path = max_vertices + I_ALTP_HDR_LEN as i32 + 1;
+    len_alt_path += (max_vertices / 2).max(16);
+    let mut p = BnStruct {
+        edge: vec![BnsEdge::default(); max_edges as usize],
+        vert: vec![BnsVertex::default(); max_vertices as usize],
+        iedge: vec![0; max_iedges as usize],
+        ..Default::default()
+    };
+    let mut num_altp = 0;
+    while num_altp < max_altp && (num_altp as usize) < BN_MAX_ALTP {
+        let mut ap = vec![BnsAltPath::default(); len_alt_path as usize];
+        ap[I_ALTP_MAX_LEN].set_number(len_alt_path);
+        p.len_alt_path = len_alt_path;
+        ap[I_ALTP_FLOW].flow[0] = 0;
+        ap[I_ALTP_START_ATOM].set_number(NO_VERTEX);
+        ap[I_ALTP_END_ATOM].set_number(NO_VERTEX);
+        ap[I_ALTP_PATH_LEN].set_number(0);
+        p.altp.push(ap);
+        num_altp += 1;
+    }
+    p.alt_path = None;
+    p.num_altp = 0;
+    p.max_altp = num_altp;
+
+    let mut iedge_pos = 0usize;
+    let mut tot_st_cap = 0;
+    let mut tot_st_flow = 0;
+    for i in 0..num_atoms {
+        let mut k = i32::from(at[i].valence) + i32::from(at[i].endpoint != 0) + n_max_add_edges;
+        if p_va[i].c_cn_list_index > 0 {
+            let cl = &CN_LIST[p_va[i].c_cn_list_index as usize - 1];
+            k += n_num_edges_to_cn_vertex(cl.p_cn, cl.len as usize, 0);
+        }
+        p.vert[i].max_adj_edges = k as u16;
+        p.vert[i].iedge = iedge_pos;
+        iedge_pos += k as usize;
+        let (needs, c1, _f1, _, _) = atom_stcap_stflow(at, p_va, srm, i);
+        let st_cap = c1
+            + if needs != 0 {
+                0
+            } else {
+                i32::from(p_va[i].c_init_free_valences)
+            };
+        p.vert[i].st_edge.cap = st_cap;
+        p.vert[i].st_edge.cap0 = st_cap;
+        tot_st_cap += st_cap;
+    }
+    let num_iedges = iedge_pos as i32;
+    if max_iedges - num_iedges < (n_max_add_edges + NUM_KINDS_OF_GROUPS) * max_vertices {
+        return None;
+    }
+    p.num_atoms = num_atoms as i32;
+    p.num_added_atoms = 0;
+    p.num_t_groups = 0;
+    p.num_c_groups = 0;
+    p.n_max_add_atoms = n_max_add_atoms;
+    p.n_max_add_edges = n_max_add_edges;
+    p.num_vertices = num_atoms as i32;
+    p.max_vertices = max_vertices;
+    p.num_bonds = num_bonds;
+    p.max_edges = max_edges;
+    p.max_iedges = max_iedges;
+
+    let mut num_changed_bonds = 0;
+    let mut n_edges = 0usize;
+    for i in 0..num_atoms {
+        let mut st_flow = 0;
+        let valence = at[i].valence as usize;
+        for j in 0..valence {
+            let neigh = at[i].neighbor[j] as usize;
+            let mut k = 0usize;
+            while k < at[neigh].valence as usize {
+                if at[neigh].neighbor[k] as usize == i {
+                    break;
+                }
+                k += 1;
+            }
+            let mut bond_type = i32::from(at[i].bond_type[j]) & BOND_TYPE_MASK;
+            let bond_mark = i32::from(at[i].bond_type[j]) & !BOND_TYPE_MASK;
+            if bond_type != BOND_TYPE_SINGLE
+                && bond_type != BOND_TYPE_DOUBLE
+                && bond_type != BOND_TYPE_TRIPLE
+            {
+                bond_type = BOND_TYPE_SINGLE;
+                at[i].bond_type[j] = (bond_mark | bond_type) as u8;
+                num_changed_bonds += 1;
+            }
+            let edge_flow;
+            if neigh > i {
+                let (n1, c1, _, _, _) = atom_stcap_stflow(at, p_va, srm, i);
+                let _c1 = c1
+                    + if n1 != 0 {
+                        0
+                    } else {
+                        i32::from(p_va[i].c_init_free_valences)
+                    };
+                let (n2, c2, _, _, _) = atom_stcap_stflow(at, p_va, srm, neigh);
+                let _c2 = c2
+                    + if n2 != 0 {
+                        0
+                    } else {
+                        i32::from(p_va[neigh].c_init_free_valences)
+                    };
+                let (ef, edge_cap, _min_order, _) = bond_flow_maxcap_minorder(at, p_va, srm, i, j);
+                edge_flow = ef;
+                let e = &mut p.edge[n_edges];
+                e.neighbor1 = i as u16;
+                e.neighbor12 = (i ^ neigh) as u16;
+                e.flow = ef;
+                e.flow0 = ef;
+                e.cap = edge_cap;
+                e.cap0 = edge_cap;
+                e.neigh_ord = [j as u16, k as u16];
+                e.pass = 0;
+                e.forbidden = 0;
+                if bond_type == BOND_TYPE_DOUBLE {
+                    let mut m = 0;
+                    while m < MAX_NUM_STEREO_BONDS && at[i].sb_parity[m] != 0 {
+                        if at[i].sb_ord[m] as usize == j {
+                            e.forbidden |= BNS_EDGE_FORBIDDEN_MASK;
+                            break;
+                        }
+                        m += 1;
+                    }
+                }
+                let vi = p.vert[i].iedge + j;
+                p.iedge[vi] = n_edges as i32;
+                let vn = p.vert[neigh].iedge + k;
+                p.iedge[vn] = n_edges as i32;
+                n_edges += 1;
+            } else {
+                let iedge2 = p.iedge[p.vert[neigh].iedge + k] as usize;
+                edge_flow = p.edge[iedge2].flow;
+            }
+            st_flow += edge_flow;
+        }
+        let v = &mut p.vert[i];
+        v.num_adj_edges = valence as u16;
+        v.st_edge.flow = st_flow;
+        v.st_edge.flow0 = st_flow;
+        v.type_ = BNS_VERT_TYPE_ATOM;
+        tot_st_flow += st_flow;
+    }
+    p.num_edges = n_edges as i32;
+    p.num_iedges = num_iedges;
+    p.num_added_edges = 0;
+    p.tot_st_cap = tot_st_cap;
+    p.tot_st_flow = tot_st_flow;
+    Some((p, num_changed_bonds / 2))
 }

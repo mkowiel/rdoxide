@@ -359,7 +359,12 @@ fn restoration_helpers_match_c() {
                     ));
                 }
             }
-            34 => {
+            34 | 40 => {
+                let (xa, xe, coa) = if t[0] == 40 {
+                    (next(), next(), next())
+                } else {
+                    (0, 0, 0)
+                };
                 let s = Srm {
                     b_metal_add_flower: next(),
                     n_metal_min_bond_order: next(),
@@ -371,6 +376,10 @@ fn restoration_helpers_match_c() {
                     n_metal_max_charge_d: next(),
                     b_fix_stereo_bonds: next(),
                     ..Default::default()
+                };
+                let s = Srm {
+                    n_metal_flower_param_d: if s.n_metal_max_charge_d != 0 { 16 } else { 3 },
+                    ..s
                 };
                 let n = next() as usize;
                 let ng = next() as usize;
@@ -412,6 +421,7 @@ fn restoration_helpers_match_c() {
                 let mut g = AllTcGroups {
                     n_group: [-1; NUM_TCGROUP_TYPES],
                     total_charge: tch,
+                    charge_on_atoms: coa,
                     ..Default::default()
                 };
                 let r = n_count_bns_sizes(&at, n, &ti, &va, &s, &mut g);
@@ -459,6 +469,106 @@ fn restoration_helpers_match_c() {
                         let x = &g.p_tcg[i];
                         got.push(format!("u{i} {} {} {}", x.type_, x.ord_num, x.num_edges));
                     }
+                    if t[0] == 40 && r2 >= 0 {
+                        match allocate_and_init_tcg_bn_struct(&mut at, n, &s, &va, &g, xa, xe, 1) {
+                            None => got.push("NULL".into()),
+                            Some((mut b, nch)) => {
+                                let r3 = add_tgroups_to_tcg_bn_struct(
+                                    &mut b, &at, n, &mut va, &mut g, xe,
+                                );
+                                got.push(format!("T {r3}"));
+                                let r4 = if r3 < 0 {
+                                    0
+                                } else {
+                                    add_cgroups_to_tcg_bn_struct(
+                                        &mut b, &at, n, &s, &mut va, &mut g, xe,
+                                    )
+                                };
+                                got.push(format!("Q {r4} {nch}"));
+                                got.push(format!(
+                                    "N {} {} {} {} {} {} {} {} {} {} {}",
+                                    b.num_atoms,
+                                    b.num_added_atoms,
+                                    b.num_c_groups,
+                                    b.num_t_groups,
+                                    b.num_vertices,
+                                    b.num_bonds,
+                                    b.num_edges,
+                                    b.max_vertices,
+                                    b.max_edges,
+                                    b.max_iedges,
+                                    b.tot_st_cap * 1000 + b.tot_st_flow
+                                ));
+                                for i in 0..b.num_vertices as usize {
+                                    let v = &b.vert[i];
+                                    let mut l = format!(
+                                        "V{i} {} {} {} {} {} {} {} {} 0 |",
+                                        v.st_edge.cap,
+                                        v.st_edge.cap0,
+                                        v.st_edge.flow,
+                                        v.st_edge.flow0,
+                                        v.type_,
+                                        v.num_adj_edges,
+                                        v.max_adj_edges,
+                                        v.iedge
+                                    );
+                                    for q in 0..v.num_adj_edges as usize {
+                                        l.push_str(&format!(" {}", b.iedge[v.iedge + q]));
+                                    }
+                                    got.push(l);
+                                }
+                                for i in 0..b.num_edges as usize {
+                                    let e = &b.edge[i];
+                                    got.push(format!(
+                                        "E{i} {} {} {} {} {} {} {} {} {} {}",
+                                        e.neighbor1,
+                                        e.neighbor12,
+                                        e.neigh_ord[0],
+                                        e.neigh_ord[1],
+                                        e.cap,
+                                        e.cap0,
+                                        e.flow,
+                                        e.flow0,
+                                        e.pass,
+                                        e.forbidden
+                                    ));
+                                }
+                                for i in 0..n {
+                                    got.push(format!(
+                                        "W{i} {} {} {} {} | {} {}",
+                                        va[i].n_c_minus_group_edge,
+                                        va[i].n_c_plus_group_edge,
+                                        va[i].n_metal_group_edge,
+                                        va[i].n_taut_group_edge,
+                                        at[i].bond_type[0],
+                                        if at[i].valence > 0 {
+                                            at[i].bond_type[at[i].valence as usize - 1]
+                                        } else {
+                                            0
+                                        }
+                                    ));
+                                }
+                                for i in 0..g.num_tc_groups as usize {
+                                    let x = &g.p_tcg[i];
+                                    got.push(format!(
+                                        "X{i} {} {} {} {} {} {} {} {}",
+                                        x.n_vertex_number,
+                                        x.n_forward_edge,
+                                        x.n_backward_edge,
+                                        x.st_cap,
+                                        x.st_flow,
+                                        x.edges_cap,
+                                        x.edges_flow,
+                                        x.num_edges
+                                    ));
+                                }
+                                got.push(format!(
+                                    "Y {} {} {} {}",
+                                    g.n_edge_plus, g.n_edge_minus, g.n_edge4charge, g.added_charge
+                                ));
+                            }
+                        }
+                    }
                 }
             }
             33 => {
@@ -482,6 +592,26 @@ fn restoration_helpers_match_c() {
             }
             _ => unreachable!(),
         }
-        assert_eq!(got, want, "case {ci}: {inp}");
+        if got != want {
+            let d = got
+                .iter()
+                .zip(&want)
+                .position(|(a, b)| a != *b)
+                .unwrap_or(got.len().min(want.len()));
+            let more: Vec<String> = got
+                .iter()
+                .zip(&want)
+                .enumerate()
+                .filter(|(_, (a, b))| a != b)
+                .take(8)
+                .map(|(i, (a, b))| format!("{i}: {a}  <>  {b}"))
+                .collect();
+            panic!(
+                "case {ci}: {inp}\nline {d}: got {:?}\n want {:?}\n{}",
+                got.get(d),
+                want.get(d),
+                more.join("\n")
+            );
+        }
     }
 }

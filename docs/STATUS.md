@@ -353,6 +353,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 237 | InChI port I11a: restoration types, GetAtomRestoreInfo, t-group info from InChI (differential vs C) |
 | 238 | InChI port I11b: BondFlowMaxcapMinorder, AtomStcapStflow, RegisterTCGroup, edge lists (differential vs C) |
 | 239 | InChI port I11c: nCountBnsSizes, nAddSuperCGroups (differential vs C) |
+| 240 | InChI port I11d: AllocateAndInitTCGBnStruct, AddTGroups2/AddCGroups2TCGBnStruct, metal flower (differential vs C) |
 
 ## Python package files
 
@@ -774,3 +775,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-22 — Stage 237: InChI I11a — ichirvrs/ichirvr1 first slice; no runtime effect, upstream_speed.html not regenerated
 * 2026-10-22 — Stage 238: InChI I11b — ichirvr1 helper slice; no runtime effect, upstream_speed.html not regenerated
 * 2026-10-22 — Stage 239: InChI I11c — BNS size counting; no runtime effect, upstream_speed.html not regenerated
+* 2026-10-22 — Stage 240: InChI I11d — BNS building for the restoration; no runtime effect, upstream_speed.html not regenerated
