@@ -539,7 +539,15 @@ pub fn process_one_structure_ex(
     use super::runichi3::oad_validate_polymer_and_pseudo_element_data;
     // PreprocessPolymerCRUData
     orig.valid_polymer = 0;
-    assert!(orig.polymer.is_none(), "polymer data is not ported");
+    if orig.polymer.is_some() {
+        // the CRU frame-shift and folding code is not ported
+        super::ichierr::add_error_message(
+            &mut sd.str_err_struct,
+            "Polymer processing is not supported yet",
+        );
+        sd.n_error_type = IS_ERROR;
+        return IS_ERROR;
+    }
 
     // ProcessOneStructureExCore
     let mut res = oad_validate_polymer_and_pseudo_element_data(
