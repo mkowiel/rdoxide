@@ -105,6 +105,8 @@ pub struct StrFromInChI {
     pub n_one_inchi_b_mobile_h: i32,
     /// `nNumRemovedProtons`
     pub n_num_removed_protons: i32,
+    /// `nNumRemovedProtonsByRevrs`
+    pub n_num_removed_protons_by_revrs: i32,
     /// `nChargeRevrs`
     pub n_charge_revrs: i32,
     /// `nAtno2Canon`
