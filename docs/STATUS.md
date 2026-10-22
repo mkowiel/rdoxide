@@ -350,6 +350,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 234 | InChI port I10g: ichiread ReadInChILine (whole InChI string reader), differential-tested vs the C library |
 | 235 | InChI port I10h: ichiread InChILine2Data post-processing (omitted stereo/H/proton layers, balances), differential-tested vs the C library |
 | 236 | InChI port I10i: ichiread SetProtonsAndXchgIsoH, DetectInpInchiCreationOptions, RemoveFixHInChIIdentical2MobH, MarkDisconectedIdenticalToReconnected, differential-tested vs the C library |
+| 237 | InChI port I11a: restoration types, GetAtomRestoreInfo, t-group info from InChI (differential vs C) |
 
 ## Python package files
 
@@ -768,3 +769,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-22 — Stage 234: I10g ichiread: ReadInChILine differential-tested against C (26000 cases)
 * 2026-10-22 — Stage 235: I10h ichiread: InChILine2Data differential-tested against C (30000 cases)
 * 2026-10-22 — Stage 236: I10i ichiread: restoration preparation differential-tested against C (30000 cases)
+* 2026-10-22 — Stage 237: InChI I11a — ichirvrs/ichirvr1 first slice; no runtime effect, upstream_speed.html not regenerated
