@@ -396,7 +396,8 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 280 | `Chem.MolKey` copied from upstream (InchiInfo works on the InChI port; MolKey itself needs AvalonTools) | ✅ | ratchet +10 (UnitTestMolKey 10/15, the rest need Avalon) |
 | 281 | InChI: differential `GetStructFromINCHI` vs the C library (1576 InChI identical) and a fix in `RunBnsRestore1` | ✅ | non-standard corpus InChI round-trip 519/527 (rest are KET/15T, refused by C too) |
 | 282 | Ratchet extended with upstream testFeatures.py, DistGeom rough_test.py and VLib NodeLib tests; `FreeChemicalFeature` keyword arguments | ✅ | ratchet +13 |
-| 283 | Python API satisfies both RDKit wrapper flavours where their tests contradict: `rdoxide._compat` (`TupleList` returned by substructure matches and `GetAtomIndices`; exceptions deriving from both OverflowError/ValueError/RuntimeError and TypeError); ratchet runner handles pytest-style files and scripts | ✅ | ratchet +13 nbWrap tests, +testGetPropDefault, +testThreads |
+| 283 | `Chem.PandasTools`, `Chem.PandasPatcher` copied from upstream; pandas is an optional dependency (`rdoxide[pandas]`), installed in the ratchet CI job | ✅ | upstream UnitTestPandasTools 23 run, 5 skipped (ratchet +23) |
+| 284 | Python API satisfies both RDKit wrapper flavours where their tests contradict: `rdoxide._compat` (`TupleList` returned by substructure matches and `GetAtomIndices`; exceptions deriving from both OverflowError/ValueError/RuntimeError and TypeError); ratchet runner handles pytest-style files and scripts | ✅ | ratchet +13 nbWrap tests, +testGetPropDefault, +testThreads |
 
 ## Python package files
 
@@ -861,4 +862,5 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-22 — Stage 280: MolKey package; ratchet +10. Pure Python, no speed change: upstream_speed.html not regenerated.
 * 2026-10-22 — Stage 281: I12q GetStructFromINCHI vs C 1576/1576; RunBnsRestore1 H fix. No speed change: upstream_speed.html not regenerated.
 * 2026-10-22 — Stage 282: Ratchet files + FreeChemicalFeature kwargs (+13). No speed change: upstream_speed.html not regenerated.
-* 2026-10-22 — Stage 283: Compat shims for nb/boost test conflicts (+13). Not a speed change.
+* 2026-10-22 — Stage 283: PandasTools (+23). Pure Python: speed report regenerated separately (PR 404).
+* 2026-10-22 — Stage 284: Compat shims for nb/boost test conflicts (+13). Not a speed change.

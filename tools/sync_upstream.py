@@ -561,6 +561,7 @@ def rename_package(path: Path) -> None:
         text = f.read_text(encoding="utf-8")
         new = _PKG_IMPORT.sub(r"\1 rdoxide", _PKG_DOTTED.sub("rdoxide", text))
         new = new.replace('getLogger("rdkit")', 'getLogger("rdoxide")')
+        new = new.replace("hasattr(rdkit,", "hasattr(rdoxide,")
         if new != text:
             f.write_text(new, encoding="utf-8")
 
