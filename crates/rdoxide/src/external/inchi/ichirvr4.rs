@@ -2397,8 +2397,9 @@ pub fn run_bns_restore1(
     let mut num_run_bns = 0;
     let mut total_delta = 0;
     let num_at = ps.num_atoms as usize;
-    let at = ps.at.clone();
-    let mut at2: Vec<InpAtom> = vec![InpAtom::default(); at.len()];
+    // C: `at = pStruct->at` is the same buffer, so the fixing functions' changes
+    // of the restored atoms (e.g. an added H) persist
+    let mut at2: Vec<InpAtom> = vec![InpAtom::default(); ps.at.len()];
     let mut at3: Vec<InpAtom> = Vec::new();
     let mut carbon_charge_edges = EdgeList::default();
     let metal_carbon_edges = EdgeList::default();
@@ -2444,7 +2445,7 @@ pub fn run_bns_restore1(
         for ring in [6, 8] {
             step!('body, forbid_nitrogen_plus2_bonds_in_small_rings(
                 bns,
-                &at,
+                &ps.at,
                 num_at,
                 p_va,
                 ring,
@@ -2586,7 +2587,6 @@ pub fn run_bns_restore1(
             i32::from(BNS_EDGE_FORBIDDEN_MASK)
         ));
     }
-    ps.at = at;
     ps.at2 = at2;
     ret
 }

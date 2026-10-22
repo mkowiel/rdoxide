@@ -103,3 +103,86 @@ fn bad_input_is_an_error() {
     let (r, _) = get_struct_from_std_inchi(Some("InChI=1/CH4/h1H4"), None);
     assert_eq!(r, INCHI_RET_ERROR);
 }
+
+/// The structures restored by the C library (`tools/inchi_getstruct_reference.py`:
+/// the corpus InChI and the PubChem hard set of RDKit's InChI tests).
+#[test]
+fn get_struct_matches_c() {
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_getstruct.json")).unwrap();
+    let mut n_ok = 0;
+    let mut bad = Vec::new();
+    for case in data.as_array().unwrap() {
+        let inchi = case["in"].as_str().unwrap();
+        let want: Vec<&str> = case["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|x| x.as_str().unwrap())
+            .collect();
+        let (ret, out) = get_struct_from_inchi(Some(inchi), Some(""));
+        let mut got = vec![format!(
+            "R {ret} {} {}",
+            out.atom.len(),
+            out.stereo_0d.len()
+        )];
+        if ret < INCHI_RET_ERROR {
+            for a in &out.atom {
+                let name_len = a
+                    .elname
+                    .iter()
+                    .position(|&c| c == 0)
+                    .unwrap_or(a.elname.len());
+                let mut l = format!(
+                    "A {} {} {} {} {} {} {} {} {}",
+                    std::str::from_utf8(&a.elname[..name_len]).unwrap(),
+                    a.charge,
+                    a.radical,
+                    a.isotopic_mass,
+                    a.num_iso_h[0],
+                    a.num_iso_h[1],
+                    a.num_iso_h[2],
+                    a.num_iso_h[3],
+                    a.num_bonds
+                );
+                for b in 0..a.num_bonds as usize {
+                    l += &format!(" {},{},{}", a.neighbor[b], a.bond_type[b], a.bond_stereo[b]);
+                }
+                got.push(l);
+            }
+            for s in &out.stereo_0d {
+                got.push(format!(
+                    "S {} {} {} {} {} {} {}",
+                    s.neighbor[0],
+                    s.neighbor[1],
+                    s.neighbor[2],
+                    s.neighbor[3],
+                    s.central_atom,
+                    s.type_,
+                    s.parity
+                ));
+            }
+        }
+        if got == want {
+            n_ok += 1;
+        } else {
+            let d: Vec<_> = got
+                .iter()
+                .zip(&want)
+                .enumerate()
+                .filter(|(_, (a, b))| a != b)
+                .map(|(i, (a, b))| format!("{i}: {a} | {b}"))
+                .collect();
+            bad.push(format!(
+                "{inchi}\n   got {} want {} first diff {d:?}",
+                got.len(),
+                want.len()
+            ));
+        }
+    }
+    eprintln!("{n_ok} of {} identical", n_ok + bad.len());
+    for b in bad.iter().take(10) {
+        eprintln!("  {b}");
+    }
+    assert!(bad.is_empty());
+}
