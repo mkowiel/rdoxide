@@ -14,10 +14,11 @@ use super::ichirvrs::*;
 use super::ichisort::insertions_sort;
 use super::ichitaut::{TGroup, TGroupInfo};
 use super::incomdef::{BOND_TYPE_DOUBLE, BOND_TYPE_SINGLE, BOND_TYPE_TRIPLE};
-use super::inpdef::{BOND_TYPE_MASK, InpAtom};
+use super::inpdef::{BOND_TYPE_MASK, InpAtom, MAX_NUM_STEREO_BONDS};
 use super::util::{
     EL_NUMBER_N, EL_NUMBER_O, EL_NUMBER_P, EL_NUMBER_S, EL_NUMBER_SE, EL_NUMBER_TE, get_el_valence,
-    if_skip_add_h,
+    get_endpoint_valence, if_skip_add_h, is_el_a_metal, n_no_metal_bonds_valence,
+    n_no_metal_num_bonds,
 };
 
 /// `TGSO_TOTAL_LEN`
@@ -2670,4 +2671,363 @@ pub fn get_atom_restore_info(
     }
     pva.c_init_free_valences = jfree as i8;
     1
+}
+
+// ---------------------------------------------------------------------------
+// Small helpers of the restoration: t/c groups, bond flows, edge lists
+
+/// `RegisterTCGroup`: adds the capacities to the group of the type and
+/// ordinal number, creating it when absent; returns `index + 1` for a new
+/// group, 0 for an existing one
+pub fn register_tc_group(
+    tcg: &mut AllTcGroups,
+    group_type: i32,
+    group_ord_num: i32,
+    vertex_cap: i32,
+    vertex_flow: i32,
+    edge_cap: i32,
+    edge_flow: i32,
+    num_edges: i32,
+) -> i32 {
+    let mut ret = 0;
+    let n = tcg.num_tc_groups as usize;
+    let mut i = tcg.p_tcg[..n.min(tcg.p_tcg.len())]
+        .iter()
+        .position(|g| g.type_ == group_type && g.ord_num == group_ord_num)
+        .unwrap_or(n);
+    if i == n {
+        if tcg.num_tc_groups == tcg.max_tc_groups {
+            // ReallocTCGroups
+            tcg.p_tcg.resize(
+                tcg.max_tc_groups as usize + INC_NUM_TCGROUPS,
+                TcGroup::default(),
+            );
+            tcg.max_tc_groups += INC_NUM_TCGROUPS as i32;
+        }
+        if tcg.p_tcg.len() <= i {
+            tcg.p_tcg.resize(i + 1, TcGroup::default());
+        }
+        ret = i as i32 + 1;
+        tcg.num_tc_groups += 1;
+        tcg.p_tcg[i].type_ = group_type;
+        tcg.p_tcg[i].ord_num = group_ord_num;
+    }
+    i = i.min(tcg.p_tcg.len() - 1);
+    let g = &mut tcg.p_tcg[i];
+    g.num_edges += num_edges;
+    g.st_cap += vertex_cap;
+    g.st_flow += vertex_flow;
+    g.edges_cap += edge_cap;
+    g.edges_flow += edge_flow;
+    ret
+}
+
+/// `nTautEndpointEdgeCap`: the capacity of the t-group edge of an endpoint
+pub fn n_taut_endpoint_edge_cap(at: &[InpAtom], p_va: &[ValAt], i: usize) -> i32 {
+    let mut cap = i32::from(p_va[i].c_init_free_valences);
+    if p_va[i].c_cn_list_index > 0 {
+        let cn = &CN_LIST[p_va[i].c_cn_list_index as usize - 1].p_cn;
+        cap += i32::from(cn[0].v.cap) - i32::from(cn[0].v.flow);
+    }
+    let mut excess = 0;
+    let a = &at[i];
+    let mut j = 0;
+    while j < MAX_NUM_STEREO_BONDS && a.sb_parity[j] != 0 {
+        let k = a.sb_ord[j] as usize;
+        if i32::from(a.bond_type[k]) < BOND_TYPE_TRIPLE {
+            excess += i32::from(a.bond_type[k]) - BOND_TYPE_SINGLE;
+        }
+        j += 1;
+    }
+    let bonds_valence = (i32::from(a.chem_bonds_valence) - i32::from(a.valence)) - excess;
+    if bonds_valence >= 0 {
+        cap + bonds_valence
+    } else {
+        RI_ERR_PROGR
+    }
+}
+
+/// `BondFlowMaxcapMinorder`: returns the initial flow; `(maxcap, minorder,
+/// needs_flower)` go to the tuple
+pub fn bond_flow_maxcap_minorder(
+    atom: &[InpAtom],
+    p_va: &[ValAt],
+    srm: &Srm,
+    iat: usize,
+    ineigh: usize,
+) -> (i32, i32, i32, bool) {
+    let at = &atom[iat];
+    let neigh = at.neighbor[ineigh] as usize;
+    let mut bond_type = i32::from(at.bond_type[ineigh]) & BOND_TYPE_MASK;
+    let n_metal = i32::from(p_va[iat].c_metal != 0) + i32::from(p_va[neigh].c_metal != 0);
+    let n_endpoint = i32::from(at.endpoint != 0) + i32::from(atom[neigh].endpoint != 0);
+    let n_stereo = i32::from(at.p_parity != 0 || at.sb_parity[0] != 0)
+        + i32::from(atom[neigh].p_parity != 0 || atom[neigh].sb_parity[0] != 0);
+    if bond_type > BOND_TYPE_TRIPLE {
+        bond_type = BOND_TYPE_SINGLE;
+    }
+    let (min_order, mut flow, mut needs_flower);
+    needs_flower = false;
+    if (n_stereo != 0 && srm.b_fix_stereo_bonds != 0) || n_metal == 0 || srm.b_metal_add_flower == 0
+    {
+        min_order = BOND_TYPE_SINGLE;
+        flow = bond_type - min_order;
+    } else if n_metal != 0 && n_endpoint == 0 {
+        min_order = srm.n_metal_min_bond_order;
+        let init = srm.n_metal_init_bond_order + bond_type - BOND_TYPE_SINGLE;
+        flow = init - min_order;
+        if srm.n_metal_init_edge_flow == 0
+            && srm.n_metal_init_bond_order > srm.n_metal_min_bond_order
+            && flow > 0
+        {
+            flow -= 1;
+        }
+        needs_flower = p_va[iat].c_metal != 0;
+    } else {
+        min_order = srm.n_metal2_endpoint_min_bond_order;
+        let init = srm.n_metal2_endpoint_init_bond_order + bond_type - BOND_TYPE_SINGLE;
+        flow = init - min_order;
+        if srm.n_metal2_endpoint_init_edge_flow == 0
+            && srm.n_metal2_endpoint_init_bond_order > srm.n_metal2_endpoint_min_bond_order
+            && flow > 0
+        {
+            flow -= 1;
+        }
+        needs_flower = if (p_va[iat].c_metal != 0
+            && at.endpoint == 0
+            && p_va[neigh].c_metal == 0
+            && atom[neigh].endpoint != 0)
+            || (p_va[neigh].c_metal != 0
+                && atom[neigh].endpoint == 0
+                && p_va[iat].c_metal == 0
+                && at.endpoint != 0)
+        {
+            p_va[iat].c_metal != 0
+        } else {
+            p_va[iat].c_metal != 0 && at.endpoint == 0
+        };
+    }
+    (flow, BOND_TYPE_TRIPLE - min_order, min_order, needs_flower)
+}
+
+/// `AtomStcapStflow`: `(num_flowers, stcap, stflow, mgroup_edge_cap,
+/// mgroup_edge_flow)`
+pub fn atom_stcap_stflow(
+    atom: &[InpAtom],
+    p_va: &[ValAt],
+    srm: &Srm,
+    iat: usize,
+) -> (i32, i32, i32, i32, i32) {
+    let mut stflow = 0;
+    let mut stcap = i32::from(atom[iat].chem_bonds_valence);
+    let (mut mcap, mut mflow, mut needs) = (0, 0, 0);
+    if srm.b_metal_add_flower != 0 {
+        stcap -= i32::from(p_va[iat].c_init_orig_valence_to_metal)
+            - i32::from(p_va[iat].c_init_valence_to_metal);
+    }
+    for ineigh in 0..atom[iat].valence as usize {
+        let (flow, _maxcap, minorder, flower) =
+            bond_flow_maxcap_minorder(atom, p_va, srm, iat, ineigh);
+        stflow += flow;
+        stcap -= minorder;
+        if flower {
+            needs += 1;
+            mflow += flow;
+            mcap += BOND_TYPE_TRIPLE - minorder + srm.n_metal_max_charge_d;
+        }
+    }
+    (
+        needs,
+        if needs != 0 { stflow } else { stcap },
+        stflow,
+        mcap,
+        mcap - mflow,
+    )
+}
+
+/// `comp_cc_cand` (with its unfinished "more valence electrons" branch)
+pub fn comp_cc_cand(p1: &CcCand, p2: &CcCand) -> i32 {
+    let d = |a: i32, b: i32| a - b;
+    let mut ret = d(i32::from(p2.c_metal), i32::from(p1.c_metal));
+    if ret != 0 {
+        return ret;
+    }
+    ret = d(
+        i32::from(p2.c_num_bonds_to_metal),
+        i32::from(p1.c_num_bonds_to_metal),
+    );
+    if ret != 0 {
+        return ret;
+    }
+    ret = d(
+        i32::from(p2.c_periodic_row_number),
+        i32::from(p1.c_periodic_row_number),
+    );
+    if ret != 0 {
+        return ret;
+    }
+    ret = d(i32::from(p2.num_bonds), i32::from(p1.num_bonds));
+    if ret != 0 {
+        return ret;
+    }
+    ret = d(i32::from(p1.chem_valence), i32::from(p2.chem_valence));
+    if ret != 0 {
+        return ret;
+    }
+    if p1.c_num_valence_electrons == 0 && p2.c_num_valence_electrons != 0 {
+        return -1;
+    }
+    if p2.c_num_valence_electrons == 0 && p1.c_num_valence_electrons != 0 {
+        return -1;
+    }
+    if p2.c_num_valence_electrons != p1.c_num_valence_electrons {
+        return ret; // sic: ret is 0 here
+    }
+    d(i32::from(p2.iat), i32::from(p1.iat))
+}
+
+pub const EL_TYPE_O: i32 = 0x0001;
+pub const EL_TYPE_S: i32 = 0x0002;
+pub const EL_TYPE_N: i32 = 0x0004;
+pub const EL_TYPE_P: i32 = 0x0008;
+pub const EL_TYPE_C: i32 = 0x0010;
+pub const EL_TYPE_X: i32 = 0x0020;
+pub const EL_TYPE_MASK: i32 = 0x003f;
+pub const EL_TYPE_OST: i32 = 0x0100;
+pub const EL_TYPE_PT: i32 = 0x0200;
+
+/// `get_pVA_atom_type`
+pub fn get_pva_atom_type(p_va: &[ValAt], at: &[InpAtom], iat: usize, bond_type: i32) -> i32 {
+    let mut ty = 0;
+    let v = &p_va[iat];
+    match v.c_num_valence_electrons {
+        4 => {
+            if v.c_periodic_row_number == 1 {
+                ty |= EL_TYPE_C;
+            }
+        }
+        6 => {
+            if v.c_periodic_row_number == 1 {
+                ty |= EL_TYPE_O;
+            } else if v.c_periodic_row_number < 5 {
+                ty |= EL_TYPE_S;
+            }
+            if bond_type == BOND_TYPE_SINGLE
+                && ty & (EL_TYPE_O | EL_TYPE_S) != 0
+                && n_no_metal_bonds_valence(at, iat) == 1
+                && n_no_metal_num_bonds(at, iat) == 1
+            {
+                ty |= EL_TYPE_OST;
+            }
+        }
+        5 => {
+            ty |= if v.c_periodic_row_number == 1 {
+                EL_TYPE_N
+            } else {
+                EL_TYPE_P
+            };
+        }
+        _ => {
+            if !is_el_a_metal(i32::from(v.c_periodic_number)) {
+                ty |= EL_TYPE_X;
+            }
+        }
+    }
+    let val = get_endpoint_valence(at[iat].el_number);
+    let a = &at[iat];
+    if val != 0
+        && val > i32::from(a.valence)
+        && a.radical == 0
+        && (-1..=0).contains(&a.charge)
+        && val == i32::from(a.chem_bonds_valence) - i32::from(a.charge) + i32::from(a.num_h)
+    {
+        ty |= EL_TYPE_PT;
+    }
+    ty
+}
+
+/// `EDGE_LIST`
+#[derive(Debug, Clone, Default)]
+pub struct EdgeList {
+    pub num_alloc: i32,
+    pub num_edges: i32,
+    pub pn_edges: Vec<i32>,
+}
+
+pub const EDGE_LIST_CLEAR: i32 = -1;
+pub const EDGE_LIST_FREE: i32 = -2;
+
+/// `AllocEdgeList`
+pub fn alloc_edge_list(e: &mut EdgeList, len: i32) -> i32 {
+    match len {
+        EDGE_LIST_FREE | EDGE_LIST_CLEAR => *e = EdgeList::default(),
+        _ => {
+            if len > 0 && len != e.num_alloc {
+                let keep = e.num_edges.min(len);
+                let mut v = vec![0; len as usize];
+                if keep > 0 {
+                    v[..keep as usize].copy_from_slice(&e.pn_edges[..keep as usize]);
+                    e.num_edges = keep;
+                } else {
+                    e.num_edges = 0;
+                }
+                e.pn_edges = v;
+                e.num_alloc = len;
+            }
+        }
+    }
+    0
+}
+
+/// `AddToEdgeList`
+pub fn add_to_edge_list(e: &mut EdgeList, iedge: i32, add_len: i32) -> i32 {
+    if e.num_alloc == e.num_edges {
+        if add_len <= 0 {
+            return RI_ERR_PROGR;
+        }
+        let ret = alloc_edge_list(e, e.num_alloc + add_len);
+        if ret != 0 {
+            return ret;
+        }
+    }
+    e.pn_edges[e.num_edges as usize] = iedge;
+    e.num_edges += 1;
+    0
+}
+
+/// `RemoveFromEdgeListByIndex`
+pub fn remove_from_edge_list_by_index(e: &mut EdgeList, index: i32) -> i32 {
+    let len = e.num_edges - index - 1;
+    if len >= 0 {
+        let i = index as usize;
+        e.pn_edges.copy_within(i + 1..i + 1 + len as usize, i);
+        e.num_edges -= 1;
+        e.pn_edges[e.num_edges as usize] = 0;
+        0
+    } else {
+        -1
+    }
+}
+
+/// `FindInEdgeList`
+pub fn find_in_edge_list(e: &EdgeList, iedge: i32) -> i32 {
+    (0..e.num_edges)
+        .rev()
+        .find(|&i| e.pn_edges[i as usize] == iedge)
+        .unwrap_or(-1)
+}
+
+/// `RemoveFromEdgeListByValue`
+pub fn remove_from_edge_list_by_value(e: &mut EdgeList, iedge: i32) -> i32 {
+    let mut n = 0;
+    for i in (0..e.num_edges).rev() {
+        if e.pn_edges[i as usize] == iedge {
+            let ret = remove_from_edge_list_by_index(e, i);
+            if ret != 0 {
+                return ret;
+            }
+            n += 1;
+        }
+    }
+    n
 }

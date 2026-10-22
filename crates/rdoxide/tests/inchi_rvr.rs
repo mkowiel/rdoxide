@@ -232,3 +232,154 @@ fn atom_restore_info_and_tgroups_match_c() {
         assert_eq!(got, want, "case {ci}: {inp}");
     }
 }
+
+#[test]
+fn restoration_helpers_match_c() {
+    let data: serde_json::Value =
+        serde_json::from_str(include_str!("../../../tests/data/inchi_rvr1b.json")).unwrap();
+    for (ci, c) in data.as_array().unwrap().iter().enumerate() {
+        let inp = c["in"].as_str().unwrap();
+        let t: Vec<i32> = inp.split_whitespace().map(|x| x.parse().unwrap()).collect();
+        let want: Vec<&str> = c["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        let mut got: Vec<String> = Vec::new();
+        let mut k = 1;
+        let mut next = || {
+            k += 1;
+            t[k - 1]
+        };
+        match t[0] {
+            30 => {
+                let s = Srm {
+                    b_metal_add_flower: next(),
+                    n_metal_min_bond_order: next(),
+                    n_metal_init_edge_flow: next(),
+                    n_metal_init_bond_order: next(),
+                    n_metal2_endpoint_min_bond_order: next(),
+                    n_metal2_endpoint_init_bond_order: next(),
+                    n_metal2_endpoint_init_edge_flow: next(),
+                    n_metal_max_charge_d: next(),
+                    b_fix_stereo_bonds: next(),
+                    ..Default::default()
+                };
+                let n = next() as usize;
+                let mut at = vec![InpAtom::default(); n + 1];
+                let mut va = vec![ValAt::default(); n + 1];
+                for i in 0..n {
+                    at[i].el_number = next() as u8;
+                    at[i].num_h = next() as i8;
+                    at[i].chem_bonds_valence = next() as i8;
+                    at[i].endpoint = next() as u16;
+                    at[i].charge = next() as i8;
+                    at[i].radical = next() as i8;
+                    at[i].p_parity = next() as i8;
+                    let nsb = next() as usize;
+                    for q in 0..nsb {
+                        at[i].sb_parity[q] = next() as i8;
+                        at[i].sb_ord[q] = next() as i8;
+                    }
+                    let nb = next() as usize;
+                    at[i].valence = nb as i8;
+                    for q in 0..nb {
+                        at[i].neighbor[q] = next() as u16;
+                        at[i].bond_type[q] = next() as u8;
+                    }
+                    va[i].c_metal = next() as i8;
+                    va[i].c_init_valence_to_metal = next() as i8;
+                    va[i].c_init_orig_valence_to_metal = next() as i8;
+                    va[i].c_init_free_valences = next() as i8;
+                    va[i].c_cn_list_index = next() as i8;
+                    va[i].c_num_valence_electrons = next() as i8;
+                    va[i].c_periodic_row_number = next() as i8;
+                    va[i].c_periodic_number = next() as u8;
+                }
+                for i in 0..n {
+                    for q in 0..at[i].valence as usize {
+                        let (fl, mc, mo, nf) = bond_flow_maxcap_minorder(&at, &va, &s, i, q);
+                        got.push(format!("B{i}.{q} {fl} {mc} {mo} {}", i32::from(nf)));
+                    }
+                    let (r, stcap, stflow, mcap, mflow) = atom_stcap_stflow(&at, &va, &s, i);
+                    got.push(format!("S{i} {r} {stcap} {stflow} {mcap} {mflow}"));
+                    got.push(format!("T{i} {}", n_taut_endpoint_edge_cap(&at, &va, i)));
+                    got.push(format!(
+                        "P{i} {} {} {}",
+                        get_pva_atom_type(&va, &at, i, 1),
+                        get_pva_atom_type(&va, &at, i, 2),
+                        get_pva_atom_type(&va, &at, i, 0)
+                    ));
+                }
+            }
+            31 => {
+                let n = next() as usize;
+                let mut cc = Vec::new();
+                for _ in 0..n {
+                    cc.push(CcCand {
+                        iat: next() as i16,
+                        num_bonds: next() as i8,
+                        chem_valence: next() as i8,
+                        c_metal: next() as i8,
+                        c_num_bonds_to_metal: next() as i8,
+                        c_num_valence_electrons: next() as i8,
+                        c_periodic_row_number: next() as i8,
+                        c_num_charge_states: 0,
+                        el_number: next() as u8,
+                    });
+                }
+                let mut s = String::new();
+                for a in &cc {
+                    for b in &cc {
+                        s.push_str(&format!("{} ", comp_cc_cand(a, b)));
+                    }
+                }
+                got.push(s);
+            }
+            32 => {
+                let mut g = AllTcGroups::default();
+                let m = next();
+                for i in 0..m {
+                    let v: Vec<i32> = (0..7).map(|_| next()).collect();
+                    let r = register_tc_group(&mut g, v[0], v[1], v[2], v[3], v[4], v[5], v[6]);
+                    got.push(format!("r{i} {r} {} {}", g.num_tc_groups, g.max_tc_groups));
+                }
+                for i in 0..g.num_tc_groups as usize {
+                    let x = &g.p_tcg[i];
+                    got.push(format!(
+                        "g{i} {} {} {} {} {} {} {}",
+                        x.type_,
+                        x.ord_num,
+                        x.num_edges,
+                        x.st_cap,
+                        x.st_flow,
+                        x.edges_cap,
+                        x.edges_flow
+                    ));
+                }
+            }
+            33 => {
+                let mut e = EdgeList::default();
+                let m = next();
+                for i in 0..m {
+                    let (op, a, b) = (next(), next(), next());
+                    let r = match op {
+                        0 => add_to_edge_list(&mut e, a, b),
+                        1 => remove_from_edge_list_by_index(&mut e, a),
+                        2 => find_in_edge_list(&e, a),
+                        3 => remove_from_edge_list_by_value(&mut e, a),
+                        _ => alloc_edge_list(&mut e, a),
+                    };
+                    let mut s = format!("o{i} {r} | {} {} |", e.num_alloc, e.num_edges);
+                    for q in 0..e.num_alloc as usize {
+                        s.push_str(&format!(" {}", e.pn_edges[q]));
+                    }
+                    got.push(s);
+                }
+            }
+            _ => unreachable!(),
+        }
+        assert_eq!(got, want, "case {ci}: {inp}");
+    }
+}
