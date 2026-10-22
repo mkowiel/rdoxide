@@ -399,6 +399,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not done. Eve
 | 283 | `Chem.PandasTools`, `Chem.PandasPatcher` copied from upstream; pandas is an optional dependency (`rdoxide[pandas]`), installed in the ratchet CI job | ✅ | upstream UnitTestPandasTools 23 run, 5 skipped (ratchet +23) |
 | 284 | Python API satisfies both RDKit wrapper flavours where their tests contradict: `rdoxide._compat` (`TupleList` returned by substructure matches and `GetAtomIndices`; exceptions deriving from both OverflowError/ValueError/RuntimeError and TypeError); ratchet runner handles pytest-style files and scripts | ✅ | ratchet +13 nbWrap tests, +testGetPropDefault, +testThreads |
 | 285 | Serialization enabled (`rdBase._serializationEnabled`): `TautomerQuery.ToBinary`/pickle/`TautomerQuery(bytes)` (own `RDXT` format, shared with `ExtendedQueryMol`), `TautomerQueryCanSerialize` is True; `SubstructLibrary`, `ExtendedQueryMol` serialization already existed | ✅ | upstream GeneralizedSubstruct 7/7, SubstructLibrary +2, TautomerQuery +1 (ratchet +10); `tests/python/test_tautomerquery.py`. Not enabled: `FilterCatalog` serialization (`FilterCatalogCanSerialize` stays False) |
+| 286 | Reactions in PNG metadata (`chem_reactions::png`: pickle, reaction SMILES/SMARTS and RXN-block tags); Python `ReactionFromPNGFile`/`String`, `ReactionMetadataToPNGFile`/`String`; `rdBase._iostreamsEnabled` is True | ✅ | upstream `testReactionWrapper.py::test_PNGMetadata` (ratchet +1); `tests/python/test_reaction_png.py` |
 
 ## InChI port (summary, audited 2026-10-22)
 
@@ -893,3 +894,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-22 — Stage 283: PandasTools (+23). Pure Python: speed report regenerated separately (PR 404).
 * 2026-10-22 — Stage 284: Compat shims for nb/boost test conflicts (+13). Not a speed change.
 * 2026-10-22 — Stage 285: serialization flag on, TautomerQuery pickles (ratchet +10). Pure Python/IO: upstream_speed.html not regenerated.
+* 2026-10-22 — Stage 286: reaction PNG metadata (ratchet +1). Not a speed change.
