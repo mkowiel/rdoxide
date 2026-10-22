@@ -1381,6 +1381,16 @@ rdkit/Chem/Fraggle/UnitTestFraggle.py::TestCase::test_select_fragments
 rdkit/Chem/Fraggle/UnitTestFraggle.py::TestCase::test_select_fragments_acyclic
 rdkit/Chem/Fraggle/UnitTestFraggle.py::TestCase::test_select_fragments_cyclic
 rdkit/Chem/Fraggle/UnitTestFraggle.py::TestCase::test_select_fragments_cyclic_acyclic
+rdkit/Chem/MolKey/UnitTestMolKey.py::TestInchiInfo::testAcetate
+rdkit/Chem/MolKey/UnitTestMolKey.py::TestInchiInfo::testAceticAcid
+rdkit/Chem/MolKey/UnitTestMolKey.py::TestInchiInfo::testDeuteratedUrea
+rdkit/Chem/MolKey/UnitTestMolKey.py::TestInchiInfo::testGuanine
+rdkit/Chem/MolKey/UnitTestMolKey.py::TestInchiInfo::testMobile1
+rdkit/Chem/MolKey/UnitTestMolKey.py::TestInchiInfo::testMobile2
+rdkit/Chem/MolKey/UnitTestMolKey.py::TestInchiInfo::testSP3_unk
+rdkit/Chem/MolKey/UnitTestMolKey.py::TestInchiInfo::testSugar1
+rdkit/Chem/MolKey/UnitTestMolKey.py::TestInchiInfo::testSugar2
+rdkit/Chem/MolKey/UnitTestMolKey.py::TestInchiInfo::testTritiatedUrea
 rdkit/Chem/MolStandardize/UnitTestMolStandardize.py::TestCase::testBasic
 rdkit/Chem/MolStandardize/UnitTestMolStandardize.py::TestCase::testLength
 rdkit/Chem/MolStandardize/UnitTestMolStandardize.py::TestCase::testNoUnassignedStereoAfterCanonicalize
