@@ -1,0 +1,188 @@
+"""Generates tests/data/inchi_rvr1b.json from the InChI C code: small
+helpers of ichirvr1.c -- `BondFlowMaxcapMinorder`, `AtomStcapStflow`,
+`nTautEndpointEdgeCap`, `get_pVA_atom_type`, `comp_cc_cand`,
+`RegisterTCGroup` and the EDGE_LIST functions.
+
+    python tools/inchi_rvr1b_reference.py
+"""
+import importlib.util
+import json
+import random
+import subprocess
+import tempfile
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def load(name, rel):
+    spec = importlib.util.spec_from_file_location(name, ROOT / rel)
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
+
+r1 = load("rvr1", "tools/inchi_rvr1_reference.py")
+r2, ma, SRC = r1.r2, r1.ma, r1.SRC
+
+MAIN = r1.PRE + r"""
+static int cmpcc(const void *a, const void *b) { return comp_cc_cand(a, b); }
+int main(void) {
+    int ncases;
+    scanf("%d", &ncases);
+    for (int cs = 0; cs < ncases; cs++) {
+        int t;
+        printf("#CASE %d\n", cs);
+        scanf("%d", &t);
+        if (t == 30) {
+            SRM s;
+            scanf("%d %d %d %d %d %d %d %d %d", &s.bMetalAddFlower, &s.nMetalMinBondOrder, &s.nMetalInitEdgeFlow, &s.nMetalInitBondOrder,
+                  &s.nMetal2EndpointMinBondOrder, &s.nMetal2EndpointInitBondOrder, &s.nMetal2EndpointInitEdgeFlow, &s.nMetalMaxCharge_D, &s.bFixStereoBonds);
+            int n; scanf("%d", &n);
+            inp_ATOM *at = calloc(n + 1, sizeof(inp_ATOM));
+            VAL_AT *va = calloc(n + 1, sizeof(VAL_AT));
+            for (int i = 0; i < n; i++) {
+                int el, nh, cbv, e, ch, rad, pp, nsb, nb, v[8];
+                scanf("%d %d %d %d %d %d %d %d", &el, &nh, &cbv, &e, &ch, &rad, &pp, &nsb);
+                at[i].el_number = el; at[i].num_H = nh; at[i].chem_bonds_valence = cbv; at[i].endpoint = e;
+                at[i].charge = ch; at[i].radical = rad; at[i].p_parity = pp;
+                for (int k = 0; k < nsb; k++) { int p, o; scanf("%d %d", &p, &o); at[i].sb_parity[k] = p; at[i].sb_ord[k] = o; }
+                scanf("%d", &nb); at[i].valence = nb;
+                for (int k = 0; k < nb; k++) { int nn, bt; scanf("%d %d", &nn, &bt); at[i].neighbor[k] = nn; at[i].bond_type[k] = bt; }
+                for (int k = 0; k < 8; k++) scanf("%d", &v[k]);
+                va[i].cMetal = v[0]; va[i].cInitValenceToMetal = v[1]; va[i].cInitOrigValenceToMetal = v[2]; va[i].cInitFreeValences = v[3];
+                va[i].cnListIndex = v[4]; va[i].cNumValenceElectrons = v[5]; va[i].cPeriodicRowNumber = v[6]; va[i].cPeriodicNumber = v[7];
+            }
+            for (int i = 0; i < n; i++) {
+                for (int k = 0; k < at[i].valence; k++) {
+                    int mc, mo, nf; int fl = BondFlowMaxcapMinorder(at, va, &s, i, k, &mc, &mo, &nf);
+                    printf("B%d.%d %d %d %d %d\n", i, k, fl, mc, mo, nf);
+                }
+                int stcap, stflow; EdgeFlow mcap, mflow;
+                int r = AtomStcapStflow(at, va, &s, i, &stcap, &stflow, &mcap, &mflow);
+                printf("S%d %d %d %d %d %d\n", i, r, stcap, stflow, mcap, mflow);
+                printf("T%d %d\n", i, nTautEndpointEdgeCap(at, va, i));
+                printf("P%d %d %d %d\n", i, get_pVA_atom_type(va, at, i, 1), get_pVA_atom_type(va, at, i, 2), get_pVA_atom_type(va, at, i, 0));
+            }
+        } else if (t == 31) {
+            int n; scanf("%d", &n);
+            CC_CAND *c = calloc(n, sizeof(CC_CAND));
+            for (int i = 0; i < n; i++) {
+                int v[8]; for (int k = 0; k < 8; k++) scanf("%d", &v[k]);
+                c[i].iat = v[0]; c[i].num_bonds = v[1]; c[i].chem_valence = v[2]; c[i].cMetal = v[3]; c[i].cNumBondsToMetal = v[4];
+                c[i].cNumValenceElectrons = v[5]; c[i].cPeriodicRowNumber = v[6]; c[i].cNumChargeStates = 0; c[i].el_number = v[7];
+            }
+            for (int i = 0; i < n; i++) for (int j = 0; j < n; j++) printf("%d ", comp_cc_cand(&c[i], &c[j]));
+            printf("\n");
+        } else if (t == 32) {
+            ALL_TC_GROUPS g; memset(&g, 0, sizeof(g));
+            int m; scanf("%d", &m);
+            for (int i = 0; i < m; i++) {
+                int v[7]; for (int k = 0; k < 7; k++) scanf("%d", &v[k]);
+                int r = RegisterTCGroup(&g, v[0], v[1], v[2], v[3], v[4], v[5], v[6]);
+                printf("r%d %d %d %d\n", i, r, g.num_tc_groups, g.max_tc_groups);
+            }
+            for (int i = 0; i < g.num_tc_groups; i++) printf("g%d %d %d %d %d %d %d %d\n", i, g.pTCG[i].type, g.pTCG[i].ord_num, g.pTCG[i].num_edges, g.pTCG[i].st_cap, g.pTCG[i].st_flow, g.pTCG[i].edges_cap, g.pTCG[i].edges_flow);
+        } else if (t == 33) {
+            EDGE_LIST e; memset(&e, 0, sizeof(e));
+            int m; scanf("%d", &m);
+            for (int i = 0; i < m; i++) {
+                int op, a, b; scanf("%d %d %d", &op, &a, &b);
+                int r = 0;
+                if (op == 0) r = AddToEdgeList(&e, a, b);
+                else if (op == 1) r = RemoveFromEdgeListByIndex(&e, a);
+                else if (op == 2) r = FindInEdgeList(&e, a);
+                else if (op == 3) r = RemoveFromEdgeListByValue(&e, a);
+                else if (op == 4) r = AllocEdgeList(&e, a);
+                printf("o%d %d | %d %d |", i, r, e.num_alloc, e.num_edges);
+                for (int k = 0; k < e.num_alloc; k++) printf(" %d", e.pnEdges[k]);
+                printf("\n");
+            }
+        }
+    }
+    return 0;
+}
+"""
+HARNESS = r2.HARNESS.split("int main(void)")[0] + MAIN
+R = random.Random(97531)
+ELS = [1, 5, 6, 6, 6, 7, 7, 8, 8, 9, 14, 15, 16, 16, 17, 34, 35, 53, 11, 12, 26, 29, 13, 3, 33, 52, 20, 30, 50, 82, 79, 92]
+
+
+def atom_case():
+    n = R.randrange(1, 6)
+    adj = [[] for _ in range(n)]
+    edges = {}
+    for i in range(1, n):
+        edges[(R.randrange(0, i), i)] = R.choice([1, 1, 2, 3, 4, 5])
+    for (i, j), b in edges.items():
+        adj[i].append((j, b))
+        adj[j].append((i, b))
+    srm = [R.choice([0, 1, 1]), R.choice([0, 1]), R.choice([0, 1]), R.choice([0, 1, 2]), R.choice([0, 1]), R.choice([0, 1, 2]),
+           R.choice([0, 1]), R.choice([0, 16]), R.choice([0, 1])]
+    parts = ["30 " + " ".join(map(str, srm)) + f" {n}"]
+    for i in range(n):
+        el = R.choice(ELS)
+        nsb = R.choice([0, 0, 1, 2]) if adj[i] else 0
+        sb = []
+        for _ in range(nsb):
+            sb += [R.choice([1, 2]), R.randrange(0, len(adj[i]))]
+        va = [R.choice([0, 0, 1]), R.choice([0, 1, 2]), R.choice([0, 1, 2, 3]), R.choice([0, 0, 1, 2]), R.choice([0, 0, 1, 3, 18]),
+              R.choice([0, 3, 4, 5, 6, 7]), R.choice([0, 1, 2, 3, 5]), el]
+        parts.append(f"{el} {R.choice([0, 1, 2])} {R.randrange(0, 5)} {R.choice([0, 0, 1])} {R.choice([-1, 0, 0, 1])} {R.choice([0, 0, 2])} "
+                     f"{R.choice([0, 0, 1])} {nsb} " + " ".join(map(str, sb)) + f" {len(adj[i])} " + " ".join(f"{j} {b}" for j, b in adj[i]) + " " + " ".join(map(str, va)))
+    return " ".join(parts)
+
+
+def cc_case():
+    n = R.randrange(1, 6)
+    return f"31 {n} " + " ".join(" ".join(str(R.choice(c)) for c in
+                                         ([0, 1, 5], [0, 1, 2, 3], [0, 1, 2, 3], [0, 1], [0, 1, 2], [0, 4, 5, 6], [0, 1, 2, 3], [6, 7, 8])) for _ in range(n))
+
+
+def tcg_case():
+    m = R.randrange(1, 40)
+    return f"32 {m} " + " ".join(" ".join(str(R.randrange(a, b)) for a, b in ((0, 4), (0, 40), (-2, 3), (-2, 3), (-2, 3), (-2, 3), (0, 3))) for _ in range(m))
+
+
+def el_case():
+    m = R.randrange(1, 25)
+    ops = []
+    for _ in range(m):
+        op = R.choice([0, 0, 0, 0, 1, 2, 3, 4])
+        a = R.randrange(0, 6) if op != 4 else R.choice([-2, -1, 0, 3, 5, 8])
+        b = R.choice([-1, 0, 1, 2, 4]) if op == 0 else 0
+        ops.append(f"{op} {a} {b}")
+    return f"33 {m} " + " ".join(ops)
+
+
+def main():
+    cases = []
+    for _ in range(15000):
+        cases += [atom_case(), cc_case(), tcg_case(), el_case()]
+    objs = ma.build_lib()
+    with tempfile.TemporaryDirectory() as d:
+        (Path(d) / "h.c").write_text(HARNESS)
+        exe = Path(d) / "h"
+        subprocess.run(["cc", "-w", "-DTARGET_API_LIB", f"-I{SRC}", "-o", str(exe), str(Path(d) / "h.c"), *objs, "-lm"], check=True)
+        kept, out = [], []
+        for c in cases:
+            try:
+                r1_ = subprocess.run([str(exe)], input=f"1\n{c}\n".encode(), capture_output=True, timeout=2)
+            except subprocess.TimeoutExpired:
+                continue
+            if r1_.returncode != 0:
+                continue
+            kept.append(c)
+            out += [f"#CASE {len(kept) - 1}"] + r1_.stdout.decode(errors="replace").split("\n")[1:]
+        print(len(cases) - len(kept), "cases dropped")
+        cases = kept
+    starts = [i for i, l in enumerate(out) if l.startswith("#CASE ")]
+    starts.append(len(out))
+    data = [{"in": c, "out": [x for x in out[a + 1:b] if x != ""]} for c, a, b in zip(cases, starts, starts[1:])]
+    path = ROOT / "tests/data/inchi_rvr1b.json"
+    path.write_text(json.dumps(data, separators=(",", ":")))
+    print(len(data), "cases ->", path)
+
+
+if __name__ == "__main__":
+    main()
