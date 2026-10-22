@@ -189,6 +189,13 @@ pub fn mol_to_inchi_input(mol: &ROMol, options: Option<&str>) -> Result<Option<I
                 }
                 nid += 1;
             }
+            if nid == 2 {
+                // C++ leaves the last two slots uninitialised; the official
+                // build accepts the descriptor (with the parity unchanged, as
+                // found by trying all placeholders against the library)
+                let (n0, n1) = (st.neighbor[0], st.neighbor[1]);
+                st.neighbor = [n0, n1, i as i16, n0];
+            }
             if nid == 3 {
                 for k in (1..=3).rev() {
                     st.neighbor[k] = st.neighbor[k - 1];
