@@ -5058,3 +5058,159 @@ pub fn remove_rad_from_mobile_h_endpoint_fix_h(
     at2.extend_from_slice(&ps.at[..len_at]);
     ret
 }
+
+/// `MoveChargeToMakeCenerpoints`: moves (+) charges to >N- and other
+/// centerpoints of two or more endpoints of one t-group
+#[allow(clippy::too_many_arguments)]
+pub fn move_charge_to_make_centerpoints(
+    bns: &mut BnStruct,
+    bd: &mut BnData,
+    ps: &mut StrFromInChI,
+    at2: &mut Vec<InpAtom>,
+    p_va: &[ValAt],
+    tcg: &AllTcGroups,
+    num_run_bns: &mut i32,
+    total_delta: &mut i32,
+    forbidden_edge_mask: i32,
+) -> i32 {
+    let num_at = ps.num_atoms as usize;
+    let mask = forbidden_edge_mask as i8;
+    let mut res = BnsTestResult::default();
+    let mut num_success = 0;
+    let r2 = refresh_at2(ps, at2, bns, p_va, tcg);
+    if r2 < 0 {
+        return r2;
+    }
+    for i in 0..num_at {
+        let va = &p_va[i];
+        let a = &at2[i];
+        if !(va.c_num_valence_electrons != 4
+            && va.c_metal == 0
+            && va.n_taut_group_edge == 0
+            && a.num_h == 0
+            && a.valence >= 3
+            && i32::from(a.valence) == i32::from(a.chem_bonds_valence)
+            && a.charge == 0
+            && va.n_c_plus_group_edge > 0
+            && is_centerpoint_elem(a.el_number))
+        {
+            continue;
+        }
+        let mut tg_group = 0;
+        let mut num_endpoints = 0;
+        let mut j = 0;
+        while j < a.valence as usize {
+            let neigh = a.neighbor[j] as usize;
+            if at2[neigh].endpoint != 0 {
+                if num_endpoints == 0 {
+                    tg_group = at2[neigh].endpoint;
+                } else if tg_group != at2[neigh].endpoint {
+                    break;
+                }
+                num_endpoints += 1;
+            }
+            j += 1;
+        }
+        if !(j == a.valence as usize && num_endpoints > 1) {
+            continue;
+        }
+        let plus = (va.n_c_plus_group_edge - 1) as usize;
+        let minus: Option<usize> =
+            (va.n_c_minus_group_edge > 0).then(|| (va.n_c_minus_group_edge - 1) as usize);
+        let minus_flow = minus.map_or(0, |m| bns.edge[m].flow);
+        if bns.edge[plus].flow + minus_flow != 1 {
+            continue;
+        }
+        let v1p = bns.edge[plus].neighbor1 as usize;
+        let v2p = (bns.edge[plus].neighbor12 as usize) ^ v1p;
+        let mut ret = 0;
+        let delta = bns.edge[plus].flow;
+        if delta != 0 {
+            bns.edge[plus].flow -= delta;
+            bns.vert[v1p].st_edge.flow -= delta;
+            bns.vert[v2p].st_edge.flow -= delta;
+            bns.tot_st_flow -= 2 * delta;
+            bns.edge[plus].forbidden |= mask;
+            if let Some(m) = minus {
+                bns.edge[m].forbidden |= mask;
+            }
+            ret = run_bns_test_once(bns, bd, p_va, &mut res);
+            if ret < 0 {
+                return ret;
+            }
+            let (a1, a2v) = (v1p as i32, v2p as i32);
+            if ret == 1
+                && ((res.v_last == a1 && res.v_first == a2v)
+                    || (res.v_last == a2v && res.v_first == a1))
+                && res.delta_charge == -1
+            {
+                ret = run_bns_restore_once(bns, bd);
+                *num_run_bns += 1;
+                if ret < 0 {
+                    return ret;
+                } else if ret == 1 {
+                    *total_delta += ret;
+                } else {
+                    return RI_ERR_PROGR;
+                }
+            } else {
+                ret = 0;
+                bns.edge[plus].flow += delta;
+                bns.vert[v1p].st_edge.flow += delta;
+                bns.vert[v2p].st_edge.flow += delta;
+                bns.tot_st_flow += 2 * delta;
+            }
+            bns.edge[plus].forbidden &= !mask;
+            if let Some(m) = minus {
+                bns.edge[m].forbidden &= !mask;
+            }
+        } else if let Some(m) =
+            minus.filter(|&m| delta == bns.edge[m].flow && bns.edge[plus].flow == 0)
+        {
+            let v1m = bns.edge[m].neighbor1 as usize;
+            let v2m = (bns.edge[m].neighbor12 as usize) ^ v1m;
+            bns.edge[m].flow -= delta;
+            bns.vert[v1m].st_edge.flow -= delta;
+            bns.vert[v2m].st_edge.flow -= delta;
+            bns.tot_st_flow -= 2 * delta;
+            bns.edge[plus].forbidden |= mask;
+            bns.edge[m].forbidden |= mask;
+            ret = run_bns_test_once(bns, bd, p_va, &mut res);
+            if ret < 0 {
+                return ret;
+            }
+            let (a1, a2v) = (v1m as i32, v2m as i32);
+            if ret == 1
+                && ((res.v_last == a1 && res.v_first == a2v)
+                    || (res.v_last == a2v && res.v_first == a1))
+                && res.delta_charge == -1
+            {
+                ret = run_bns_restore_once(bns, bd);
+                *num_run_bns += 1;
+                if ret < 0 {
+                    return ret;
+                } else if ret == 1 {
+                    *total_delta += ret;
+                } else {
+                    return RI_ERR_PROGR;
+                }
+            } else {
+                ret = 0;
+                bns.edge[m].flow += delta;
+                bns.vert[v1m].st_edge.flow += delta;
+                bns.vert[v2m].st_edge.flow += delta;
+                bns.tot_st_flow += 2 * delta;
+            }
+            bns.edge[plus].forbidden &= !mask;
+            bns.edge[m].forbidden &= !mask;
+        }
+        if ret != 0 {
+            num_success += 1;
+            let r2 = refresh_at2(ps, at2, bns, p_va, tcg);
+            if r2 < 0 {
+                return r2;
+            }
+        }
+    }
+    num_success
+}
