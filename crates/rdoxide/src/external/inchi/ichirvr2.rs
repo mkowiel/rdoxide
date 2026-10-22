@@ -93,6 +93,16 @@ pub struct StrFromInChI {
     pub fixed_h: Option<Vec<i8>>,
     /// `endpoint`: the endpoints of the original Fixed-H InChI
     pub endpoint: Option<Vec<u16>>,
+    /// `One_ti`: t-groups of the normalized canonicalized restored structure
+    pub one_ti: TGroupInfo,
+    /// `pOneINChI`: InChI of the restored structure ([0] Fixed-H or the only one)
+    pub p_one_inchi: [Option<InChI>; 2],
+    /// `pOne_norm_data`: normalized restored structure
+    pub p_one_norm_data: [Option<super::ichimake::InpAtomData>; 2],
+    /// `nAtno2Canon`
+    pub n_atno2canon: [Vec<u16>; 2],
+    /// `nCanon2Atno`
+    pub n_canon2atno: [Vec<u16>; 2],
     /// `pbfsq`: work arrays of the ring search
     pub pbfsq: BfsQ,
 }
