@@ -5,10 +5,13 @@
 //! searches, and the query cannot be serialized (upstream needs
 //! boost::serialization for that).
 
-use pyo3::exceptions::{PyRuntimeError, PyTypeError};
+use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyTuple};
 use rdoxide::graphmol::ROMol;
+use rdoxide::graphmol::generalized_substruct::{
+    tautomer_query_from_binary, tautomer_query_to_binary,
+};
 use rdoxide::graphmol::substruct::{MatchVect, SubstructMatchParameters};
 use rdoxide::graphmol::tautomer_query::TautomerQuery;
 
@@ -16,8 +19,6 @@ use crate::datastructs::PyExplicitBitVect;
 use crate::errors::IntoPyResult;
 use crate::mol::PyMol;
 use crate::substruct::PySubstructMatchParameters;
-
-const NO_SERIALIZATION: &str = "Boost SERIALIZATION is not enabled";
 
 /// The tautomer query class: a query that matches all the tautomeric forms
 /// of a molecule.
@@ -101,8 +102,10 @@ impl PyTautomerQuery {
     #[pyo3(signature = (mol, tautomerTransformFile = None))]
     #[allow(non_snake_case)]
     fn py_new(mol: &Bound<'_, PyAny>, tautomerTransformFile: Option<&str>) -> PyResult<Self> {
-        if mol.extract::<String>().is_ok() || mol.cast::<pyo3::types::PyBytes>().is_ok() {
-            return Err(PyRuntimeError::new_err(NO_SERIALIZATION));
+        if let Ok(pkl) = mol.cast::<pyo3::types::PyBytes>() {
+            return Ok(PyTautomerQuery {
+                query: tautomer_query_from_binary(pkl.as_bytes()).py()?,
+            });
         }
         let mol = mol.cast::<PyMol>()?.borrow();
         Ok(PyTautomerQuery {
@@ -240,16 +243,18 @@ impl PyTautomerQuery {
         PyTuple::new(py, items)
     }
 
-    /// Serialization needs boost::serialization, which rdoxide does not have.
+    /// Returns the binary form (a pickle) of the TautomerQuery.
     #[pyo3(name = "ToBinary")]
-    fn to_binary(&self) -> PyResult<()> {
-        Err(PyRuntimeError::new_err(NO_SERIALIZATION))
+    fn to_binary<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, pyo3::types::PyBytes>> {
+        let data = py.detach(|| tautomer_query_to_binary(&self.query)).py()?;
+        Ok(pyo3::types::PyBytes::new(py, &data))
     }
 
-    fn __reduce__(&self) -> PyResult<()> {
-        Err(PyRuntimeError::new_err(
-            "Pickling of TautomerQuery instances is not enabled",
-        ))
+    /// `(type(self), (self.ToBinary(),))`
+    fn __reduce__<'py>(slf: &Bound<'py, Self>) -> PyResult<Bound<'py, PyTuple>> {
+        let py = slf.py();
+        let args = PyTuple::new(py, [slf.call_method0("ToBinary")?])?;
+        PyTuple::new(py, [slf.get_type().into_any(), args.into_any()])
     }
 }
 
@@ -299,7 +304,7 @@ fn pattern_fingerprint_tautomer_target(
 #[pyfunction]
 #[pyo3(name = "TautomerQueryCanSerialize")]
 fn tautomer_query_can_serialize() -> bool {
-    false
+    true
 }
 
 pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
