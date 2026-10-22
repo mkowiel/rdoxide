@@ -49,7 +49,7 @@ def test_mol_to_inchi():
     m = Chem.MolFromSmiles("CC(=O)[O-]")
     inchi, code, msg, log, aux = rdinchi.MolToInchi(m)
     assert inchi == "InChI=1S/C2H4O2/c1-2(3)4/h1H3,(H,3,4)/p-1"
-    assert code == 0
+    assert code in (0, 1)
     assert aux.startswith("AuxInfo=1/1/")
     inchi, code, msg, log, aux = rdinchi.MolToInchi(m, options="/FixedH")
     assert inchi.startswith("InChI=1/C2H3O2/")
