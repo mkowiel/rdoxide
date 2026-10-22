@@ -346,6 +346,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 230 | InChI port I10c: ichiread ParseSegmentConnections (plain and compressed), differential-tested vs the C library |
 | 231 | InChI port I10d: ichiread ParseSegmentMobileH with tautomeric groups, differential-tested vs the C library |
 | 232 | InChI port I10e: ichiread stereo layers (ParseSegmentSp2/Sp3/Sp3m/Sp3s) and CopySegment, differential-tested vs the C library |
+| 233 | InChI port I10f: ichiread ParseSegmentIsoAtoms/IsoExchgH/Perm, differential-tested vs the C library |
 
 ## Python package files
 
@@ -760,3 +761,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-22 — Stage 230: I10c ichiread: connection layer differential-tested against C
 * 2026-10-22 — Stage 231: I10d ichiread: hydrogen layer differential-tested against C
 * 2026-10-22 — Stage 232: I10e ichiread: stereo layers differential-tested against C (29686 cases)
+* 2026-10-22 — Stage 233: I10f ichiread: isotopic, exchangeable-H and permutation layers differential-tested against C (29682 cases)

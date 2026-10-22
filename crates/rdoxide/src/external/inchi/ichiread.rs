@@ -2133,7 +2133,9 @@ pub fn copy_segment(
             }
         }
     } else if segment_type == CPY_ISO_AT {
-        let f = from.unwrap();
+        let Some(f) = from else {
+            return RI_ERR_SYNTAX;
+        };
         if b_isotopic_from < 0 || !f.isotopic_atom.is_empty() {
             let len = if b_isotopic_from < 0 {
                 0
@@ -2982,4 +2984,391 @@ pub fn parse_segment_sp2(
         return RI_ERR_SYNTAX;
     }
     i_comp + 1
+}
+
+/// `ParseSegmentIsoExchgH`: the `/i/h` layer (isotopic exchangeable H)
+pub fn parse_segment_iso_exchg_h(
+    s: &[u8],
+    b_mobile_h: usize,
+    n_num_protons: &mut [RemProtons],
+    state: i32,
+    pb_abc: &mut i32,
+) -> i32 {
+    const ABC_H: &[u8] = b"hdt";
+    if at(s, 0) != b'h' {
+        return 0;
+    }
+    let p_start = 1usize;
+    if !(b_mobile_h == TAUT_YES && state == IST_MOBILE_H_ISO_EXCH_H) {
+        return RI_ERR_PROGR;
+    }
+    if strchr(s, p_start, b';').is_some() {
+        return RI_ERR_SYNTAX;
+    }
+    let p_end = p_start + strlen(s, p_start);
+    let mut p = p_start;
+    if p < p_end && *pb_abc == -1 {
+        *pb_abc = i32::from(is_digit(at(s, p)));
+    }
+    if *pb_abc == 1 {
+        let mut i_prev = ABC_H.len() as i32 + 1;
+        while p < p_end {
+            let (v, q) = strtol(s, p);
+            let num = v as i32;
+            if !(0..=MAX_ATOMS).contains(&num) {
+                return RI_ERR_SYNTAX;
+            }
+            if 0 >= num || p == q || q >= p_end {
+                return RI_ERR_SYNTAX;
+            }
+            match ABC_H.iter().position(|&c| c == at(s, q)).map(|i| i as i32) {
+                Some(i) if i < i_prev && i < 3 => {
+                    n_num_protons[b_mobile_h].n_num_removed_isotopic_h[i as usize] = num as i16;
+                    p = q + 1;
+                    i_prev = i;
+                }
+                _ => return RI_ERR_SYNTAX,
+            }
+        }
+    } else {
+        for (c, idx) in [(b'T', 2usize), (b'D', 1), (b'H', 0)] {
+            if at(s, p) == c {
+                n_num_protons[b_mobile_h].n_num_removed_isotopic_h[idx] = 1;
+                p += 1;
+                if is_digit(at(s, p)) {
+                    let (v, q) = strtol(s, p);
+                    n_num_protons[b_mobile_h].n_num_removed_isotopic_h[idx] = v as i16;
+                    p = q;
+                }
+            }
+        }
+    }
+    if p != p_end {
+        return RI_ERR_SYNTAX;
+    }
+    1
+}
+
+/// `ParseSegmentPerm`: the `/o` layer (the transposition of the fixed-H
+/// components)
+pub fn parse_segment_perm(
+    s: &[u8],
+    b_mobile_h: usize,
+    p_inp_inchi: &mut [Vec<InChI>; 2],
+    ppn_num_components: [i32; 2],
+    state: i32,
+    pb_abc: &mut i32,
+) -> i32 {
+    if at(s, 0) != b'o' {
+        return 0;
+    }
+    if p_inp_inchi[b_mobile_h].is_empty() {
+        return RI_ERR_ALLOC;
+    }
+    let mut p_start = 1usize;
+    let n_num = ppn_num_components[b_mobile_h];
+    if !(b_mobile_h == TAUT_NON
+        && (state == IST_FIXED_H_PERMUTATION || state == IST_FIXED_H_ISO_PERMUTATION))
+    {
+        return RI_ERR_PROGR;
+    }
+    if strchr(s, p_start, b';').is_some() {
+        return RI_ERR_SYNTAX;
+    }
+    let p_end = p_start + strlen(s, p_start);
+    let v = &mut p_inp_inchi[b_mobile_h];
+    while p_start < p_end {
+        if at(s, p_start) != b'(' {
+            return RI_ERR_SYNTAX;
+        }
+        let p_perm_start = p_start + 1;
+        let mut tmp = InChI::default();
+        let p_perm_end = match strchr(s, p_perm_start, b')') {
+            Some(e) if e != p_perm_start => e,
+            _ => return RI_ERR_SYNTAX,
+        };
+        if p_perm_start < p_perm_end && *pb_abc == -1 {
+            *pb_abc = i32::from(upper(s, p_perm_start));
+        }
+        let base = if *pb_abc == 1 { ALPHA_BASE } else { 10 };
+        let mut p = p_perm_start;
+        let (mut i_comp2, mut num_trans) = (0i32, 0);
+        while p < p_perm_end {
+            let (q, i_comp1);
+            if *pb_abc == 1 {
+                let (val, e) = inchi_strtol(s, p, base);
+                q = e;
+                i_comp1 = val as i32;
+                if 0 >= i_comp1 || i_comp1 > n_num {
+                    return RI_ERR_SYNTAX;
+                }
+            } else {
+                if !is_digit(at(s, p)) {
+                    return RI_ERR_SYNTAX;
+                }
+                let (val, e) = strtol(s, p);
+                q = e;
+                i_comp1 = val as i32;
+                if i_comp1 < 1 || i_comp1 > n_num {
+                    return RI_ERR_SYNTAX;
+                }
+            }
+            if i_comp2 != 0 {
+                v[(i_comp2 - 1) as usize] = v[(i_comp1 - 1) as usize].clone();
+                num_trans += 1;
+            } else {
+                tmp = v[(i_comp1 - 1) as usize].clone();
+            }
+            i_comp2 = i_comp1;
+            p = if *pb_abc == 1 {
+                q
+            } else {
+                q + usize::from(at(s, q) == b',')
+            };
+        }
+        v[(i_comp2 - 1) as usize] = tmp;
+        if num_trans == 0 || p != p_perm_end {
+            return RI_ERR_SYNTAX;
+        }
+        p_start = p + 1;
+    }
+    1
+}
+
+/// `ParseSegmentIsoAtoms`: the `/i` layer (isotopic atoms)
+pub fn parse_segment_iso_atoms(
+    s: &[u8],
+    b_mobile_h: usize,
+    p_inp_inchi: &mut [Vec<InChI>; 2],
+    ppn_num_components: [i32; 2],
+    state: i32,
+    pb_abc: &mut i32,
+) -> i32 {
+    const PARITY: &[u8] = b"-+TDH";
+    if at(s, 0) != b'i' {
+        return 0;
+    }
+    let mut p_start = 1usize;
+    let mut i_comp = 0i32;
+    let n_num = ppn_num_components[b_mobile_h];
+    if !((b_mobile_h == TAUT_YES && state == IST_MOBILE_H_ISO_ATOMS)
+        || (b_mobile_h == TAUT_NON && state == IST_FIXED_H_ISO_ATOMS))
+    {
+        return RI_ERR_PROGR;
+    }
+    if at(s, p_start) == 0 {
+        return n_num + 1;
+    }
+    loop {
+        let p_end = strchr(s, p_start, b';').unwrap_or(p_start + strlen(s, p_start));
+        let mut p: usize;
+        let mpy_component: i32;
+        if let Some(star) = strchr(s, p_start, b'*').filter(|&x| x < p_end) {
+            let (v, q) = strtol(s, p_start);
+            mpy_component = v as i32;
+            if star != q {
+                return RI_ERR_SYNTAX;
+            }
+            if i_comp.wrapping_add(mpy_component) > n_num {
+                return RI_ERR_SYNTAX;
+            }
+            p = star + 1;
+        } else {
+            let (val, q, if_cnd) = leading_count(s, p_start);
+            if if_cnd && strchr_set(MULT_TYPE, at(s, q)).is_some() && q + 1 == p_end {
+                if i_comp.wrapping_add(val) > n_num {
+                    return RI_ERR_SYNTAX;
+                }
+                let (from, iso_from) = match (b_mobile_h, at(s, q)) {
+                    (TAUT_YES, _) => return RI_ERR_SYNTAX,
+                    (_, b'm') => (1 - b_mobile_h, 0),
+                    (_, b'e') => (b_mobile_h, -1),
+                    _ => return RI_ERR_SYNTAX,
+                };
+                for i in 0..val {
+                    let idx = i_comp.wrapping_add(i);
+                    if idx > n_num || idx < 0 {
+                        return RI_ERR_SYNTAX;
+                    }
+                    let src = p_inp_inchi[from].get(idx as usize).cloned();
+                    let Some(t) = p_inp_inchi[b_mobile_h].get_mut(idx as usize) else {
+                        return RI_ERR_SYNTAX;
+                    };
+                    let mut r = copy_segment(t, src.as_ref(), CPY_ISO_AT, 0, iso_from);
+                    if r == 0 {
+                        r = RI_ERR_SYNTAX;
+                    }
+                    if r < 0 {
+                        return r;
+                    }
+                }
+                i_comp = i_comp.wrapping_add(val);
+                if at(s, p_end) != 0 {
+                    p_start = p_end + 1;
+                    continue;
+                }
+                break;
+            }
+            mpy_component = 1;
+            p = p_start;
+        }
+        if i_comp > n_num - 1 || i_comp < 0 {
+            return RI_ERR_SYNTAX;
+        }
+        let n_atoms = p_inp_inchi[b_mobile_h]
+            .get(i_comp as usize)
+            .map_or(0, |c| c.n_number_of_atoms);
+        if n_atoms <= 0 || n_atoms > MAX_ATOMS {
+            return RI_ERR_SYNTAX;
+        }
+        p_start = p;
+        if !p_inp_inchi[b_mobile_h][i_comp as usize]
+            .isotopic_atom
+            .is_empty()
+        {
+            return RI_ERR_PROGR;
+        }
+        if p < p_end && *pb_abc == -1 {
+            *pb_abc = i32::from(upper(s, p));
+        }
+        let base = if *pb_abc == 1 { ALPHA_BASE } else { 10 };
+        // the 1st pass finds the number of atoms, the 2nd one stores them
+        let mut len = 0usize;
+        let mut allocated = false;
+        loop {
+            let mut atoms: Vec<InChIIsotopicAtom> = Vec::new();
+            let mut i_atom = 0usize;
+            p = p_start;
+            while p < p_end {
+                let mut iso = InChIIsotopicAtom::default();
+                let n1;
+                if *pb_abc == 1 {
+                    n1 = num16(s, &mut p, base);
+                    if i32::from(n1) > MAX_ATOMS || n1 == 0 || i32::from(n1) > n_atoms {
+                        return RI_ERR_SYNTAX;
+                    }
+                    iso.n_atom_number = n1;
+                    let (v, q) = strtol(s, p);
+                    iso.n_iso_difference = v as i16;
+                    if p == q {
+                        return RI_ERR_SYNTAX;
+                    }
+                    p = q;
+                    parse_iso_counts(s, &mut p, &mut iso, b"tdh");
+                    if p > p_end || iso_is_zero(&iso) {
+                        return RI_ERR_SYNTAX;
+                    }
+                } else {
+                    let (v, q) = strtol(s, p);
+                    n1 = v as u16;
+                    if i32::from(n1) > MAX_ATOMS {
+                        return RI_ERR_SYNTAX;
+                    }
+                    p = q;
+                    if n1 == 0 || i32::from(n1) > n_atoms || strchr_set(PARITY, at(s, p)).is_none()
+                    {
+                        return RI_ERR_SYNTAX;
+                    }
+                    iso.n_atom_number = n1;
+                    if at(s, p) == b'+' && is_digit(at(s, p + 1)) {
+                        let (v, q) = strtol(s, p + 1);
+                        iso.n_iso_difference = v as i16;
+                        if iso.n_iso_difference >= 0 {
+                            iso.n_iso_difference = iso.n_iso_difference.wrapping_add(1);
+                        }
+                        p = q;
+                    } else if at(s, p) == b'-' && is_digit(at(s, p + 1)) {
+                        let (v, q) = strtol(s, p + 1);
+                        iso.n_iso_difference = (-i32::from(v as i16)) as i16;
+                        if iso.n_iso_difference == 0 {
+                            iso.n_iso_difference = 1;
+                        }
+                        p = q;
+                    }
+                    parse_iso_counts(s, &mut p, &mut iso, b"TDH");
+                    if iso_is_zero(&iso) {
+                        return RI_ERR_SYNTAX;
+                    }
+                    if p < p_end {
+                        if at(s, p) == b',' {
+                            p += 1;
+                        } else {
+                            return RI_ERR_SYNTAX;
+                        }
+                    }
+                }
+                atoms.push(iso);
+                i_atom += 1;
+            }
+            if p != p_end {
+                return RI_ERR_SYNTAX;
+            }
+            if !allocated {
+                len = i_atom;
+                allocated = true;
+                // calloc(len + 1); the 2nd pass fills it
+                let c = &mut p_inp_inchi[b_mobile_h][i_comp as usize];
+                c.isotopic_atom = vec![InChIIsotopicAtom::default(); len + 1];
+                continue;
+            }
+            if len != i_atom {
+                return RI_ERR_PROGR;
+            }
+            let c = &mut p_inp_inchi[b_mobile_h][i_comp as usize];
+            for (k, a) in atoms.into_iter().enumerate() {
+                c.isotopic_atom[k] = a;
+            }
+            c.n_number_of_isotopic_atoms = len as i32;
+            break;
+        }
+        // multiplier
+        for i in 1..mpy_component {
+            let src = p_inp_inchi[b_mobile_h].get(i_comp as usize).cloned();
+            let Some(t) = p_inp_inchi[b_mobile_h].get_mut((i_comp + i) as usize) else {
+                return RI_ERR_SYNTAX;
+            };
+            let mut r = copy_segment(t, src.as_ref(), CPY_ISO_AT, 0, 0);
+            if r == 0 {
+                r = RI_ERR_SYNTAX;
+            }
+            if r < 0 {
+                return r;
+            }
+        }
+        i_comp = i_comp.wrapping_add(mpy_component);
+        if at(s, p_end) != 0 {
+            p_start = p_end + 1;
+        } else {
+            break;
+        }
+    }
+    if n_num != i_comp {
+        return RI_ERR_SYNTAX;
+    }
+    i_comp + 1
+}
+
+fn iso_is_zero(a: &InChIIsotopicAtom) -> bool {
+    a.n_iso_difference == 0 && a.n_num_t == 0 && a.n_num_d == 0 && a.n_num_h == 0
+}
+
+/// the optional `T[n]`, `D[n]`, `H[n]` (upper case, or lower case in the
+/// compressed form) of an isotopic atom
+fn parse_iso_counts(s: &[u8], p: &mut usize, iso: &mut InChIIsotopicAtom, letters: &[u8; 3]) {
+    for (k, &c) in letters.iter().enumerate() {
+        if at(s, *p) == c {
+            let field = match k {
+                0 => &mut iso.n_num_t,
+                1 => &mut iso.n_num_d,
+                _ => &mut iso.n_num_h,
+            };
+            *field = 1;
+            *p += 1;
+            if is_digit(at(s, *p)) {
+                let (v, q) = strtol(s, *p);
+                *field = v as i16;
+                *p = q;
+            }
+        }
+    }
 }
