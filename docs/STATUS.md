@@ -390,6 +390,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not started.
 | 274 | | I12l | `ichirvr7`: `CompareOneOrigInchiToRevInChI`, `CompareAllOrigInchiToRevInChI` | done | |
 | 275 | | I12m | `ichirvr7`: `CompareAllDisconnectedOrigInchiToRevInChI` (compiled; trivial path tested) | done | |
 | 276 | | I12n | `ichirvr7`: `ConvertInChI2Struct` (tested on 5 InChI + a mismatch) | done | |
+| 277 | | I12o | `inchi_dll_c`: `CheckINCHI`, `ReadWriteInChI` (API path), `GetStructFromINCHI(Ex)`; 28 InChI round trip | done | |
 
 ## Python package files
 
@@ -848,3 +849,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-22 — Stage 274: I12l: CompareOne/AllOrigInchiToRevInChI
 * 2026-10-22 — Stage 275: I12m: CompareAllDisconnectedOrigInchiToRevInChI
 * 2026-10-22 — Stage 276: I12n: ConvertInChI2Struct
+* 2026-10-22 — Stage 277: I12o: GetStructFromINCHI
