@@ -33,7 +33,9 @@
 #
 try:
   from rdoxide.Avalon import pyAvalonTools
-except ImportError:
+  # MolKey needs the structure checker of AvalonTools, which is not ported yet
+  pyAvalonTools.StruChkResult
+except (ImportError, AttributeError):
   raise ImportError("This code requires the RDKit to be built with AvalonTools support")
 
 import base64
