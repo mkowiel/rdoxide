@@ -45,6 +45,9 @@ const BOND_PATH_SEED: u64 = 53;
 const HCOUNT_CLASS_PATH_SEED: u64 = 43;
 const ATOM_CLASS_PATH_SEED: u64 = 23;
 const SPECIAL_RING: u32 = 0xFC & !(1 << 6);
+const RING_PATTERN_SEED: u64 = 11;
+const RING_SIZE_SEED: u64 = 67;
+const DEGREE_PATH_SEED: u64 = 71;
 const RING_CLOSURE_SEED: i64 = 101;
 
 const PROCESS_RING_CLOSURES: i32 = 0x0001;
@@ -286,6 +289,9 @@ pub fn set_fingerprint_counts_with_focus(
         | USE_BOND_PATH
         | USE_HCOUNT_CLASS_PATH
         | USE_ATOM_CLASS_PATH
+        | USE_RING_PATTERN
+        | USE_RING_SIZE_COUNTS
+        | USE_DEGREE_PATH
         | USE_SHORTCUT_LABELS;
     if which_bits & !IMPLEMENTED != 0 {
         return Err("fingerprint feature class not ported yet");
@@ -1396,6 +1402,194 @@ pub fn set_fingerprint_counts_with_focus(
                     }
                 }
             }
+        }
+    }
+
+    if which_bits & USE_RING_PATTERN != 0 {
+        let mut seed = RING_PATTERN_SEED;
+        for i in 0..n {
+            let (color, rsize) = (mp.atoms[i].color, mp.atoms[i].rsize_flags);
+            if color <= 0 || i as i32 + 1 == exclude_atom {
+                continue;
+            }
+            if color == 6 && rsize & SPECIAL_RING == 0 {
+                continue;
+            }
+            touched[i] = 1;
+            let old_seed = seed;
+            seed = ns(seed, color);
+            result += path_bits!(seed, 1, 3, 3, i, -1, PROCESS_CHAINS);
+            seed = old_seed;
+            touched[i] = 0;
+        }
+        // complete rings only, atom types ignored
+        for i in 0..n {
+            if mp.atoms[i].atom_symbol == "A" {
+                mp.atoms[i].color = 9;
+            }
+            if i as i32 + 1 == exclude_atom {
+                mp.atoms[i].color = 0;
+            }
+            if mp.atoms[i].color == 0 {
+                continue;
+            }
+            mp.atoms[i].color = 9;
+        }
+        for i in 0..mp.bonds.len() {
+            let b = &mut mp.bonds[i];
+            if b.atoms[0] == exclude_atom || b.atoms[1] == exclude_atom || bond_status[i] <= 0 {
+                b.color = 0;
+            }
+        }
+        // the remaining ring pattern classes are disabled in the C code
+    }
+
+    if which_bits & USE_RING_SIZE_COUNTS != 0 {
+        for j in 3..10 {
+            let nrbonds = mp
+                .bonds
+                .iter()
+                .filter(|b| {
+                    b.atoms[0] != exclude_atom
+                        && b.atoms[1] != exclude_atom
+                        && b.rsize_flags & (1 << j) != 0
+                })
+                .count() as i32;
+            let mut seed = ns(RING_SIZE_SEED, j * 13);
+            let mut i = 1;
+            while i < 100 {
+                if nrbonds >= j * i {
+                    seed = ns(seed, i);
+                    if (j != 6 && j != 5) || nrbonds > j * i {
+                        add_bit_count!(seed, nrbonds);
+                        result += 1;
+                    }
+                    if j != 6 && j != 5 {
+                        seed = ns(seed, 17);
+                        add_bit_count!(seed, nrbonds);
+                        result += 1;
+                    }
+                } else {
+                    break;
+                }
+                i *= 2;
+            }
+        }
+        let mut rscounts = [[0i32; 15]; 15];
+        for b in &mp.bonds {
+            if b.atoms[0] == exclude_atom || b.atoms[1] == exclude_atom {
+                continue;
+            }
+            let r0 = mp.atoms[(b.atoms[0] - 1) as usize].rsize_flags;
+            let r1 = mp.atoms[(b.atoms[1] - 1) as usize].rsize_flags;
+            for j in 3..15 {
+                for k in 3..15 {
+                    if j != k && r0 & (1 << j) != 0 && r1 & (1 << k) != 0 {
+                        rscounts[j][k] += 1;
+                        rscounts[k][j] += 1;
+                    }
+                }
+            }
+        }
+        for j in 3..9usize {
+            for k in j + 1..9usize {
+                if rscounts[j][k] == 0 {
+                    continue;
+                }
+                let (ji, ki) = (j as i32, k as i32);
+                let mut seed = ns(2 * RING_SIZE_SEED, (ji + ki) * 11);
+                seed = ns(seed, ji * ki * 13);
+                seed = ns(seed, 19);
+                add_bit!(seed);
+                result += 1;
+                if rscounts[j][k] == 1 || j == 6 || k == 6 {
+                    continue;
+                }
+                let mut seed = ns(2 * RING_SIZE_SEED + 23, (ji + ki) * 11);
+                seed = ns(seed, ji * ki * 13);
+                seed = ns(seed, 19);
+                add_bit!(seed);
+                result += 1;
+            }
+        }
+    }
+
+    // atom colour: element plus 32 * degree where the degree is defined
+    for i in 0..n {
+        let sym = mp.atoms[i].atom_symbol.clone();
+        let mut color = number_of(&sym);
+        if color <= 1 {
+            color = 0;
+        }
+        if color > 115 {
+            color = -1;
+        }
+        if sym == "A" {
+            color = -1;
+        }
+        if i as i32 + 1 == exclude_atom {
+            color = 0;
+        }
+        let sd = mp.atoms[i].sub_desc;
+        if color > 1
+            && (!as_query
+                || sd == SUB_AS_IS
+                || (sd != NONE && sd != SUB_MORE && sd == degree[i] + SUB_ONE - 1))
+        {
+            color += 32 * degree[i];
+        } else {
+            color = 0;
+        }
+        mp.atoms[i].color = color;
+    }
+    for b in &mut mp.bonds {
+        b.color = if (SINGLE..=8).contains(&b.bond_type) {
+            5
+        } else {
+            0
+        };
+        if b.atoms[0] == exclude_atom || b.atoms[1] == exclude_atom {
+            b.color = 0;
+        }
+    }
+    if which_bits & USE_DEGREE_PATH != 0 {
+        let mut seed = DEGREE_PATH_SEED;
+        for i in 0..n {
+            let color = mp.atoms[i].color;
+            if color <= 0 || i as i32 + 1 == exclude_atom {
+                continue;
+            }
+            if degree[i] <= 3 && atom_status[i] <= 2 && degree[i] != 1 {
+                continue;
+            }
+            if degree[i] == 1 && mp.atoms[i].atom_symbol != "C" {
+                continue;
+            }
+            touched[i] = 1;
+            let old_seed = seed;
+            seed = ns(seed, color);
+            result += path_bits!(seed, 1, 2, 4, i, -1, IGNORE_PATH_SYMBOL | PROCESS_CHAINS);
+            if atom_status[i] > 2 && h_count[i + 1] >= 1 {
+                seed = ns(seed, 219);
+                result += path_bits!(seed, 1, 2, 5, i, -1, IGNORE_PATH_SYMBOL | PROCESS_CHAINS);
+            }
+            seed = old_seed;
+            touched[i] = 0;
+        }
+        for i in 0..n {
+            if i as i32 + 1 == exclude_atom {
+                continue;
+            }
+            let tmp = number_of(&mp.atoms[i].atom_symbol);
+            if tmp <= 1 || tmp >= 115 || tmp == 6 || tmp < 10 {
+                continue;
+            }
+            touched[i] = 1;
+            let old_seed = seed;
+            seed = ns(seed, tmp);
+            result += path_bits!(seed, 1, 2, 2, i, -1, PROCESS_CHAINS);
+            seed = old_seed;
+            touched[i] = 0;
         }
     }
 

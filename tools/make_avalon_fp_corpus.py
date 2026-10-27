@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from make_avalon_smiles_corpus import SMILES  # noqa: E402
 
 # (which_bits, as_query, fpflags, nbits)
-BIT_SETS = [0x10, 0x04, 0x20, 0x400, 0x100, 0x40, 0x02, 0x200, 0x80, 0x08, 0x7FE]
+BIT_SETS = [0x10, 0x04, 0x20, 0x400, 0x100, 0x40, 0x02, 0x200, 0x80, 0x08, 0x01, 0x800, 0x1000, 0x1FFE]
 EXTRA = ["C(C)(C)(C)C", "CC(C)(C)C", "OC(=O)C", "O=[N+]([O-])c1ccccc1", "CS(=O)(=O)N", "ClC(Cl)(Cl)Cl", "C[Si](C)(C)C",
          "[Fe](C)(C)C", "Brc1ccc(I)cc1", "C1CC1(C)C", "C12(CCC1)CCC2", "[Na+].[Cl-]", "OP(=O)(O)O", "c1ccc2c(c1)oc1ccccc12"]
 
