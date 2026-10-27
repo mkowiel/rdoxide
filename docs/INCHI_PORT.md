@@ -217,8 +217,15 @@ Stage numbers in `docs/STATUS.md` are assigned when each PR lands (the rows
   option sets): validation, the `/z` layer, `/Z:` and `/U/` AuxInfo, 1.05/1.05+
   cyclization, backbone bonds and CRU frame shift; polymer InChI are read back
   (`tests/data/inchi_polymers_read.jsonl`, `InchiToMol`). Not ported: CRU
-  folding (`analyze_CRU_folding`; the official library crashes on every
-  foldable unit, so there is no reference output). RDKit's `MolToInchi` never
+  folding (`analyze_CRU_folding`). The official library crashes whenever the
+  fold analysis runs on a unit it could fold, because of two memory bugs in
+  InChI 1.07.3 itself: `OAD_StructureEdits_Apply` sizes the new atom array as
+  `nat0 - del_atom->used` although `del_atom` may hold duplicates (heap overflow),
+  and `analyze_CRU_folding` passes the NULL `bkbonds` of a unit that was not
+  pre-cyclized (HH/EU units, or units without two caps) to
+  `OAD_CollectBackboneBonds` (NULL dereference). rdoxide skips the fold step and
+  returns the unfolded result, which equals the C code with folding switched off
+  (checked on 198 Zz-capped molfiles against a build of the C sources). RDKit's `MolToInchi` never
   passes polymer data, so only `MolBlockToInchi` can differ.
 * **AuxInfo input**: `ParseAuxSegment*`, `ReadInChICoord` (AuxInfo line) and
   `Get_inchi_Input_FromAuxInfo` are not ported; RDKit does not call them
