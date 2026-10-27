@@ -989,3 +989,532 @@ pub fn oad_validate_polymer_and_pseudo_element_data(
     }
     err
 }
+
+// ---------------------------------------------------------------------------
+// Polymer helpers: bond edits of the original input, ring systems, atom
+// seniority and the working set of the polymer layer
+
+const MAXVAL: usize = super::inpdef::MAXVAL;
+const INCHI_BOND_TYPE_DOUBLE: i32 = 2;
+const INCHI_BOND_TYPE_TRIPLE: i32 = 3;
+
+/// `OrigAtData_RemoveHalfBond` (0-based atoms)
+fn orig_at_data_remove_half_bond(
+    at: &mut [super::inpdef::InpAtom],
+    this_atom: i32,
+    other_atom: i32,
+    bond_type: &mut i32,
+    bond_stereo: &mut i32,
+) -> bool {
+    if this_atom < 0 || other_atom < 0 {
+        return false;
+    }
+    let a = &mut at[this_atom as usize];
+    for k in 0..a.valence as usize {
+        if i32::from(a.neighbor[k]) != other_atom {
+            continue;
+        }
+        *bond_type = i32::from(a.bond_type[k]);
+        *bond_stereo = i32::from(a.bond_stereo[k]);
+        for kk in k + 1..a.valence as usize {
+            a.neighbor[kk - 1] = a.neighbor[kk];
+            a.bond_type[kk - 1] = a.bond_type[kk];
+            a.bond_stereo[kk - 1] = a.bond_stereo[kk];
+        }
+        for kk in (a.valence as usize - 1)..MAXVAL {
+            a.neighbor[kk] = 0;
+            a.bond_type[kk] = 0;
+            a.bond_stereo[kk] = 0;
+        }
+        return true;
+    }
+    false
+}
+
+/// `OrigAtData_RemoveBond`
+pub fn orig_at_data_remove_bond(
+    at: &mut [super::inpdef::InpAtom],
+    this_atom: i32,
+    other_atom: i32,
+    bond_type: &mut i32,
+    bond_stereo: &mut i32,
+    num_inp_bonds: &mut i32,
+) -> bool {
+    if this_atom < 0 || other_atom < 0 {
+        return false;
+    }
+    let mut del = i32::from(orig_at_data_remove_half_bond(
+        at,
+        this_atom,
+        other_atom,
+        bond_type,
+        bond_stereo,
+    ));
+    del += i32::from(orig_at_data_remove_half_bond(
+        at,
+        other_atom,
+        this_atom,
+        bond_type,
+        bond_stereo,
+    ));
+    if del == 2 {
+        *num_inp_bonds -= 1;
+        at[this_atom as usize].valence -= 1;
+        at[this_atom as usize].chem_bonds_valence -= *bond_type as i8;
+        at[other_atom as usize].valence -= 1;
+        at[other_atom as usize].chem_bonds_valence -= *bond_type as i8;
+        return true;
+    }
+    false
+}
+
+/// `OrigAtData_AddBond`
+pub fn orig_at_data_add_bond(
+    at: &mut [super::inpdef::InpAtom],
+    this_atom: i32,
+    other_atom: i32,
+    mut bond_type: i32,
+    bond_stereo: i32,
+    num_bonds: &mut i32,
+) -> bool {
+    let (ta, oa) = (this_atom as usize, other_atom as usize);
+    if at[ta].valence as usize >= MAXVAL || at[oa].valence as usize >= MAXVAL {
+        return false;
+    }
+    if bond_type != INCHI_BOND_TYPE_DOUBLE && bond_type != INCHI_BOND_TYPE_TRIPLE {
+        bond_type = 1;
+    }
+    let a = &mut at[ta];
+    let k = a.valence as usize;
+    if !a.neighbor[..k].iter().any(|&n| i32::from(n) == other_atom) {
+        a.neighbor[k] = other_atom as u16;
+        a.bond_type[k] = bond_type as u8;
+        a.bond_stereo[k] = bond_stereo as i8;
+        a.chem_bonds_valence += bond_type as i8;
+        a.valence += 1;
+    }
+    let a = &mut at[oa];
+    let k = a.valence as usize;
+    if !a.neighbor[..k].iter().any(|&n| i32::from(n) == this_atom) && k < MAXVAL {
+        a.neighbor[k] = this_atom as u16;
+        a.bond_type[k] = bond_type as u8;
+        a.bond_stereo[k] = bond_stereo as i8;
+        a.chem_bonds_valence += bond_type as i8;
+        a.valence += 1;
+    }
+    *num_bonds += 1;
+    true
+}
+
+/// `OrigAtData_AddSingleStereolessBond`
+pub fn orig_at_data_add_single_stereoless_bond(
+    at: &mut [super::inpdef::InpAtom],
+    this_atom: i32,
+    other_atom: i32,
+    num_bonds: &mut i32,
+) -> bool {
+    orig_at_data_add_bond(at, this_atom, other_atom, 1, 0, num_bonds)
+}
+
+/// `OAD_Polymer_FindRingSystems`: `num_ring_sys[orig_at_number]` (-1 for none)
+/// and `size_ring_sys[orig_at_number]` for the atoms in rings systems of more
+/// than two atoms; returns the number of such atoms.
+pub fn oad_polymer_find_ring_systems(
+    pd: &OadPolymer,
+    at: &mut [super::inpdef::InpAtom],
+    nat: usize,
+    num_inp_bonds: &mut i32,
+    num_ring_sys: &mut [i32],
+    size_ring_sys: &mut [i32],
+    start: usize,
+) -> i32 {
+    let (mut bt, mut bs) = (0, 0);
+    let n = pd.n.max(0) as usize;
+    for u in pd.units.iter().take(n) {
+        if u.cyclized != 0 {
+            orig_at_data_remove_bond(
+                at,
+                u.end_atom1 - 1,
+                u.end_atom2 - 1,
+                &mut bt,
+                &mut bs,
+                num_inp_bonds,
+            );
+        }
+    }
+    super::ichinorm::mark_ring_systems_inp(&mut at[..nat], start);
+    for v in num_ring_sys.iter_mut().take(nat + 1) {
+        *v = -1;
+    }
+    for a in at.iter().take(nat) {
+        if a.n_num_at_in_ring_system > 2 {
+            let atnum = a.orig_at_number as usize;
+            num_ring_sys[atnum] = i32::from(a.n_ring_system);
+            size_ring_sys[atnum] = i32::from(a.n_num_at_in_ring_system);
+        }
+    }
+    super::ichinorm::unmark_ring_systems_inp(&mut at[..nat]);
+    let nrings = num_ring_sys.iter().take(nat).filter(|&&v| v > -1).count() as i32;
+    for u in pd.units.iter().take(n) {
+        if u.cyclized != 0 {
+            orig_at_data_add_single_stereoless_bond(
+                at,
+                u.end_atom1 - 1,
+                u.end_atom2 - 1,
+                num_inp_bonds,
+            );
+        }
+    }
+    nrings
+}
+
+/// `OAD_AtProps`
+#[derive(Debug, Clone, Copy, Default)]
+pub struct OadAtProps {
+    pub erank: i32,
+    pub ring_erank: i32,
+    pub ring_size: i32,
+    pub ring_num: i32,
+}
+
+const ERANK_RULE2: &[i32] = &[
+    0, 1, 198, 197, 196, 202, 2, 216, 215, 191, 190, 189, 188, 187, 206, 210, 214, 183, 182, 181,
+    180, 179, 178, 177, 176, 175, 174, 173, 172, 171, 170, 169, 205, 209, 213, 165, 164, 163, 162,
+    161, 160, 159, 158, 157, 156, 155, 154, 153, 152, 151, 204, 208, 212, 147, 146, 145, 144, 143,
+    142, 141, 140, 139, 138, 137, 136, 135, 134, 133, 132, 131, 130, 129, 128, 127, 126, 125, 124,
+    123, 122, 121, 201, 119, 203, 207, 116, 115, 114, 113, 112, 111, 110, 109, 108, 107, 106, 105,
+    104, 103, 102, 101, 100, 99, 98, 97, 96, 95, 94, 93, 92, 91, 90, 89, 88, 87, 86, 85, 84, 83,
+    82, 81,
+];
+const ERANK_RULE4: &[i32] = &[
+    0, 1, 198, 197, 196, 202, 2, 211, 215, 191, 190, 189, 188, 187, 206, 210, 214, 183, 182, 181,
+    180, 179, 178, 177, 176, 175, 174, 173, 172, 171, 170, 169, 205, 209, 213, 165, 164, 163, 162,
+    161, 160, 159, 158, 157, 156, 155, 154, 153, 152, 151, 204, 208, 212, 147, 146, 145, 144, 143,
+    142, 141, 140, 139, 138, 137, 136, 135, 134, 133, 132, 131, 130, 129, 128, 127, 126, 125, 124,
+    123, 122, 121, 201, 119, 203, 207, 116, 115, 114, 113, 112, 111, 110, 109, 108, 107, 106, 105,
+    104, 103, 102, 101, 100, 99, 98, 97, 96, 95, 94, 93, 92, 91, 90, 89, 88, 87, 86, 85, 84, 83,
+    82, 81,
+];
+
+/// `OAD_Polymer_SetAtProps`: `aprops` has `nat + 2` elements; `cano_nums` maps
+/// the original atom numbers to canonical numbers (0-based) when given.
+pub fn oad_polymer_set_at_props(
+    pd: &OadPolymer,
+    at: &mut [super::inpdef::InpAtom],
+    nat: usize,
+    num_inp_bonds: &mut i32,
+    aprops: &mut [OadAtProps],
+    cano_nums: Option<&[i32]>,
+) {
+    for k in 0..nat {
+        let atnum = at[k].orig_at_number as usize;
+        let index = cano_nums.map_or(k as i32, |c| c[atnum]);
+        let el = at[k].el_number as usize;
+        if index >= 0 && el < ERANK_RULE4.len() {
+            let p = &mut aprops[index as usize];
+            p.erank = ERANK_RULE4[el];
+            p.ring_erank = 0;
+            p.ring_size = 0;
+            p.ring_num = -1;
+        }
+    }
+    let mut num_ring_sys = vec![0i32; nat + 1];
+    let mut size_ring_sys = vec![0i32; nat + 1];
+    // break temporarily the first 'cyclizing' bond of the SRUs
+    let n = pd.n.max(0) as usize;
+    let (mut bt, mut bs, mut dummy) = (-1, -1, 0);
+    let breakable = |u: &OadPolymerUnit| {
+        u.na > 2 && u.nbkbonds > 0 && u.cyclized == 0 && u.cyclizable == CLOSING_SRU_RING
+    };
+    for u in pd.units.iter().take(n).filter(|u| breakable(u)) {
+        orig_at_data_remove_bond(
+            at,
+            u.bkbonds[0][0] - 1,
+            u.bkbonds[0][1] - 1,
+            &mut bt,
+            &mut bs,
+            &mut dummy,
+        );
+    }
+    let nrings = oad_polymer_find_ring_systems(
+        pd,
+        at,
+        nat,
+        num_inp_bonds,
+        &mut num_ring_sys,
+        &mut size_ring_sys,
+        0,
+    );
+    for u in pd.units.iter().take(n).filter(|u| breakable(u)) {
+        orig_at_data_add_bond(
+            at,
+            u.bkbonds[0][0] - 1,
+            u.bkbonds[0][1] - 1,
+            bt,
+            bs,
+            &mut dummy,
+        );
+    }
+    if nrings > 0 {
+        let idx = |k: usize, at: &[super::inpdef::InpAtom]| -> usize {
+            let atnum = at[k].orig_at_number as usize;
+            cano_nums.map_or(k as i32, |c| c[atnum] + 1) as usize
+        };
+        let mut max_ring_num = 0;
+        for k in 0..nat {
+            let atnum = at[k].orig_at_number as usize;
+            let index = idx(k, at);
+            if num_ring_sys[atnum] >= 0 {
+                aprops[index].ring_num = num_ring_sys[atnum];
+                max_ring_num = max_ring_num.max(aprops[index].ring_num);
+                aprops[index].ring_size = size_ring_sys[atnum];
+            }
+        }
+        for i in 0..=max_ring_num {
+            let mut max_erank = 0;
+            for k in 0..nat {
+                if aprops[idx(k, at)].ring_num == i {
+                    max_erank = max_erank.max(
+                        ERANK_RULE2
+                            .get(at[k].el_number as usize)
+                            .copied()
+                            .unwrap_or(0),
+                    );
+                }
+            }
+            for k in 0..nat {
+                let index = idx(k, at);
+                if aprops[index].ring_num == i && aprops[index].ring_size > 2 {
+                    aprops[index].ring_erank = max_erank;
+                }
+            }
+        }
+    }
+}
+
+/// `OAD_Polymer_CompareRanksOfTwoAtoms`
+pub fn oad_polymer_compare_ranks_of_two_atoms(
+    atom1: i32,
+    atom2: i32,
+    aprops: &[OadAtProps],
+) -> i32 {
+    const HETEROCYC: i32 = 3;
+    const HETEROAT: i32 = 2;
+    const CARBOCYC: i32 = 1;
+    const CARBOAT: i32 = 0;
+    let (a1, a2) = (atom1 - 1, atom2 - 1);
+    if a1 < 0 || a2 < 0 {
+        return 0;
+    }
+    let (p1, p2) = (&aprops[a1 as usize], &aprops[a2 as usize]);
+    let kind = |p: &OadAtProps| {
+        if p.ring_size > 2 {
+            if p.ring_erank <= 2 {
+                CARBOCYC
+            } else {
+                HETEROCYC
+            }
+        } else if p.erank == 2 {
+            CARBOAT
+        } else {
+            HETEROAT
+        }
+    };
+    let (t1, t2) = (kind(p1), kind(p2));
+    let lower_first = |x: i32, y: i32| -> i32 {
+        // smaller value is more senior (returns 1)
+        if x < y {
+            1
+        } else if x > y {
+            -1
+        } else {
+            0
+        }
+    };
+    if t1 == HETEROCYC && t2 == HETEROCYC {
+        let r = lower_first(p1.ring_erank, p2.ring_erank);
+        if r != 0 {
+            return r;
+        }
+        return lower_first(p1.ring_size, p2.ring_size);
+    } else if t1 == HETEROCYC {
+        return -1;
+    } else if t2 == HETEROCYC {
+        return 1;
+    }
+    if t1 == HETEROAT && t2 == HETEROAT {
+        return lower_first(p1.erank, p2.erank);
+    } else if t1 == HETEROAT {
+        return -1;
+    } else if t2 == HETEROAT {
+        return 1;
+    }
+    if t1 == CARBOCYC && t2 == CARBOCYC {
+        return lower_first(p1.ring_size, p2.ring_size);
+    } else if t1 == CARBOCYC {
+        return -1;
+    } else if t2 == CARBOCYC {
+        return 1;
+    }
+    0
+}
+
+/// `OAD_Polymer_IsFirstAtomRankLower`
+pub fn oad_polymer_is_first_atom_rank_lower(atom1: i32, atom2: i32, aprops: &[OadAtProps]) -> i32 {
+    let r = oad_polymer_compare_ranks_of_two_atoms(atom1, atom2, aprops);
+    if r != 0 {
+        return r;
+    }
+    if atom1 < atom2 {
+        1
+    } else if atom1 > atom2 {
+        -1
+    } else {
+        0
+    }
+}
+
+/// `OAD_PolymerUnit_OrderBondAtomsAndBondsThemselves`: returns 1 when a
+/// crossing bond is invalid.
+fn oad_polymer_unit_order_bond_atoms_and_bonds_themselves(
+    u: &mut OadPolymerUnit,
+    star_atoms: &[i32],
+) -> i32 {
+    for k in 0..u.nb as usize {
+        let (a1, a2) = (u.blist[2 * k], u.blist[2 * k + 1]);
+        let na = u.na as usize;
+        let a1_out = !u.alist[..na].contains(&a1) || star_atoms.contains(&a1);
+        let a2_out = !u.alist[..na].contains(&a2) || star_atoms.contains(&a2);
+        if a1_out && a2_out {
+            return 1;
+        }
+        if a2_out {
+            u.blist[2 * k] = a2;
+            u.blist[2 * k + 1] = a1;
+        }
+    }
+    if u.nb == 2 {
+        let (b1a1, b1a2, b2a1, b2a2) = (u.blist[0], u.blist[1], u.blist[2], u.blist[3]);
+        if b1a1 > b2a1 {
+            u.blist[0] = b2a1;
+            u.blist[1] = b2a2;
+            u.blist[2] = b1a1;
+            u.blist[3] = b1a2;
+        }
+    }
+    0
+}
+
+/// `OAD_PolymerUnit_CompareAtomListsMod`
+fn oad_polymer_unit_compare_atom_lists_mod(u1: &OadPolymerUnit, u2: &OadPolymerUnit) -> i32 {
+    if u1.na != u2.na {
+        return if u1.na < u2.na { -1 } else { 1 };
+    }
+    for i in 0..u1.na as usize {
+        if u1.alist[i] != u2.alist[i] {
+            return if u1.alist[i] < u2.alist[i] { -1 } else { 1 };
+        }
+    }
+    0
+}
+
+/// `OAD_Polymer_PrepareWorkingSet`: `p.pzz` and the lists of `units2` (copies
+/// of the units of `p`) get canonical numbers + 1; fills `unum` with the unit
+/// numbers in the order of their atom lists. `cano_nums` is indexed by the
+/// original atom number (and holds -1 for removed atoms). Returns the error.
+pub fn oad_polymer_prepare_working_set(
+    p: &mut OadPolymer,
+    cano_nums: &[i32],
+    units2: &mut [OadPolymerUnit],
+    unum: &mut [usize],
+) -> i32 {
+    let n_pzz = p.n_pzz.max(0) as usize;
+    if let Some(pzz) = p.pzz.as_mut() {
+        for k in 0..n_pzz {
+            let c = cano_nums[pzz[k] as usize] + 1;
+            if c == 0 {
+                return 10;
+            }
+            pzz[k] = c;
+        }
+    }
+    let n = p.n.max(0) as usize;
+    for u in units2.iter_mut().take(n) {
+        let mut na_new = 0usize;
+        for k in 0..u.na as usize {
+            let c = cano_nums[u.alist[k] as usize] + 1;
+            if c == 0 {
+                continue;
+            }
+            u.alist[na_new] = c;
+            na_new += 1;
+        }
+        u.na = na_new as i32;
+        for k in 0..2 * u.nb as usize {
+            let c = cano_nums[u.blist[k] as usize] + 1;
+            if c == 0 {
+                return 11;
+            }
+            u.blist[k] = c;
+        }
+        for field in 0..4 {
+            let v = match field {
+                0 => u.cap1,
+                1 => u.cap2,
+                2 => u.end_atom1,
+                _ => u.end_atom2,
+            };
+            let c = if v >= 0 && (v as usize) < cano_nums.len() {
+                cano_nums[v as usize] + 1
+            } else {
+                0
+            };
+            if c == 0 {
+                return 11;
+            }
+            match field {
+                0 => u.cap1 = c,
+                1 => u.cap2 = c,
+                2 => u.end_atom1 = c,
+                _ => u.end_atom2 = c,
+            }
+        }
+        for k in 0..u.nbkbonds as usize {
+            let c1 = cano_nums[u.bkbonds[k][0] as usize] + 1;
+            if c1 == 0 {
+                continue;
+            }
+            let c2 = cano_nums[u.bkbonds[k][1] as usize] + 1;
+            if c2 == 0 {
+                continue;
+            }
+            u.bkbonds[k][0] = c1.min(c2);
+            u.bkbonds[k][1] = c1.max(c2);
+        }
+    }
+    let pzz: Vec<i32> = p.pzz.clone().unwrap_or_default();
+    for u in units2.iter_mut().take(n) {
+        let na = u.na as usize;
+        super::ichisort::iisort(&mut u.alist[..na]);
+        if oad_polymer_unit_order_bond_atoms_and_bonds_themselves(u, &pzz[..n_pzz.min(pzz.len())])
+            != 0
+        {
+            return 12;
+        }
+    }
+    for (i, v) in unum.iter_mut().enumerate().take(n) {
+        *v = i;
+    }
+    for i in 1..n {
+        let tmp = unum[i];
+        let mut j = i as isize - 1;
+        while j >= 0
+            && oad_polymer_unit_compare_atom_lists_mod(&units2[unum[j as usize]], &units2[tmp]) > 0
+        {
+            unum[j as usize + 1] = unum[j as usize];
+            j -= 1;
+        }
+        unum[(j + 1) as usize] = tmp;
+    }
+    0
+}

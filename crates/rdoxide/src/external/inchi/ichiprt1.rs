@@ -2312,6 +2312,11 @@ pub struct OrigStruct {
     pub sz_bonds: Option<String>,
     pub sz_coord: Option<String>,
     pub n_zy: i32,
+    /// `polymer` (set when the input has a valid polymer), with the original
+    /// atoms of `orig_inp_data` that the polymer layer needs
+    pub polymer: Option<super::mol2atom::OadPolymer>,
+    pub orig_at: Vec<InpAtom>,
+    pub orig_num_inp_bonds: i32,
 }
 
 /// `ORIG_STR_BUFLEN`
@@ -2654,6 +2659,282 @@ pub fn internally_get_cano_nums_and_component_nums(
     }
     inchi_strbuf_reset(strbuf);
     err
+}
+
+/// `OutputINCHI_PolymerLayer_SingleUnit`: the text of one unit, errors are the
+/// C error codes
+#[allow(clippy::too_many_arguments)]
+fn output_inchi_polymer_layer_single_unit(
+    u: &mut super::mol2atom::OadPolymerUnit,
+    b_polymers: i32,
+    total_star_atoms: i32,
+    n_used_stars: &mut i32,
+    aprops: &[super::runichi3::OadAtProps],
+    orig_struct: &OrigStruct,
+    treat: i32,
+    frame_shift_scheme: i32,
+    strbuf: &mut InchiIosString,
+) -> i32 {
+    use super::runichi3::{
+        CLOSING_SRU_DIRADICAL, CLOSING_SRU_HIGHER_ORDER_BOND, CLOSING_SRU_RING,
+        oad_polymer_is_first_atom_rank_lower,
+    };
+    let pr = |strbuf: &mut InchiIosString, t: String| {
+        inchi_strbuf_printf(strbuf, &t);
+    };
+    pr(strbuf, format!("{}{}{}-", u.type_, u.subtype, u.conn));
+    super::ichiprt2::print_sequence_of_nums_compressing_ranges(&u.alist[..u.na as usize], strbuf);
+    if u.nb > 2 {
+        return 12;
+    }
+    let (mut a1, mut a2, mut a3, mut a4);
+    if u.nb == 2 && (u.cyclizable == 0 || u.cyclized == 0) {
+        a1 = u.blist[0];
+        a2 = u.blist[1];
+        a3 = u.blist[2];
+        a4 = u.blist[3];
+        let na = u.na as usize;
+        if u.alist[..na].contains(&a1) {
+            std::mem::swap(&mut a1, &mut a2);
+        }
+        if u.alist[..na].contains(&a3) {
+            std::mem::swap(&mut a3, &mut a4);
+        }
+        let swap = if b_polymers == super::ichiparm::POLYMERS_LEGACY {
+            a3 < a1
+        } else {
+            oad_polymer_is_first_atom_rank_lower(a2, a4, aprops) == 1
+        };
+        if swap {
+            pr(strbuf, format!("({a3}-{a4},{a1}-{a2})"));
+        } else {
+            pr(strbuf, format!("({a1}-{a2},{a3}-{a4})"));
+        }
+    } else if u.nb <= 2 && (u.cyclizable != 0 || u.nbkbonds > 0) {
+        a1 = 0;
+        a2 = 0;
+        if u.cap1 > 0 || u.cap2 > 0 {
+            let sza = orig_struct.sz_atoms.as_deref().unwrap_or("").as_bytes();
+            let mut n_expl_h = 0;
+            let mut pos = 0;
+            while pos < sza.len() {
+                if sza[pos] == b'H' {
+                    let next = sza.get(pos + 1).copied();
+                    if next.is_none_or(|c| c.is_ascii_uppercase()) {
+                        n_expl_h += 1;
+                    }
+                    if next.is_none() {
+                        break;
+                    }
+                }
+                pos += 1;
+            }
+            if u.cap1 > 0 {
+                let c = orig_struct.num_atoms - n_expl_h - total_star_atoms + *n_used_stars + 1;
+                if c > orig_struct.num_atoms {
+                    return 11;
+                }
+                a1 = c;
+                *n_used_stars += 1;
+            }
+            if u.cap2 > 0 {
+                let c = orig_struct.num_atoms - n_expl_h - total_star_atoms + *n_used_stars + 1;
+                if c > orig_struct.num_atoms {
+                    return 11;
+                }
+                a2 = c;
+                *n_used_stars += 1;
+            }
+        }
+        pr(strbuf, format!("({a1},{a2}-"));
+        if u.cyclizable == CLOSING_SRU_DIRADICAL {
+            pr(strbuf, format!("{})", u.end_atom1));
+        } else if u.cyclizable == CLOSING_SRU_HIGHER_ORDER_BOND {
+            a3 = u.end_atom1;
+            a4 = u.end_atom2;
+            inchi_sort_int_pair_ascending(&mut a3, &mut a4);
+            pr(strbuf, format!("{a3}.{a4})"));
+        } else if u.cyclizable == CLOSING_SRU_RING {
+            if u.nbkbonds == 0 {
+                a3 = u.end_atom1;
+                a4 = u.end_atom2;
+                inchi_sort_int_pair_ascending(&mut a3, &mut a4);
+                pr(strbuf, format!("{a3},{a4})"));
+            } else {
+                // insertion sort of the backbone bonds by atom numbers
+                let nbk = u.nbkbonds as usize;
+                for b in 1..nbk {
+                    let tmp = u.bkbonds[b].clone();
+                    let mut j = b as isize - 1;
+                    while j >= 0
+                        && is_bond_atom_nums_lesser(
+                            &[u.bkbonds[j as usize][0], u.bkbonds[j as usize][1]],
+                            &[tmp[0], tmp[1]],
+                        ) > 0
+                    {
+                        u.bkbonds[j as usize + 1] = u.bkbonds[j as usize].clone();
+                        j -= 1;
+                    }
+                    u.bkbonds[(j + 1) as usize] = tmp;
+                }
+                if (treat == super::ichiparm::POLYMERS_MODERN
+                    || treat == super::ichiparm::POLYMERS_LEGACY_PLUS)
+                    && frame_shift_scheme != 0
+                    && u.cap1 >= 1
+                    && u.cap2 >= 1
+                {
+                    // OAD_PolymerUnit_SetReopeningDetails and the seniority sort of the
+                    // backbone bonds belong to the frame shift stage, not ported yet
+                    return 13;
+                }
+                for k in 0..nbk {
+                    let sep = if k == nbk - 1 { ')' } else { ',' };
+                    pr(
+                        strbuf,
+                        format!("{},{}{}", u.bkbonds[k][0], u.bkbonds[k][1], sep),
+                    );
+                }
+            }
+        }
+    }
+    0
+}
+
+/// `OutputINCHI_PolymerLayer`: the `/z` layer; returns the error code (0 for none)
+fn output_inchi_polymer_layer(
+    strbuf: &mut InchiIosString,
+    orig_struct: Option<&OrigStruct>,
+    io: &mut InchiOutCtl,
+    out_file: &mut InchiIostream,
+    lf: &str,
+) -> i32 {
+    use super::runichi3::{OadAtProps, oad_polymer_prepare_working_set, oad_polymer_set_at_props};
+    let Some(os) = orig_struct else {
+        return 0;
+    };
+    let Some(polymer) = os.polymer.as_ref() else {
+        return 0;
+    };
+    let nat = os.orig_at.len().min(os.num_atoms.max(0) as usize);
+    let nat = nat.max(os.num_atoms.max(0) as usize).min(os.orig_at.len());
+    let num_atoms = os.num_atoms.max(0) as usize;
+    let mut cano_nums = vec![0i32; num_atoms + 1];
+    let mut compnt_nums = vec![0i32; num_atoms + 1];
+    if internally_get_cano_nums_and_component_nums(
+        strbuf,
+        io,
+        num_atoms,
+        &mut cano_nums,
+        &mut compnt_nums,
+    ) != 0
+    {
+        return 3;
+    }
+    let mut p = polymer.clone();
+    let mut at = os.orig_at.clone();
+    let mut num_inp_bonds = os.orig_num_inp_bonds;
+    let mut aprops = vec![OadAtProps::default(); nat + 2];
+    oad_polymer_set_at_props(
+        &p,
+        &mut at,
+        nat,
+        &mut num_inp_bonds,
+        &mut aprops,
+        Some(&cano_nums),
+    );
+    let n = p.n.max(0) as usize;
+    let mut units2: Vec<_> = p.units.iter().take(n).cloned().collect();
+    let n_pzz = p.n_pzz;
+    let mut unum = vec![0usize; n];
+    if oad_polymer_prepare_working_set(&mut p, &cano_nums, &mut units2, &mut unum) != 0 {
+        return 5;
+    }
+    inchi_strbuf_printf(strbuf, "/z");
+    let mut n_used_stars = 0;
+    for i in 0..n {
+        let u = &mut units2[unum[i]];
+        let err = output_inchi_polymer_layer_single_unit(
+            u,
+            io.b_polymers,
+            n_pzz,
+            &mut n_used_stars,
+            &aprops,
+            os,
+            p.treat,
+            p.frame_shift_scheme,
+            strbuf,
+        );
+        if err != 0 {
+            return err;
+        }
+        if i + 1 < n {
+            inchi_strbuf_printf(strbuf, ";");
+        }
+    }
+    let text = strbuf
+        .p_str
+        .as_ref()
+        .map(|b| String::from_utf8_lossy(&b[..strbuf.n_used_length.max(0) as usize]).into_owned())
+        .unwrap_or_default();
+    inchi_ios_print_nodisplay(Some(out_file), &format!("{text}{lf}"));
+    0
+}
+
+/// `OutputAUXINFO_PolymerInfo`: the `/Z:` segment of the AuxInfo
+fn output_auxinfo_polymer_info(
+    out_file: &mut InchiIostream,
+    strbuf: &mut InchiIosString,
+    orig_struct: Option<&OrigStruct>,
+    lf: &str,
+) -> i32 {
+    let Some(p) = orig_struct.and_then(|o| o.polymer.as_ref()) else {
+        return 0;
+    };
+    inchi_strbuf_reset(strbuf);
+    inchi_ios_print(Some(out_file), "/Z:");
+    let n = p.n.max(0) as usize;
+    let fmt_xbr =
+        |x: &[f64; 4]| -> String { format!("[{:.6},{:.6},{:.6},{:.6}]", x[0], x[1], x[2], x[3]) };
+    for (i, u) in p.units.iter().take(n).enumerate() {
+        let smt_len = u.smt.iter().position(|&c| c == 0).unwrap_or(u.smt.len());
+        let smt = if smt_len > 0 {
+            String::from_utf8_lossy(&u.smt[..smt_len]).into_owned()
+        } else {
+            "n".to_string()
+        };
+        inchi_strbuf_printf(
+            strbuf,
+            &format!("{}{}{}-{}-", u.type_, u.subtype, u.conn, smt),
+        );
+        super::ichiprt2::print_sequence_of_nums_compressing_ranges(
+            &u.alist[..u.na as usize],
+            strbuf,
+        );
+        if u.nb > 0 {
+            inchi_strbuf_printf(strbuf, "(");
+            let m = 2 * u.nb as usize;
+            for k in 0..m - 1 {
+                inchi_strbuf_printf(strbuf, &format!("{},", u.blist[k]));
+            }
+            inchi_strbuf_printf(strbuf, &format!("{})", u.blist[m - 1]));
+        }
+        if (-u.xbr1[0].abs() + 777777.777).abs() > 1.0e-7 {
+            inchi_strbuf_printf(strbuf, &fmt_xbr(&u.xbr1));
+        }
+        if (-u.xbr2[0].abs() + 777777.777).abs() > 1.0e-7 {
+            inchi_strbuf_printf(strbuf, &fmt_xbr(&u.xbr2));
+        }
+        if i + 1 < n {
+            inchi_strbuf_printf(strbuf, ";");
+        }
+    }
+    let text = strbuf
+        .p_str
+        .as_ref()
+        .map(|b| String::from_utf8_lossy(&b[..strbuf.n_used_length.max(0) as usize]).into_owned())
+        .unwrap_or_default();
+    inchi_ios_print(Some(out_file), &format!("{text}{lf}"));
+    0
 }
 
 /// `EditINCHI_HidePolymerZz`: removes the polymer-related `Zz` pseudo atoms
@@ -3334,6 +3615,7 @@ pub fn output_inchi1(
             if basic_or_reconnected == INCHI_BAS || output_options & INCHI_OUT_EMBED_REC == 0 {
                 let n_atoms_all = n_atoms_all1.max(n_atoms_all2);
                 let is_beta = n_atoms_all > NORMALLY_ALLOWED_INP_MAX_ATOMS
+                    || orig_struct.is_some_and(|o| o.polymer.is_some())
                     || (orig_struct.is_none() && (ip.large_molecules || ip.polymers != 0))
                     || orig_struct.is_some_and(|o| o.n_zy != 0);
                 output_inchi_version_and_kind(out_file, strbuf, output_options, is_beta, lf);
@@ -3367,7 +3649,13 @@ pub fn output_inchi1(
                 if intermediate_result != 0 {
                     break 'main;
                 }
-                // (the polymer layer: nothing to do without polymers)
+                if npass == 0 {
+                    intermediate_result =
+                        output_inchi_polymer_layer(strbuf, orig_struct, &mut io, out_file, lf);
+                    if intermediate_result != 0 {
+                        break 'main;
+                    }
+                }
                 intermediate_result = output_inchi_stereo_layer(out_file, strbuf, &mut io, lf);
                 if intermediate_result != 0 {
                     break 'main;
@@ -3563,7 +3851,10 @@ pub fn output_inchi1(
             if intermediate_result != 0 {
                 break 'main;
             }
-            // (the polymer AuxInfo: nothing to do without polymers)
+            intermediate_result = output_auxinfo_polymer_info(out_file, strbuf, orig_struct, lf);
+            if intermediate_result != 0 {
+                break 'main;
+            }
             let mut embedded = false;
             if disconnected_coord
                 && basic_or_reconnected == INCHI_BAS
