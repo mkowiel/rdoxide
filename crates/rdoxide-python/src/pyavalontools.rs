@@ -115,7 +115,21 @@ fn get_avalon_count_fp_py(
         .py()
 }
 
+/// the parts of AvalonTools that are not ported raise an `ImportError`, so that code guarding
+/// `import MolKey` with `except ImportError` keeps treating AvalonTools as unavailable (dunder
+/// names still raise `AttributeError` for the import machinery and introspection)
+const MISSING_ATTRIBUTES: &std::ffi::CStr = c"
+def __getattr__(name):
+    if name.startswith('__'):
+        raise AttributeError(name)
+    raise ImportError(f'pyAvalonTools.{name} is not available in rdoxide yet')
+";
+
 pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    let py = m.py();
+    let globals = pyo3::types::PyDict::new(py);
+    py.run(MISSING_ATTRIBUTES, Some(&globals), None)?;
+    m.setattr("__getattr__", globals.get_item("__getattr__")?)?;
     m.add_function(wrap_pyfunction!(get_avalon_fp_py, m)?)?;
     m.add_function(wrap_pyfunction!(get_avalon_fp_as_words_py, m)?)?;
     m.add_function(wrap_pyfunction!(get_avalon_count_fp_py, m)?)?;
