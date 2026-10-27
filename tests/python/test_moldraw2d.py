@@ -295,3 +295,26 @@ def test_comic_mode_and_unknown_stereo():
     comic = svg(comicMode=True)
     assert comic != plain and "class='bond-0" in comic
     assert svg(unspecifiedStereoIsUnknown=True) != plain
+
+
+def test_prepare_for_drawing_kekulizes_canonically():
+    # same Kekule form as MolOps::KekulizeIfPossible(mol, false) (canonical=true)
+    from rdoxide import Chem
+    from rdoxide.Chem.Draw import rdMolDraw2D
+
+    m = rdMolDraw2D.PrepareMolForDrawing(Chem.MolFromSmiles("c1ccccc1"), kekulize=True)
+    assert [b.GetBondType().name for b in m.GetBonds()] == ["SINGLE", "DOUBLE"] * 3
+
+
+def test_svg_glyph_contours_end_at_curve_start():
+    # a contour whose last segment is a curve back to its start gets no closing line
+    from rdoxide import Chem
+    from rdoxide.Chem.Draw import rdMolDraw2D
+
+    d = rdMolDraw2D.MolDraw2DSVG(300, 250)
+    d.DrawMolecule(Chem.MolFromSmiles("CCO"))
+    d.FinishDrawing()
+    svg = d.GetDrawingText()
+    o = svg.split("<path class='atom-2'")[1].split("fill='#FF0000'")[0]
+    lines = o.split("\n")
+    assert not any(l.startswith("L ") for l in lines)

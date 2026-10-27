@@ -537,7 +537,8 @@ impl Outline {
     }
 
     /// `FT_Outline_Decompose`: the move/line/conic sequence for the outline.
-    /// Every contour ends with a line back to its start.
+    /// A contour ends with a line back to its start unless its last segment
+    /// is a curve that already returns there.
     pub fn decompose(&self) -> Vec<PathCommand> {
         let mut cmds = Vec::new();
         let mut first = 0usize;
@@ -593,8 +594,9 @@ impl Outline {
                     cmds.push(PathCommand::ConicTo(control, middle));
                     control = v(next);
                 } else {
+                    // FreeType jumps to its `Close` label past the closing line
                     cmds.push(PathCommand::ConicTo(control, v_start));
-                    break 'outer;
+                    return;
                 }
             }
         }

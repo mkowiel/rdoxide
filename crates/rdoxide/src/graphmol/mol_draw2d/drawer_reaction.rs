@@ -261,7 +261,7 @@ impl MolDraw2DSVG {
         mol.update_property_cache(false)?;
         if self.canvas.options.prepare_mols_before_drawing {
             let _blocker = LogStateSetter::new();
-            kekulize_if_possible(mol, false, false, DEFAULT_MAX_BACKTRACKS)?;
+            kekulize_if_possible(mol, false, true, DEFAULT_MAX_BACKTRACKS)?;
             set_hybridization(mol);
         }
         if mol.num_conformers() == 0 {
