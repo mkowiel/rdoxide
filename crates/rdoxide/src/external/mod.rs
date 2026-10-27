@@ -2,6 +2,7 @@
 //! RDKit tree). Each module carries its own license (see `LICENSES/`).
 
 pub mod avalon;
+pub mod avalon_tools;
 pub mod inchi;
 pub mod inchi_api;
 pub mod inchi_input;
