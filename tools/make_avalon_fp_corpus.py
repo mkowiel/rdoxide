@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from make_avalon_smiles_corpus import SMILES  # noqa: E402
 
 # (which_bits, as_query, fpflags, nbits)
-BIT_SETS = [0x10, 0x04, 0x20, 0x400, 0x100, 0x40, 0x02, 0x200, 0x80, 0x08, 0x01, 0x800, 0x1000, 0x2000, 0x4000, 0x7FFF]
+BIT_SETS = [0x10, 0x04, 0x20, 0x400, 0x100, 0x40, 0x02, 0x200, 0x80, 0x08, 0x01, 0x800, 0x1000, 0x2000, 0x4000, 0x7FFF, 0x100000, 0x200000, 0x400000, 0x800000, 0xF07FFF]
 EXTRA = ["C(C)(C)(C)C", "CC(C)(C)C", "OC(=O)C", "O=[N+]([O-])c1ccccc1", "CS(=O)(=O)N", "ClC(Cl)(Cl)Cl", "C[Si](C)(C)C",
          "[Fe](C)(C)C", "Brc1ccc(I)cc1", "C1CC1(C)C", "C12(CCC1)CCC2", "[Na+].[Cl-]", "OP(=O)(O)O", "c1ccc2c(c1)oc1ccccc12"]
 
@@ -30,6 +30,15 @@ def with_sub(mb, rng):
     picks = rng.sample(range(1, n + 1), min(3, n))
     ents = "".join(f" {a:3d} {rng.choice([-2, -2, 1, 2, 3]):3d}" for a in picks)
     lines.insert(i, f"M  SUB{len(picks):3d}{ents}")
+    return "\n".join(lines)
+
+
+def with_shortcut(mb):
+    lines = mb.split("\n")
+    n = int(lines[3][:3])
+    lines[4 + n - 1] = lines[4 + n - 1].replace(" O  ", " R  ", 1).replace(" C  ", " R  ", 1)
+    i = lines.index("M  END")
+    lines[i:i] = [f"A  {n:3d}", "SomeLabel"]
     return "\n".join(lines)
 
 
@@ -46,10 +55,12 @@ def main():
         if k % 3 == 0:
             blocks.append(Chem.MolToMolBlock(Chem.AddHs(m)))
         blocks.append(with_sub(Chem.MolToMolBlock(m), rng))
+        if k % 5 == 0:
+            blocks.append(with_shortcut(Chem.MolToMolBlock(m)))
         for mb in blocks:
             for which in BIT_SETS:
-                for as_query in (0, 1):
-                    for fpflags in (0, 1):
+                for as_query, fpflags in [rng.choice([(0, 0), (0, 1), (1, 0), (1, 1)])]:
+                    if True:
                         nbits = rng.choice([512, 2048, 4096])
                         with tempfile.NamedTemporaryFile("wb", suffix=".mol", dir=os.getcwd(), delete=False) as f:
                             f.write(mb.encode())
