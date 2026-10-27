@@ -48,6 +48,10 @@ const SPECIAL_RING: u32 = 0xFC & !(1 << 6);
 const RING_PATTERN_SEED: u64 = 11;
 const RING_SIZE_SEED: u64 = 67;
 const DEGREE_PATH_SEED: u64 = 71;
+const CLASS_SPIDER_SEED: u64 = 79;
+const CSP3: i32 = 19;
+const HETERO: i32 = 23;
+const MAX_SPIDER: usize = 7;
 const RING_CLOSURE_SEED: i64 = 101;
 
 const PROCESS_RING_CLOSURES: i32 = 0x0001;
@@ -268,6 +272,138 @@ fn set_path_bits_rec(
     result
 }
 
+/// `SetPathLengthFlags`: bit `k` of `matrix[start][a]` is set if a path of `k` bonds links the atoms
+fn set_path_length_flags(
+    mp: &Molecule,
+    touched: &mut [i32],
+    start: usize,
+    path_length: i32,
+    current: usize,
+    max_size: i32,
+    matrix: &mut [Vec<i32>],
+    nbp: &[Neighbourhood],
+    exclude_atom: i32,
+) {
+    for &ai in &nbp[current].atoms {
+        if path_length + 1 > max_size || ai as i32 + 1 == exclude_atom || touched[ai] != 0 {
+            continue;
+        }
+        if mp.atoms[ai].color == 0 {
+            continue;
+        }
+        touched[ai] = 1;
+        matrix[start][ai] |= 1 << (path_length + 1);
+        set_path_length_flags(
+            mp,
+            touched,
+            start,
+            path_length + 1,
+            ai,
+            max_size,
+            matrix,
+            nbp,
+            exclude_atom,
+        );
+        touched[ai] = 0;
+    }
+}
+
+/// `SpecialNeighboursRec`: counts of sp3 carbons and hetero atoms at graph distances
+fn special_neighbours_rec(
+    mp: &Molecule,
+    touched: &mut [i32],
+    path_length: usize,
+    current: usize,
+    csp3: &mut [i32; MAX_SPIDER + 1],
+    hetero: &mut [i32; MAX_SPIDER + 1],
+    nbp: &[Neighbourhood],
+    exclude_atom: i32,
+) {
+    for &ai in &nbp[current].atoms {
+        if path_length + 1 > MAX_SPIDER || ai as i32 + 1 == exclude_atom || touched[ai] != 0 {
+            continue;
+        }
+        let color = mp.atoms[ai].color;
+        if color <= 0 {
+            continue;
+        }
+        if color == CSP3 {
+            csp3[path_length] += 1;
+        } else if color == HETERO {
+            hetero[path_length] += 1;
+        }
+        if color == HETERO && path_length > 1 {
+            continue;
+        }
+        touched[ai] = 1;
+        special_neighbours_rec(
+            mp,
+            touched,
+            path_length + 1,
+            ai,
+            csp3,
+            hetero,
+            nbp,
+            exclude_atom,
+        );
+        touched[ai] = 0;
+    }
+}
+
+/// `SetFeatureBits` (without the count variant, which the C code does not use)
+fn set_feature_bits(
+    mp: &Molecule,
+    fp_counts: &mut [i32],
+    start_flags: i32,
+    end_flags: i32,
+    path_min: i32,
+    path_max: i32,
+    matrix: &[Vec<i32>],
+    start_seed: u64,
+    exclude_atom: i32,
+) -> i32 {
+    const TYPE_MASK: i32 = 0x00FF;
+    let ncounts = fp_counts.len();
+    let n = mp.atoms.len();
+    let mut result = 0;
+    let mut counts = vec![0i32; ncounts * 4];
+    for i in 0..n {
+        if i as i32 + 1 == exclude_atom {
+            continue;
+        }
+        let coli = mp.atoms[i].color;
+        if coli & start_flags == 0 || coli & TYPE_MASK == 0 {
+            continue;
+        }
+        let seed_i = ns(start_seed, coli & TYPE_MASK);
+        for j in 0..n {
+            if j as i32 + 1 == exclude_atom {
+                continue;
+            }
+            let colj = mp.atoms[j].color;
+            if colj & end_flags == 0 || colj & TYPE_MASK == 0 {
+                continue;
+            }
+            let seed = ns(seed_i, colj & TYPE_MASK);
+            for k in path_min..=path_max {
+                if (1 << k) & matrix[i][j] != 0 {
+                    let idx = (i64::from(k * 19) as u64).wrapping_add(seed) % (ncounts as u64 * 4);
+                    counts[idx as usize] += 1;
+                    result += 1;
+                }
+            }
+        }
+    }
+    for (i, &c) in counts.iter().enumerate() {
+        if c > 0 {
+            let p = hash_position(i as u64, ncounts);
+            fp_counts[p] += 1;
+            result += 1;
+        }
+    }
+    result
+}
+
 /// `SetFingerprintCountsWithFocus`: multiplicities of the hashed features in `fp_counts`; `Err` if
 /// a requested feature class is not ported yet. The atom colours, ring size flags and query
 /// hydrogen counts of `mp` are left changed, as in the C code.
@@ -292,6 +428,8 @@ pub fn set_fingerprint_counts_with_focus(
         | USE_RING_PATTERN
         | USE_RING_SIZE_COUNTS
         | USE_DEGREE_PATH
+        | USE_CLASS_SPIDERS
+        | USE_FEATURE_PAIRS
         | USE_SHORTCUT_LABELS;
     if which_bits & !IMPLEMENTED != 0 {
         return Err("fingerprint feature class not ported yet");
@@ -1590,6 +1728,204 @@ pub fn set_fingerprint_counts_with_focus(
             result += path_bits!(seed, 1, 2, 2, i, -1, PROCESS_CHAINS);
             seed = old_seed;
             touched[i] = 0;
+        }
+    }
+
+    let mut length_matrix: Vec<Vec<i32>> = Vec::new();
+    if which_bits & (USE_CLASS_SPIDERS | USE_FEATURE_PAIRS | USE_NON_SSS_BITS) != 0 {
+        length_matrix = vec![vec![0; n]; n];
+        touched.fill(0);
+        for i in 0..n {
+            if i as i32 + 1 == exclude_atom {
+                continue;
+            }
+            touched[i] = 1;
+            set_path_length_flags(
+                mp,
+                &mut touched,
+                i,
+                0,
+                i,
+                12,
+                &mut length_matrix,
+                &nbp,
+                exclude_atom,
+            );
+            touched[i] = 0;
+        }
+    }
+    if which_bits & (USE_CLASS_SPIDERS | USE_FEATURE_PAIRS) != 0 {
+        for i in 0..n {
+            let sym = mp.atoms[i].atom_symbol.clone();
+            let mut color = number_of(&sym);
+            color = match sym.as_str() {
+                "H" | "D" | "T" => 0,
+                "Q" => HETERO,
+                "A" | "L" => -1,
+                "C" => {
+                    if cdegree[i] >= 3 {
+                        CSP3
+                    } else {
+                        6
+                    }
+                }
+                _ if color > 1 && color < 115 => HETERO,
+                _ => 0,
+            };
+            if i as i32 + 1 == exclude_atom {
+                color = 0;
+            }
+            mp.atoms[i].color = color;
+        }
+        for i in 0..n {
+            if i as i32 + 1 == exclude_atom || degree[i] < 3 {
+                continue;
+            }
+            let color = mp.atoms[i].color;
+            if color != CSP3 && color != 6 {
+                continue;
+            }
+            touched[i] = 1;
+            let mut hetero = [0i32; MAX_SPIDER + 1];
+            let mut csp3 = [0i32; MAX_SPIDER + 1];
+            if which_bits & USE_CLASS_SPIDERS != 0 {
+                special_neighbours_rec(
+                    mp,
+                    &mut touched,
+                    1,
+                    i,
+                    &mut csp3,
+                    &mut hetero,
+                    &nbp,
+                    exclude_atom,
+                );
+            }
+            touched[i] = 0;
+            if which_bits & USE_CLASS_SPIDERS != 0 {
+                for j in 1..=MAX_SPIDER {
+                    if csp3[j] == 0 {
+                        continue;
+                    }
+                    let mut seed = CLASS_SPIDER_SEED;
+                    let first = if color == HETERO { HETERO } else { 6 };
+                    seed = ns(seed, first * 8);
+                    seed = ns(seed, CSP3 * 11);
+                    for j1 in 1..=MAX_SPIDER {
+                        if hetero[j1] <= 0 {
+                            continue;
+                        }
+                        for j2 in j1..=MAX_SPIDER {
+                            let mut tmp2 = hetero[j2];
+                            if j2 == j1 {
+                                tmp2 -= 1;
+                            }
+                            if tmp2 <= 0 {
+                                continue;
+                            }
+                            let s = ns(ns(seed, j as i32), (j1 + j2) as i32);
+                            add_bit!(s);
+                            result += 1;
+                        }
+                    }
+                }
+            }
+            if color != CSP3 {
+                continue;
+            }
+            if which_bits & USE_CLASS_SPIDERS != 0 {
+                for j in 1..=MAX_SPIDER {
+                    if hetero[j] == 0 {
+                        continue;
+                    }
+                    let mut seed = CLASS_SPIDER_SEED;
+                    seed = ns(seed, 6 * 8);
+                    seed = ns(seed, HETERO * 11);
+                    for j1 in j..=MAX_SPIDER {
+                        let mut tmp1 = hetero[j1];
+                        if j1 == j {
+                            tmp1 -= 1;
+                        }
+                        if tmp1 <= 0 {
+                            continue;
+                        }
+                        for j2 in j1..=MAX_SPIDER {
+                            let mut tmp2 = hetero[j2];
+                            if j2 == j {
+                                tmp2 -= 1;
+                            }
+                            if j2 == j1 {
+                                tmp2 -= 1;
+                            }
+                            if tmp2 <= 0 {
+                                continue;
+                            }
+                            let s = ns(seed, (j * j1 * j2) as i32);
+                            add_bit!(s);
+                            result += 1;
+                            if degree[i] > 3 {
+                                add_bit!(ns(s, 501));
+                                result += 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if which_bits & USE_FEATURE_PAIRS != 0 {
+            const HETERO_FLAG: i32 = 0x0100;
+            const RING_SUBST_FLAG: i32 = 0x0200;
+            const QUART_FLAG: i32 = 0x0400;
+            const CSP3_FLAG: i32 = 0x0800;
+            const RS_SPECIAL_FLAG: i32 = 0x1000;
+            for i in 0..n {
+                let sym = mp.atoms[i].atom_symbol.as_str();
+                let mut flags = match sym {
+                    "C" => 1,
+                    "O" => 2,
+                    "N" => 3,
+                    "S" => 4,
+                    "P" => 5,
+                    _ if atom_symbol_match(sym, "F,Cl,Br,I,At") => 6,
+                    _ => 0,
+                };
+                if mp.atoms[i].color == HETERO {
+                    flags |= HETERO_FLAG;
+                }
+                if cdegree[i] >= 3 {
+                    flags |= CSP3_FLAG;
+                }
+                if degree[i] >= 4 {
+                    flags |= QUART_FLAG;
+                }
+                if atom_status[i] > 0 && degree[i] >= 3 {
+                    flags |= RING_SUBST_FLAG;
+                    if mp.atoms[i].rsize_flags & SPECIAL_RING != 0 {
+                        flags |= RS_SPECIAL_FLAG;
+                    }
+                }
+                if i as i32 + 1 == exclude_atom {
+                    flags = 0;
+                }
+                mp.atoms[i].color = flags;
+            }
+            for (sf, ef, pmin, pmax, seed) in [
+                (RING_SUBST_FLAG, RING_SUBST_FLAG, 5, 7, 2237),
+                (QUART_FLAG, HETERO_FLAG, 1, 8, 4237),
+                (QUART_FLAG, RING_SUBST_FLAG, 1, 6, 5237),
+                (6, CSP3_FLAG, 1, 1, 15237),
+            ] {
+                result += set_feature_bits(
+                    mp,
+                    fp_counts,
+                    sf,
+                    ef,
+                    pmin,
+                    pmax,
+                    &length_matrix,
+                    seed,
+                    exclude_atom,
+                );
+            }
         }
     }
 
