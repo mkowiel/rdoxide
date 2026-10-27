@@ -34,4 +34,4 @@ def polymer_agreement(opt):
 def test_polymer_progress_is_recorded():
     # the number of molfiles whose `-Polymers` result already equals RDKit's; raise the
     # floor as the polymer stages land (it must never go down)
-    assert polymer_agreement("-Polymers") >= 0
+    assert polymer_agreement("-Polymers") >= 17  # baseline: the molfiles RDKit rejects too
