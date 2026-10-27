@@ -1,16 +1,15 @@
 # Avalon Toolkit port: notes
 
-Status: **not started** (2026-10-28). Nothing has been downloaded; these notes come from
-RDKit's wrapper sources in `upstream/rdkit/External/AvalonTools` and from the license file of
-the Avalon repository.
+Status: stage A0 done (2026-10-28): tarball downloaded to `.work/avalon/` (not committed) and its
+MD5 verified; license copied to `LICENSES/Avalon-BSD-3-Clause-Novartis.txt`.
 
 ## 1. Source and license
 
 * Source RDKit builds against: `ava-formake` tag `AvalonToolkit_2.0.5-pre.3`,
   <https://github.com/rdkit/ava-formake/archive/refs/tags/AvalonToolkit_2.0.5-pre.3.tar.gz>,
   MD5 `7a20c25a7e79f3344e0f9f49afa03351` (from `External/AvalonTools/CMakeLists.txt`).
-  RDKit patches the sources after download (README: "to avoid a potential memory corruption
-  issue"); the patch has to be found in the tarball/CMake step and applied or re-derived.
+  The `README` in RDKit's tree still talks about a patch, but the CMake file of this tag applies
+  none: the `rdkit/ava-formake` tag is already RDKit's patched fork (A0 finding).
 * License (`license.txt` at the top of the repository, read 2026-10-28): a BSD-style
   3-clause license, **Copyright 2001-2011 Novartis Pharma AG**; source and binary
   redistribution allowed with or without modification if (1) source redistributions keep the
@@ -83,3 +82,16 @@ check) come before the largest and riskiest one (layout). A1 is the prerequisite
 * Locale: RDKit wraps reader calls in `LocaleSwitcher`; Rust parsing must be locale independent.
 * Size is unknown until A0 counts the reachable lines; the earlier estimate (50-70k lines in
   the whole toolkit) shrinks to the reachable subset.
+
+## 5. Reachability (A0 result)
+
+`tools/avalon_reach.py` builds the call graph of the 473 function definitions in the 26 C files
+RDKit compiles (clang AST, function references included) and walks it from the entry points of
+section 2. Result: **324 functions, about 23.4k of 27.3k C lines (86 %)** are reachable; the list
+is `docs/avalon_reachable.txt`. So "only what RDKit uses" saves little here: almost the whole
+library is used. Biggest reachable parts: `layout.c` 5.0k, `ssmatch.c` 3.8k, `smi2mol.c` 3.0k,
+`utilities.c` 1.9k, `struchk.c` 1.3k, `reaccsio.c` 1.2k, `patclean.c` 1.1k, `canonizer.c` 1.0k,
+`fixcharges.c` 0.9k, `stereo.c` 0.9k. Not reachable: `didepict.c` (0.95k), `depictutil.c`,
+`rtutils.c`, `shortcut.c`, `sketch.c`, `jni`, `programs/*` except `struchk.c`.
+The oracle is the official wheel (it contains `rdkit.Avalon.pyAvalonTools`); a C build is
+possible as a second oracle from the same tarball.
