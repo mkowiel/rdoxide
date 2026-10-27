@@ -217,3 +217,163 @@ pub const PERIODIC_TABLE: &[(&str, i32)] = &[
     ("R", 123),
     ("A", 124),
 ];
+
+/// `cas_node_table` (symbol, CAS valence); the last entry `??` is the sentinel
+pub const CAS_VALENCE: &[(&str, i32)] = &[
+    ("Ac", 3),
+    ("Ag", 1),
+    ("Al", 3),
+    ("Am", 3),
+    ("Ar", 0),
+    ("As", 3),
+    ("At", 1),
+    ("Au", 1),
+    ("B", 3),
+    ("Ba", 2),
+    ("Be", 2),
+    ("Bi", 3),
+    ("Bk", 3),
+    ("Br", 1),
+    ("C", 4),
+    ("Ca", 2),
+    ("Cd", 2),
+    ("Ce", 3),
+    ("Cf", 3),
+    ("Cl", 1),
+    ("Cm", 3),
+    ("Co", 2),
+    ("Cr", 6),
+    ("Cs", 1),
+    ("Cu", 2),
+    ("D", 1),
+    ("D", 1),
+    ("Dy", 3),
+    ("Er", 3),
+    ("Es", 3),
+    ("Eu", 3),
+    ("F", 1),
+    ("Fe", 2),
+    ("Fm", 3),
+    ("Fr", 1),
+    ("Ga", 3),
+    ("Gd", 3),
+    ("Ge", 4),
+    ("H", 0),
+    ("He", 0),
+    ("Hf", 4),
+    ("Hg", 2),
+    ("Ho", 3),
+    ("I", 1),
+    ("In", 3),
+    ("Ir", 2),
+    ("K", 1),
+    ("Kr", 0),
+    ("La", 3),
+    ("Li", 1),
+    ("Lu", 3),
+    ("Lw", 3),
+    ("Md", 3),
+    ("Mg", 2),
+    ("Mn", 7),
+    ("Mo", 6),
+    ("N", 3),
+    ("Na", 1),
+    ("Nb", 5),
+    ("Nd", 3),
+    ("Ne", 0),
+    ("Ni", 2),
+    ("No", 3),
+    ("Np", 5),
+    ("O", 2),
+    ("Os", 2),
+    ("P", 3),
+    ("Pa", 5),
+    ("Pb", 4),
+    ("Pd", 2),
+    ("Pm", 3),
+    ("Po", 2),
+    ("Pr", 3),
+    ("Pt", 2),
+    ("Pu", 4),
+    ("Ra", 2),
+    ("Rb", 1),
+    ("Re", 7),
+    ("Rh", 0),
+    ("Rn", 2),
+    ("Ru", 2),
+    ("S", 2),
+    ("Sb", 3),
+    ("Sc", 3),
+    ("Se", 2),
+    ("Si", 4),
+    ("Sm", 3),
+    ("Sn", 4),
+    ("Sr", 2),
+    ("T", 1),
+    ("Ta", 5),
+    ("Tb", 3),
+    ("Tc", 7),
+    ("Te", 2),
+    ("Th", 4),
+    ("Ti", 4),
+    ("Tl", 1),
+    ("Tm", 3),
+    ("U", 6),
+    ("V", 5),
+    ("W", 6),
+    ("Xe", 0),
+    ("Y", 3),
+    ("Yb", 3),
+    ("Zn", 2),
+    ("Zr", 4),
+    ("??", 0),
+];
+
+/// the element group tables of utilities.c (`G`, `Q`, `M`, `alk`, `hal`, ...)
+pub const HC_TABLE: &[&str] = &["H", "C"];
+pub const NON_METAL_HETERO_ELEMENTS: &[&str] = &[
+    "He", "B", "N", "O", "F", "Ne", "Si", "P", "S", "Cl", "Ar", "As", "Se", "Br", "Kr", "Sb", "Te",
+    "I", "Xe", "At",
+];
+pub const METALS: &[&str] = &[
+    "Li", "Be", "Na", "Mg", "Al", "K", "Ca", "Sc", "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni", "Cu",
+    "Zn", "Ga", "Rb", "Sr", "Y", "Zr", "Nb", "Mo", "Tc", "Ru", "Rh", "Pd", "Ag", "Cd", "In", "Sn",
+    "Cs", "Ba", "La", "Ce", "Pr", "Nd", "Pm", "Sm", "Eu", "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb",
+    "Lu", "Hf", "Ta", "W", "Re", "Os", "Ir", "Pt", "Au", "Hg", "Tl", "Pb", "Bi", "Po", "Fr", "Ra",
+    "Ac", "Th", "Pa", "U", "Np", "Pu",
+];
+pub const NON_METAL_SMALL_SOLUTION: &[&str] = &[
+    "H", "B", "C", "N", "O", "F", "Si", "P", "S", "Cl", "Se", "Br", "I",
+];
+pub const ALKALI_METALS: &[&str] = &["Li", "Na", "K", "Rb", "Cs", "Fr"];
+pub const GR2: &[&str] = &["Be", "Mg", "Ca", "Sr", "Ba", "Ra"];
+pub const GR3: &[&str] = &["B", "Al", "Ga", "In", "Tl"];
+pub const GR4: &[&str] = &["C", "Si", "Ge", "Sn", "Pb"];
+pub const ONS_TABLE: &[&str] = &["O", "N", "S"];
+pub const ON2: &[&str] = &["O", "N", "S", "P", "Se", "Te", "Po"];
+pub const HALOGENES: &[&str] = &["F", "Cl", "Br", "I", "At"];
+pub const HA2: &[&str] = &["Cl", "Br", "I", "At"];
+pub const TRANSITION_METALS: &[&str] = &[
+    "Sc", "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni", "Cu", "Zn", "Y", "Zr", "Nb", "Mo", "Tc", "Ru",
+    "Rh", "Pd", "Ag", "Cd", "La", "Hf", "Ta", "W", "Re", "Os", "Ir", "Pt", "Au", "Hg",
+];
+pub const TRA: &[&str] = &[
+    "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni", "Zr", "Nb", "Mo", "Tc", "Ru", "Rh", "Pd", "Hf", "Ta",
+    "W", "Re", "Os", "Ir", "Pt",
+];
+pub const TRB: &[&str] = &["Cu", "Zn", "Ag", "Cd", "Au", "Hg"];
+pub const TM1: &[&str] = &["Cu", "Ag", "Au"];
+pub const TM2: &[&str] = &["Zn", "Cd", "Hg"];
+pub const TM3: &[&str] = &["Sc", "Y", "La"];
+pub const TM4: &[&str] = &["Ti", "Zr", "Hf"];
+pub const TM5: &[&str] = &["V", "Nb", "Ta"];
+pub const TM6: &[&str] = &["Cr", "Mo", "W"];
+pub const TM7: &[&str] = &["Mn", "Tc", "Re"];
+pub const TM8: &[&str] = &["Fe", "Co", "Ni", "Ru", "Rh", "Pd", "Os", "Ir", "Pt"];
+pub const LANTHANOIDS: &[&str] = &[
+    "Ce", "Pr", "Nd", "Pm", "Sm", "Eu", "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu",
+];
+pub const AMINO_ACIDS: &[&str] = &[
+    "Ala", "Arg", "Asn", "Asp", "Cys", "Gln", "Glu", "Gly", "His", "Ile", "Leu", "Lys", "Met",
+    "Phe", "Pro", "Ser", "Thr", "Trp", "Tyr", "Val",
+];
