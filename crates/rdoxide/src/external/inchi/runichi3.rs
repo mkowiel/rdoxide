@@ -1518,3 +1518,314 @@ pub fn oad_polymer_prepare_working_set(
     }
     0
 }
+
+/// `OrigAtData_IncreaseBondOrder`: number of the bond ends raised
+pub fn orig_at_data_increase_bond_order(
+    at: &mut [super::inpdef::InpAtom],
+    this_atom: usize,
+    other_atom: usize,
+) -> i32 {
+    use super::inpdef::MAXVAL;
+    if at[this_atom].valence as usize >= MAXVAL || at[other_atom].valence as usize >= MAXVAL {
+        return 0;
+    }
+    let mut n_up = 0;
+    for (from, to) in [(this_atom, other_atom), (other_atom, this_atom)] {
+        let a = &mut at[from];
+        if a.chem_bonds_valence as usize > MAXVAL - 1 {
+            return 0;
+        }
+        for i in 0..a.valence as usize {
+            if a.neighbor[i] as usize != to {
+                continue;
+            }
+            if a.bond_type[i] > 3 {
+                return 0;
+            }
+            a.bond_type[i] += 1;
+            a.chem_bonds_valence += 1;
+            n_up += 1;
+            break;
+        }
+    }
+    n_up
+}
+
+/// `OAD_PolymerUnit_HasMetal`
+fn oad_polymer_unit_has_metal(u: &OadPolymerUnit, at: &[super::inpdef::InpAtom]) -> bool {
+    u.alist
+        .iter()
+        .take(u.na as usize)
+        .any(|&a| super::util::is_el_a_metal(i32::from(at[a as usize - 1].el_number)))
+}
+
+/// `OAD_PolymerUnit_UnlinkCapsAndConnectEndAtoms`
+fn oad_polymer_unit_unlink_caps_and_connect_end_atoms(
+    unit: &mut OadPolymerUnit,
+    orig: &mut OrigAtomData,
+) {
+    if unit.cyclizable == CLOSING_SRU_NOT_APPLICABLE {
+        return;
+    }
+    let (mut bt, mut bs) = (0, 0);
+    let (c1, c2, e1, e2) = (
+        unit.cap1 - 1,
+        unit.cap2 - 1,
+        unit.end_atom1 - 1,
+        unit.end_atom2 - 1,
+    );
+    let mut nb = orig.num_inp_bonds;
+    if unit.cyclizable == CLOSING_SRU_RING {
+        orig_at_data_remove_bond(&mut orig.at, c1, e1, &mut bt, &mut bs, &mut nb);
+        orig_at_data_remove_bond(&mut orig.at, c2, e2, &mut bt, &mut bs, &mut nb);
+        orig_at_data_add_single_stereoless_bond(&mut orig.at, e1, e2, &mut nb);
+    } else if unit.cyclizable == CLOSING_SRU_HIGHER_ORDER_BOND {
+        orig_at_data_increase_bond_order(&mut orig.at, e1 as usize, e2 as usize);
+        orig_at_data_remove_bond(&mut orig.at, c1, e1, &mut bt, &mut bs, &mut nb);
+        orig_at_data_remove_bond(&mut orig.at, c2, e2, &mut bt, &mut bs, &mut nb);
+    } else if unit.cyclizable == CLOSING_SRU_DIRADICAL {
+        orig.at[e1 as usize].radical = RADICAL_TRIPLET as i8;
+        orig_at_data_remove_bond(&mut orig.at, c1, e1, &mut bt, &mut bs, &mut nb);
+        orig_at_data_remove_bond(&mut orig.at, c2, e2, &mut bt, &mut bs, &mut nb);
+    }
+    orig.num_inp_bonds = nb;
+    unit.cyclized = 1;
+}
+
+/// `OAD_Polymer_CyclizeCloseableUnits`: returns the error code
+pub fn oad_polymer_cyclize_closeable_units(
+    orig: &mut OrigAtomData,
+    p_str_err: &mut String,
+    b_no_warnings: bool,
+) -> i32 {
+    let n = orig.polymer.as_ref().map_or(0, |p| p.units.len());
+    for i in 0..n {
+        let mut unit = std::mem::take(&mut orig.polymer.as_mut().expect("polymer").units[i]);
+        let mut err = 0;
+        'unit: {
+            if unit.cyclizable == CLOSING_SRU_NOT_APPLICABLE {
+                break 'unit;
+            }
+            err = oad_polymer_unit_set_ends_and_caps(&mut unit, orig, p_str_err);
+            if err != 0 || unit.cyclizable == 0 {
+                break 'unit;
+            }
+            if oad_polymer_unit_has_metal(&unit, &orig.at)
+                && unit.cyclizable == CLOSING_SRU_RING
+                && !b_no_warnings
+            {
+                add_error_message(
+                    p_str_err,
+                    "Frame shift in metallated polymer unit may be missed",
+                );
+            }
+            oad_polymer_unit_unlink_caps_and_connect_end_atoms(&mut unit, orig);
+        }
+        orig.polymer.as_mut().expect("polymer").units[i] = unit;
+        if err != 0 {
+            return err;
+        }
+    }
+    0
+}
+
+/// `subgraf`: a light-weight subgraph of the original atoms (`subgraf_new`)
+struct Subgraf {
+    nodes: Vec<i32>,
+    /// original atom number -> node number (-1: not in the subgraph)
+    orig2node: Vec<i32>,
+    adj: Vec<Vec<usize>>,
+}
+
+fn subgraf_new(at: &[super::inpdef::InpAtom], nat: usize, nodes: &[i32]) -> Subgraf {
+    let mut orig2node = vec![-1; nat + 1];
+    for (i, &n) in nodes.iter().enumerate() {
+        orig2node[n as usize] = i as i32;
+    }
+    let adj = nodes
+        .iter()
+        .map(|&n| {
+            let a = &at[n as usize - 1];
+            (0..a.valence as usize)
+                .filter_map(|j| {
+                    let nbr = orig2node[a.neighbor[j] as usize + 1];
+                    (nbr >= 0).then_some(nbr as usize)
+                })
+                .collect()
+        })
+        .collect();
+    Subgraf {
+        nodes: nodes.to_vec(),
+        orig2node,
+        adj,
+    }
+}
+
+/// `subgraf_pathfinder_run` (no forbidden edges, no atom list): all simple
+/// paths from the last node of `seen` to `end`; collects their bonds as pairs of
+/// original atom numbers
+fn subgraf_pathfinder_run(
+    sg: &Subgraf,
+    seen: &mut Vec<usize>,
+    end: usize,
+    bonds: &mut Vec<[i32; 2]>,
+) {
+    let Some(&node0) = seen.last() else {
+        return;
+    };
+    for &node in &sg.adj[node0] {
+        if seen.contains(&node) {
+            continue;
+        }
+        if node == end {
+            seen.push(node);
+            for k in 1..seen.len() {
+                let (a1, a2) = (sg.nodes[seen[k - 1]], sg.nodes[seen[k]]);
+                if !bonds
+                    .iter()
+                    .any(|b| (b[0] == a1 && b[1] == a2) || (b[0] == a2 && b[1] == a1))
+                {
+                    bonds.push([a1, a2]);
+                }
+            }
+            seen.pop();
+            break;
+        }
+    }
+    for &node in &sg.adj[node0] {
+        if node == end || seen.contains(&node) {
+            continue;
+        }
+        seen.push(node);
+        subgraf_pathfinder_run(sg, seen, end, bonds);
+        seen.pop();
+    }
+}
+
+/// `OAD_PolymerUnit_RemoveLinkFromCRUChain`
+fn oad_polymer_unit_remove_link_from_cru_chain(
+    at1: i32,
+    at2: i32,
+    nbonds: &mut i32,
+    bonds: &mut [Vec<i32>],
+) {
+    for p in 0..*nbonds as usize {
+        if bonds[p][0] == at1 && bonds[p][1] == at2 {
+            for q in p + 1..*nbonds as usize {
+                bonds[q - 1][0] = bonds[q][0];
+                bonds[q - 1][1] = bonds[q][1];
+            }
+            *nbonds -= 1;
+            break;
+        }
+    }
+}
+
+/// `OAD_Polymer_FindBackbones`: for all frame-shiftable units, the bonds
+/// potentially involved in the frame shift. `at_data` is the preprocessed
+/// structure; `taut_bonds` holds the tautomeric bonds of the composite
+/// normalized structure as pairs of original atom numbers.
+pub fn oad_polymer_find_backbones(
+    at_data: &mut OrigAtomData,
+    pd: &mut OadPolymer,
+    taut_bonds: &std::collections::HashSet<(i32, i32)>,
+) {
+    let nat = at_data.num_inp_atoms;
+    for i in 0..pd.units.len().min(pd.n.max(0) as usize) {
+        if pd.units[i].cyclizable == CLOSING_SRU_NOT_APPLICABLE {
+            continue;
+        }
+        {
+            let u = &mut pd.units[i];
+            let sg = subgraf_new(&at_data.at, nat, &u.alist[..u.na as usize]);
+            let (start, end) = (
+                sg.orig2node[u.end_atom1 as usize],
+                sg.orig2node[u.end_atom2 as usize],
+            );
+            u.nbkbonds = 0;
+            if start < 0 || end < 0 {
+                continue;
+            }
+            let mut bonds = Vec::new();
+            subgraf_pathfinder_run(&sg, &mut vec![start as usize], end as usize, &mut bonds);
+            u.nbkbonds = bonds.len() as i32;
+            for (k, b) in bonds.iter().enumerate() {
+                if k < u.bkbonds.len() {
+                    u.bkbonds[k] = b.to_vec();
+                } else {
+                    u.bkbonds.push(b.to_vec());
+                }
+            }
+        }
+        if pd.units[i].nbkbonds < 2 {
+            continue;
+        }
+        // OAD_PolymerUnit_DelistIntraRingBackboneBonds
+        let mut num_ring_sys = vec![-1; nat + 1];
+        let mut size_ring_sys = vec![0; nat + 1];
+        let start = (pd.units[i].end_atom1 - 1) as usize;
+        let nrings = {
+            let snapshot = pd.clone();
+            let mut nb = at_data.num_inp_bonds;
+            let n = oad_polymer_find_ring_systems(
+                &snapshot,
+                &mut at_data.at,
+                nat,
+                &mut nb,
+                &mut num_ring_sys,
+                &mut size_ring_sys,
+                start,
+            );
+            at_data.num_inp_bonds = nb;
+            n
+        };
+        let u = &mut pd.units[i];
+        if nrings != 0 {
+            let mut j = 0;
+            loop {
+                let (a1, a2) = (u.bkbonds[j][0], u.bkbonds[j][1]);
+                let (r1, r2) = (num_ring_sys[a1 as usize], num_ring_sys[a2 as usize]);
+                if r1 == r2 && r1 != -1 {
+                    oad_polymer_unit_remove_link_from_cru_chain(
+                        a1,
+                        a2,
+                        &mut u.nbkbonds,
+                        &mut u.bkbonds,
+                    );
+                } else {
+                    j += 1;
+                }
+                if j as i32 >= u.nbkbonds {
+                    break;
+                }
+            }
+        }
+        // OAD_PolymerUnit_DelistHighOrderBackboneBonds (tautomeric bonds only)
+        if u.na >= 2 && u.nb >= 2 && u.nbkbonds >= 1 {
+            let mut j = 0;
+            loop {
+                let (a1, a2) = (u.bkbonds[j][0], u.bkbonds[j][1]);
+                if taut_bonds.contains(&(a1.min(a2), a1.max(a2))) {
+                    oad_polymer_unit_remove_link_from_cru_chain(
+                        a1,
+                        a2,
+                        &mut u.nbkbonds,
+                        &mut u.bkbonds,
+                    );
+                } else {
+                    j += 1;
+                }
+                if j as i32 >= u.nbkbonds {
+                    break;
+                }
+            }
+        }
+        if u.nbkbonds == 0 {
+            // keep a single frame-shift bond between the original caps of the CRU ends
+            u.cyclizable = 1;
+            u.nbkbonds = 1;
+            u.bkbonds[0][0] = u.end_atom1;
+            u.bkbonds[0][1] = u.end_atom2;
+        }
+    }
+}
