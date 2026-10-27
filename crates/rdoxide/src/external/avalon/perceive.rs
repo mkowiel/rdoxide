@@ -4,6 +4,7 @@
 use super::graph::{BondSet, combine_rings, proper_ring_pairs, ring_list};
 use super::reaccs::{Molecule, SymbolList};
 use super::set::BitSet;
+use super::utilities::atom_symbol_match;
 
 /// `RING`, `CHAIN` of `mdl.h`
 pub const RING: i32 = 1;
@@ -65,24 +66,6 @@ pub fn setup_neighbourhood(mp: &Molecule) -> Option<Vec<Neighbourhood>> {
         }
     }
     Some(nb)
-}
-
-/// `AtomSymbolMatch` for lists of plain symbols (and the symbol `A`); the named element groups
-/// (`alk`, `hal`, `Q`, ...) are not ported yet
-pub fn atom_symbol_match(atsym: &str, pattern: &str) -> bool {
-    for tok in pattern.split(',').filter(|t| !t.is_empty()) {
-        debug_assert!(
-            !tok.starts_with(|c: char| c.is_ascii_lowercase()),
-            "named atom group {tok} is not ported"
-        );
-        if tok == atsym {
-            return true;
-        }
-    }
-    if pattern == "A" {
-        return atsym != "H";
-    }
-    false
 }
 
 /// `RingState`: number of basis rings per bond and of ring bonds per atom
@@ -474,6 +457,7 @@ pub fn perceive_dy_aromaticity(mp: &mut Molecule, nbp: &[Neighbourhood]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::external::avalon::denormal::cct_denormalize;
     use crate::external::avalon::reaccsio::mol_str_to_mol;
 
     /// every perception routine must leave the same molecule as the Avalon C code
@@ -488,16 +472,20 @@ mod tests {
             let want = v["output"].as_str().expect("output");
             let mut m = mol_str_to_mol(input).expect("molecule");
             let nbp = setup_neighbourhood(&m).expect("neighbourhood");
+            let mut got = String::new();
             match mode {
                 "ring" => perceive_ring_bonds(&mut m),
                 "arom" => perceive_aromatic_bonds(&mut m),
                 "dy" => perceive_dy_aromaticity(&mut m, &nbp),
                 "rsize" => set_ring_size_flags(&mut m, 8, &nbp),
+                "den" => got += &format!("r {}\n", cct_denormalize(&mut m)),
                 _ => unreachable!(),
             }
-            let mut got = String::new();
             for a in &m.atoms {
-                got += &format!("a {} {}\n", a.query_h_count, a.rsize_flags);
+                got += &format!(
+                    "a {} {} {} {} {}\n",
+                    a.query_h_count, a.rsize_flags, a.charge, a.dummy2, a.color
+                );
             }
             for b in &m.bonds {
                 got += &format!(
@@ -508,6 +496,6 @@ mod tests {
             assert_eq!(got, want, "{mode}\n{input}");
             n += 1;
         }
-        assert!(n > 800);
+        assert!(n > 1300);
     }
 }

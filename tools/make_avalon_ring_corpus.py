@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Builds tests/data/avalon_rings.jsonl: molfiles and what PerceiveRingBonds, PerceiveAromaticBonds,
-PerceiveDYAromaticity and SetRingSizeFlags of the Avalon C code leave in the molecule (driver built from .work/avalon_drv/ring.c; its rand()
+PerceiveDYAromaticity, SetRingSizeFlags and CCTDenormalize of the Avalon C code leave in the molecule (driver built from .work/avalon_drv/ring.c; its rand()
 is the glibc generator).
 
     .venv-ref/bin/python tools/make_avalon_ring_corpus.py DRIVER > tests/data/avalon_rings.jsonl
@@ -31,7 +31,7 @@ SMILES = [
     "C1=CNC=C1", "C1=CCC=C1", "C1=CC=CN1", "O=C1NC=CC=C1", "c1ccc2c(c1)ccc1ccccc12", "c1c[nH]c2ncccc12",
     "[nH]1cccc1-c1ccccc1", "c1cc2ccc3ccc4ccc5ccc6ccc1c1c2c3c4c5c61", "S1C=CC=C1", "N1C=CC=C1C=O", "C=C1C=CC=CC1=O",
 ]
-MODES = ["ring", "arom", "dy", "rsize"]
+MODES = ["ring", "arom", "dy", "rsize", "den"]
 
 
 def main():
@@ -43,7 +43,7 @@ def main():
         AllChem.Compute2DCoords(m)
         mk = Chem.Mol(m)
         Chem.Kekulize(mk, clearAromaticFlags=True)
-        for mb in (Chem.MolToMolBlock(m), Chem.MolToMolBlock(mk, kekulize=False), Chem.MolToV3KMolBlock(m)):
+        for mb in (Chem.MolToMolBlock(m), Chem.MolToMolBlock(m, kekulize=False), Chem.MolToMolBlock(mk, kekulize=False), Chem.MolToV3KMolBlock(m)):
             for mode in MODES:
                 with tempfile.NamedTemporaryFile("wb", suffix=".mol", dir=os.getcwd(), delete=False) as f:
                     f.write(mb.encode())

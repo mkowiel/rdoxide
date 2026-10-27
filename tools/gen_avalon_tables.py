@@ -2,12 +2,14 @@
 """Generates crates/rdoxide/src/external/avalon/tables.rs from the Avalon Toolkit sources
 (`ptable` and `periodic_table` of utilities.c).
 
-    python3 tools/gen_avalon_tables.py <path to src/main/C/common/utilities.c>
+    python3 tools/gen_avalon_tables.py <path to src/main/C/common>
 """
 import re
 import sys
 
-src = open(sys.argv[1], errors="replace").read()
+base = sys.argv[1]
+src = open(base + "/utilities.c", errors="replace").read()
+cas = open(base + "/casutils.c", errors="replace").read()
 a = src.index("struct ptable_entry ptable[] =")
 b = src.index("};", a)
 pt = re.findall(r'\{\s*"([^"]+)"\s*,\s*(-?\d+)\s*,\s*([-\d.]+)\s*,\s*([-\d.]+)\s*,\s*([-\d.]+)\s*\}', src[a:b])
@@ -24,4 +26,22 @@ out += ["];", "", "/// `periodic_table` (symbol, atomic number)", "pub const PER
 for s, v in st:
     out.append(f'    ("{s}", {v}),')
 out.append("];")
+a = cas.index("struct cas_node_entry_t cas_node_table[] =")
+b = cas.index("};", a)
+ce = re.findall(r'\{\s*"([^"]+)"\s*,\s*(\d+)\s*,\s*"[^"]*"\s*,\s*(0x[0-9A-Fa-f]+)\s*\}', cas[a:b])
+out += ["", "/// `cas_node_table` (symbol, CAS valence); the last entry `??` is the sentinel",
+        "pub const CAS_VALENCE: &[(&str, i32)] = &["]
+for sym, v, _ in ce:
+    out.append(f'    ("{sym}", {v}),')
+out.append("];")
+groups = ["HC_table", "non_metal_hetero_elements", "metals", "non_metal_small_solution", "alkali_metals", "gr2",
+          "gr3", "gr4", "ONS_table", "on2", "halogenes", "ha2", "transition_metals", "tra", "trb", "tm1", "tm2",
+          "tm3", "tm4", "tm5", "tm6", "tm7", "tm8", "lanthanoids", "amino_acids"]
+out += ["", "/// the element group tables of utilities.c (`G`, `Q`, `M`, `alk`, `hal`, ...)"]
+for g in groups:
+    a = src.index("char *%s[]" % g)
+    b = src.index("};", a)
+    body = re.sub(r"/\*.*?\*/|//[^\n]*", "", src[a:b], flags=re.S)
+    names = re.findall(r'"([^"]*)"', body)
+    out.append("pub const %s: &[&str] = &[%s];" % (g.upper(), ", ".join('"%s"' % n for n in names)))
 print("\n".join(out))
