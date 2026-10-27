@@ -185,6 +185,9 @@ pub fn create_one_component_inchi(
 pub struct StructResults {
     pub p_inchi: [Vec<[Option<InChI>; 2]>; 3],
     pub p_aux: [Vec<[Option<InChIAux>; 2]>; 3],
+    /// the tautomeric bonds of the normalized components as pairs of original
+    /// atom numbers (what the composite normalized structure is used for)
+    pub taut_bonds: [std::collections::HashSet<(i32, i32)>; 3],
 }
 
 /// `CreateOneStructureINChI`: preprocesses the structure (once), splits it
@@ -314,6 +317,22 @@ pub fn create_one_structure_inchi(
             );
             res.p_inchi[i_inchi][i] = pi;
             res.p_aux[i_inchi][i] = pa;
+            for nd in [&inp_norm_data[1], &inp_norm_data[0]] {
+                if nd.b_exists != 0 && nd.b_deleted == 0 {
+                    for a in nd.at.iter().take(nd.num_at.max(0) as usize) {
+                        for k in 0..a.valence as usize {
+                            if i32::from(a.bond_type[k]) == super::ichitaut::BOND_TAUTOM {
+                                let (x, y) = (
+                                    i32::from(a.orig_at_number),
+                                    i32::from(nd.at[a.neighbor[k] as usize].orig_at_number),
+                                );
+                                res.taut_bonds[i_inchi].insert((x.min(y), x.max(y)));
+                            }
+                        }
+                    }
+                    break;
+                }
+            }
             if n_ret != 0 {
                 n_ret = treat_errors_in_create_one_component_inchi(sd, log, i, num_inp);
                 break;
@@ -467,6 +486,9 @@ pub fn process_one_structure_arrays(
             sd, ip, log, num_inp, INCHI_BAS, orig, prep, &mut res, &mut nc,
         );
         n_ret = n_ret.max(n1);
+        if let Some(r) = find_backbones(orig, prep, &res.taut_bonds[INCHI_BAS], true) {
+            n_ret = n_ret.max(r);
+        }
     }
     // 3. INChI of the whole metal-reconnected structure
     if ok(n_ret)
@@ -477,6 +499,12 @@ pub fn process_one_structure_arrays(
             sd, ip, log, num_inp, INCHI_REC, orig, prep, &mut res, &mut nc,
         );
         n_ret = n_ret.max(n1);
+        if let Some(r) = find_backbones(orig, prep, &res.taut_bonds[INCHI_REC], false) {
+            n_ret = n_ret.max(r);
+        }
+    }
+    if let (Some(pd), true) = (orig.polymer.as_ref(), orig_struct.polymer.is_some()) {
+        orig_struct.polymer = Some(pd.clone());
     }
     let mut pinchi: [PInChI2; 2] = [
         std::mem::take(&mut res.p_inchi[0]),
@@ -553,6 +581,33 @@ pub fn process_one_structure_arrays(
     n_ret
 }
 
+/// the `OAD_Polymer_FindBackbones` calls of `ProcessOneStructure` (on the
+/// preprocessed atoms, with the polymer data of the original structure)
+fn find_backbones(
+    orig: &mut OrigAtomData,
+    prep: &mut [OrigAtomData; 2],
+    taut_bonds: &std::collections::HashSet<(i32, i32)>,
+    structure_based_only: bool,
+) -> Option<i32> {
+    use super::runichi3::{
+        POLYMER_REPRESENTATION_STRUCTURE_BASED, oad_polymer_find_backbones,
+        oad_polymer_get_representation,
+    };
+    if orig.valid_polymer == 0 || !orig.polymer.as_ref().is_some_and(|p| p.n > 0) {
+        return None;
+    }
+    if structure_based_only
+        && oad_polymer_get_representation(orig.polymer.as_mut())
+            != POLYMER_REPRESENTATION_STRUCTURE_BASED
+    {
+        return None;
+    }
+    let mut pd = orig.polymer.take()?;
+    oad_polymer_find_backbones(&mut prep[0], &mut pd, taut_bonds);
+    orig.polymer = Some(pd);
+    Some(0)
+}
+
 /// `ProcessOneStructureExCore`: validates the polymer and pseudoatom data, then
 /// calculates the InChI. Returns the `IS_*` result.
 #[allow(clippy::too_many_arguments)]
@@ -566,7 +621,7 @@ fn process_one_structure_ex_core(
     prep: &mut [OrigAtomData; 2],
     num_inp: i64,
 ) -> i32 {
-    use super::ichiparm::{POLYMERS_LEGACY, POLYMERS_LEGACY_PLUS, POLYMERS_MODERN, POLYMERS_NO};
+    use super::ichiparm::{POLYMERS_LEGACY, POLYMERS_LEGACY_PLUS, POLYMERS_MODERN};
     use super::runichi3::oad_validate_polymer_and_pseudo_element_data;
     let mut res = oad_validate_polymer_and_pseudo_element_data(
         orig,
@@ -602,18 +657,24 @@ fn process_one_structure_ex_core(
     }
     if mind_polymers
         && ip.b_polymers != POLYMERS_MODERN
-        && ip.b_polymers != POLYMERS_NO
         && (ip.b_frame_shift_scheme == super::ichiparm::FSS_STARS_CYCLED
             || ip.b_frame_shift_scheme == super::ichiparm::FSS_STARS_CYCLED_SORTED)
-        && orig.polymer.as_ref().is_some_and(|p| p.n_pzz >= 2)
     {
-        // OAD_Polymer_CyclizeCloseableUnits (older polymer modes)
-        super::ichierr::add_error_message(
+        // older polymer modes: cyclize the frame-shift eligible units
+        res = super::runichi3::oad_polymer_cyclize_closeable_units(
+            orig,
             &mut sd.str_err_struct,
-            "Polymer processing is not supported yet",
+            ip.b_no_warnings != 0,
         );
-        sd.n_error_type = IS_ERROR;
-        return IS_ERROR;
+        if res != 0 {
+            sd.n_error_code = res;
+            super::ichierr::add_error_message(
+                &mut sd.str_err_struct,
+                "Error while processing polymer-related input",
+            );
+            orig.num_inp_atoms = 0;
+            return IS_ERROR;
+        }
     }
     res = process_one_structure(sd, ip, log, out_file, strbuf, orig, prep, num_inp);
     if (res == super::runichi3::IS_OKAY || res == super::runichi3::IS_WARNING)
