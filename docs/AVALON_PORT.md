@@ -95,3 +95,18 @@ library is used. Biggest reachable parts: `layout.c` 5.0k, `ssmatch.c` 3.8k, `sm
 `rtutils.c`, `shortcut.c`, `sketch.c`, `jni`, `programs/*` except `struchk.c`.
 The oracle is the official wheel (it contains `rdkit.Avalon.pyAvalonTools`); a C build is
 possible as a second oracle from the same tarball.
+
+## Status (updated)
+
+Done and checked against the Avalon C code (oracle driver built from the tarball) or against the
+official wheel: A1 (MOL reader/writer), A2a-d (sets, rings, aromaticity, denormalization, `MOLToSMI`),
+A4 (all fingerprint classes) and the first part of A7: `rdoxide.Avalon.pyAvalonTools` with
+`GetAvalonFP`, `GetAvalonCountFP` and `GetAvalonFPAsWords` for molecules and MOL blocks
+(`tests/python/test_avalon_fp.py`, 780 cases vs the official wheel). Findings worth keeping:
+
+* the Python fingerprint is two passes (the second one with Daylight aromaticity, OR-ed in unless
+  `isQuery`); the count fingerprint ignores `bitFlags` (always `USE_ALL_FEATURES`) and adds a second
+  accumulating pass in query mode;
+* `GetAvalonFPAsWords` packs signed `char`s, so bytes >= 0x80 sign-extend;
+* still open: SMILES input (`SMIToMOL` needs layout), `GetCanonSmiles`, `CheckMolecule`,
+  `Generate2DCoords`, `PerceiveMarkush`, `MolKey` wiring.

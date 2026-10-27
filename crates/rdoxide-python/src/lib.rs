@@ -26,6 +26,7 @@ mod molbundle;
 mod monomer_info;
 mod perception;
 mod props;
+mod pyavalontools;
 mod pyconv;
 mod rdabbreviations;
 mod rdalignment;
@@ -343,6 +344,12 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
     )?;
     add_submodule(m, "rdSLNParse", "rdoxide.Chem.rdSLNParse", rdslnparse::init)?;
     add_submodule(m, "rdinchi", "rdoxide.Chem.rdinchi", rdinchi::init)?;
+    add_submodule(
+        m,
+        "pyAvalonTools",
+        "rdoxide.Avalon.pyAvalonTools",
+        pyavalontools::init,
+    )?;
     add_submodule(
         m,
         "rdStructChecker",
