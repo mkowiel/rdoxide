@@ -2779,13 +2779,29 @@ fn output_inchi_polymer_layer_single_unit(
                 }
                 if (treat == super::ichiparm::POLYMERS_MODERN
                     || treat == super::ichiparm::POLYMERS_LEGACY_PLUS)
-                    && frame_shift_scheme != 0
+                    && frame_shift_scheme != super::ichiparm::FSS_NONE
+                    && u.nbkbonds >= 1
                     && u.cap1 >= 1
                     && u.cap2 >= 1
+                    && super::runichi3::oad_polymer_unit_set_reopening_details(
+                        u,
+                        &orig_struct.orig_at,
+                    ) != 0
                 {
-                    // OAD_PolymerUnit_SetReopeningDetails and the seniority sort of the
-                    // backbone bonds belong to the frame shift stage, not ported yet
-                    return 13;
+                    // move the senior backbone bond to the beginning of the list
+                    let senior =
+                        super::runichi3::oad_polymer_unit_sort_backbone_bonds_and_set_seniors(
+                            u, aprops,
+                        );
+                    if senior != 0 {
+                        let (b0, b1) = (u.bkbonds[0][0], u.bkbonds[0][1]);
+                        u.bkbonds[0][0] = u.bkbonds[senior][0];
+                        u.bkbonds[0][1] = u.bkbonds[senior][1];
+                        u.end_atom1 = u.bkbonds[0][0];
+                        u.end_atom2 = u.bkbonds[0][1];
+                        u.bkbonds[senior][0] = b0;
+                        u.bkbonds[senior][1] = b1;
+                    }
                 }
                 for k in 0..nbk {
                     let sep = if k == nbk - 1 { ')' } else { ',' };

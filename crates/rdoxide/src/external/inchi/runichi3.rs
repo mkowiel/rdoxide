@@ -1829,3 +1829,327 @@ pub fn oad_polymer_find_backbones(
         }
     }
 }
+
+/// `OAD_PolymerUnit_SetReopeningDetails`: returns the number of backbone bonds
+pub fn oad_polymer_unit_set_reopening_details(
+    u: &mut OadPolymerUnit,
+    at: &[super::inpdef::InpAtom],
+) -> i32 {
+    if u.nbkbonds == 1 {
+        u.end_atom1 = u.bkbonds[0][0];
+        u.end_atom2 = u.bkbonds[0][1];
+        if u.end_atom1 == u.end_atom2 {
+            u.cyclizable = CLOSING_SRU_DIRADICAL;
+        } else {
+            let a = &at[u.end_atom1 as usize - 1];
+            for k in 0..a.valence as usize {
+                if i32::from(a.neighbor[k]) == u.end_atom2 - 1 {
+                    if a.bond_type[k] > 1 {
+                        u.cyclizable = CLOSING_SRU_HIGHER_ORDER_BOND;
+                    }
+                    break;
+                }
+            }
+        }
+    }
+    u.nbkbonds
+}
+
+/// `OAD_Polymer_CompareBackboneBondsSeniority`
+fn oad_polymer_compare_backbone_bonds_seniority(
+    b1: &[i32],
+    b2: &[i32],
+    aprops: &[OadAtProps],
+) -> i32 {
+    let (mut b1max, mut b1min) = (b1[0], b1[1]);
+    let (mut b2max, mut b2min) = (b2[0], b2[1]);
+    if oad_polymer_is_first_atom_rank_lower(b1min, b1max, aprops) == -1 {
+        std::mem::swap(&mut b1max, &mut b1min);
+    }
+    if oad_polymer_is_first_atom_rank_lower(b2min, b2max, aprops) == -1 {
+        std::mem::swap(&mut b2max, &mut b2min);
+    }
+    match oad_polymer_compare_ranks_of_two_atoms(b1max, b2max, aprops) {
+        1 => return 1,
+        -1 => return -1,
+        _ => {}
+    }
+    match oad_polymer_compare_ranks_of_two_atoms(b1min, b2min, aprops) {
+        1 => return -1,
+        -1 => return 1,
+        _ => {}
+    }
+    if b1max < b2max {
+        return 1;
+    }
+    if b1max > b2max {
+        return -1;
+    }
+    if b1min < b2min {
+        return -1;
+    }
+    if b1min > b2min {
+        return 1;
+    }
+    0
+}
+
+/// `OAD_PolymerUnit_SortBackboneBondsAndSetSeniors`: returns the index of the
+/// senior backbone bond
+pub fn oad_polymer_unit_sort_backbone_bonds_and_set_seniors(
+    u: &mut OadPolymerUnit,
+    aprops: &[OadAtProps],
+) -> usize {
+    let mut senior = 0;
+    if u.nbkbonds > 1 {
+        let n = u.nbkbonds as usize;
+        let mut bnum: Vec<usize> = (0..n).collect();
+        for i in 1..n {
+            let tmp = bnum[i];
+            let mut j = i as isize - 1;
+            while j >= 0
+                && oad_polymer_compare_backbone_bonds_seniority(
+                    &u.bkbonds[bnum[j as usize]],
+                    &u.bkbonds[tmp],
+                    aprops,
+                ) > 0
+            {
+                bnum[(j + 1) as usize] = bnum[j as usize];
+                j -= 1;
+            }
+            bnum[(j + 1) as usize] = tmp;
+        }
+        senior = bnum[0];
+    }
+    if oad_polymer_is_first_atom_rank_lower(u.bkbonds[senior][0], u.bkbonds[senior][1], aprops) == 1
+    {
+        u.bkbonds[senior].swap(0, 1);
+    }
+    u.end_atom1 = u.bkbonds[senior][0];
+    u.end_atom2 = u.bkbonds[senior][1];
+    senior
+}
+
+/// `inchi_strtol`-like: the integer at `pos` (after white space and a sign) and the
+/// position after it; `(0, pos)` when there are no digits
+fn strtol_at(b: &[u8], pos: usize) -> (i32, usize) {
+    let mut i = pos;
+    while i < b.len() && b[i].is_ascii_whitespace() {
+        i += 1;
+    }
+    let neg = i < b.len() && b[i] == b'-';
+    if i < b.len() && (b[i] == b'-' || b[i] == b'+') {
+        i += 1;
+    }
+    let st = i;
+    let mut v: i64 = 0;
+    while i < b.len() && b[i].is_ascii_digit() {
+        v = (v * 10 + i64::from(b[i] - b'0')).min(i64::from(i32::MAX));
+        i += 1;
+    }
+    if i == st {
+        return (0, pos);
+    }
+    (if neg { -v as i32 } else { v as i32 }, i)
+}
+
+/// `GetFrameShiftInfoFrom105PlusInChI`: `(unit, atom1, atom2)` of the senior
+/// backbone bond of each eligible unit in the `/z` layer
+fn get_frame_shift_info_from_105plus_inchi(
+    sinchi: &str,
+    max_crossing: usize,
+) -> Vec<(usize, i32, i32)> {
+    let b = sinchi.as_bytes();
+    let find = |from: usize, c: u8| {
+        b.get(from..)
+            .and_then(|s| s.iter().position(|&x| x == c))
+            .map(|k| k + from)
+    };
+    let mut out = Vec::new();
+    let mut p = sinchi.find("/z");
+    let mut iunit = 0;
+    while let Some(pp) = p {
+        let Some(open) = find(pp + 2, b'(') else {
+            break;
+        };
+        let mut pos = open + 1;
+        let mut num = [-1, -1];
+        let mut j = 0;
+        let mut skip = false;
+        loop {
+            let (k, q) = strtol_at(b, pos);
+            if k == 0 || j >= 2 {
+                break;
+            }
+            num[j] = k;
+            j += 1;
+            let c = b.get(q).copied().unwrap_or(0);
+            if (j == 1 && c == b'-') || c == b')' {
+                skip = true;
+                break;
+            }
+            pos = q + 1;
+        }
+        if !skip && j >= 2 {
+            out.push((iunit, num[0], num[1]));
+            if out.len() >= max_crossing {
+                break;
+            }
+        }
+        p = find(pos, b';');
+        iunit += 1;
+    }
+    out
+}
+
+/// `extract_orig_nums_from_auxinfo_string`: `orig[canonical number]`
+fn extract_orig_nums_from_auxinfo_string(saux: &str, orig: &mut [i32]) -> bool {
+    let b = saux.as_bytes();
+    let Some(p) = saux.find("/N:") else {
+        return false;
+    };
+    if !b.get(p + 3).is_some_and(u8::is_ascii_digit) {
+        return false;
+    }
+    let mut pos = p + 3;
+    let mut cano = 1;
+    loop {
+        let (k, q) = strtol_at(b, pos);
+        if k == 0 {
+            break;
+        }
+        if cano < orig.len() {
+            orig[cano] = k;
+        }
+        cano += 1;
+        match b.get(q).copied() {
+            Some(c) if c != 0 && c != b'/' => pos = q + 1,
+            _ => break,
+        }
+    }
+    true
+}
+
+/// `OAD_Polymer_PrepareFrameShiftEdits`: the bond modifications
+/// `(old_a1, old_a2, new_a1, new_a2)`; `None` is an error
+pub fn oad_polymer_prepare_frame_shift_edits(
+    orig: &OrigAtomData,
+    sinchi: &str,
+    saux: &str,
+) -> Option<Vec<[i32; 4]>> {
+    let p = orig.polymer.as_ref()?;
+    let nu = p.n.max(0) as usize;
+    let mut cano2orig = vec![0; orig.num_inp_atoms + 1];
+    if !extract_orig_nums_from_auxinfo_string(saux, &mut cano2orig) {
+        return None;
+    }
+    let mut mods = Vec::new();
+    for (_, c1, c2) in get_frame_shift_info_from_105plus_inchi(sinchi, nu) {
+        let at = |c: i32| cano2orig.get(c as usize).copied().unwrap_or(0);
+        let (end1, end2) = (at(c1), at(c2));
+        let mut iu = None;
+        for (k, u) in p.units.iter().enumerate().take(nu) {
+            if u.blist.is_empty() || u.nb < 2 {
+                continue;
+            }
+            let present = u
+                .alist
+                .iter()
+                .take(u.na as usize)
+                .filter(|&&a| a == end1 || a == end2)
+                .count();
+            if present >= 2 {
+                iu = Some(k);
+            }
+        }
+        let u = &p.units[iu?];
+        let mut probe = u.clone();
+        let mut dummy = String::new();
+        let err = oad_polymer_unit_find_ends_and_caps(&mut probe, orig, &mut dummy);
+        let (cap1, cap2) = (probe.cap1, probe.cap2);
+        if err == 0
+            && probe.cap1_is_undef != 0
+            && probe.cap2_is_undef != 0
+            && end1 != 0
+            && end2 != 0
+            && cap1 != 0
+            && cap2 != 0
+        {
+            let bl = &u.blist;
+            let old_end = |cap: i32| -> Option<i32> {
+                if cap == bl[0] {
+                    Some(bl[1])
+                } else if cap == bl[1] {
+                    Some(bl[0])
+                } else if cap == bl[2] {
+                    Some(bl[3])
+                } else if cap == bl[3] {
+                    Some(bl[2])
+                } else {
+                    None
+                }
+            };
+            let (Some(old_end1), Some(old_end2)) = (old_end(cap1), old_end(cap2)) else {
+                continue;
+            };
+            if old_end1 == 0 || old_end2 == 0 || old_end1 == old_end2 {
+                continue;
+            }
+            let same = |a1: i32, a2: i32, b1: i32, b2: i32| {
+                (a1 == b1 && a2 == b2) || (a1 == b2 && a2 == b1)
+            };
+            if same(old_end1, cap1, end1, cap1) && same(old_end2, cap2, end2, cap2) {
+                continue;
+            }
+            if !same(old_end1, cap1, end1, cap1) {
+                mods.push([old_end1, cap1, end1, cap1]);
+            }
+            if !same(old_end2, cap2, end2, cap2) {
+                mods.push([old_end2, cap2, end2, cap2]);
+            }
+            mods.push([end1, end2, old_end1, old_end2]);
+        }
+    }
+    Some(mods)
+}
+
+/// `OAD_StructureEdits_Apply` for bond modifications; returns the number of
+/// edits done, `None` at error
+pub fn oad_structure_edits_apply_mod_bonds(
+    orig: &mut OrigAtomData,
+    mods: &[[i32; 4]],
+) -> Option<i32> {
+    let mut n = 0;
+    for m in mods {
+        let (o1, o2, n1, n2) = (m[0], m[1], m[2], m[3]);
+        if (o1 == n1 && o2 == n2) || (o2 == n1 && o1 == n2) {
+            continue;
+        }
+        let (mut bt, mut bs) = (0, 0);
+        let mut nb = orig.num_inp_bonds;
+        if !orig_at_data_remove_bond(&mut orig.at, o1 - 1, o2 - 1, &mut bt, &mut bs, &mut nb) {
+            return None;
+        }
+        if !orig_at_data_add_bond(&mut orig.at, n1 - 1, n2 - 1, bt, bs, &mut nb) {
+            return None;
+        }
+        orig.num_inp_bonds = nb;
+        if let Some(p) = orig.polymer.as_mut() {
+            for u in p.units.iter_mut().take(p.n.max(0) as usize) {
+                if u.blist.is_empty() {
+                    continue;
+                }
+                let same = |a1: i32, a2: i32| (a1 == o1 && a2 == o2) || (a1 == o2 && a2 == o1);
+                if same(u.blist[0], u.blist[1]) {
+                    u.blist[0] = n1;
+                    u.blist[1] = n2;
+                } else if same(u.blist[2], u.blist[3]) {
+                    u.blist[2] = n1;
+                    u.blist[3] = n2;
+                }
+            }
+        }
+        n += 1;
+    }
+    Some(n)
+}
