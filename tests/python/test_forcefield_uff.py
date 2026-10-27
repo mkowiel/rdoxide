@@ -113,7 +113,8 @@ def test_all_conformers():
     res = ChemicalForceFields.UFFOptimizeMoleculeConfs(m, numThreads=1)
     res_mt = ChemicalForceFields.UFFOptimizeMoleculeConfs(benzene_two(), numThreads=0)
     assert len(res) == 2 and all(r[0] == 0 for r in res)
-    assert res == pytest.approx(res_mt)
+    assert [r[0] for r in res] == [r[0] for r in res_mt]
+    assert [r[1] for r in res] == pytest.approx([r[1] for r in res_mt])
 
 
 def benzene_two():
