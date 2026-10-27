@@ -39,6 +39,12 @@ const AUGMENTED_ATOM_SEED: u64 = 37;
 const HCOUNT_PAIR_SEED: u64 = 47;
 const AUGMENTED_BOND_SEED: u64 = 61;
 const ATOM_SYMBOL_PATH_SEED: u64 = 17;
+const HCOUNT_PATH_SEED: u64 = 41;
+const RING_PATH_SEED: u64 = 13;
+const BOND_PATH_SEED: u64 = 53;
+const HCOUNT_CLASS_PATH_SEED: u64 = 43;
+const ATOM_CLASS_PATH_SEED: u64 = 23;
+const SPECIAL_RING: u32 = 0xFC & !(1 << 6);
 const RING_CLOSURE_SEED: i64 = 101;
 
 const PROCESS_RING_CLOSURES: i32 = 0x0001;
@@ -275,6 +281,11 @@ pub fn set_fingerprint_counts_with_focus(
         | USE_AUGMENTED_ATOM
         | USE_AUGMENTED_BOND
         | USE_HCOUNT_PAIR
+        | USE_HCOUNT_PATH
+        | USE_RING_PATH
+        | USE_BOND_PATH
+        | USE_HCOUNT_CLASS_PATH
+        | USE_ATOM_CLASS_PATH
         | USE_SHORTCUT_LABELS;
     if which_bits & !IMPLEMENTED != 0 {
         return Err("fingerprint feature class not ported yet");
@@ -973,6 +984,415 @@ pub fn set_fingerprint_counts_with_focus(
                             add_bit!(seed);
                             result += 3;
                         }
+                    }
+                }
+            }
+        }
+    }
+
+    if which_bits & USE_HCOUNT_PATH != 0 {
+        let mut seed = HCOUNT_PATH_SEED;
+        for i in 0..n {
+            let color = mp.atoms[i].color;
+            if color <= 0 || i as i32 + 1 == exclude_atom || h_count[i + 1] == 0 {
+                continue;
+            }
+            if color == 6 && h_count[i + 1] < 3 && degree[i] < 3 {
+                continue;
+            }
+            touched[i] = 1;
+            let mut old_seed = seed;
+            seed = ns(seed, color);
+            if color != 6 {
+                result += path_bits!(seed, 1, 2, 5, i, -1, IGNORE_PATH_SYMBOL | PROCESS_CHAINS);
+            } else {
+                if degree[i] > 2 {
+                    result += path_bits!(
+                        ns(seed, 103),
+                        1,
+                        2,
+                        5,
+                        i,
+                        -1,
+                        IGNORE_PATH_SYMBOL | FORCED_HETERO_END | PROCESS_CHAINS
+                    );
+                }
+                if h_count[i + 1] >= 3 {
+                    result += path_bits!(
+                        ns(seed, 1105),
+                        1,
+                        3,
+                        6,
+                        i,
+                        -1,
+                        IGNORE_PATH_SYMBOL | FORCED_HETERO_END | PROCESS_CHAINS
+                    );
+                }
+            }
+            touched[i] = 0;
+            seed = old_seed;
+            if color == 6 {
+                continue;
+            }
+            if h_count[i + 1] > 1 {
+                touched[i] = 1;
+                old_seed = seed;
+                seed = ns(seed, 113);
+                seed = ns(seed, color);
+                result += path_bits!(seed, 1, 1, 5, i, -1, IGNORE_PATH_SYMBOL | PROCESS_CHAINS);
+                touched[i] = 0;
+                seed = old_seed;
+            }
+            for j in 1..h_count[i + 1] {
+                seed = ns(seed, 61 * j);
+                seed = ns(seed, color);
+                add_bit!(seed);
+                result += 1;
+            }
+            seed = old_seed;
+        }
+    }
+
+    // ring paths: only ring atoms and bonds take part
+    for i in 0..n {
+        if atom_status[i] <= 0 || i as i32 + 1 == exclude_atom {
+            mp.atoms[i].color = 0;
+        }
+    }
+    for i in 0..mp.bonds.len() {
+        let (a0, a1) = (mp.bonds[i].atoms[0], mp.bonds[i].atoms[1]);
+        if bond_status[i] <= 0
+            && atom_status[(a0 - 1) as usize] == 0
+            && atom_status[(a1 - 1) as usize] == 0
+        {
+            mp.bonds[i].color = 0;
+        }
+        if a0 == exclude_atom || a1 == exclude_atom {
+            mp.bonds[i].color = 0;
+        }
+    }
+    if which_bits & USE_RING_PATH != 0 {
+        let mut seed = RING_PATH_SEED;
+        for i in 0..n {
+            let color = mp.atoms[i].color;
+            if color <= 0 {
+                continue;
+            }
+            touched[i] = 1;
+            let old_seed = seed;
+            seed = ns(seed, color);
+            if color > 5 && color < 10 && atom_status[i] > 2 {
+                seed = ns(seed, 61);
+                result += path_bits!(
+                    seed,
+                    1,
+                    3,
+                    8,
+                    i,
+                    -1,
+                    STOP_AT_HEAVY_ATOM | PROCESS_RING_CLOSURES
+                );
+            }
+            seed = old_seed;
+            touched[i] = 0;
+        }
+    }
+
+    // all atoms but hydrogens in one class, bond types retained
+    for i in 0..n {
+        let c = number_of(&mp.atoms[i].atom_symbol);
+        mp.atoms[i].color = if c == 1 || i as i32 + 1 == exclude_atom {
+            0
+        } else {
+            ANY_COLOR
+        };
+    }
+    for b in &mut mp.bonds {
+        b.color = match b.bond_type {
+            SINGLE => 1,
+            DOUBLE => 2,
+            TRIPLE => 3,
+            AROMATIC => 4,
+            _ => 0,
+        };
+        if b.atoms[0] == exclude_atom || b.atoms[1] == exclude_atom {
+            b.color = 0;
+        }
+    }
+    if which_bits & USE_BOND_PATH != 0 {
+        let mut seed = BOND_PATH_SEED;
+        for i in 0..n {
+            if mp.atoms[i].color <= 0 || i as i32 + 1 == exclude_atom {
+                continue;
+            }
+            touched[i] = 1;
+            let old_seed = seed;
+            if degree[i] > 2 && atom_status[i] > 1 {
+                result += path_bits!(seed, 1, 4, 4, i, -1, PROCESS_CHAINS);
+                if mp.atoms[i].rsize_flags & SPECIAL_RING != 0 {
+                    result += path_bits!(
+                        ns(seed, 217),
+                        1,
+                        5,
+                        5,
+                        i,
+                        -1,
+                        IGNORE_PATH_SYMBOL | PROCESS_CHAINS
+                    );
+                }
+            }
+            seed = old_seed;
+            seed = ns(seed, 11);
+            result += path_bits!(
+                seed,
+                1,
+                4,
+                6,
+                i,
+                -1,
+                FORCED_RING_PATH | IGNORE_PATH_SYMBOL | PROCESS_RING_CLOSURES
+            );
+            for j in 0..nbp[i].atoms.len() {
+                let bp = &mp.bonds[nbp[i].bonds[j]];
+                let ai = nbp[i].atoms[j];
+                if ai as i32 + 1 == exclude_atom || bp.color == 0 {
+                    continue;
+                }
+                if bp.bond_type != DOUBLE && bp.bond_type != TRIPLE {
+                    continue;
+                }
+                if atom_status[i] <= 0 && bp.bond_type != TRIPLE {
+                    continue;
+                }
+                seed = old_seed;
+                seed = ns(seed, bp.color * 413);
+                touched[ai] = 1;
+                result += path_bits!(
+                    seed,
+                    2,
+                    4,
+                    5,
+                    ai,
+                    i as i32,
+                    IGNORE_PATH_SYMBOL | PROCESS_RING_CLOSURES | PROCESS_CHAINS
+                );
+                touched[ai] = 0;
+            }
+            seed = old_seed;
+            touched[i] = 0;
+        }
+    }
+
+    // atom type classes: carbon, hetero atoms, nothing
+    for i in 0..n {
+        if i as i32 + 1 == exclude_atom {
+            mp.atoms[i].color = 0;
+            continue;
+        }
+        let sym = mp.atoms[i].atom_symbol.clone();
+        let mut color;
+        if sym == "L" {
+            color = 0;
+            for sl in mp.symbol_lists.iter().filter(|l| l.atom == i as i32 + 1) {
+                color = 0;
+                if sl.logic == super::reaccs::EXCLUSIVE {
+                    break;
+                }
+                for tok in sl.string.split(',').filter(|t| !t.is_empty()) {
+                    color |= match tok {
+                        "H" => 1,
+                        "C" => 2,
+                        "O" | "N" | "S" => 4,
+                        _ => 8,
+                    };
+                }
+                color = match color {
+                    2 => 6,
+                    4 | 8 => 8,
+                    _ => 0,
+                };
+            }
+        } else {
+            color = match sym.as_str() {
+                "H" | "D" | "T" | "A" => 0,
+                "C" => 6,
+                "N" | "O" | "S" | "Q" => 8,
+                _ => {
+                    let t = number_of(&sym);
+                    if 1 < t && t < 115 { 8 } else { 0 }
+                }
+            };
+        }
+        if color > 115 {
+            color = 0;
+        }
+        mp.atoms[i].color = color;
+    }
+    if which_bits & USE_HCOUNT_CLASS_PATH != 0 {
+        let mut seed = HCOUNT_CLASS_PATH_SEED;
+        for i in 0..n {
+            let color = mp.atoms[i].color;
+            if color <= 0 || i as i32 + 1 == exclude_atom || h_count[i + 1] == 0 {
+                continue;
+            }
+            if color == 6 && h_count[i + 1] < 2 {
+                continue;
+            }
+            let old_seed = seed;
+            seed = ns(seed, color);
+            touched[i] = 1;
+            if color == 6 {
+                result += path_bits!(seed, 1, 2, 4, i, -1, FORCED_HETERO_END | PROCESS_CHAINS);
+            } else {
+                result += path_bits!(
+                    seed,
+                    1,
+                    2,
+                    5,
+                    i,
+                    -1,
+                    IGNORE_PATH_SYMBOL | FORCED_HETERO_END | PROCESS_CHAINS
+                );
+            }
+            seed = old_seed;
+            touched[i] = 0;
+        }
+    }
+    if which_bits & USE_ATOM_CLASS_PATH != 0 {
+        let mut seed = ns(ATOM_CLASS_PATH_SEED, 117);
+        for i in 0..n {
+            let color = mp.atoms[i].color;
+            if color <= 0 || i as i32 + 1 == exclude_atom || (color == 6 && degree[i] < 3) {
+                continue;
+            }
+            touched[i] = 1;
+            let old_seed = seed;
+            seed = ns(seed, color);
+            if color != 6 {
+                result += path_bits!(
+                    seed,
+                    1,
+                    3,
+                    4,
+                    i,
+                    -1,
+                    FORCED_RING_PATH | PROCESS_RING_CLOSURES | PROCESS_CHAINS
+                );
+            }
+            touched[i] = 0;
+            seed = old_seed;
+        }
+    }
+    // a single bond class
+    for b in &mut mp.bonds {
+        b.color = if (SINGLE..=8).contains(&b.bond_type) {
+            5
+        } else {
+            0
+        };
+        if b.atoms[0] == exclude_atom || b.atoms[1] == exclude_atom {
+            b.color = 0;
+        }
+    }
+    if which_bits & USE_ATOM_CLASS_PATH != 0 {
+        let mut seed = ATOM_CLASS_PATH_SEED;
+        for i in 0..n {
+            let color = mp.atoms[i].color;
+            if color <= 0 || i as i32 + 1 == exclude_atom || color == 6 {
+                continue;
+            }
+            touched[i] = 1;
+            let old_seed = seed;
+            seed = ns(seed, color);
+            seed = ns(seed, 23 + color * 19);
+            result += path_bits!(
+                seed,
+                1,
+                3,
+                9,
+                i,
+                -1,
+                IGNORE_PATH_SYMBOL | PROCESS_RING_CLOSURES
+            );
+            seed = old_seed;
+            touched[i] = 0;
+        }
+        let (mut qq_count, mut qc_count) = (0i32, 0i32);
+        for i in 0..mp.bonds.len() {
+            let bp = &mp.bonds[i];
+            if bond_status[i] == 0
+                || bp.color == 0
+                || bp.atoms[0] == exclude_atom
+                || bp.atoms[1] == exclude_atom
+            {
+                continue;
+            }
+            let c1 = mp.atoms[(bp.atoms[0] - 1) as usize].color;
+            let c2 = mp.atoms[(bp.atoms[1] - 1) as usize].color;
+            if c1 == 0 || c2 == 0 || (c1 == 6 && c2 == 6) {
+                continue;
+            }
+            let mul = if c1 != 6 && c2 != 6 {
+                qq_count += 1;
+                17
+            } else {
+                qc_count += 1;
+                19
+            };
+            for j in 3..9 {
+                if bp.rsize_flags & (1 << j) != 0 {
+                    add_bit!(ns(ATOM_CLASS_PATH_SEED * mul, j * 8));
+                    result += 1;
+                }
+            }
+        }
+        let mut seed = 2 * ATOM_CLASS_PATH_SEED + 3;
+        let mut i = 1;
+        while i <= qq_count {
+            seed = ns(seed, i * 153);
+            add_bit!(seed);
+            result += 1;
+            seed = ns(seed, 53);
+            if i <= 1 {
+                add_bit!(seed);
+                result += 1;
+            }
+            i = (1.0 + f64::from(i) * 1.5) as i32;
+        }
+        seed = 3 * ATOM_CLASS_PATH_SEED + 5;
+        for i in 1..=qc_count.min(2) {
+            seed = ns(seed, i * 157);
+            add_bit!(seed);
+            result += 1;
+        }
+        let mut i = 3;
+        while i <= qc_count {
+            seed = ns(seed, i * 157);
+            add_bit!(seed);
+            result += 1;
+            i = (f64::from(i) * 1.8) as i32;
+        }
+    }
+
+    // ring pattern preparation: only bonds with a ring atom, atom classes C and Q
+    for i in 0..mp.bonds.len() {
+        let (a0, a1) = (mp.bonds[i].atoms[0], mp.bonds[i].atoms[1]);
+        if a0 == exclude_atom || a1 == exclude_atom {
+            continue;
+        }
+        mp.bonds[i].color = 5;
+        let (i0, i1) = ((a0 - 1) as usize, (a1 - 1) as usize);
+        if atom_status[i0] == 0 && atom_status[i1] == 0 {
+            mp.bonds[i].color = 0;
+        } else {
+            for k in [i0, i1] {
+                let ap = &mut mp.atoms[k];
+                if ap.color != 0 {
+                    if ap.color != 6 {
+                        ap.color = 8;
+                    }
+                    if ap.rsize_flags == 0 {
+                        ap.color = 0;
                     }
                 }
             }
