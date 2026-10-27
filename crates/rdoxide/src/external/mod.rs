@@ -1,6 +1,7 @@
 //! Ports of third-party libraries RDKit builds against (`External/` in the
 //! RDKit tree). Each module carries its own license (see `LICENSES/`).
 
+pub mod avalon;
 pub mod inchi;
 pub mod inchi_api;
 pub mod inchi_input;
