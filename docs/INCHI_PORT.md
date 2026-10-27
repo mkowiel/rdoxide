@@ -212,12 +212,15 @@ Stage numbers in `docs/STATUS.md` are assigned when each PR lands (the rows
 
 ## 6. What is missing or incomplete
 
-* **Polymers**: `-Polymers`, `-NPZz`, CRU frame shift and folding, the `/z`
-  layer and `DetectAndExposePolymerInternals` are not ported (the options are
-  parsed but have no effect). RDKit's `MolToInchi` never passes polymer data,
-  so only `MolBlockToInchi` of polymer molfiles with these options can differ.
-  The C polymer code is `OAD_*`/`POSE*` in `runichi2.c`/`runichi3.c` and the
-  polymer output functions of `ichiprt1.c`.
+* **Polymers**: `MolBlockToInchi` of polymer molfiles agrees with RDKit on the
+  oracle corpora (`tests/data/inchi_polymers*.jsonl`, 238 molfiles x all polymer
+  option sets): validation, the `/z` layer, `/Z:` and `/U/` AuxInfo, 1.05/1.05+
+  cyclization, backbone bonds and CRU frame shift. Not ported: CRU folding
+  (`analyze_CRU_folding`; the official library crashes on every foldable unit,
+  so there is no reference output) and reading polymers back from an InChI
+  (`ichiread` `ParseSegmentPolymer`, `DetectAndExposePolymerInternals`).
+  RDKit's `MolToInchi` never passes polymer data, so only `MolBlockToInchi`
+  can differ.
 * **AuxInfo input**: `ParseAuxSegment*`, `ReadInChICoord` (AuxInfo line) and
   `Get_inchi_Input_FromAuxInfo` are not ported; RDKit does not call them
   (`MolFromInchiAndAuxInfo` parses the AuxInfo string in Python).

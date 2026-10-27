@@ -14,6 +14,8 @@ OPTIONS = ["", "-Polymers", "-Polymers -NPZz", "-Polymers -FoldCRU", "-Polymers1
 BASE = [
     "CCOC", "CC(C)C", "CC(c1ccccc1)C", "C(=O)CCCCC(=O)NCCCCCCN", "CC(F)(F)C", "CCCC", "OCCO",
     "C[Si](C)(C)OC", "CC(O)CC(O)C", "CCCCCCCC", "c1ccc(cc1)C", "NCC(=O)N", "CC(=O)OC", "C1CCCCC1",
+    "OCCOCCOCCOCCO", "NCCNCCN", "CC(C)CC(C)C", "C(C)C(C)", "CC(Cl)CC(Cl)C", "OC(=O)CCC(=O)OCC",
+    "CC(C)(C)CC", "N1CCNCC1",
 ]
 
 

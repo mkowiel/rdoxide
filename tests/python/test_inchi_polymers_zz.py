@@ -22,7 +22,7 @@ def agreement(opt):
 
 
 # floors of agreeing cases per option set; raise them as the polymer stages land
-FLOORS = {"": 74, "-Polymers": 0, "-Polymers -NPZz": 0, "-Polymers -FoldCRU": 0, "-Polymers105": 74}
+FLOORS = {"": 115, "-Polymers": 115, "-Polymers -NPZz": 115, "-Polymers -FoldCRU": 115, "-Polymers105": 115}
 
 
 @pytest.mark.parametrize("opt", sorted(FLOORS))

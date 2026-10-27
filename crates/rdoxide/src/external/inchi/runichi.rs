@@ -446,6 +446,12 @@ pub fn process_one_structure_arrays(
     let mut res = StructResults::default();
     let mut nc = NormCanonFlags::default();
 
+    if orig.valid_polymer != 0 {
+        if let Some(pd) = orig.polymer.as_mut().filter(|p| p.n > 0) {
+            pd.frame_shift_scheme = ip.b_frame_shift_scheme;
+            pd.treat = ip.b_polymers;
+        }
+    }
     // OrigAtData_StoreNativeInput
     let mut orig_struct = OrigStruct::default();
     match orig_struct_fill_out(
@@ -644,18 +650,6 @@ fn process_one_structure_ex_core(
     }
     let mind_polymers = orig.polymer.as_ref().is_some_and(|p| p.n > 0) && orig.valid_polymer != 0;
     if mind_polymers
-        && ip.b_polymers == POLYMERS_MODERN
-        && orig.polymer.as_ref().is_some_and(|p| p.n_pzz >= 2)
-    {
-        // CRU folding and frame shift (units capped with two undefined-nature atoms)
-        super::ichierr::add_error_message(
-            &mut sd.str_err_struct,
-            "Polymer processing is not supported yet",
-        );
-        sd.n_error_type = IS_ERROR;
-        return IS_ERROR;
-    }
-    if mind_polymers
         && ip.b_polymers != POLYMERS_MODERN
         && (ip.b_frame_shift_scheme == super::ichiparm::FSS_STARS_CYCLED
             || ip.b_frame_shift_scheme == super::ichiparm::FSS_STARS_CYCLED_SORTED)
@@ -688,22 +682,21 @@ fn process_one_structure_ex_core(
     res
 }
 
-/// `OAD_ProcessOneStructureNoEdits`: the AuxInfo of the unedited structure
-/// (a calculation on copies); `None` when it fails.
+/// the calculation on copies of the structure (`POSEContext`): `tune` sets the
+/// options of the copy. Returns the result, the text of the output and the
+/// number of the Zz-capped-unit atoms.
 #[allow(clippy::too_many_arguments)]
-fn oad_process_one_structure_no_edits(
+fn dup_run(
     sd: &StructData,
     ip: &InputParms,
-    _log: &mut InchiIostream,
     strbuf: &InchiIosString,
     orig: &OrigAtomData,
     prep: &[OrigAtomData; 2],
     num_inp: i64,
-) -> (i32, Option<String>) {
+    tune: impl FnOnce(&mut InputParms, &mut OrigAtomData),
+) -> (i32, String, i32) {
     use super::ichi_io::{INCHI_IOS_TYPE_STRING, IosFile, inchi_ios_init};
-    use super::ichiparm::{
-        FSS_NONE, INCHI_OUT_NO_AUX_INFO, INCHI_OUT_SHORT_AUX_INFO, POLYMERS_MODERN,
-    };
+    use super::ichiparm::{INCHI_OUT_NO_AUX_INFO, INCHI_OUT_SHORT_AUX_INFO};
     let mut dsd = sd.clone();
     let mut dip = ip.clone();
     let mut dorig = orig.clone();
@@ -713,13 +706,8 @@ fn oad_process_one_structure_no_edits(
     inchi_ios_init(&mut dout, INCHI_IOS_TYPE_STRING, IosFile::None);
     let mut dlog = InchiIostream::default();
     inchi_ios_init(&mut dlog, INCHI_IOS_TYPE_STRING, IosFile::None);
-    if let Some(pd) = dorig.polymer.as_mut() {
-        pd.treat = POLYMERS_MODERN;
-    }
-    dip.b_polymers = POLYMERS_MODERN;
-    dip.b_fold_polymer_sru = 0;
-    dip.b_frame_shift_scheme = FSS_NONE;
     dip.b_inchi_output_options &= !(INCHI_OUT_NO_AUX_INFO | INCHI_OUT_SHORT_AUX_INFO);
+    tune(&mut dip, &mut dorig);
     let ret = process_one_structure_ex_core(
         &mut dsd,
         &dip,
@@ -730,23 +718,144 @@ fn oad_process_one_structure_no_edits(
         &mut dprep,
         num_inp,
     );
-    if ret == IS_FATAL || ret == IS_ERROR {
-        return (ret, None);
-    }
     let text = dout
         .s
         .p_str
         .as_ref()
         .map(|b| String::from_utf8_lossy(&b[..dout.s.n_used_length.max(0) as usize]).into_owned())
         .unwrap_or_default();
-    // extract_auxinfo_substring: from "AuxInfo=" up to the first white space
-    let aux = text.find("AuxInfo=").map(|i| {
-        let rest = &text[i..];
-        rest[..rest.find(char::is_whitespace).unwrap_or(rest.len())].to_string()
+    let n_pzz = dorig.polymer.as_ref().map_or(0, |p| p.n_pzz);
+    (ret, text, n_pzz)
+}
+
+/// `extract_inchi_substring`, `extract_auxinfo_substring`: the token starting at `key`
+fn extract_token(text: &str, key: &str) -> Option<String> {
+    let i = text.find(key)?;
+    let rest = &text[i..];
+    Some(rest[..rest.find(char::is_whitespace).unwrap_or(rest.len())].to_string())
+}
+
+/// `OAD_ProcessOneStructureNoEdits`: the AuxInfo of the unedited structure;
+/// `(result, AuxInfo, n_pzz)`
+#[allow(clippy::too_many_arguments)]
+fn oad_process_one_structure_no_edits(
+    sd: &StructData,
+    ip: &InputParms,
+    strbuf: &InchiIosString,
+    orig: &OrigAtomData,
+    prep: &[OrigAtomData; 2],
+    num_inp: i64,
+) -> (i32, Option<String>, i32) {
+    use super::ichiparm::{FSS_NONE, POLYMERS_MODERN};
+    let (ret, text, n_pzz) = dup_run(sd, ip, strbuf, orig, prep, num_inp, |dip, dorig| {
+        if let Some(pd) = dorig.polymer.as_mut() {
+            pd.treat = POLYMERS_MODERN;
+        }
+        dip.b_polymers = POLYMERS_MODERN;
+        dip.b_fold_polymer_sru = 0;
+        dip.b_frame_shift_scheme = FSS_NONE;
     });
-    match aux {
-        Some(a) => (ret, Some(a)),
-        None => (IS_ERROR, None),
+    if ret == IS_FATAL || ret == IS_ERROR {
+        return (ret, None, 0);
+    }
+    if extract_token(&text, "InChI=").is_none() {
+        return (IS_ERROR, None, 0);
+    }
+    match extract_token(&text, "AuxInfo=") {
+        Some(a) => (ret, Some(a), n_pzz),
+        None => (IS_ERROR, None, 0),
+    }
+}
+
+/// `OAD_ProcessOneStructure105Plus`: the InChI and AuxInfo of the structure in
+/// the 1.05+ polymer treatment
+#[allow(clippy::too_many_arguments)]
+fn oad_process_one_structure_105_plus(
+    sd: &StructData,
+    ip: &InputParms,
+    strbuf: &InchiIosString,
+    orig: &OrigAtomData,
+    prep: &[OrigAtomData; 2],
+    num_inp: i64,
+) -> (i32, Option<(String, String)>) {
+    use super::ichiparm::POLYMERS_LEGACY_PLUS;
+    let (ret, text, _) = dup_run(sd, ip, strbuf, orig, prep, num_inp, |dip, dorig| {
+        if let Some(pd) = dorig.polymer.as_mut() {
+            pd.treat = POLYMERS_LEGACY_PLUS;
+        }
+        dip.b_polymers = POLYMERS_LEGACY_PLUS;
+    });
+    if ret == IS_FATAL || ret == IS_ERROR {
+        return (ret, None);
+    }
+    match (
+        extract_token(&text, "InChI="),
+        extract_token(&text, "AuxInfo="),
+    ) {
+        (Some(i), Some(a)) => (ret, Some((i, a))),
+        _ => (IS_ERROR, None),
+    }
+}
+
+/// the `POLYMERS_MODERN` part of `PreprocessPolymerCRUData`: the unedited
+/// structure's AuxInfo, then CRU folding and frame shift of units capped with
+/// two undefined-nature atoms
+fn preprocess_modern_polymer(
+    sd: &mut StructData,
+    ip: &InputParms,
+    strbuf: &InchiIosString,
+    orig: &mut OrigAtomData,
+    prep: &[OrigAtomData; 2],
+    num_inp: i64,
+    saux_noedits: &mut Option<String>,
+) {
+    use super::ichierr::add_error_message;
+    use super::ichiparm::FSS_NONE;
+    use super::runichi3::{
+        oad_polymer_prepare_frame_shift_edits, oad_structure_edits_apply_mod_bonds,
+    };
+    let (ret, aux, n_pzz) = oad_process_one_structure_no_edits(sd, ip, strbuf, orig, prep, num_inp);
+    if ret == IS_FATAL || ret == IS_ERROR {
+        if ip.b_no_warnings == 0 {
+            add_error_message(
+                &mut sd.str_err_struct,
+                "CRU folding and frame shift analysis failed",
+            );
+        }
+        return;
+    }
+    *saux_noedits = aux;
+    if n_pzz < 2 {
+        return;
+    }
+    // CRU folding is not ported yet
+    if ip.b_frame_shift_scheme == FSS_NONE {
+        return;
+    }
+    let fail = |sd: &mut StructData, m: &str| {
+        if ip.b_no_warnings == 0 {
+            add_error_message(&mut sd.str_err_struct, m);
+        }
+    };
+    let (ret, interim) = oad_process_one_structure_105_plus(sd, ip, strbuf, orig, prep, num_inp);
+    let Some((sinchi, saux)) = interim.filter(|_| ret != IS_FATAL && ret != IS_ERROR) else {
+        fail(sd, "Frame shift analysis failed");
+        return;
+    };
+    let Some(mods) = oad_polymer_prepare_frame_shift_edits(orig, &sinchi, &saux) else {
+        fail(sd, "Frame shift analysis failed");
+        return;
+    };
+    if mods.is_empty() {
+        return;
+    }
+    if oad_structure_edits_apply_mod_bonds(orig, &mods).is_none() {
+        fail(sd, "Frame shift failed");
+    } else if ip.b_no_warnings == 0 {
+        add_error_message(
+            &mut sd.str_err_struct,
+            "Bond(s) rearranged due to CRU frame shift",
+        );
     }
 }
 
@@ -777,20 +886,12 @@ pub fn process_one_structure_ex(
         if ip.b_polymers != POLYMERS_NO {
             orig.valid_polymer = 1;
             if ip.b_polymers == POLYMERS_MODERN {
-                // the unedited structure first (CRU folding and frame shift analysis,
-                // which re-runs the calculation, are not ported yet)
-                let (ret, aux) =
-                    oad_process_one_structure_no_edits(sd, ip, log, strbuf, orig, prep, num_inp);
-                if ret == IS_FATAL || ret == IS_ERROR {
-                    if ip.b_no_warnings == 0 {
-                        super::ichierr::add_error_message(
-                            &mut sd.str_err_struct,
-                            "CRU folding and frame shift analysis failed",
-                        );
-                    }
-                } else {
-                    saux_noedits = aux;
-                }
+                preprocess_modern_polymer(sd, ip, strbuf, orig, prep, num_inp, &mut saux_noedits);
+            }
+        } else {
+            // POLYMERS_NO
+            if ip.b_no_warnings == 0 {
+                super::ichierr::add_error_message(&mut sd.str_err_struct, "Ignore polymer data");
             }
         }
     }
