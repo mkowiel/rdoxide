@@ -52,6 +52,7 @@ const CLASS_SPIDER_SEED: u64 = 79;
 const CSP3: i32 = 19;
 const HETERO: i32 = 23;
 const MAX_SPIDER: usize = 7;
+const NON_SSS_SEED: u64 = 179;
 const RING_CLOSURE_SEED: i64 = 101;
 
 const PROCESS_RING_CLOSURES: i32 = 0x0001;
@@ -415,25 +416,6 @@ pub fn set_fingerprint_counts_with_focus(
     fpflags: i32,
     exclude_atom: i32,
 ) -> Result<i32, &'static str> {
-    const IMPLEMENTED: i32 = USE_ATOM_COUNT
-        | USE_ATOM_SYMBOL_PATH
-        | USE_AUGMENTED_ATOM
-        | USE_AUGMENTED_BOND
-        | USE_HCOUNT_PAIR
-        | USE_HCOUNT_PATH
-        | USE_RING_PATH
-        | USE_BOND_PATH
-        | USE_HCOUNT_CLASS_PATH
-        | USE_ATOM_CLASS_PATH
-        | USE_RING_PATTERN
-        | USE_RING_SIZE_COUNTS
-        | USE_DEGREE_PATH
-        | USE_CLASS_SPIDERS
-        | USE_FEATURE_PAIRS
-        | USE_SHORTCUT_LABELS;
-    if which_bits & !IMPLEMENTED != 0 {
-        return Err("fingerprint feature class not ported yet");
-    }
     let ncounts = fp_counts.len();
     let n = mp.atoms.len();
     let mut result = 0;
@@ -1925,6 +1907,142 @@ pub fn set_fingerprint_counts_with_focus(
                     seed,
                     exclude_atom,
                 );
+            }
+        }
+    }
+
+    // scaffold bits: extended connectivity of the ring bond graph (not usable for SSS screening)
+    if !as_query && which_bits & USE_NON_SSS_BITS != 0 {
+        let seed = NON_SSS_SEED;
+        let mut extcon = vec![0i32; n];
+        let mut extcon2 = vec![0i32; n];
+        for j in 0..n {
+            if atom_status[j] > 0 {
+                extcon[j] = mp.atoms[j].rsize_flags as i32;
+            }
+        }
+        // one round of the ring bond graph extended connectivity
+        let step = |mp: &Molecule, extcon: &[i32], extcon2: &mut [i32]| {
+            extcon2.fill(0);
+            for j in 0..n {
+                if atom_status[j] <= 0 {
+                    continue;
+                }
+                extcon2[j] = atom_status[j] * 3 + extcon[j].wrapping_mul(0xF);
+                let mut sum = 0u64;
+                let prod = 0u64;
+                for (&aj, &bj) in nbp[j].atoms.iter().zip(&nbp[j].bonds) {
+                    if bond_status[bj] <= 0 {
+                        continue;
+                    }
+                    sum = sum.wrapping_add(i64::from(extcon[aj]) as u64);
+                }
+                let _ = mp;
+                let v = ((i64::from(extcon2[j]) as u64)
+                    .wrapping_add(sum.wrapping_mul(191))
+                    .wrapping_add(prod)
+                    << 8)
+                    .wrapping_add(((extcon2[j] & 0xFF0000) >> 16) as u64);
+                extcon2[j] = (v as i32) & 0xFFFFFF;
+            }
+        };
+        // propagate the smallest hash to all members of a ring system
+        let spread = |extcon: &mut [i32]| loop {
+            let mut changed = false;
+            for j in 0..n {
+                if atom_status[j] <= 0 {
+                    continue;
+                }
+                for (&aj, &bj) in nbp[j].atoms.iter().zip(&nbp[j].bonds) {
+                    if bond_status[bj] > 0 && extcon[j] < extcon[aj] {
+                        changed = true;
+                        extcon[aj] = extcon[j];
+                    }
+                }
+            }
+            if !changed {
+                break;
+            }
+        };
+        for _ in 0..32 {
+            step(mp, &extcon, &mut extcon2);
+            extcon.copy_from_slice(&extcon2);
+        }
+        spread(&mut extcon);
+        for j in 0..n {
+            if j as i32 + 1 == exclude_atom || atom_status[j] <= 0 {
+                continue;
+            }
+            if which_bits & USE_SCAFFOLD_IDS != 0 {
+                add_bit!(ns(seed, extcon[j].wrapping_mul(10013)));
+                result += 1;
+            }
+            if which_bits & USE_SCAFFOLD_LINKS != 0 {
+                if degree[j] <= atom_status[j] {
+                    continue;
+                }
+                for jj in 0..n {
+                    if jj as i32 + 1 == exclude_atom || atom_status[jj] <= 0 || j == jj {
+                        continue;
+                    }
+                    if degree[jj] <= atom_status[jj] {
+                        continue;
+                    }
+                    let Some(k) = (0..12).find(|&k| length_matrix[j][jj] == 1 << k) else {
+                        continue;
+                    };
+                    if k >= 3 {
+                        continue;
+                    }
+                    let (e, e2, f, f2) = (extcon[j], extcon2[j], extcon[jj], extcon2[jj]);
+                    add_bit!(ns(
+                        ns(seed, 3 * k),
+                        e.wrapping_mul(1013).wrapping_add(f.wrapping_mul(2003))
+                    ));
+                    add_bit!(ns(
+                        ns(seed, 5 * k),
+                        e2.wrapping_mul(2013).wrapping_add(f.wrapping_mul(1003))
+                    ));
+                    add_bit!(ns(
+                        ns(seed, 5 * k),
+                        e.wrapping_mul(2013).wrapping_add(f2.wrapping_mul(1003))
+                    ));
+                    add_bit!(ns(
+                        ns(seed, 7 * k),
+                        e2.wrapping_mul(3013).wrapping_add(f2.wrapping_mul(3003))
+                    ));
+                    result += 4;
+                }
+            }
+        }
+        if which_bits & USE_SCAFFOLD_COLORS != 0 {
+            for j in 0..n {
+                if j as i32 + 1 == exclude_atom || atom_status[j] <= 0 {
+                    continue;
+                }
+                let sym = mp.atoms[j].atom_symbol.as_str();
+                let tmp1 = match sym {
+                    "C" => 101,
+                    "O" => 301,
+                    "N" => 401,
+                    "S" => 601,
+                    "P" => 701,
+                    _ if atom_symbol_match(sym, "F,Cl,Br,I,At") => 901,
+                    _ => 0,
+                };
+                extcon[j] = mp.atoms[j].rsize_flags as i32 + tmp1;
+            }
+            for _ in 0..32 {
+                step(mp, &extcon, &mut extcon2);
+                extcon.copy_from_slice(&extcon2);
+            }
+            spread(&mut extcon);
+            for j in 0..n {
+                if j as i32 + 1 == exclude_atom {
+                    continue;
+                }
+                add_bit!(ns(ns(seed, 4), extcon[j].wrapping_mul(3013)));
+                result += 1;
             }
         }
     }
