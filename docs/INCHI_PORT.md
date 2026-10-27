@@ -159,12 +159,12 @@ RDKit can reach is ported; 🟡 ported with the gaps named in the last column;
 | 0 | `ikey_dll.c`, `ikey_base26.c`, `sha2.c` | 2.5k | InChIKey from the InChI string | `ikey_dll`, `ikey_base26`, `sha256` (own FIPS 180-4 code instead of `sha2.c`) | ✅ | `sha2.c` self-test and HMAC |
 | 1 | headers `mode.h`, `incomdef.h`, `ichi.h`, `inpdef.h`, `extr_ct.h`, `ichicomn.h`, `ichicant.h`, `ichitaut.h`, `ichi_bns.h`, `ichirvrs.h`, `inchi_api.h`; `util.c`, `ichisort.c`, `ichiring.c`, `ichiqueu.c`, `ichierr.c`, `ichi_io.c` | 7.2k (+12.6k headers) | data model (`inp_ATOM`, `sp_ATOM`, `INChI`, ...), utilities, sorting, queues, I/O streams | `ichi`, `inpdef`, `incomdef`, `util`, `el_data`, `ichisort`, `ichiring`, `ichierr`, `ichi_io` | ✅ | allocators, Windows text window output, `_inchi_trace` |
 | 2 | `inchi_dll.c` (input side), `inchi_dll_a.c` (`parse_options_string`), `ichiparm.c`, RDKit `inchi.cpp` (`MolToInchi` input) | 8.9k | `inchi_Input` from a molecule; option parsing | `inchi_dll`, `ichiparm`, `inchi_input` | ✅ | staged `INCHIGEN_*`/`STDINCHIGEN_*` API, `GetINCHIfromINCHI`, command-line help |
-| 3 | `runichi.c`, `runichi2.c`, `runichi3.c`, `strutil.c` | 16.2k | preprocessing (unusual valences, salts, metal disconnection, components) and the per-structure driver `ProcessOneStructureEx` | `runichi`, `runichi2`, `runichi3`, `runichi4`, `strutil` | 🟡 | polymer units (`OAD_Polymer*`, CRU folding, frame shift), AuxInfo input (`InchiToInchi_Input`), display/debug code |
+| 3 | `runichi.c`, `runichi2.c`, `runichi3.c`, `strutil.c` | 16.2k | preprocessing (unusual valences, salts, metal disconnection, components) and the per-structure driver `ProcessOneStructureEx` | `runichi`, `runichi2`, `runichi3`, `runichi4`, `strutil` | 🟡 | CRU folding (the C code crashes, see section 6), AuxInfo input (`InchiToInchi_Input`), display/debug code |
 | 4 | `ichinorm.c`, `ichi_bns.c`, `ichitaut.c`, `ichiisot.c` | 27.5k | normalization: ring systems, aromatic bonds, balanced-network search (charges, radicals, mobile H), tautomeric groups (incl. keto-enol and 1,5), isotopic keys | `ichinorm`, `ichi_bns`, `ichitaut`, `ichican2` (isotopic keys) | 🟡 | the ring-chain/underivatization code of `ichinorm.c` (engineering mode), `TempFix_NH_NH_Bonds` and a few `#if`-ed helpers |
 | 5 | `ichister.c`, `ichicans.c` | 7.3k | stereo perception (0D parities, 2D/3D geometry) and stereo canonicalization | `ichister` | ✅ | |
 | 6 | `ichican2.c`, `ichicano.c`, `ichimap1.c`, `ichimap2.c`, `ichimap4.c` | 16.5k | canonical numbering (`CanonGraph`, connection tables, symmetry/stereo mapping) | `ichican2`, `ichicano`, `ichimap`, `ichimap4` | ✅ | time limit (`InchiClock`, `bInchiTimeIsOver`), user-quit callbacks, `CMODE_NOEQ_STEREO`, CRC32 debug code |
 | 7 | `ichimake.c`, `ichimak2.c`, `inchi_dll_a2.c`, `runichi4.c` | 12.7k | `INChI`/`INChI_Aux` construction, Hill formula, component sorting, composite structures | `ichimake`, `ichimak2`, `runichi4` | ✅ | stepwise normalization/canonicalization API of `inchi_dll_a2.c` |
-| 8 | `ichiprt1.c`, `ichiprt2.c`, `ichiprt3.c` | 12.3k | InChI string and AuxInfo serialization, warnings/messages | `ichiprt1`, `ichiprt2`, `ichiprt3` | 🟡 | polymer layers (`OutputINCHI_PolymerLayer*`, `OutputAUXINFO_PolymerInfo`) |
+| 8 | `ichiprt1.c`, `ichiprt2.c`, `ichiprt3.c` | 12.3k | InChI string and AuxInfo serialization, warnings/messages | `ichiprt1`, `ichiprt2`, `ichiprt3` | ✅ | |
 | 9 | `mol_fmt1.c`, `mol_fmt2.c`, `mol_fmt3.c`, `mol2atom.c`, `readinch.c`, `inchi_dll_b.c` | 11.0k | InChI's own MOL V2000/V3000 reader (`MakeINCHIFromMolfileText`, used by `MolBlockToInchi`) | `molfmt`, `molfmt3`, `mol2atom`, `readinch`, `inchi_dll_b` | ✅ | `mol_fmt4.c` writer half (S-group lists, SD output; executable only) |
 | 10 | `ichiread.c` | 12.5k | InChI string parser (`InChILine2Data`) | `ichiread` | 🟡 | AuxInfo segment parsers (`ParseAuxSegment*`, `ReadInChICoord`'s AuxInfo line) and `OutputInChIAsRequested` |
 | 11 | `ichirvr1.c`–`ichirvr7.c`, `ichilnct.c`, `inchi_dll.c` (`GetStructFromINCHI`) | 31.1k | structure restoration from InChI | `ichirvrs`, `ichirvr1`–`ichirvr7`, `inchi_dll_c` | ✅ | display code, `Get_*_Input_FromAuxInfo` |
@@ -211,6 +211,23 @@ Stage numbers in `docs/STATUS.md` are assigned when each PR lands (the rows
 
 
 ## 6. What is missing or incomplete
+
+Why so many marks? Every 🟡 or ⬜ above is in one of these groups; none of them is a
+function that a call through RDKit can reach and get a wrong answer from, except where
+the last group says so.
+
+| Group | Examples | Why it is not ported | Rows |
+|---|---|---|---|
+| A. Not reachable from RDKit | IXA API, `GetINCHIfromINCHI`, staged `INCHIGEN_*`/`STDINCHIGEN_*`, `inchi_gui.c`, the `inchi-1` executable, `mol_fmt4.c` SD writer | RDKit's `inchi.cpp` never calls them | 0-2, 7, 9, 12, `ixa` |
+| B. Options accepted but not enforced | time limits (`-W`, `InchiClock`), user-quit callbacks, `CMODE_NOEQ_STEREO` | no timer/callback in a library call from Python; the answer does not change unless the limit is hit | 6 |
+| C. Engineering/debug code | display windows, `_inchi_trace`, CRC32 debug, ring-chain/underivatization of `ichinorm.c`, `TempFix_NH_NH_Bonds` | compiled out or only reachable with engineering options | 1, 4, 6 |
+| D. AuxInfo as input | `ParseAuxSegment*`, `InchiToInchi_Input`, `Get_inchi_Input_FromAuxInfo` | `MolFromInchiAndAuxInfo` parses the AuxInfo string in Python; the C input route is not used | 3, 10, 11 |
+| E. Broken in the C library | CRU folding (heap overflow + NULL dereference), restoration of `/KET`/`/15T` layers | the original crashes or fails; rdoxide returns the C result without that step | 3, section 6 |
+| F. Verified only end to end | `ichirvr4`-`ichirvr7` restoration functions | compared through 1576 round-trip InChI, not function by function | 11 |
+
+Polymers were the largest gap in this table and are ported now (rows 3 and 8); the marks
+that remain are groups A-E, which need no further work for RDKit compatibility, and F,
+which is a test-depth gap, not a missing function.
 
 * **Polymers**: `MolBlockToInchi` of polymer molfiles agrees with RDKit on the
   oracle corpora (`tests/data/inchi_polymers*.jsonl`, 238 molfiles x all polymer
