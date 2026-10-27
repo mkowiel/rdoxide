@@ -31,7 +31,17 @@ def polymer_agreement(opt):
     return sum(_run(c, opt) == c["results"][opt] for c in CASES)
 
 
-def test_polymer_progress_is_recorded():
-    # the number of molfiles whose `-Polymers` result already equals RDKit's; raise the
-    # floor as the polymer stages land (it must never go down)
-    assert polymer_agreement("-Polymers") >= 17  # baseline: the molfiles RDKit rejects too
+# floors of agreeing cases per option set; raise them as the polymer stages land
+FLOORS = {
+    "-Polymers": 33,
+    "-Polymers -NPZz": 33,
+    "-Polymers -FoldCRU": 33,
+    "-Polymers -NoFoldCRU": 33,
+    "-Polymers105": 33,
+}
+
+
+@pytest.mark.parametrize("opt", sorted(FLOORS))
+def test_polymer_progress_floor(opt):
+    # the molfiles RDKit rejects (stage P1, polymer validation) must give its exact errors
+    assert polymer_agreement(opt) >= FLOORS[opt]

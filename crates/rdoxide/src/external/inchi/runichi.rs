@@ -562,14 +562,36 @@ pub fn process_one_structure_ex(
     use super::runichi3::oad_validate_polymer_and_pseudo_element_data;
     // PreprocessPolymerCRUData
     orig.valid_polymer = 0;
-    if orig.polymer.is_some() {
-        // the CRU frame-shift and folding code is not ported
-        super::ichierr::add_error_message(
-            &mut sd.str_err_struct,
-            "Polymer processing is not supported yet",
-        );
-        sd.n_error_type = IS_ERROR;
-        return IS_ERROR;
+    let polymer_mode = orig.polymer.is_some() && ip.b_polymers != super::ichiparm::POLYMERS_NO;
+    if polymer_mode {
+        // PreprocessPolymerCRUData: sets `polymer->treat`; the CRU folding and frame-shift
+        // analysis (which re-runs the whole calculation) is not ported yet
+        if let Some(pd) = orig.polymer.as_mut() {
+            pd.treat = ip.b_polymers;
+        }
+        if ip.b_polymers == super::ichiparm::POLYMERS_MODERN {
+            // OAD_ProcessOneStructureNoEdits: the whole calculation for a copy of the input
+            // first; its failure (the validation part of it is all that is ported) only
+            // adds a warning-like message to the structure
+            let mut dup = orig.clone();
+            let mut dup_err = String::new();
+            if let Some(pd) = dup.polymer.as_mut() {
+                pd.treat = super::ichiparm::POLYMERS_MODERN;
+            }
+            let e = super::runichi3::oad_validate_polymer_and_pseudo_element_data(
+                &mut dup,
+                super::ichiparm::POLYMERS_MODERN,
+                ip.b_np_zz,
+                &mut dup_err,
+                ip.b_no_warnings != 0,
+            );
+            if e != 0 && ip.b_no_warnings == 0 {
+                super::ichierr::add_error_message(
+                    &mut sd.str_err_struct,
+                    "CRU folding and frame shift analysis failed",
+                );
+            }
+        }
     }
 
     // ProcessOneStructureExCore
@@ -578,7 +600,17 @@ pub fn process_one_structure_ex(
         ip.b_polymers,
         ip.b_np_zz,
         &mut sd.str_err_struct,
+        ip.b_no_warnings != 0,
     );
+    if res == 0 && polymer_mode && orig.valid_polymer != 0 {
+        // the CRU folding, frame shift and the polymer layers are not ported yet
+        super::ichierr::add_error_message(
+            &mut sd.str_err_struct,
+            "Polymer processing is not supported yet",
+        );
+        sd.n_error_type = IS_ERROR;
+        return IS_ERROR;
+    }
     if res != 0 {
         sd.n_error_code = res;
         inchi_ios_eprint(

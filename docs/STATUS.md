@@ -403,6 +403,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not done. Eve
 | 287 | MolDraw2D fidelity: FreeType outline decomposition no longer closes a contour that already ended in a curve to its start; `prepareMolForDrawing`/reaction drawer kekulize with `canonical=true` as upstream | ✅ | `compare.py drawsvg` (`MolDraw2DSVG` of every molecule of the NCI and canonSmiles corpora): 10311 of 10312 SVGs byte-identical to RDKit 2026.09.1 (was 974); `tests/python/test_moldraw2d.py` |
 | 288 | FilterCatalog serialization (`filter_catalog::serialize`: catalogs, entries and every matcher kind incl. And/Or/Not/ExclusionList/FilterHierarchyMatcher trees; own format, not Boost); Python `Serialize`, pickling and construction from bytes; `FilterCatalogCanSerialize()` is True | ✅ | upstream `FilterCatalog/Wrap/rough_test.py` pickle paths now run (17/17); `tests/python/test_filtercatalog_serialization.py` |
 | 289 | InChI `remove_ion_pairs` pair type 1a (`FIX_P_IV_Plus_O_Minus`: `Y3P(+)-O(-)`, also S/Se/Te, becomes `Y3P=X`), which the port had left out; found by running `MolToInchiAndAuxInfo` over every .mol/.sdf of the upstream test data (3561 molecules; the three that differed in the AuxInfo `/CRV:` segment now agree) | ✅ | `tests/python/test_inchi.py` |
+| 290 | InChI polymers, stage P1: `OAD_ValidatePolymerAndPseudoElementData` in full (unit checks 9001-9035, ends and caps, representation, pseudo-element atoms, copolymer conversions) and the first failing pass of `PreprocessPolymerCRUData`; valid polymer input still stops with "Polymer processing is not supported yet" | 🟡 | `tests/python/test_inchi_polymers.py`: the 33 of 123 molfiles that RDKit rejects give its exact error text for all five polymer option sets; the 90 others wait for stages P2-P6 |
 
 ## InChI port (summary, audited 2026-10-22)
 
@@ -901,3 +902,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-27 — Stage 287: MolDraw2D SVG byte-identical to RDKit on 10311/10312 molecules. Not a speed change.
 * 2026-10-27 — Stage 288: FilterCatalog serialization. Not a speed change.
 * 2026-10-27 — Stage 289: InChI P(IV)+/X- ion pair neutralization. Not a speed change.
+* 2026-10-27 — Stage 290: InChI polymer validation (P1); 33/123 polymer corpus cases agree. Not a speed change.
