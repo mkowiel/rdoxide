@@ -423,7 +423,7 @@ What works from Python (`rdoxide.Chem.rdinchi`, `rdoxide.Chem.inchi`, `INCHI_AVA
 | `MolFromInchi`, `InchiToMol` (restoration of the structure, `cleanUp`, 0D stereo, bond directions) | ✅ | official RDKit: differential `molfrominchi` (SMILES and re-generated InChI) 10312/10312 + 29200/29200 + 72/72 identical; C `GetStructFromINCHI`: atoms, bonds, hydrogens and 0D stereo of 1576 InChI identical (`tests/inchi_getstruct.rs`); upstream `UnitTestInchi` 18/18 | InChI with keto-enol/1,5 layers (`/KET /15T`) are not restorable, as in C |
 | `MolFromInchiAndAuxInfo` | ✅ | upstream `TestMolFromInchiAndAuxInfo` | the AuxInfo is parsed by upstream's pure-Python code |
 | `Chem.MolKey.InchiInfo` | ✅ | `UnitTestMolKey` 10/15 | `MolKey` itself needs AvalonTools (not ported) |
-| Polymers (`-Polymers`, `-NPZz`, CRU folding, `/z` layer, `DetectAndExposePolymerInternals`) | ⬜ | | the options are parsed, the polymer code paths (`OAD_Polymer*`, `OutputINCHI_PolymerLayer`) are not ported; RDKit's `MolToInchi` never passes polymer data, only `MolBlockToInchi` with these options could differ |
+| Polymers (`-Polymers`, `-NPZz`, `/z` layer, frame shift, reading polymer InChI) | ✅ | | rows 290-295; CRU folding is not ported (the official library crashes on every foldable unit, so there is no reference output); RDKit's `MolToInchi` never passes polymer data, only `MolBlockToInchi` with these options can differ |
 | Time limits (`-W`), user-quit callbacks | ⬜ | | accepted, never enforced |
 | `GetINCHIfromINCHI`, staged `INCHIGEN_*`/`STDINCHIGEN_*` API, IXA API, `mol_fmt4` SD/S-group writer, `inchi_gui`, the InChI executable | ⬜ | | not used by RDKit; not planned |
 
