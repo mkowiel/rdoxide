@@ -440,6 +440,14 @@ pub fn process_one_structure_arrays(
         Ok(o) => {
             orig_struct = o;
             orig.sz_coord = None;
+            // OrigStruct_FillOut: the polymer of a valid polymer input
+            if let Some(pd) = orig.polymer.as_ref() {
+                if pd.n > 0 && orig.valid_polymer != 0 {
+                    orig_struct.polymer = Some(pd.clone());
+                    orig_struct.orig_at = orig.at[..orig.num_inp_atoms].to_vec();
+                    orig_struct.orig_num_inp_bonds = orig.num_inp_bonds;
+                }
+            }
         }
         Err(_) => {
             add_error_message(
@@ -545,8 +553,142 @@ pub fn process_one_structure_arrays(
     n_ret
 }
 
-/// `ProcessOneStructureExCore` + `ProcessOneStructureEx` for structures
-/// without polymer data (the CRU frame-shift and folding code is not ported)
+/// `ProcessOneStructureExCore`: validates the polymer and pseudoatom data, then
+/// calculates the InChI. Returns the `IS_*` result.
+#[allow(clippy::too_many_arguments)]
+fn process_one_structure_ex_core(
+    sd: &mut StructData,
+    ip: &InputParms,
+    log: &mut InchiIostream,
+    out_file: &mut InchiIostream,
+    strbuf: &mut InchiIosString,
+    orig: &mut OrigAtomData,
+    prep: &mut [OrigAtomData; 2],
+    num_inp: i64,
+) -> i32 {
+    use super::ichiparm::{POLYMERS_LEGACY, POLYMERS_LEGACY_PLUS, POLYMERS_MODERN, POLYMERS_NO};
+    use super::runichi3::oad_validate_polymer_and_pseudo_element_data;
+    let mut res = oad_validate_polymer_and_pseudo_element_data(
+        orig,
+        ip.b_polymers,
+        ip.b_np_zz,
+        &mut sd.str_err_struct,
+        ip.b_no_warnings != 0,
+    );
+    if res != 0 {
+        sd.n_error_code = res;
+        inchi_ios_eprint(
+            Some(log),
+            &format!(
+                "Error {} ({}) structure #{}.\n",
+                sd.n_error_code, sd.str_err_struct, num_inp
+            ),
+        );
+        orig.num_inp_atoms = 0;
+        return IS_ERROR;
+    }
+    let mind_polymers = orig.polymer.as_ref().is_some_and(|p| p.n > 0) && orig.valid_polymer != 0;
+    if mind_polymers
+        && ip.b_polymers == POLYMERS_MODERN
+        && orig.polymer.as_ref().is_some_and(|p| p.n_pzz >= 2)
+    {
+        // CRU folding and frame shift (units capped with two undefined-nature atoms)
+        super::ichierr::add_error_message(
+            &mut sd.str_err_struct,
+            "Polymer processing is not supported yet",
+        );
+        sd.n_error_type = IS_ERROR;
+        return IS_ERROR;
+    }
+    if mind_polymers
+        && ip.b_polymers != POLYMERS_MODERN
+        && ip.b_polymers != POLYMERS_NO
+        && (ip.b_frame_shift_scheme == super::ichiparm::FSS_STARS_CYCLED
+            || ip.b_frame_shift_scheme == super::ichiparm::FSS_STARS_CYCLED_SORTED)
+        && orig.polymer.as_ref().is_some_and(|p| p.n_pzz >= 2)
+    {
+        // OAD_Polymer_CyclizeCloseableUnits (older polymer modes)
+        super::ichierr::add_error_message(
+            &mut sd.str_err_struct,
+            "Polymer processing is not supported yet",
+        );
+        sd.n_error_type = IS_ERROR;
+        return IS_ERROR;
+    }
+    res = process_one_structure(sd, ip, log, out_file, strbuf, orig, prep, num_inp);
+    if (res == super::runichi3::IS_OKAY || res == super::runichi3::IS_WARNING)
+        && mind_polymers
+        && (ip.b_polymers == POLYMERS_LEGACY || ip.b_polymers == POLYMERS_LEGACY_PLUS)
+    {
+        // cut and hide "Zz" and related things in the InChI
+        let n_pzz = orig.polymer.as_ref().map_or(0, |p| p.n_pzz);
+        super::ichiprt1::edit_inchi_hide_polymer_zz(out_file, n_pzz, orig.n_zy);
+    }
+    res
+}
+
+/// `OAD_ProcessOneStructureNoEdits`: the AuxInfo of the unedited structure
+/// (a calculation on copies); `None` when it fails.
+#[allow(clippy::too_many_arguments)]
+fn oad_process_one_structure_no_edits(
+    sd: &StructData,
+    ip: &InputParms,
+    log: &mut InchiIostream,
+    strbuf: &InchiIosString,
+    orig: &OrigAtomData,
+    prep: &[OrigAtomData; 2],
+    num_inp: i64,
+) -> (i32, Option<String>) {
+    use super::ichi_io::{INCHI_IOS_TYPE_STRING, IosFile, inchi_ios_init};
+    use super::ichiparm::{
+        FSS_NONE, INCHI_OUT_NO_AUX_INFO, INCHI_OUT_SHORT_AUX_INFO, POLYMERS_MODERN,
+    };
+    let mut dsd = sd.clone();
+    let mut dip = ip.clone();
+    let mut dorig = orig.clone();
+    let mut dprep = prep.clone();
+    let mut dstrbuf = strbuf.clone();
+    let mut dout = InchiIostream::default();
+    inchi_ios_init(&mut dout, INCHI_IOS_TYPE_STRING, IosFile::None);
+    if let Some(pd) = dorig.polymer.as_mut() {
+        pd.treat = POLYMERS_MODERN;
+    }
+    dip.b_polymers = POLYMERS_MODERN;
+    dip.b_fold_polymer_sru = 0;
+    dip.b_frame_shift_scheme = FSS_NONE;
+    dip.b_inchi_output_options &= !(INCHI_OUT_NO_AUX_INFO | INCHI_OUT_SHORT_AUX_INFO);
+    let ret = process_one_structure_ex_core(
+        &mut dsd,
+        &dip,
+        log,
+        &mut dout,
+        &mut dstrbuf,
+        &mut dorig,
+        &mut dprep,
+        num_inp,
+    );
+    if ret == IS_FATAL || ret == IS_ERROR {
+        return (ret, None);
+    }
+    let text = dout
+        .s
+        .p_str
+        .as_ref()
+        .map(|b| String::from_utf8_lossy(&b[..dout.s.n_used_length.max(0) as usize]).into_owned())
+        .unwrap_or_default();
+    // extract_auxinfo_substring: from "AuxInfo=" up to the first white space
+    let aux = text.find("AuxInfo=").map(|i| {
+        let rest = &text[i..];
+        rest[..rest.find(char::is_whitespace).unwrap_or(rest.len())].to_string()
+    });
+    match aux {
+        Some(a) => (ret, Some(a)),
+        None => (IS_ERROR, None),
+    }
+}
+
+/// `ProcessOneStructureEx`: polymer preprocessing, the calculation, and the
+/// AuxInfo of the unedited input for polymers
 #[allow(clippy::too_many_arguments)]
 pub fn process_one_structure_ex(
     sd: &mut StructData,
@@ -558,73 +700,39 @@ pub fn process_one_structure_ex(
     prep: &mut [OrigAtomData; 2],
     num_inp: i64,
 ) -> i32 {
-    use super::ichiparm::{INCHI_OUT_INCHI_GEN_ERROR, INCHI_OUT_STDINCHI};
-    use super::runichi3::oad_validate_polymer_and_pseudo_element_data;
+    use super::ichiparm::{
+        INCHI_OUT_INCHI_GEN_ERROR, INCHI_OUT_NO_AUX_INFO, INCHI_OUT_STDINCHI, POLYMERS_MODERN,
+        POLYMERS_NO,
+    };
     // PreprocessPolymerCRUData
+    let mut saux_noedits: Option<String> = None;
     orig.valid_polymer = 0;
-    let polymer_mode = orig.polymer.is_some() && ip.b_polymers != super::ichiparm::POLYMERS_NO;
-    if polymer_mode {
-        // PreprocessPolymerCRUData: sets `polymer->treat`; the CRU folding and frame-shift
-        // analysis (which re-runs the whole calculation) is not ported yet
+    if orig.polymer.is_some() {
         if let Some(pd) = orig.polymer.as_mut() {
             pd.treat = ip.b_polymers;
         }
-        if ip.b_polymers == super::ichiparm::POLYMERS_MODERN {
-            // OAD_ProcessOneStructureNoEdits: the whole calculation for a copy of the input
-            // first; its failure (the validation part of it is all that is ported) only
-            // adds a warning-like message to the structure
-            let mut dup = orig.clone();
-            let mut dup_err = String::new();
-            if let Some(pd) = dup.polymer.as_mut() {
-                pd.treat = super::ichiparm::POLYMERS_MODERN;
-            }
-            let e = super::runichi3::oad_validate_polymer_and_pseudo_element_data(
-                &mut dup,
-                super::ichiparm::POLYMERS_MODERN,
-                ip.b_np_zz,
-                &mut dup_err,
-                ip.b_no_warnings != 0,
-            );
-            if e != 0 && ip.b_no_warnings == 0 {
-                super::ichierr::add_error_message(
-                    &mut sd.str_err_struct,
-                    "CRU folding and frame shift analysis failed",
-                );
+        if ip.b_polymers != POLYMERS_NO {
+            orig.valid_polymer = 1;
+            if ip.b_polymers == POLYMERS_MODERN {
+                // the unedited structure first (CRU folding and frame shift analysis,
+                // which re-runs the calculation, are not ported yet)
+                let (ret, aux) =
+                    oad_process_one_structure_no_edits(sd, ip, log, strbuf, orig, prep, num_inp);
+                if ret == IS_FATAL || ret == IS_ERROR {
+                    if ip.b_no_warnings == 0 {
+                        super::ichierr::add_error_message(
+                            &mut sd.str_err_struct,
+                            "CRU folding and frame shift analysis failed",
+                        );
+                    }
+                } else {
+                    saux_noedits = aux;
+                }
             }
         }
     }
 
-    // ProcessOneStructureExCore
-    let mut res = oad_validate_polymer_and_pseudo_element_data(
-        orig,
-        ip.b_polymers,
-        ip.b_np_zz,
-        &mut sd.str_err_struct,
-        ip.b_no_warnings != 0,
-    );
-    if res == 0 && polymer_mode && orig.valid_polymer != 0 {
-        // the CRU folding, frame shift and the polymer layers are not ported yet
-        super::ichierr::add_error_message(
-            &mut sd.str_err_struct,
-            "Polymer processing is not supported yet",
-        );
-        sd.n_error_type = IS_ERROR;
-        return IS_ERROR;
-    }
-    if res != 0 {
-        sd.n_error_code = res;
-        inchi_ios_eprint(
-            Some(log),
-            &format!(
-                "Error {} ({}) structure #{}.\n",
-                sd.n_error_code, sd.str_err_struct, num_inp
-            ),
-        );
-        res = IS_ERROR;
-        orig.num_inp_atoms = 0;
-    } else {
-        res = process_one_structure(sd, ip, log, out_file, strbuf, orig, prep, num_inp);
-    }
+    let res = process_one_structure_ex_core(sd, ip, log, out_file, strbuf, orig, prep, num_inp);
 
     if ip.b_inchi_output_options2 & INCHI_OUT_INCHI_GEN_ERROR != 0
         && (res == IS_FATAL || res == IS_ERROR)
@@ -635,6 +743,31 @@ pub fn process_one_structure_ex(
             "InChI=1//\n"
         };
         inchi_ios_eprint(Some(out_file), t);
+    }
+    // post-process: AuxInfo of the very unedited original structure
+    if res != IS_FATAL && res != IS_ERROR && ip.b_inchi_output_options & INCHI_OUT_NO_AUX_INFO == 0
+    {
+        if let Some(saux) = saux_noedits.as_deref() {
+            let has_aux = out_file.s.p_str.as_ref().is_some_and(|b| {
+                b[..out_file.s.n_used_length.max(0) as usize]
+                    .windows(8)
+                    .any(|w| w == b"AuxInfo=")
+            });
+            if has_aux && saux.len() > 8 {
+                if let Some(b) = out_file.s.p_str.as_mut() {
+                    let mut len = out_file.s.n_used_length.max(0) as usize;
+                    if len > 0 && b[len - 1] == b'\n' {
+                        len -= 1;
+                        if len > 0 && b[len - 1] == b'\r' {
+                            len -= 1;
+                        }
+                    }
+                    b[len] = 0;
+                    out_file.s.n_used_length = len as i32;
+                }
+                inchi_ios_eprint(Some(out_file), &format!("/U/{}\n", &saux[8..]));
+            }
+        }
     }
     res
 }

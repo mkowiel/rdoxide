@@ -33,11 +33,11 @@ def polymer_agreement(opt):
 
 # floors of agreeing cases per option set; raise them as the polymer stages land
 FLOORS = {
-    "-Polymers": 33,
-    "-Polymers -NPZz": 33,
-    "-Polymers -FoldCRU": 33,
-    "-Polymers -NoFoldCRU": 33,
-    "-Polymers105": 33,
+    "-Polymers": 107,
+    "-Polymers -NPZz": 107,
+    "-Polymers -FoldCRU": 107,
+    "-Polymers -NoFoldCRU": 107,
+    "-Polymers105": 123,
 }
 
 
