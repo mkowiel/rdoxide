@@ -70,7 +70,7 @@ a differential test compares against the official `rdkit` wheel.
 | 10 | Geometry & 3D | Geometry, Numerics, MolTransforms, Depictor (2D coords), DistGeom + ETKDG, ForceField (UFF, MMFF), MolAlign, ShapeHelpers | `rdDepictor`, `rdDistGeom`, `rdForceFieldHelpers`, `rdMolAlign` |
 | 11 | Search & analysis | FMCS, RascalMCES, RGroupDecomposition, SimDivPickers, ML (clustering), FilterCatalog | corresponding modules |
 | 12 | Drawing | MolDraw2D (SVG backend in pure Rust; Cairo-free PNG via a Rust rasterizer) | `rdMolDraw2D`, `Draw` |
-| 13 | Long tail | InChI (pure-Rust port of InChI 1.07.3, MIT; see INCHI_PORT.md), Avalon, CDXML, Marvin, SLN, MolEnumerator, MMPA, Abbreviations, ... | — |
+| 13 | Long tail | InChI (pure-Rust port of InChI 1.07.3, MIT; see INCHI_PORT.md), Avalon (BSD-3 Novartis; notes in AVALON_PORT.md), CDXML, Marvin, SLN, MolEnumerator, MMPA, Abbreviations, ... | — |
 
 Priorities inside each stage are driven by real-world usage: the API used by
 `rdoxide.Chem.__init__`, `AllChem`, `Descriptors` and `PandasTools` comes first.
