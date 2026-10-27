@@ -3397,13 +3397,316 @@ fn contains_c(s: &[u8], pat: &[u8]) -> bool {
     s[..n].windows(pat.len()).any(|w| w == pat)
 }
 
-/// `ParseSegmentPolymer`: only the layer test; the polymer units are not
-/// ported, so a `/z` layer is a syntax error
-fn parse_segment_polymer_stub(s: &[u8]) -> i32 {
+/// `ParseSegmentReadDelimitedNumbers` as a `Result` of the end position
+fn read_delimited(
+    s: &[u8],
+    from: usize,
+    p_end: usize,
+    numlist: &mut Vec<i32>,
+    delim: u8,
+    stop: u8,
+) -> Result<usize, i32> {
+    match parse_segment_read_delimited_numbers(s, from, p_end, numlist, delim, stop) {
+        (Some(p), 1) => Ok(p),
+        (_, r) => Err(r),
+    }
+}
+
+/// `ParseSegmentPolymer`: the `/z` layer of an InChI that is converted to a
+/// structure. Returns the number of units, `0` if `s` is not a `/z` layer
+/// or a negative `RI_ERR_*`.
+fn parse_segment_polymer(
+    s: &[u8],
+    na_total: i32,
+    polymer: &mut Option<super::mol2atom::OadPolymer>,
+) -> i32 {
+    use super::mol2atom::{OadPolymer, OadPolymerUnit};
+    use super::runichi3::{
+        CLOSING_SRU_DIRADICAL, CLOSING_SRU_HIGHER_ORDER_BOND, CLOSING_SRU_NOT_APPLICABLE,
+        CLOSING_SRU_RING, POLYMER_CONN_EU, POLYMER_CONN_HH, POLYMER_CONN_HT, POLYMER_CONN_NON,
+        POLYMER_SST_ALT, POLYMER_SST_BLK, POLYMER_SST_NON, POLYMER_SST_RAN, POLYMER_STY_COP,
+        POLYMER_STY_CRO, POLYMER_STY_MER, POLYMER_STY_MOD, POLYMER_STY_MON, POLYMER_STY_NON,
+        POLYMER_STY_SRU,
+    };
     if at(s, 0) != b'z' {
         return 0;
     }
-    RI_ERR_SYNTAX
+    let len = strlen(s, 0);
+    let s = &s[..len];
+    let n = 1 + s[1..].iter().filter(|&&c| c == b';').count();
+    let mut pd = OadPolymer {
+        n: n as i32,
+        ..OadPolymer::default()
+    };
+    let mut p_start = 1;
+    let mut iunit = 0usize;
+    let mut ret;
+    'parse: {
+        while p_start < len {
+            if at(s, p_start) == b';' {
+                p_start += 1;
+            }
+            let p_end = s[p_start..]
+                .iter()
+                .position(|&c| c == b';')
+                .map_or(len, |k| p_start + k);
+            if !at(s, p_start).is_ascii_digit() {
+                ret = RI_ERR_SYNTAX;
+                break 'parse;
+            }
+            let (val, q) = strtol(s, p_start);
+            let val = val as i32;
+            let ty = val / 100;
+            let subtype = (val - ty * 100) / 10;
+            let conn = val - (ty * 100 + subtype * 10);
+            if at(s, q) != b'-' || val < 100 {
+                ret = RI_ERR_SYNTAX;
+                break 'parse;
+            }
+            let valid = matches!(
+                ty,
+                POLYMER_STY_NON
+                    | POLYMER_STY_SRU
+                    | POLYMER_STY_MON
+                    | POLYMER_STY_COP
+                    | POLYMER_STY_MOD
+                    | POLYMER_STY_CRO
+                    | POLYMER_STY_MER
+            ) && matches!(
+                subtype,
+                POLYMER_SST_NON | POLYMER_SST_ALT | POLYMER_SST_RAN | POLYMER_SST_BLK
+            ) && matches!(
+                conn,
+                POLYMER_CONN_NON | POLYMER_CONN_HT | POLYMER_CONN_HH | POLYMER_CONN_EU
+            );
+            if !valid {
+                ret = RI_ERR_SYNTAX;
+                break 'parse;
+            }
+            let mut p = q + 1;
+            let mut alist: Vec<i32> = Vec::new();
+            let (mut prev, mut is_range) = (0i32, false);
+            while p < p_end && at(s, p) != b'(' {
+                let (v, q2) = strtol(s, p);
+                p = q2;
+                let num_atom = i32::from(v as u16);
+                if num_atom == 0 || num_atom > na_total {
+                    ret = RI_ERR_SYNTAX;
+                    break 'parse;
+                }
+                if is_range {
+                    alist.extend(prev + 1..=num_atom);
+                    is_range = false;
+                    prev = 0;
+                } else {
+                    alist.push(num_atom);
+                    prev = num_atom;
+                }
+                if at(s, p) == b'-' {
+                    p += 1;
+                    is_range = true;
+                } else if at(s, p) == b',' {
+                    p += 1;
+                }
+            }
+            let mut has_unit = false;
+            if !alist.is_empty() {
+                pd.units.push(OadPolymerUnit {
+                    id: iunit as i32 + 1,
+                    label: iunit as i32 + 1,
+                    type_: ty,
+                    subtype,
+                    conn,
+                    na: alist.len() as i32,
+                    alist,
+                    cyclizable: CLOSING_SRU_NOT_APPLICABLE,
+                    cap1: -1,
+                    end_atom1: -1,
+                    cap2: -1,
+                    end_atom2: -1,
+                    ..OadPolymerUnit::default()
+                });
+                iunit += 1;
+                has_unit = true;
+            }
+            if at(s, p) == b'(' {
+                const ENDGROUPS: u8 = 1;
+                const STARS: u8 = 2;
+                const STARS_RING: u8 = 3;
+                const STARS_BOND: u8 = 4;
+                const STARS_ATOM: u8 = 5;
+                let mut have = 0u8;
+                let p0 = p;
+                let mut pp = p;
+                loop {
+                    pp += 1;
+                    if at(s, pp) == 0 {
+                        break;
+                    }
+                    if at(s, pp) == b'-' {
+                        have = ENDGROUPS;
+                        break;
+                    }
+                    if at(s, pp) == b',' {
+                        have = STARS;
+                        break;
+                    }
+                }
+                if have == STARS {
+                    loop {
+                        pp += 1;
+                        match at(s, pp) {
+                            0 => break,
+                            b',' => {
+                                have = STARS_RING;
+                                break;
+                            }
+                            b'.' => {
+                                have = STARS_BOND;
+                                break;
+                            }
+                            b')' => {
+                                have = STARS_ATOM;
+                                break;
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                p = p0;
+                if !has_unit {
+                    ret = RI_ERR_SYNTAX;
+                    break 'parse;
+                }
+                let unit = pd.units.last_mut().expect("unit");
+                let mut numlist: Vec<i32> = Vec::new();
+                if have == ENDGROUPS {
+                    let r1 = read_delimited(s, p, p_end, &mut numlist, b'-', b',');
+                    let Ok(p1) = r1 else {
+                        ret = RI_ERR_SYNTAX;
+                        break 'parse;
+                    };
+                    if numlist.len() != 2 {
+                        ret = RI_ERR_SYNTAX;
+                        break 'parse;
+                    }
+                    let r2 = read_delimited(s, p1, p_end, &mut numlist, b'-', b')');
+                    let Ok(p2) = r2 else {
+                        ret = RI_ERR_SYNTAX;
+                        break 'parse;
+                    };
+                    if numlist.len() != 4 {
+                        ret = RI_ERR_SYNTAX;
+                        break 'parse;
+                    }
+                    p_start = p2 + 1;
+                    unit.nb = 2;
+                    unit.blist = numlist.clone();
+                    unit.cap1 = numlist[0];
+                    unit.cap2 = numlist[2];
+                    continue;
+                } else if have == STARS_RING || have == STARS_BOND || have == STARS_ATOM {
+                    let r = read_delimited(s, p, p_end, &mut numlist, b',', b'-');
+                    let Ok(p1) = r else {
+                        ret = RI_ERR_SYNTAX;
+                        break 'parse;
+                    };
+                    p = p1;
+                    if numlist.len() != 2 {
+                        ret = RI_ERR_SYNTAX;
+                        break 'parse;
+                    }
+                    if have == STARS_RING {
+                        let r = read_delimited(s, p, p_end, &mut numlist, b',', b')');
+                        let Ok(p2) = r else {
+                            ret = RI_ERR_SYNTAX;
+                            break 'parse;
+                        };
+                        p = p2;
+                        if numlist.len() < 4 {
+                            ret = RI_ERR_SYNTAX;
+                            break 'parse;
+                        }
+                        unit.cyclizable = CLOSING_SRU_RING;
+                        unit.nbkbonds = (numlist.len() as i32 - 2) / 2;
+                    } else if have == STARS_BOND {
+                        let r = read_delimited(s, p, p_end, &mut numlist, b'.', b')');
+                        let Ok(p2) = r else {
+                            ret = RI_ERR_SYNTAX;
+                            break 'parse;
+                        };
+                        p = p2;
+                        if numlist.len() < 4 {
+                            ret = RI_ERR_SYNTAX;
+                            break 'parse;
+                        }
+                        unit.cyclizable = CLOSING_SRU_HIGHER_ORDER_BOND;
+                        unit.nbkbonds = 1;
+                    } else {
+                        let (num, q3) = strtol(s, p + 1);
+                        p = q3;
+                        if num > i64::from(na_total) || num < 0 || at(s, p) != b')' {
+                            ret = RI_ERR_SYNTAX;
+                            break 'parse;
+                        }
+                        numlist.push(num as i32);
+                        unit.cyclizable = CLOSING_SRU_DIRADICAL;
+                        unit.nbkbonds = 1;
+                    }
+                } else {
+                    ret = RI_ERR_SYNTAX;
+                    break 'parse;
+                }
+                unit.cap1 = numlist[0];
+                unit.cap2 = numlist[1];
+                unit.maxbkbonds = unit.maxbkbonds.max(unit.nbkbonds);
+                unit.bkbonds = vec![vec![0; 2]; unit.maxbkbonds as usize];
+                for ib in 0..unit.nbkbonds as usize {
+                    unit.bkbonds[ib][0] = numlist[ib * 2 + 2];
+                    unit.bkbonds[ib][1] = if numlist.len() != 3 {
+                        numlist[ib * 2 + 3]
+                    } else {
+                        unit.bkbonds[ib][0]
+                    };
+                }
+                p_start = p + 1;
+                continue;
+            }
+            if at(s, p) == b';' {
+                p += 1;
+            }
+            p_start = p;
+        }
+        pd.really_do_frame_shift = 1;
+        pd.frame_shift_scheme = super::ichiparm::FSS_STARS_CYCLED;
+        pd.treat = super::ichiparm::POLYMERS_MODERN;
+        pd.is_in_reconn = 0;
+        ret = pd.n;
+        // checks of the star atom numbers
+        let maxats = na_total + pd.n_pzz;
+        if pd.units.len() < pd.n as usize {
+            ret = RI_ERR_SYNTAX;
+            break 'parse;
+        }
+        for u in &pd.units {
+            if u.nb == 0 {
+                continue;
+            }
+            let (a1, a2) = (u.cap1, u.cap2);
+            if a1 > maxats || a1 <= 0 || a2 > maxats || a2 <= 0 {
+                ret = RI_ERR_SYNTAX;
+                break 'parse;
+            }
+            for b in u.bkbonds.iter().take(u.nbkbonds as usize) {
+                if b[0] > maxats || b[0] <= 0 || b[1] > maxats || b[1] <= 0 {
+                    ret = RI_ERR_SYNTAX;
+                    break 'parse;
+                }
+            }
+        }
+    }
+    *polymer = Some(pd);
+    ret
 }
 
 /// the state of the `InChI` structures read by `ReadInChILine`
@@ -3416,6 +3719,8 @@ pub struct InpInChI {
     /// `CompareInchiFlags[INCHI_NUM][TAUT_NUM]`: `INCHIDIFF` bits of the
     /// comparison with the restored structures
     pub compare_inchi_flags: [[u64; 2]; 2],
+    /// the polymer data of the `/z` layer
+    pub polymer: Option<super::mol2atom::OadPolymer>,
 }
 
 /// `ReadInChILine`: reads the InChI string of the stream into `inp_inchi`;
@@ -3439,7 +3744,7 @@ pub fn read_inchi_line(
     let mut state: i32;
     let mut prev_state: i32 = -1;
     let mut b_abc = -1i32;
-    let mut na_total: i32;
+    let mut na_total: i32 = 0;
     let mut nb_total = 0i32;
     let (mut let1, mut let2) = (0u8, 0u8);
     const A2P: &[u8] = b"ABCDEFGHIJKLMNOP";
@@ -3612,7 +3917,10 @@ pub fn read_inchi_line(
                 state = IST_MOBILE_H_POLYMER;
             }
             IST_MOBILE_H_POLYMER => {
-                ret = parse_segment_polymer_stub(s);
+                ret = parse_segment_polymer(s, na_total, &mut d.polymer);
+                if let Some(p) = d.polymer.as_mut() {
+                    p.is_in_reconn = rc as i32;
+                }
                 state = IST_MOBILE_H_SP2;
             }
             IST_MOBILE_H_SP2 | IST_MOBILE_H_ISO_SP2 | IST_FIXED_H_SP2 | IST_FIXED_H_ISO_SP2 => {
@@ -5309,4 +5617,189 @@ pub fn set_protons_and_xchg_iso_h(
     num_components[INCHI_REC] =
         d.n_num_components[INCHI_REC][TAUT_YES].max(d.n_num_components[INCHI_REC][TAUT_NON]);
     (0, num_components, mode)
+}
+
+/// `DetectHiddenPolymerStuff`: the number of the hidden star atoms of a `/z`
+/// layer (`z`) and the positions where their numbers are to be inserted
+fn detect_hidden_polymer_stuff(
+    z: &[u8],
+    insert_pos: &mut Vec<usize>,
+    insert_lead_offset: usize,
+) -> Result<i32, i32> {
+    let (mut nstars, mut opened, mut skip, mut i0) = (0, false, false, 0);
+    let mut closed = true;
+    for (i, &c) in z.iter().enumerate() {
+        match c {
+            b'(' => {
+                if !closed {
+                    return Err(-3);
+                }
+                opened = true;
+                closed = false;
+                skip = false;
+                i0 = i;
+            }
+            b')' => {
+                if !opened {
+                    return Err(-3);
+                }
+                if !skip {
+                    nstars += 2;
+                    insert_pos.push(i0 + 1 + insert_lead_offset);
+                }
+                opened = false;
+                closed = true;
+            }
+            b'-' => skip = true,
+            _ => {}
+        }
+    }
+    Ok(nstars)
+}
+
+/// `DetectAndExposePolymerInternals`: an InChI of the 1.05+ polymer treatment
+/// has its star atoms (`Zz`) hidden; makes them explicit in the formula and
+/// the layers. `None`: nothing to do (or not recognized, "proceed silently").
+pub fn detect_and_expose_polymer_internals(input: &str) -> Option<String> {
+    let full = input.as_bytes();
+    let i2 = full
+        .iter()
+        .position(|c| c.is_ascii_whitespace())
+        .unwrap_or(0);
+    let (s, s2): (&[u8], &[u8]) = if i2 > 0 {
+        (&full[..i2], &full[i2..])
+    } else {
+        (full, &[][..])
+    };
+    let slen = s.len();
+    if slen == 0 {
+        return None;
+    }
+    let i_last_sym = slen - 1;
+    let find = |from: usize, pat: &[u8]| -> Option<usize> {
+        s.get(from..)?
+            .windows(pat.len())
+            .position(|w| w == pat)
+            .map(|k| k + from)
+    };
+    let find_c = |from: usize, c: u8| -> Option<usize> {
+        s.get(from..)?
+            .iter()
+            .position(|&x| x == c)
+            .map(|k| k + from)
+    };
+    let p0 = find(0, b"InChI=1")?;
+    let pz = find(p0, b"/z")? + 1;
+    // the formula
+    let mut p = find_c(p0, b'/')? + 1;
+    let pend = find_c(p, b'/');
+    let mut ntimes: i64 = 1;
+    let mut nheavy: i64 = 0;
+    while Some(p) != pend {
+        if at(s, p).is_ascii_digit() {
+            let (v, q) = strtol(s, p);
+            if !(0..=i64::from(MAX_ATOMS)).contains(&v) {
+                return None;
+            }
+            ntimes = v;
+            p = q;
+        } else if at(s, p) == b'.' {
+            ntimes = 1;
+        }
+        if !at(s, p).is_ascii_uppercase() {
+            return None;
+        }
+        let mut element = String::new();
+        element.push(at(s, p) as char);
+        p += 1;
+        if at(s, p).is_ascii_lowercase() {
+            element.push(at(s, p) as char);
+            p += 1;
+        }
+        let elindex = if at(s, p).is_ascii_digit() {
+            let (v, q) = strtol(s, p);
+            if !(0..=i64::from(MAX_ATOMS)).contains(&v) {
+                return None;
+            }
+            p = q;
+            v
+        } else {
+            1
+        };
+        if elindex == 0 || super::util::get_periodic_table_number(&element) == super::util::ERR_ELEM
+        {
+            return None;
+        }
+        if element != "H" {
+            nheavy += ntimes * elindex;
+        }
+        if at(s, p) == b'.' {
+            p += 1;
+        }
+    }
+    let mut insert_pos: Vec<usize> = vec![pend.unwrap_or(i_last_sym)];
+    // hidden stars
+    let zend = find_c(pz, b'/').unwrap_or(slen);
+    let mut nstars = detect_hidden_polymer_stuff(&s[pz..zend], &mut insert_pos, pz).ok()?;
+    if nstars == 0 {
+        return None;
+    }
+    // a second `/z` in the reconnected layer
+    if let Some(r) = find(0, b"/r") {
+        let pr = r + 1;
+        insert_pos.push(find_c(pr, b'/').unwrap_or(i_last_sym));
+        if let Some(z2) = find(pr, b"/z") {
+            let pz2 = z2 + 1;
+            let zend2 = find_c(pz2, b'/').unwrap_or(slen);
+            nstars = detect_hidden_polymer_stuff(&s[pz2..zend2], &mut insert_pos, pz2).ok()?;
+        }
+    }
+    let mut out: Vec<u8> = Vec::with_capacity(slen * 2);
+    let mut prev_layer_symbol = b'0';
+    let mut kinsert = 0;
+    let mut star0 = nheavy + 1;
+    let ninsert = insert_pos.len();
+    for i in 0..slen {
+        if kinsert < ninsert && i == insert_pos[kinsert] {
+            let t = if kinsert == 0 || prev_layer_symbol == b'r' {
+                star0 = nheavy + 1;
+                prev_layer_symbol = b'0';
+                format!(".{nstars}Zz")
+            } else {
+                let t = format!("{},{}-", star0, star0 + 1);
+                star0 += 2;
+                t
+            };
+            kinsert += 1;
+            out.extend_from_slice(t.as_bytes());
+        }
+        if i == i_last_sym {
+            out.push(s[i]);
+        }
+        if s[i] == b'/' || i == i_last_sym {
+            if !matches!(prev_layer_symbol, b'0' | b'f' | b'z' | b'p' | b'r' | b's') {
+                let addon = if prev_layer_symbol == b'm' {
+                    b'.'
+                } else {
+                    b';'
+                };
+                out.extend(std::iter::repeat_n(addon, nstars as usize));
+            } else if prev_layer_symbol == b'f'
+                && at(s, i.wrapping_sub(1)) != b'f'
+                && i >= 2
+                && s[i - 2] != b'/'
+            {
+                out.extend_from_slice(format!(".{nstars}Zz").as_bytes());
+            }
+            if i != i_last_sym {
+                prev_layer_symbol = s[i + 1];
+            } else {
+                break;
+            }
+        }
+        out.push(s[i]);
+    }
+    out.extend_from_slice(s2);
+    out.push(b'\n');
+    String::from_utf8(out).ok()
 }

@@ -2153,3 +2153,91 @@ pub fn oad_structure_edits_apply_mod_bonds(
     }
     Some(n)
 }
+
+/// `OrigAtData_DecreaseBondOrder`
+pub fn orig_at_data_decrease_bond_order(
+    at: &mut [super::inpdef::InpAtom],
+    this_atom: usize,
+    other_atom: usize,
+) -> i32 {
+    use super::inpdef::MAXVAL;
+    let mut n_dn = 0;
+    for (from, to) in [(this_atom, other_atom), (other_atom, this_atom)] {
+        let a = &mut at[from];
+        if from == this_atom && a.chem_bonds_valence as usize > MAXVAL - 1 {
+            return 0;
+        }
+        for i in 0..a.valence as usize {
+            if a.neighbor[i] as usize != to {
+                continue;
+            }
+            if a.bond_type[i] < 2 {
+                return 0;
+            }
+            a.bond_type[i] -= 1;
+            a.chem_bonds_valence -= 1;
+            n_dn += 1;
+            break;
+        }
+    }
+    n_dn
+}
+
+/// `OAD_PolymerUnit_ReopenCyclized`
+fn oad_polymer_unit_reopen_cyclized(
+    u: &mut OadPolymerUnit,
+    at: &mut [super::inpdef::InpAtom],
+    num_inp_bonds: &mut i32,
+) {
+    let (mut bt, mut bs) = (0, 0);
+    let (e1, e2) = (u.end_atom1 - 1, u.end_atom2 - 1);
+    if u.cyclizable == CLOSING_SRU_RING {
+        orig_at_data_remove_bond(at, e1, e2, &mut bt, &mut bs, num_inp_bonds);
+    } else if u.cyclizable == CLOSING_SRU_HIGHER_ORDER_BOND {
+        orig_at_data_decrease_bond_order(at, e1 as usize, e2 as usize);
+    } else if u.cyclizable == CLOSING_SRU_DIRADICAL
+        && i32::from(at[e1 as usize].radical) == RADICAL_TRIPLET
+    {
+        at[e1 as usize].radical = 0;
+    }
+    orig_at_data_add_single_stereoless_bond(at, u.cap1 - 1, u.end_atom1 - 1, num_inp_bonds);
+    orig_at_data_add_single_stereoless_bond(at, u.cap2 - 1, u.end_atom2 - 1, num_inp_bonds);
+    u.nb = 2;
+    u.nbkbonds = 0;
+    u.blist = vec![u.cap1, u.end_atom1, u.cap2, u.end_atom2];
+}
+
+/// `OAD_Polymer_SmartReopenCyclizedUnits`: opens the pre-cyclized units
+/// (makes the frame shift) of a polymer read from an InChI
+pub fn oad_polymer_smart_reopen_cyclized_units(
+    p: &mut OadPolymer,
+    at: &mut [super::inpdef::InpAtom],
+    nat: usize,
+    num_inp_bonds: &mut i32,
+) {
+    use super::ichiparm::FSS_NONE;
+    if p.n < 1 || p.really_do_frame_shift == 0 || nat == 0 {
+        return;
+    }
+    let mut aprops = vec![OadAtProps::default(); nat + 1];
+    oad_polymer_set_at_props(p, at, nat, num_inp_bonds, &mut aprops, None);
+    let scheme = p.frame_shift_scheme;
+    for u in p.units.iter_mut().take(p.n as usize) {
+        if scheme == FSS_NONE {
+            continue;
+        }
+        if u.nbkbonds < 1
+            || u.cap1 < 1
+            || u.cap2 < 1
+            || u.cap1 as usize > nat
+            || u.cap2 as usize > nat
+        {
+            continue;
+        }
+        if oad_polymer_unit_set_reopening_details(u, at) != 0 {
+            oad_polymer_unit_sort_backbone_bonds_and_set_seniors(u, &aprops);
+        }
+        oad_polymer_unit_reopen_cyclized(u, at, num_inp_bonds);
+    }
+    p.really_do_frame_shift = 0;
+}

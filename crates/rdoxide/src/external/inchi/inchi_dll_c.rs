@@ -111,6 +111,8 @@ pub struct InchiOutputStructEx {
     pub sz_message: Option<String>,
     pub sz_log: Option<String>,
     pub warning_flags: [[u64; 2]; 2],
+    /// the polymer data of a polymer InChI (`outStruct->polymer`)
+    pub polymer: Option<super::mol2atom::OadPolymer>,
 }
 
 /// `inchi_Ret_*`
@@ -152,7 +154,9 @@ fn read_write_inchi(
 
     let mut inp = InchiIostream::default();
     inchi_ios_init(&mut inp, INCHI_IOS_TYPE_STRING, IosFile::None);
-    let bytes = sz_inchi.as_bytes().to_vec();
+    // polymer InChI with hidden stars: expose them
+    let exposed = super::ichiread::detect_and_expose_polymer_internals(sz_inchi);
+    let bytes = exposed.as_deref().unwrap_or(sz_inchi).as_bytes().to_vec();
     inp.s.n_used_length = bytes.len() as i32;
     inp.s.p_str = Some(bytes);
     inp.s.n_ptr = 0;
@@ -218,13 +222,15 @@ fn read_write_inchi(
     if ret < 0 {
         return (ret, Vec::new());
     }
-    let conv = convert_inchi2_struct(&ip, &mut one_input, "", b_req_non_taut, 1, None);
+    let polymer = one_input.polymer.clone();
+    let conv = convert_inchi2_struct(&ip, &mut one_input, "", b_req_non_taut, 1, polymer.as_ref());
     out.sz_message = Some(conv.message.chars().take(MAX_MSG_LEN - 1).collect());
     if conv.ret < 0 {
         // errors (and the mismatches treated as errors) give no structure
         return (conv.ret, Vec::new());
     }
     out.warning_flags = conv.warning_flags;
+    out.polymer = polymer;
     (conv.ret, conv.atoms)
 }
 
@@ -275,8 +281,22 @@ pub fn get_struct_from_inchi_ex(
             break 'body;
         }
         print_input_parms(&mut log, &ip);
-        let (r, at) = read_write_inchi(&ip, &mut log, sz_inchi, &mut out);
+        let (r, mut at) = read_write_inchi(&ip, &mut log, sz_inchi, &mut out);
         n_ret = r;
+        if n_ret >= 0 {
+            if let Some(p) = out.polymer.as_mut() {
+                if !at.is_empty() {
+                    let mut num_bonds = at.iter().map(|a| i32::from(a.valence)).sum::<i32>() / 2;
+                    let nat = at.len();
+                    super::runichi3::oad_polymer_smart_reopen_cyclized_units(
+                        p,
+                        &mut at,
+                        nat,
+                        &mut num_bonds,
+                    );
+                }
+            }
+        }
         if n_ret >= 0 && !at.is_empty() {
             // success
             let (r, atoms, stereo) = inp_atom_0d_to_inchi_atom(&at);
@@ -284,6 +304,14 @@ pub fn get_struct_from_inchi_ex(
             if n_ret >= 0 {
                 out.atom = atoms;
                 out.stereo_0d = stereo;
+                if out.polymer.is_some() {
+                    // stars for the Zz atoms when the polymer extension is supplied
+                    for a in out.atom.iter_mut() {
+                        if a.elname.starts_with(b"Zz\0") {
+                            a.elname[..2].copy_from_slice(b"*\0");
+                        }
+                    }
+                }
             } else {
                 inchi_ios_eprint(Some(&mut log), "Final structure conversion failed\n");
             }
