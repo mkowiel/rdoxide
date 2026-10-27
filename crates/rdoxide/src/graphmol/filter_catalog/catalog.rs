@@ -149,6 +149,11 @@ impl FilterCatalogParams {
         &self.catalogs
     }
 
+    /// Rebuilds parameters from the stored flags (deserialization).
+    pub fn from_flags(catalogs: Vec<u32>) -> Self {
+        FilterCatalogParams { catalogs }
+    }
+
     /// `fillCatalog`
     pub fn fill_catalog(&self, catalog: &mut FilterCatalog) -> Result<()> {
         let data = builtin_catalogs();
@@ -224,6 +229,18 @@ impl FilterCatalog {
         self.entries.clear();
         self.params = Some(params.clone());
         params.fill_catalog(self)
+    }
+
+    /// Rebuilds a catalog from its parts (deserialization).
+    pub fn from_parts(
+        params: Option<FilterCatalogParams>,
+        entries: Vec<Arc<FilterCatalogEntry>>,
+    ) -> Self {
+        FilterCatalog { params, entries }
+    }
+
+    pub fn entries(&self) -> &[Arc<FilterCatalogEntry>] {
+        &self.entries
     }
 
     pub fn catalog_params(&self) -> Option<&FilterCatalogParams> {
@@ -310,7 +327,7 @@ impl FilterCatalog {
 
 /// Whether catalogs can be serialized (upstream: Boost serialization built in).
 pub fn filter_catalog_can_serialize() -> bool {
-    false
+    true
 }
 
 /// `RunFilterCatalog`: the entries matching each SMILES; an unparsable SMILES

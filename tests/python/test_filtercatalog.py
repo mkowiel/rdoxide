@@ -51,7 +51,6 @@ def test_run_filter_catalog_threads():
     assert one[2][0].GetDescription() == "no valid RDKit molecule"
 
 
-def test_catalog_not_picklable():
+def test_empty_catalog_picklable():
     import pickle
-    with pytest.raises(RuntimeError):
-        pickle.dumps(FilterCatalog.FilterCatalog())
+    assert pickle.loads(pickle.dumps(FilterCatalog.FilterCatalog())).GetNumEntries() == 0

@@ -409,6 +409,10 @@ impl ExclusionList {
         Ok(())
     }
 
+    pub fn exclusion_patterns(&self) -> &[SharedMatcher] {
+        &self.off_patterns
+    }
+
     pub fn set_exclusion_patterns(&mut self, patterns: Vec<SharedMatcher>) {
         self.off_patterns = patterns;
     }
@@ -489,6 +493,15 @@ impl FilterHierarchyMatcher {
 
     pub fn matcher(&self) -> Option<&SharedMatcher> {
         self.matcher.as_ref()
+    }
+
+    pub fn children(&self) -> &[HierarchyNode] {
+        &self.children
+    }
+
+    /// Rebuilds a node from its parts (deserialization).
+    pub fn from_parts(matcher: Option<SharedMatcher>, children: Vec<HierarchyNode>) -> Self {
+        FilterHierarchyMatcher { children, matcher }
     }
 
     pub fn set_pattern(&mut self, matcher: &dyn FilterMatcher) -> Result<()> {
