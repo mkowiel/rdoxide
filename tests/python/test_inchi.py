@@ -69,3 +69,17 @@ def test_inchi_to_mol():
     m = Chem.MolFromInchi("InChI=1S/C3H7NO2/c1-2(4)3(5)6/h2H,4H2,1H3,(H,5,6)/t2-/m0/s1")
     assert Chem.MolToSmiles(m) == "C[C@H](N)C(=O)O"
     assert Chem.MolFromInchi("not an inchi") is None
+
+
+def test_phosphonium_chalcogenide_ion_pairs_are_neutralized():
+    # Y3P(+)-X(-) becomes Y3P=X in the InChI normalization (FIX_P_IV_Plus_O_Minus), so the
+    # AuxInfo has no /CRV: segment; N(+)-O(-) keeps its charges (values from RDKit 2026.09.1)
+    aux = {
+        "C[P+](C)(C)[S-]": "AuxInfo=1/0/N:1,3,4,2,5/E:(1,2,3)/rA:5CP+CCS-/rB:s1;s2;s2;s2;/rC:;;;;;",
+        "C[P+](C)(C)[O-]": "AuxInfo=1/0/N:1,3,4,5,2/E:(1,2,3)/rA:5CP+CCO-/rB:s1;s2;s2;s2;/rC:;;;;;",
+        "C[N+](C)(C)[O-]": "AuxInfo=1/0/N:1,3,4,2,5/E:(1,2,3)/CRV:4+1,5-1/rA:5CN+CCO-/rB:s1;s2;s2;s2;/rC:;;;;;",
+    }
+    from rdoxide.Chem import inchi
+
+    for smi, want in aux.items():
+        assert inchi.MolToInchiAndAuxInfo(Chem.MolFromSmiles(smi))[1] == want
