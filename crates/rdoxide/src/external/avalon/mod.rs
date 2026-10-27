@@ -3,6 +3,7 @@
 //! `LICENSES/Avalon-BSD-3-Clause-Novartis.txt` and `docs/AVALON_PORT.md`.
 
 pub mod denormal;
+pub mod fingerprint;
 pub mod graph;
 pub mod perceive;
 pub mod reaccs;
