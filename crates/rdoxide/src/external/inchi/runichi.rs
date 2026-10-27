@@ -633,7 +633,7 @@ fn process_one_structure_ex_core(
 fn oad_process_one_structure_no_edits(
     sd: &StructData,
     ip: &InputParms,
-    log: &mut InchiIostream,
+    _log: &mut InchiIostream,
     strbuf: &InchiIosString,
     orig: &OrigAtomData,
     prep: &[OrigAtomData; 2],
@@ -650,6 +650,8 @@ fn oad_process_one_structure_no_edits(
     let mut dstrbuf = strbuf.clone();
     let mut dout = InchiIostream::default();
     inchi_ios_init(&mut dout, INCHI_IOS_TYPE_STRING, IosFile::None);
+    let mut dlog = InchiIostream::default();
+    inchi_ios_init(&mut dlog, INCHI_IOS_TYPE_STRING, IosFile::None);
     if let Some(pd) = dorig.polymer.as_mut() {
         pd.treat = POLYMERS_MODERN;
     }
@@ -660,7 +662,7 @@ fn oad_process_one_structure_no_edits(
     let ret = process_one_structure_ex_core(
         &mut dsd,
         &dip,
-        log,
+        &mut dlog,
         &mut dout,
         &mut dstrbuf,
         &mut dorig,
