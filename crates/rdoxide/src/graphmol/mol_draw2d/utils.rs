@@ -43,7 +43,7 @@ pub fn prepare_mol_for_drawing(
 ) -> Result<()> {
     if kekulize {
         let _blocker = LogStateSetter::new();
-        kekulize_if_possible(mol, false, false, DEFAULT_MAX_BACKTRACKS)?;
+        kekulize_if_possible(mol, false, true, DEFAULT_MAX_BACKTRACKS)?;
     }
     if add_chiral_hs {
         let chiral_ats: Vec<u32> = (0..mol.num_atoms())
