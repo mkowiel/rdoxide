@@ -21,6 +21,7 @@ import concurrent.futures as cf
 import glob
 import os
 import subprocess
+import threading
 import sys
 import tempfile
 import json
@@ -68,6 +69,19 @@ def run_file(path: Path, timeout: int) -> dict[str, tuple[str, str]]:
         return {f"{rel}::{k}": tuple(v) for k, v in data.items()} or {f"{rel}::<no tests>": ("failed", "")}
 
 
+# these two files write the same output files (test_data/outNCI_few.sdf, ...), so they must not
+# run at the same time
+_SHARED_OUTPUT_LOCK = threading.Lock()
+_SHARED_OUTPUT_FILES = ("Code/GraphMol/Wrap/rough_test.py", "Code/GraphMol/nbWrap/rough_test.py")
+
+
+def run_file_locked(path: Path, timeout: int) -> dict[str, tuple[str, str]]:
+    if str(path).endswith(_SHARED_OUTPUT_FILES):
+        with _SHARED_OUTPUT_LOCK:
+            return run_file(path, timeout)
+    return run_file(path, timeout)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--update", action="store_true", help="add newly passing tests to expected_pass.txt")
@@ -83,7 +97,7 @@ def main() -> int:
     files = [f for f in test_files() if args.k in str(f)]
     results: dict[str, tuple[str, str]] = {}
     with cf.ThreadPoolExecutor(args.j) as ex:
-        for res in ex.map(lambda f: run_file(f, args.timeout), files):
+        for res in ex.map(lambda f: run_file_locked(f, args.timeout), files):
             results.update(res)
 
     expected = set()
