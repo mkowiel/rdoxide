@@ -402,6 +402,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not done. Eve
 | 286 | Reactions in PNG metadata (`chem_reactions::png`: pickle, reaction SMILES/SMARTS and RXN-block tags); Python `ReactionFromPNGFile`/`String`, `ReactionMetadataToPNGFile`/`String`; `rdBase._iostreamsEnabled` is True | ✅ | upstream `testReactionWrapper.py::test_PNGMetadata` (ratchet +1); `tests/python/test_reaction_png.py` |
 | 287 | MolDraw2D fidelity: FreeType outline decomposition no longer closes a contour that already ended in a curve to its start; `prepareMolForDrawing`/reaction drawer kekulize with `canonical=true` as upstream | ✅ | `compare.py drawsvg` (`MolDraw2DSVG` of every molecule of the NCI and canonSmiles corpora): 10311 of 10312 SVGs byte-identical to RDKit 2026.09.1 (was 974); `tests/python/test_moldraw2d.py` |
 | 288 | FilterCatalog serialization (`filter_catalog::serialize`: catalogs, entries and every matcher kind incl. And/Or/Not/ExclusionList/FilterHierarchyMatcher trees; own format, not Boost); Python `Serialize`, pickling and construction from bytes; `FilterCatalogCanSerialize()` is True | ✅ | upstream `FilterCatalog/Wrap/rough_test.py` pickle paths now run (17/17); `tests/python/test_filtercatalog_serialization.py` |
+| 289 | InChI `remove_ion_pairs` pair type 1a (`FIX_P_IV_Plus_O_Minus`: `Y3P(+)-O(-)`, also S/Se/Te, becomes `Y3P=X`), which the port had left out; found by running `MolToInchiAndAuxInfo` over every .mol/.sdf of the upstream test data (3561 molecules; the three that differed in the AuxInfo `/CRV:` segment now agree) | ✅ | `tests/python/test_inchi.py` |
 
 ## InChI port (summary, audited 2026-10-22)
 
@@ -899,3 +900,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-22 — Stage 286: reaction PNG metadata (ratchet +1). Not a speed change.
 * 2026-10-27 — Stage 287: MolDraw2D SVG byte-identical to RDKit on 10311/10312 molecules. Not a speed change.
 * 2026-10-27 — Stage 288: FilterCatalog serialization. Not a speed change.
+* 2026-10-27 — Stage 289: InChI P(IV)+/X- ion pair neutralization. Not a speed change.

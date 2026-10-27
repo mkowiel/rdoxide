@@ -373,6 +373,8 @@ pub fn remove_ion_pairs(at: &mut [InpAtom]) -> i32 {
     let mut num_changes = 0;
     let (mut num_c_ii, mut num_c_plus, mut num_c_minus) = (0, 0, 0);
     let (mut num_n_plus, mut num_n_minus, mut num_o_plus, mut num_o_minus) = (0, 0, 0, 0);
+    // FIX_P_IV_Plus_O_Minus: P(IV)(+) atoms, counted among the N group
+    let mut num_p_iv_plus = 0;
 
     // count candidates
     for a in at.iter() {
@@ -399,6 +401,12 @@ pub fn remove_ion_pairs(at: &mut [InpAtom]) -> i32 {
                     } else {
                         num_n_minus += 1;
                     }
+                    num_p_iv_plus += i32::from(
+                        a.el_number != EL_NUMBER_N
+                            && chrg == 1
+                            && a.valence == 4
+                            && a.chem_bonds_valence == 4,
+                    );
                 }
                 _ => {}
             }
@@ -461,6 +469,51 @@ pub fn remove_ion_pairs(at: &mut [InpAtom]) -> i32 {
                             num_changes += 1;
                             num_n_plus -= 1;
                             num_o_minus -= 1;
+                            num_all -= 2;
+                        }
+                    }
+                }
+                i += 1;
+            }
+        }
+
+        // ---- terminal pair type 1a: Y3P(+)-O(-) => Y3P=O (FIX_P_IV_Plus_O_Minus) ----
+        if type_ == 1 {
+            let mut i = 0;
+            while i < num_atoms && num_p_iv_plus > 0 && num_o_minus > 0 {
+                if at[i].charge == 1
+                    && nnm_bonds(at, i) == 4
+                    && nnm_val(at, i) == 4
+                    && at[i].el_number != EL_NUMBER_N
+                    && grp(at, i) == EL_NUMBER_N
+                {
+                    let mut ord_om = [0i32; 4];
+                    let mut num_om = 0usize;
+                    for i1 in 0..at[i].valence as usize {
+                        let n = nb(at, i, i1);
+                        if nnm_bonds(at, n) == 1
+                            && num_of_h(at, n) == 0
+                            && grp(at, n) == EL_NUMBER_O
+                            && at[i].bond_type[i1] == SINGLE
+                            && at[n].charge == -1
+                        {
+                            ord_om[num_om] = i1 as i32;
+                            num_om += 1;
+                        }
+                    }
+                    if num_om > 0 {
+                        let i1 = n_find_one_om(at, i, &mut ord_om, num_om);
+                        if i1 >= 0 {
+                            let i1 = i1 as usize;
+                            let n = nb(at, i, i1);
+                            let i2 = pos_of(at, n, i);
+                            neutralize_pair(at, i, i1, n, i2);
+                            at[i].radical = 0;
+                            at[n].radical = 0;
+                            num_changes += 1;
+                            num_n_plus -= 1;
+                            num_o_minus -= 1;
+                            num_p_iv_plus -= 1;
                             num_all -= 2;
                         }
                     }
