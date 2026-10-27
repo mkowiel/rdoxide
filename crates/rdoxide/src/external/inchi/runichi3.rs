@@ -19,6 +19,7 @@ use super::ichiparm::{
 use super::ichister::reconcile_all_cml_bond_parities;
 use super::incomdef::{RADICAL_DOUBLET, RADICAL_SINGLET, RADICAL_TRIPLET};
 use super::inpdef::{MAX_NUM_STEREO_BONDS, SB_PARITY_FLAG, SB_PARITY_MASK, SB_PARITY_SHFT};
+use super::mol2atom::{OadPolymer, OadPolymerUnit};
 use super::strutil::{
     OrigAtomData, disconnect_metals, disconnect_salts, fix_odd_things,
     mark_disconnected_components, may_disconnect_metals, num_hetero_atom_has_isotopic_h,
@@ -372,9 +373,215 @@ pub fn preprocess_one_structure(
     sd.n_error_type
 }
 
-/// `OAD_ValidateAndSortOutPseudoElementAtoms` for structures without polymer
-/// data: the pseudoelement atoms `*`, `Zz` and `Zy` become `Zy`; sets
-/// `orig.n_zy`. Returns the error code (0 for none).
+pub const NO_POLYMER: i32 = -1;
+pub const POLYMER_REPRESENTATION_SOURCE_BASED: i32 = 1;
+pub const POLYMER_REPRESENTATION_STRUCTURE_BASED: i32 = 2;
+pub const POLYMER_REPRESENTATION_MIXED: i32 = 3;
+pub const POLYMER_REPRESENTATION_UNRECOGNIZED: i32 = 4;
+
+pub const POLYMER_STY_NON: i32 = 0;
+pub const POLYMER_STY_SRU: i32 = 1;
+pub const POLYMER_STY_MON: i32 = 2;
+pub const POLYMER_STY_COP: i32 = 3;
+pub const POLYMER_STY_MOD: i32 = 4;
+pub const POLYMER_STY_CRO: i32 = 5;
+pub const POLYMER_STY_MER: i32 = 6;
+
+pub const POLYMER_SST_NON: i32 = 0;
+pub const POLYMER_SST_ALT: i32 = 1;
+pub const POLYMER_SST_RAN: i32 = 2;
+pub const POLYMER_SST_BLK: i32 = 3;
+
+pub const POLYMER_CONN_NON: i32 = 0;
+pub const POLYMER_CONN_HT: i32 = 1;
+pub const POLYMER_CONN_HH: i32 = 2;
+pub const POLYMER_CONN_EU: i32 = 3;
+
+pub const CLOSING_SRU_NOT_APPLICABLE: i32 = 0;
+pub const CLOSING_SRU_RING: i32 = 1;
+pub const CLOSING_SRU_HIGHER_ORDER_BOND: i32 = 2;
+pub const CLOSING_SRU_DIRADICAL: i32 = 3;
+pub const CLOSING_SRU_RING_OPENED: i32 = 4;
+pub const CLOSING_SRU_MOVED_BRACKETS: i32 = 5;
+
+// inpdef.h: ALLOW_CLOSING_SRU_VIA_HIGHER_ORDER_BOND, ALLOW_CLOSING_SRU_VIA_DIRADICAL,
+// CLOSING_STARRED_SRU_IS_A_MUST and ALLOW_MIXED_SRU_AND_MON are all 1
+
+fn elname_is(orig: &OrigAtomData, idx: usize, name: &str) -> bool {
+    let e = &orig.at[idx].elname;
+    let len = e.iter().position(|&c| c == 0).unwrap_or(e.len());
+    &e[..len] == name.as_bytes()
+}
+
+fn set_elname(orig: &mut OrigAtomData, idx: usize, name: &str) {
+    let e = &mut orig.at[idx].elname;
+    e.iter_mut().for_each(|c| *c = 0);
+    e[..name.len()].copy_from_slice(name.as_bytes());
+}
+
+/// `OAD_PolymerUnit_FindEndsAndCaps`: the aliased output parameters of the C
+/// code are the fields of the unit itself. Returns the error code.
+fn oad_polymer_unit_find_ends_and_caps(
+    unit: &mut OadPolymerUnit,
+    orig: &OrigAtomData,
+    p_str_err: &mut String,
+) -> i32 {
+    use super::molfmt::treat_err;
+    let num_atoms = orig.num_inp_atoms as i32;
+    unit.end_atom1 = 0;
+    unit.end_atom2 = 0;
+    unit.cap1 = 0;
+    unit.cap2 = 0;
+    unit.cap1_is_undef = 0;
+    unit.cap2_is_undef = 0;
+    let mut err = 0;
+    if unit.blist.is_empty() || unit.nb < 1 {
+        return 0;
+    }
+    // left crossing bond
+    let (i, j) = (unit.blist[0], unit.blist[1]);
+    let i_inside = unit.alist.contains(&i);
+    let j_inside = unit.alist.contains(&j);
+    if i_inside && j_inside {
+        treat_err(
+            &mut err,
+            9032,
+            p_str_err,
+            "Polymer CRU cap(s) lie inside CRU",
+        );
+        return err;
+    }
+    if i_inside {
+        unit.end_atom1 = i;
+        unit.cap1 = j;
+    } else {
+        unit.end_atom1 = j;
+        unit.cap1 = i;
+    }
+    if unit.cap1 >= 1
+        && (unit.cap1 as usize) <= orig.at.len()
+        && elname_is(orig, unit.cap1 as usize - 1, "Zz")
+    {
+        unit.cap1_is_undef = 1;
+    }
+    // right crossing bond (an error here does not stop the C code)
+    let (i, j) = (unit.blist[2], unit.blist[3]);
+    let i_inside = unit.alist.contains(&i);
+    let j_inside = unit.alist.contains(&j);
+    if i_inside && j_inside {
+        treat_err(
+            &mut err,
+            9032,
+            p_str_err,
+            "Polymer CRU cap(s) lie inside CRU",
+        );
+    }
+    if i_inside {
+        unit.end_atom2 = i;
+        unit.cap2 = j;
+    } else {
+        unit.end_atom2 = j;
+        unit.cap2 = i;
+    }
+    if unit.cap2 >= 1
+        && (unit.cap2 as usize) <= orig.at.len()
+        && elname_is(orig, unit.cap2 as usize - 1, "Zz")
+    {
+        unit.cap2_is_undef = 1;
+    }
+    let bad = |v: i32| v <= 0 || v > num_atoms;
+    if bad(unit.end_atom1) || bad(unit.cap1) {
+        treat_err(
+            &mut err,
+            9090,
+            p_str_err,
+            "Invalid polymer CRU crossing bond",
+        );
+        return err;
+    }
+    if bad(unit.end_atom2) || bad(unit.cap2) {
+        treat_err(
+            &mut err,
+            9091,
+            p_str_err,
+            "Invalid polymer CRU crossing bond",
+        );
+        return err;
+    }
+    if unit.cap1 == unit.cap2 {
+        treat_err(&mut err, 9090, p_str_err, "Invalid polymer CRU surrounding");
+        return err;
+    }
+    // `*err = 0` at the end of the C function: a 9032 on the right bond is dropped
+    0
+}
+
+/// `OAD_PolymerUnit_SetEndsAndCaps`: returns the error code.
+fn oad_polymer_unit_set_ends_and_caps(
+    unit: &mut OadPolymerUnit,
+    orig: &OrigAtomData,
+    p_str_err: &mut String,
+) -> i32 {
+    unit.cyclizable = CLOSING_SRU_NOT_APPLICABLE;
+    unit.end_atom1 = -1;
+    unit.end_atom2 = -1;
+    unit.cap1 = -1;
+    unit.cap2 = -1;
+    unit.cap1_is_undef = 0;
+    unit.cap2_is_undef = 0;
+    let err = oad_polymer_unit_find_ends_and_caps(unit, orig, p_str_err);
+    if err != 0 {
+        return err;
+    }
+    if unit.cap1_is_undef == 0 && unit.cap2_is_undef == 0 {
+        return 0;
+    }
+    // the rest is applicable only to the *---SRU---* case
+    if unit.end_atom1 == unit.end_atom2 {
+        unit.cyclizable = CLOSING_SRU_DIRADICAL;
+        return 0;
+    }
+    let a1 = &orig.at[unit.end_atom1 as usize - 1];
+    for k in 0..a1.valence as usize {
+        if i32::from(a1.neighbor[k]) == unit.end_atom2 - 1 {
+            unit.cyclizable = CLOSING_SRU_HIGHER_ORDER_BOND;
+            return 0;
+        }
+    }
+    unit.cyclizable = CLOSING_SRU_RING;
+    0
+}
+
+/// `OAD_Polymer_GetRepresentation`
+pub fn oad_polymer_get_representation(p: Option<&mut OadPolymer>) -> i32 {
+    let Some(p) = p else {
+        return NO_POLYMER;
+    };
+    let (mut n_source, mut n_struct) = (0, 0);
+    for u in p.units.iter_mut().take(p.n.max(0) as usize) {
+        if u.nb == 2 || u.nbkbonds > 0 || (u.cap1 > 0 && u.cap2 > 0) {
+            u.representation = POLYMER_REPRESENTATION_STRUCTURE_BASED;
+            n_struct += 1;
+        } else if u.nb == 0 {
+            u.representation = POLYMER_REPRESENTATION_SOURCE_BASED;
+            n_source += 1;
+        }
+    }
+    if p.n == n_source {
+        POLYMER_REPRESENTATION_SOURCE_BASED
+    } else if p.n == n_struct {
+        POLYMER_REPRESENTATION_STRUCTURE_BASED
+    } else if n_source > 0 && n_struct > 0 && n_source + n_struct == p.n {
+        POLYMER_REPRESENTATION_MIXED
+    } else {
+        POLYMER_REPRESENTATION_UNRECOGNIZED
+    }
+}
+
+/// `OAD_ValidateAndSortOutPseudoElementAtoms`: the pseudoelement atoms `*`,
+/// `Zz` and `Zy` become `Zy`; for a valid polymer the caps of units with two
+/// undefined-nature caps are turned back into `Zz`. Sets `orig.n_zy` and the
+/// number of polymer `Zz` atoms; returns the error code (0 for none).
 fn oad_validate_and_sort_out_pseudo_element_atoms(
     orig: &mut OrigAtomData,
     treat_polymers: i32,
@@ -385,22 +592,20 @@ fn oad_validate_and_sort_out_pseudo_element_atoms(
     let mut err = 0;
     let mut n_pseudo = 0;
     let pseudos_allowed = b_np_zz == 1 || treat_polymers != super::ichiparm::POLYMERS_NO;
-    let nat = orig.num_inp_atoms;
-    for k in 0..nat {
-        let name_len = orig.at[k]
-            .elname
-            .iter()
-            .position(|&c| c == 0)
-            .unwrap_or(orig.at[k].elname.len());
-        let name = orig.at[k].elname[..name_len].to_vec();
-        let is_zy = name == b"Zy";
-        let is_star = name == b"*";
-        let is_zz = !is_star && name == b"Zz";
+    for k in 0..orig.num_inp_atoms {
+        let is_zy = elname_is(orig, k, "Zy");
+        let is_star = elname_is(orig, k, "*");
+        let is_zz = !is_star && elname_is(orig, k, "Zz");
         if is_star || is_zz || is_zy {
             n_pseudo += 1;
             if !pseudos_allowed {
+                let name = {
+                    let e = &orig.at[k].elname;
+                    String::from_utf8_lossy(&e[..e.iter().position(|&c| c == 0).unwrap_or(e.len())])
+                        .into_owned()
+                };
                 treat_err(&mut err, 70 + 5, p_str_err, "Invalid element(s):");
-                treat_err(&mut err, 70 + 5, p_str_err, &String::from_utf8_lossy(&name));
+                treat_err(&mut err, 70 + 5, p_str_err, &name);
                 continue;
             }
             if orig.at[k].valence > 1 || orig.at[k].chem_bonds_valence > 1 {
@@ -412,12 +617,34 @@ fn oad_validate_and_sort_out_pseudo_element_atoms(
                 );
                 continue;
             }
-            orig.at[k].elname[0] = b'Z';
-            orig.at[k].elname[1] = b'y';
-            orig.at[k].elname[2] = 0;
+            set_elname(orig, k, "Zy");
         }
     }
-    orig.n_zy = n_pseudo;
+    orig.n_zy = 0;
+    let mut nzz = 0;
+    if orig.valid_polymer != 0 {
+        let caps: Vec<(i32, i32)> = orig
+            .polymer
+            .as_ref()
+            .map(|pd| {
+                pd.units
+                    .iter()
+                    .take(pd.n.max(0) as usize)
+                    .filter(|u| u.cap1_is_undef != 0 && u.cap2_is_undef != 0)
+                    .map(|u| (u.cap1, u.cap2))
+                    .collect()
+            })
+            .unwrap_or_default();
+        for (c1, c2) in caps {
+            set_elname(orig, c1 as usize - 1, "Zz");
+            set_elname(orig, c2 as usize - 1, "Zz");
+            nzz += 2;
+        }
+        if let Some(pd) = orig.polymer.as_mut() {
+            pd.n_pzz = nzz;
+        }
+    }
+    orig.n_zy = n_pseudo - nzz;
     if orig.n_zy != 0 && b_np_zz == 0 {
         treat_err(
             &mut err,
@@ -432,29 +659,333 @@ fn oad_validate_and_sort_out_pseudo_element_atoms(
     err
 }
 
-/// `OAD_ValidatePolymerAndPseudoElementData` for structures without polymer
-/// data (`orig.polymer` is `None`; the polymer unit checks are not ported).
-/// Returns the error code (0 for none).
+/// `OAD_ValidatePolymerAndPseudoElementData`: checks the polymer units and
+/// pseudoelement atoms and fixes what can be fixed. Returns the error code
+/// (0 for none).
 pub fn oad_validate_polymer_and_pseudo_element_data(
     orig: &mut OrigAtomData,
     treat_polymers: i32,
     b_np_zz: i32,
     p_str_err: &mut String,
+    b_no_warnings: bool,
 ) -> i32 {
     use super::molfmt::treat_err;
+    let nat = orig.num_inp_atoms as i32;
+    let mut err = 0;
     orig.valid_polymer = 0;
-    let mut err =
-        oad_validate_and_sort_out_pseudo_element_atoms(orig, treat_polymers, b_np_zz, p_str_err);
-    if err != 0 {
-        return err;
+    if treat_polymers != 0 && orig.polymer.is_some() {
+        orig.valid_polymer = 1;
     }
-    if orig.n_zy > 0 && b_np_zz == 0 {
-        treat_err(
-            &mut err,
-            9,
+    let nsgroups = if orig.valid_polymer != 0 {
+        orig.polymer.as_ref().map_or(0, |p| p.n.max(0) as usize)
+    } else {
+        0
+    };
+    let warn = |m: &mut String, text: &str| {
+        if !b_no_warnings {
+            add_error_message(m, text);
+        }
+    };
+    'exit: {
+        if nsgroups == 1 {
+            let u = &orig.polymer.as_ref().expect("polymer").units[0];
+            if u.type_ == POLYMER_STY_COP {
+                treat_err(
+                    &mut err,
+                    9001,
+                    p_str_err,
+                    "Copolymer must contain more than one unit",
+                );
+                break 'exit;
+            }
+            if matches!(
+                u.subtype,
+                POLYMER_SST_RAN | POLYMER_SST_ALT | POLYMER_SST_BLK
+            ) {
+                treat_err(
+                    &mut err,
+                    9002,
+                    p_str_err,
+                    "Single polymer unit may not be RAN/ALT/BLO",
+                );
+                break 'exit;
+            }
+        }
+        // for each CRU
+        for i in 0..nsgroups {
+            let (nb, na) = {
+                let u = &orig.polymer.as_ref().expect("polymer").units[i];
+                (u.nb, u.na)
+            };
+            if nb != 0 && nb != 2 {
+                treat_err(
+                    &mut err,
+                    9003,
+                    p_str_err,
+                    "Number of crossing bonds in polymer unit is not 0 or 2",
+                );
+                break 'exit;
+            }
+            if na < 1 {
+                treat_err(&mut err, 9004, p_str_err, "Empty polymer unit");
+                break 'exit;
+            }
+            if na > nat {
+                treat_err(&mut err, 9005, p_str_err, "Too large polymer unit");
+                break 'exit;
+            }
+            let bad_atom = orig.polymer.as_ref().expect("polymer").units[i]
+                .alist
+                .iter()
+                .take(na as usize)
+                .any(|&a| a < 1 || a > nat);
+            if bad_atom {
+                treat_err(
+                    &mut err,
+                    9006,
+                    p_str_err,
+                    "Invalid atom number in polymer unit",
+                );
+                break 'exit;
+            }
+            let mut unit = std::mem::take(&mut orig.polymer.as_mut().expect("polymer").units[i]);
+            let e = oad_polymer_unit_set_ends_and_caps(&mut unit, orig, p_str_err);
+            if e != 0 {
+                err = e;
+            }
+            if err == 0 {
+                unit.nbkbonds = 0;
+                unit.cyclizable = CLOSING_SRU_NOT_APPLICABLE;
+                unit.cyclized = 0;
+            }
+            orig.polymer.as_mut().expect("polymer").units[i] = unit;
+            if err != 0 {
+                break 'exit;
+            }
+        }
+
+        err = oad_validate_and_sort_out_pseudo_element_atoms(
+            orig,
+            treat_polymers,
+            b_np_zz,
             p_str_err,
-            "Non-polymer-related Zz/star atoms are not allowed",
         );
+        if err != 0 {
+            break 'exit;
+        }
+        if orig.n_zy > 0 && b_np_zz == 0 {
+            treat_err(
+                &mut err,
+                9,
+                p_str_err,
+                "Non-polymer-related Zz/star atoms are not allowed",
+            );
+            break 'exit;
+        }
+        if orig.polymer.is_none() || orig.valid_polymer == 0 {
+            break 'exit;
+        }
+
+        let n_pzz = orig.polymer.as_ref().expect("polymer").n_pzz;
+        if n_pzz > 0 {
+            if orig.polymer.as_ref().expect("polymer").treat == super::ichiparm::POLYMERS_NO {
+                treat_err(
+                    &mut err,
+                    9,
+                    p_str_err,
+                    "Pseudoelement endgroups are not allowed",
+                );
+                break 'exit;
+            }
+            let pzz: Vec<i32> = (0..orig.num_inp_atoms)
+                .filter(|&k| elname_is(orig, k, "Zz"))
+                .map(|k| k as i32 + 1)
+                .collect();
+            orig.polymer.as_mut().expect("polymer").pzz = Some(pzz);
+        }
+
+        // copolymers must include more than one SRU
+        let n = orig.polymer.as_ref().expect("polymer").n.max(0) as usize;
+        for i in 0..n {
+            let pd = orig.polymer.as_ref().expect("polymer");
+            let (utype, unb) = (pd.units[i].type_, pd.units[i].nb);
+            if utype != POLYMER_STY_COP && utype != POLYMER_STY_SRU {
+                continue;
+            }
+            if unb > 0 {
+                if utype == POLYMER_STY_COP {
+                    treat_err(
+                        &mut err,
+                        9026,
+                        p_str_err,
+                        "Polymer COP unit contains bracket-crossing bonds, not supported",
+                    );
+                    break 'exit;
+                }
+                continue;
+            }
+            let mut in_units = 0;
+            for j in 0..n {
+                if pd.units[j].type_ == POLYMER_STY_COP {
+                    continue;
+                }
+                let aj = &pd.units[j].alist[..pd.units[j].na as usize];
+                let ai = &pd.units[i].alist[..pd.units[i].na as usize];
+                if super::util::is_ilist_inside(aj, ai) {
+                    in_units += 1;
+                    if in_units == 2 {
+                        break;
+                    }
+                }
+            }
+            if in_units > 1 {
+                if utype != POLYMER_STY_COP {
+                    orig.polymer.as_mut().expect("polymer").units[i].type_ = POLYMER_STY_COP;
+                    warn(p_str_err, "Convert multiple-subunits unit to copolymer");
+                }
+            } else if utype == POLYMER_STY_COP {
+                treat_err(
+                    &mut err,
+                    9027,
+                    p_str_err,
+                    "Polymer COP unit contains a single SRU instead of multiple",
+                );
+                break 'exit;
+            }
+        }
+
+        let representation = oad_polymer_get_representation(orig.polymer.as_mut());
+        let nsg = nsgroups;
+        if representation == POLYMER_REPRESENTATION_SOURCE_BASED {
+            let pd = orig.polymer.as_mut().expect("polymer");
+            for u in pd.units.iter_mut().take(nsg) {
+                if u.type_ == POLYMER_STY_SRU {
+                    u.type_ = POLYMER_STY_MON;
+                    warn(p_str_err, "Converted src-based polymer unit type to MON");
+                }
+                if u.type_ == POLYMER_STY_COP && u.subtype == POLYMER_SST_NON {
+                    u.subtype = POLYMER_SST_RAN;
+                    warn(p_str_err, "Set missing copolymer subtype to RAN");
+                }
+                if u.conn != POLYMER_CONN_NON {
+                    u.conn = POLYMER_CONN_NON;
+                    warn(
+                        p_str_err,
+                        "Ignore connection pattern for src-based polymer unit",
+                    );
+                }
+            }
+        } else if representation == POLYMER_REPRESENTATION_STRUCTURE_BASED
+            || representation == POLYMER_REPRESENTATION_MIXED
+        {
+            for i in 0..nsg {
+                let (utype, unb) = {
+                    let u = &orig.polymer.as_ref().expect("polymer").units[i];
+                    (u.type_, u.nb)
+                };
+                if unb == 0 && utype == POLYMER_STY_SRU {
+                    orig.polymer.as_mut().expect("polymer").units[i].type_ = POLYMER_STY_COP;
+                    warn(p_str_err, "Set copolymer embedding unit mark to COP");
+                }
+                let utype = orig.polymer.as_ref().expect("polymer").units[i].type_;
+                if utype == POLYMER_STY_COP {
+                    let u = &mut orig.polymer.as_mut().expect("polymer").units[i];
+                    u.cyclizable = CLOSING_SRU_NOT_APPLICABLE;
+                    if u.subtype == POLYMER_SST_NON {
+                        u.subtype = POLYMER_SST_RAN;
+                        warn(p_str_err, "Set missing copolymer subtype to RAN");
+                    }
+                    continue;
+                }
+                if utype == POLYMER_STY_MON {
+                    continue;
+                }
+                // SRU with end groups or stars
+                let pd = orig.polymer.as_ref().expect("polymer");
+                let u = &pd.units[i];
+                let pzz: &[i32] = pd.pzz.as_deref().unwrap_or(&[]);
+                for k in 0..u.nb as usize {
+                    let (a1, a2) = (u.blist[2 * k], u.blist[2 * k + 1]);
+                    let is_h = |a: i32| {
+                        elname_is(orig, a as usize - 1, "H")
+                            || elname_is(orig, a as usize - 1, "D")
+                            || elname_is(orig, a as usize - 1, "T")
+                    };
+                    if is_h(a1) {
+                        treat_err(
+                            &mut err,
+                            9030,
+                            p_str_err,
+                            "H as polymer end group is not supported",
+                        );
+                        break 'exit;
+                    }
+                    if is_h(a2) {
+                        treat_err(
+                            &mut err,
+                            9031,
+                            p_str_err,
+                            "H as polymer end group is not supported",
+                        );
+                        break 'exit;
+                    }
+                    let na = u.na as usize;
+                    let out1 = !u.alist[..na].contains(&a1) || pzz.contains(&a1);
+                    let out2 = !u.alist[..na].contains(&a2) || pzz.contains(&a2);
+                    if out1 && out2 {
+                        treat_err(
+                            &mut err,
+                            9032,
+                            p_str_err,
+                            "Caps of polymer unit lie inside it",
+                        );
+                        break 'exit;
+                    }
+                }
+                let (utype, cap1, cap2, na, conn) = (u.type_, u.cap1, u.cap2, u.na, u.conn);
+                if matches!(
+                    utype,
+                    POLYMER_STY_SRU | POLYMER_STY_MOD | POLYMER_STY_CRO | POLYMER_STY_MER
+                ) {
+                    let mut conn = conn;
+                    let mut cyc = orig.polymer.as_ref().expect("polymer").units[i].cyclizable;
+                    if conn == POLYMER_CONN_NON {
+                        warn(p_str_err, "Set missing copolymer unit connection to EU");
+                        conn = POLYMER_CONN_EU;
+                    }
+                    if cap1 != 0 && cap2 != 0 {
+                        cyc = match na {
+                            1 => CLOSING_SRU_DIRADICAL,
+                            2 => CLOSING_SRU_HIGHER_ORDER_BOND,
+                            _ => CLOSING_SRU_RING,
+                        };
+                    }
+                    if conn != POLYMER_CONN_HT {
+                        cyc = CLOSING_SRU_NOT_APPLICABLE;
+                    }
+                    let nb_total = orig.num_inp_bonds;
+                    let u = &mut orig.polymer.as_mut().expect("polymer").units[i];
+                    u.conn = conn;
+                    u.cyclizable = cyc;
+                    if cyc != CLOSING_SRU_NOT_APPLICABLE {
+                        u.maxbkbonds = nb_total + 2;
+                        u.bkbonds = vec![vec![0; 2]; u.maxbkbonds as usize];
+                    }
+                }
+            }
+        } else {
+            treat_err(
+                &mut err,
+                9035,
+                p_str_err,
+                "Invalid kind of polymer representation",
+            );
+            break 'exit;
+        }
+        orig.valid_polymer = 1;
+    }
+    if err != 0 {
+        orig.valid_polymer = 0;
     }
     err
 }
