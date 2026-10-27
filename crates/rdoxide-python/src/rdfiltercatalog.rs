@@ -4,16 +4,17 @@
 use std::any::Any;
 use std::sync::{Arc, Mutex};
 
-use pyo3::exceptions::{PyIndexError, PyNotImplementedError, PyRuntimeError, PyTypeError};
+use pyo3::exceptions::{PyIndexError, PyNotImplementedError, PyTypeError};
 use pyo3::prelude::*;
 use pyo3::pyclass_init::PyClassInitializer;
-use pyo3::types::{PyBytes, PyDict, PyList, PyString, PyTuple};
+use pyo3::types::{PyBytes, PyDict, PyList, PyTuple};
 use rdoxide::graphmol::ROMol;
 use rdoxide::graphmol::filter_catalog::catalogs;
 use rdoxide::graphmol::filter_catalog::{
     And, ExclusionList, FilterCatalog, FilterCatalogEntry, FilterCatalogParams,
     FilterHierarchyMatcher, FilterMatch, FilterMatcher, HierarchyNode, Not, Or, SharedMatcher,
-    SmartsMatcher, filter_catalog_can_serialize, functional_group_hierarchy, run_filter_catalog,
+    SmartsMatcher, catalog_from_binary, catalog_to_binary, entry_from_binary, entry_to_binary,
+    filter_catalog_can_serialize, functional_group_hierarchy, run_filter_catalog,
 };
 use rdoxide::graphmol::functional_group_hierarchy::flattened_functional_group_hierarchy;
 use rdoxide::{RDKitError, Result as CoreResult};
@@ -645,11 +646,16 @@ pub struct PyFilterCatalogEntry {
 impl PyFilterCatalogEntry {
     #[new]
     #[pyo3(signature = (name = None, matcher = None))]
-    fn new(name: Option<&str>, matcher: Option<&Bound<'_, PyAny>>) -> PyResult<Self> {
+    fn new(name: Option<&Bound<'_, PyAny>>, matcher: Option<&Bound<'_, PyAny>>) -> PyResult<Self> {
+        if let (Some(pkl), None) = (name.and_then(|n| n.cast::<PyBytes>().ok()), matcher) {
+            let e = entry_from_binary(pkl.as_bytes()).map_err(map_err)?;
+            return Ok(PyFilterCatalogEntry { e: Arc::new(e) });
+        }
         let e = match (name, matcher) {
-            (Some(name), Some(m)) => {
-                FilterCatalogEntry::with_matcher(name, Some(to_matcher(m)?.copy()))
-            }
+            (Some(name), Some(m)) => FilterCatalogEntry::with_matcher(
+                &name.extract::<String>()?,
+                Some(to_matcher(m)?.copy()),
+            ),
             (None, None) => FilterCatalogEntry::new(),
             _ => return Err(PyTypeError::new_err("FilterCatalogEntry(name, matcher)")),
         };
@@ -692,10 +698,17 @@ impl PyFilterCatalogEntry {
         self.e.has_filter_match(&mol.borrow().mol).map_err(map_err)
     }
 
-    fn Serialize(&self) -> PyResult<()> {
-        Err(PyRuntimeError::new_err(
-            "Boost SERIALIZATION is not enabled",
-        ))
+    /// Returns a binary string representation of the entry
+    fn Serialize<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyBytes>> {
+        let data = entry_to_binary(&self.e).map_err(map_err)?;
+        Ok(PyBytes::new(py, &data))
+    }
+
+    /// `(type(self), (self.Serialize(),))`
+    fn __reduce__<'py>(slf: &Bound<'py, Self>) -> PyResult<Bound<'py, PyTuple>> {
+        let py = slf.py();
+        let args = PyTuple::new(py, [slf.call_method0("Serialize")?])?;
+        PyTuple::new(py, [slf.get_type().into_any(), args.into_any()])
     }
 
     fn GetPropList(&self) -> Vec<String> {
@@ -758,10 +771,8 @@ impl PyFilterCatalog {
             Some(a) => {
                 if let Ok(p) = a.cast::<PyFilterCatalogParams>() {
                     FilterCatalog::from_params(&p.borrow().p).map_err(map_err)?
-                } else if a.is_instance_of::<PyBytes>() || a.is_instance_of::<PyString>() {
-                    return Err(PyRuntimeError::new_err(
-                        "Boost SERIALIZATION is not enabled",
-                    ));
+                } else if let Ok(pkl) = a.cast::<PyBytes>() {
+                    catalog_from_binary(pkl.as_bytes()).map_err(map_err)?
                 } else {
                     FilterCatalog::from_catalogs(a.extract::<u32>()?).map_err(map_err)?
                 }
@@ -770,14 +781,17 @@ impl PyFilterCatalog {
         Ok(PyFilterCatalog { c })
     }
 
-    fn Serialize(&self) -> PyResult<()> {
-        Err(PyRuntimeError::new_err(
-            "Pickling of FilterCatalog instances is not enabled",
-        ))
+    /// Returns a binary string representation of the catalog
+    fn Serialize<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyBytes>> {
+        let data = catalog_to_binary(&self.c).map_err(map_err)?;
+        Ok(PyBytes::new(py, &data))
     }
 
-    fn __getstate__(&self) -> PyResult<()> {
-        self.Serialize()
+    /// `(type(self), (self.Serialize(),))`
+    fn __reduce__<'py>(slf: &Bound<'py, Self>) -> PyResult<Bound<'py, PyTuple>> {
+        let py = slf.py();
+        let args = PyTuple::new(py, [slf.call_method0("Serialize")?])?;
+        PyTuple::new(py, [slf.get_type().into_any(), args.into_any()])
     }
 
     /// Add a FilterCatalogEntry to the catalog

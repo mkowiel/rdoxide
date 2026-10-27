@@ -401,6 +401,7 @@ Upstream: RDKit 2026.09.1. Legend: ✅ done · 🟡 partial · ⬜ not done. Eve
 | 285 | Serialization enabled (`rdBase._serializationEnabled`): `TautomerQuery.ToBinary`/pickle/`TautomerQuery(bytes)` (own `RDXT` format, shared with `ExtendedQueryMol`), `TautomerQueryCanSerialize` is True; `SubstructLibrary`, `ExtendedQueryMol` serialization already existed | ✅ | upstream GeneralizedSubstruct 7/7, SubstructLibrary +2, TautomerQuery +1 (ratchet +10); `tests/python/test_tautomerquery.py`. Not enabled: `FilterCatalog` serialization (`FilterCatalogCanSerialize` stays False) |
 | 286 | Reactions in PNG metadata (`chem_reactions::png`: pickle, reaction SMILES/SMARTS and RXN-block tags); Python `ReactionFromPNGFile`/`String`, `ReactionMetadataToPNGFile`/`String`; `rdBase._iostreamsEnabled` is True | ✅ | upstream `testReactionWrapper.py::test_PNGMetadata` (ratchet +1); `tests/python/test_reaction_png.py` |
 | 287 | MolDraw2D fidelity: FreeType outline decomposition no longer closes a contour that already ended in a curve to its start; `prepareMolForDrawing`/reaction drawer kekulize with `canonical=true` as upstream | ✅ | `compare.py drawsvg` (`MolDraw2DSVG` of every molecule of the NCI and canonSmiles corpora): 10311 of 10312 SVGs byte-identical to RDKit 2026.09.1 (was 974); `tests/python/test_moldraw2d.py` |
+| 288 | FilterCatalog serialization (`filter_catalog::serialize`: catalogs, entries and every matcher kind incl. And/Or/Not/ExclusionList/FilterHierarchyMatcher trees; own format, not Boost); Python `Serialize`, pickling and construction from bytes; `FilterCatalogCanSerialize()` is True | ✅ | upstream `FilterCatalog/Wrap/rough_test.py` pickle paths now run (17/17); `tests/python/test_filtercatalog_serialization.py` |
 
 ## InChI port (summary, audited 2026-10-22)
 
@@ -897,3 +898,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-22 — Stage 285: serialization flag on, TautomerQuery pickles (ratchet +10). Pure Python/IO: upstream_speed.html not regenerated.
 * 2026-10-22 — Stage 286: reaction PNG metadata (ratchet +1). Not a speed change.
 * 2026-10-27 — Stage 287: MolDraw2D SVG byte-identical to RDKit on 10311/10312 molecules. Not a speed change.
+* 2026-10-27 — Stage 288: FilterCatalog serialization. Not a speed change.
