@@ -660,6 +660,42 @@ def molsurf_record(smi):
     }
 
 
+def uff_record(smi):
+    """UFF energy and gradient on synthetic coordinates (an optimization from such a start is chaotic)."""
+    from rdkit.Chem import AllChem, rdDepictor, rdForceFieldHelpers as H
+    m = Chem.MolFromSmiles(smi)
+    if m is None:
+        return None
+    mh = Chem.AddHs(m)
+    # coordinates that do not depend on any embedding or depiction code
+    import math
+    conf = Chem.Conformer(mh.GetNumAtoms())
+    for i in range(mh.GetNumAtoms()):
+        conf.SetAtomPosition(i, (1.5 * math.cos(i * 0.9) + 0.1 * i, 1.5 * math.sin(i * 0.9) + 0.1 * i,
+                                 0.45 * i))
+    mh.AddConformer(conf)
+    if not H.UFFHasAllMoleculeParams(mh):
+        return {"params": False}
+    ff = H.UFFGetMoleculeForceField(mh)
+    def r(x, n=7):
+        return float(f"{x:.{n}g}")
+
+    res = {"params": True, "energy": r(ff.CalcEnergy()), "grad": [r(x) for x in ff.CalcGrad()]}
+    return res
+
+
+def drawsvg_record(smi):
+    """The SVG of MolDraw2DSVG for default options."""
+    from rdkit.Chem.Draw import rdMolDraw2D
+    m = Chem.MolFromSmiles(smi)
+    if m is None:
+        return None
+    d = rdMolDraw2D.MolDraw2DSVG(300, 250)
+    d.DrawMolecule(m)
+    d.FinishDrawing()
+    return d.GetDrawingText()
+
+
 def gasteiger_record(smi):
     """Gasteiger charges (rdPartialCharges) with several iteration counts, and PEOE_VSA_."""
     from rdkit.Chem import rdMolDescriptors as D
@@ -996,6 +1032,10 @@ def dump(mode, smi):
         return molsurf_record(smi)
     if mode == "gasteiger":
         return gasteiger_record(smi)
+    if mode == "uff":
+        return uff_record(smi)
+    if mode == "drawsvg":
+        return drawsvg_record(smi)
     if mode == "connectivity":
         return connectivity_record(smi)
     if mode == "matrices":
