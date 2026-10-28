@@ -1,7 +1,7 @@
 //! Port of the library entry points of Avalon Toolkit's `struchk.c` (`InitCheckMol`, `CheckMol`/`RunStruchk`)
 //! for the options RDKit's MolKey uses: `-ta`, `-ca`, `-cc`, `-cl`, `-cn`, `-cs`, `-tm`, `-da`, `-dg`, `-ds`,
-//! `-or`, `-l`. Options that need the charge, tautomer or pattern machinery (`-tc`, `-tt`, `-pc`, `-pr`, `-ps`,
-//! `-f`) are reported as errors by `init_check_mol`.
+//! `-or`, `-l`, and the charge fixing `-tc`, `-tq`, `-tl`. Options that need the tautomer or pattern machinery
+//! (`-tt`, `-pc`, `-pr`, `-ps`, `-f`) are reported as errors by `init_check_mol`.
 //!
 //! The state is global as in C (parameters, the message list, the collision limit).
 
@@ -9,6 +9,9 @@ use std::io::Write;
 use std::sync::Mutex;
 
 use super::aacheck::check_atoms;
+use super::fixcharges::{
+    initialize_charge_data_tables, recharge_molecule, set_acidity_limit, total_charge,
+};
 use super::pattern::{
     AugmentedAtom, read_aa_pairs, read_augmented_atoms, transform_augmented_atoms,
 };
@@ -69,6 +72,8 @@ struct State {
     convert_atom_texts: bool,
     groups_to_sgroups: bool,
     convert_stext: bool,
+    charges_read: bool,
+    desired_charge: i32,
     log_file: Option<std::fs::File>,
     /// `SetCollisionLimit` is not undone by `ClearParameters`
     clash_limit: ClashLimit,
@@ -89,6 +94,8 @@ impl State {
             convert_atom_texts: false,
             groups_to_sgroups: false,
             convert_stext: false,
+            charges_read: false,
+            desired_charge: 0,
             log_file: None,
             clash_limit: ClashLimit(0.15),
             msgs: Vec::new(),
@@ -328,9 +335,25 @@ fn initialize(args: &[String]) -> i32 {
             "da" => st.convert_atom_texts = true,
             "dg" => st.groups_to_sgroups = true,
             "ds" => st.convert_stext = true,
+            "tc" => {
+                if let Some(text) = read_file(&optarg, "charge") {
+                    if initialize_charge_data_tables(&text) {
+                        st.charges_read = true;
+                    } else {
+                        eprintln!("LIBRARY: Format error in charge file '{optarg}'");
+                        errflg += 1;
+                    }
+                }
+            }
+            "tq" => st.desired_charge = Scan::new(optarg.as_bytes()).int(0).unwrap_or(0),
+            "tl" => {
+                let limit = Scan::new(optarg.as_bytes()).double(0).unwrap_or(0.0);
+                if limit > 0.0 {
+                    set_acidity_limit(limit);
+                }
+            }
             // accepted without effect on the checks
-            "i" | "o" | "ov" | "b" | "br" | "s" | "la" | "ft" | "tq" | "tl" | "dk" | "dw"
-            | "dz" => {}
+            "i" | "o" | "ov" | "b" | "br" | "s" | "la" | "ft" | "dk" | "dw" | "dz" => {}
             // charge, tautomer, pattern and profile options are not ported
             _ => {
                 eprintln!("LIBRARY: option '{option}' is not supported");
@@ -673,6 +696,11 @@ pub fn run_struchk(mp: &mut Molecule) -> i32 {
         if st.check_stereo && !check_stereo(mp, &mut st.msgs).unwrap_or(true) {
             result |= STEREO_ERROR;
         }
+        if st.charges_read && total_charge(mp) != st.desired_charge {
+            let (ok, _, _) = recharge_molecule(mp, st.desired_charge, &mut st.msgs);
+            let ok = ok && mp.symbol_lists.is_empty() && mp.prop_lines.is_empty();
+            result |= if ok { RECHARGED } else { BAD_MOLECULE };
+        }
         if st.groups_to_sgroups {
             convert_groups_to_sgroups(mp);
         }
@@ -691,8 +719,17 @@ mod tests {
     /// the structure checker must answer what the Avalon C code answers (result bits, messages, molecule)
     #[test]
     fn struchk_matches_c() {
+        // one test: the checker state is global
+        check_corpus(include_str!(
+            "../../../../../tests/data/avalon_struchk.jsonl"
+        ));
+        check_corpus(include_str!(
+            "../../../../../tests/data/avalon_fixcharges.jsonl"
+        ));
+    }
+
+    fn check_corpus(text: &str) {
         let data = concat!(env!("CARGO_MANIFEST_DIR"), "/src/external/avalon/data");
-        let text = include_str!("../../../../../tests/data/avalon_struchk.jsonl");
         let mut bad = Vec::new();
         for line in text.lines() {
             let v: serde_json::Value = serde_json::from_str(line).expect("json");

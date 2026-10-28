@@ -15,18 +15,18 @@ const MAXNAME: usize = 80;
 
 /// status of a `Fortran_FILE`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Status {
+pub(super) enum Status {
     Normal,
     Eof,
     Error,
 }
 
 /// `Fortran_FILE` reading from a string: `GetBuffer` and friends
-struct Lines<'a> {
+pub(super) struct Lines<'a> {
     src: &'a [u8],
     ptr: usize,
-    buffer: String,
-    status: Status,
+    pub(super) buffer: String,
+    pub(super) status: Status,
 }
 
 /// `RemoveTrailingBlanks`
@@ -36,7 +36,7 @@ fn trim_end_blanks(s: &str) -> &str {
 
 impl<'a> Lines<'a> {
     /// `FortranStringOpen`
-    fn open(src: &'a str) -> Self {
+    pub(super) fn open(src: &'a str) -> Self {
         let mut l = Lines {
             src: src.as_bytes(),
             ptr: 0,
@@ -48,7 +48,7 @@ impl<'a> Lines<'a> {
     }
 
     /// `GetBuffer`
-    fn get_buffer(&mut self) {
+    pub(super) fn get_buffer(&mut self) {
         if self.ptr >= self.src.len() {
             self.buffer.clear();
             self.status = Status::Eof;
