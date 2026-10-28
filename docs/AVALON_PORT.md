@@ -110,3 +110,11 @@ A4 (all fingerprint classes) and the first part of A7: `rdoxide.Avalon.pyAvalonT
 * `GetAvalonFPAsWords` packs signed `char`s, so bytes >= 0x80 sign-extend;
 * still open: SMILES input (`SMIToMOL` needs layout), `GetCanonSmiles`, `CheckMolecule`,
   `Generate2DCoords`, `PerceiveMarkush`, `MolKey` wiring.
+
+### A5 (structure check), progress
+
+* A5a `stereo.rs`: `AtomParity`, `CheckStereo`, `NoParityDefined`, `DubiousStereochemistry`,
+  `RemoveDubiousStereochemistry`, `FixDubious3DMolecule`, `AtomClash`, `CisTransPerception`,
+  `PermutationParity` (432 cases identical to the C code, `tests/data/avalon_stereo.jsonl`). Messages
+  go to a `Vec<String>` instead of the global list. Not ported: `IsStereoMatch` (needs `ssmatch.c`)
+  and `AllCentersRefined` (reads one element past its sort buffer in C).
