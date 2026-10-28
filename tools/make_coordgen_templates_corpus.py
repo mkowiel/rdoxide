@@ -57,16 +57,6 @@ def template_blocks():
             x, y = x * math.cos(ang) - y * math.sin(ang), x * math.sin(ang) + y * math.cos(ang)
             rows.append("A %s 0 %s %s" % (z, fb(x), fb(y)))
         brows = ["B %d %d %s" % (inv[int(a)], inv[int(b)], o) for a, b, o in bonds]
-        # macrocycle double bonds need the CIP ranking, which is not ported yet
-        rw = Chem.RWMol()
-        for z, _, _ in atoms:
-            rw.AddAtom(Chem.Atom(int(z)))
-        for a, b, o in bonds:
-            rw.AddBond(int(a), int(b), {1: Chem.BondType.SINGLE, 2: Chem.BondType.DOUBLE, 3: Chem.BondType.TRIPLE}[int(o)])
-        Chem.FastFindRings(rw)
-        ri = rw.GetRingInfo()
-        if any(b.GetBondType() == Chem.BondType.DOUBLE and ri.MinBondRingSize(b.GetIdx()) >= 9 for b in rw.GetBonds()):
-            continue
         out.append("MOL %d %d\n" % (na, nb) + "\n".join(rows + brows) + "\nEND\n")
     return out
 
@@ -80,10 +70,6 @@ def main():
         if m is None or m.GetNumAtoms() == 0 or m.GetNumAtoms() > 60 or "." in s:
             continue
         Chem.Kekulize(m, clearAromaticFlags=True)
-        # double bonds in macrocycles need the CIP ranking, which is not ported yet
-        ri = m.GetRingInfo()
-        if any(b.GetBondType() == Chem.BondType.DOUBLE and ri.MinBondRingSize(b.GetIdx()) >= 9 for b in m.GetBonds()):
-            continue
         AllChem.Compute2DCoords(m)
         blocks.append(base.block(m))
     out = subprocess.run([driver], input="".join(blocks).encode(), capture_output=True, timeout=600).stdout.decode()

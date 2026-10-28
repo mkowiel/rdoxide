@@ -74,3 +74,11 @@ into `sketcherMinimizerMolecule`, runs `runGenerateCoordinates` and copies the c
   first matching template, mapping and alignment matrix (`tests/data/coordgen_templates.txt`, `tools/coordgen_drv/tmpl.cpp`,
   `tools/make_coordgen_templates_corpus.py`). Not yet: the double bond stereo check inside `compare` for macrocycle double
   bonds (needs the CIP ranking; `unimplemented!` until the stereo stage), and the user template file (maeparser).
+* CG3b `external::coordgen::cip`: the stereo code of `sketcherMinimizerAtom`/`Bond`: `CIPAtom` comparison (scores, medals,
+  friends mask), `CIPPriority`, `setCIPPriorities`, `orderAtomPriorities`, `readStereochemistry`, `writeStereoChemistry`,
+  `getRelativeStereo`, `setAbsoluteStereoFromChiralityInfo`, the three-atom `sameRing`, and the bond first-neighbour /
+  Z-E helpers. Temporary dummy H / lone pair atoms are pushed to the arena and truncated afterwards. 58 stereo molecules
+  (R/S centres, N/S/P centres, ring chirality, E/Z, macrocycle double bonds) give identical priorities, read results, written
+  wedges and first neighbours (`tests/data/coordgen_cip.txt`, `tools/coordgen_drv/cip.cpp`,
+  `tools/make_coordgen_cip_corpus.py`). The macrocycle double bond check in the template `compare` now uses it (template
+  corpus regenerated without the macrocycle filter).
