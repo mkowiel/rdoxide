@@ -861,6 +861,24 @@ pub fn flood_fill_fragments(mp: &mut Molecule) {
     }
 }
 
+/// `FlipStereoSymbols`: swaps UP and DOWN for the bonds whose atoms both have `color`
+/// (all bonds if `color` is `NONE`)
+pub fn flip_stereo_symbols(mp: &mut Molecule, color: i32) {
+    let colors: Vec<i32> = mp.atoms.iter().map(|a| a.color).collect();
+    for b in &mut mp.bonds {
+        if color == NONE
+            || (colors[(b.atoms[0] - 1) as usize] == color
+                && colors[(b.atoms[1] - 1) as usize] == color)
+        {
+            if b.stereo_symbol == UP {
+                b.stereo_symbol = DOWN;
+            } else if b.stereo_symbol == DOWN {
+                b.stereo_symbol = UP;
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
