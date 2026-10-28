@@ -2,6 +2,9 @@
 //! place substituents next to existing graphs. The C code's quirks (a second neighbour index
 //! that always names the seed, a substituent score that uses the x coordinate twice) are kept.
 
+// the C code's six-digit constants are part of its behaviour
+#![allow(clippy::approx_constant)]
+
 /// `USE_INWARDS`, `H_GEOMETRY` and `NO_RAY_CROSSING` of `geometry.h`
 pub const USE_INWARDS: i32 = 1;
 pub const H_GEOMETRY: i32 = 2;
