@@ -153,3 +153,8 @@ A4 (all fingerprint classes) and the first part of A7: `rdoxide.Avalon.pyAvalonT
 * L4 `layout.rs` (layout.c lines 1728-2390): `LayoutChainAtoms`, `LayoutRubberFragments`, `BestBondColor`, `Diameter`,
   `OrientFragment`, `LayoutFragments`; 156 molfiles identical to the C code (`tests/data/avalon_layout4.jsonl`).
   Watch for `int * float` products (`200*ap->x`), which C evaluates in single precision.
+
+### L5 — layout.c stereo part
+
+Ported `LayoutAtomStereo`, `ClearFlipFlags`, `ClearDBStereoInSmallRings`, `LayoutBondStereo` and `MakeLandscape`.
+Verified against the C code on 155 SMILES (`tests/data/avalon_layout5.jsonl`, driver `lay5.c`, atoms with parity column).
