@@ -118,3 +118,7 @@ A4 (all fingerprint classes) and the first part of A7: `rdoxide.Avalon.pyAvalonT
   `PermutationParity` (432 cases identical to the C code, `tests/data/avalon_stereo.jsonl`). Messages
   go to a `Vec<String>` instead of the global list. Not ported: `IsStereoMatch` (needs `ssmatch.c`)
   and `AllCentersRefined` (reads one element past its sort buffer in C).
+* A5b `pattern.rs` + `aacheck.rs`: augmented atoms (`StringToAugmentedAtom`, `ReadAugmentedAtoms`, `ReadAAPairs`),
+  `AAMatch`, `TransformAA`, `AAFix`, `TransformAugmentedAtoms`, `AlternativeAATransformation`,
+  `ConvertMoleculeToString`, `AAToString` and `CheckAtoms`, tested with the toolkit's real `checkfgs.chk`/`.trn`
+  rule files (180 molecules, 915 pattern strings identical to the C code).
