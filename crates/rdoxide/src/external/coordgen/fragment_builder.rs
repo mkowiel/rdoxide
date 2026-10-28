@@ -1053,6 +1053,28 @@ mod tests {
         out
     }
 
+    /// equal up to the last bits of the platform's `sin`/`cos` (the 8 digit hex words are float coordinates)
+    fn same(got: &str, want: &str) -> bool {
+        let tokens = |s: &str| -> Vec<String> {
+            s.split(|c: char| c.is_whitespace() || c == ':')
+                .map(String::from)
+                .collect()
+        };
+        let (g, w) = (tokens(got), tokens(want));
+        g.len() == w.len()
+            && g.iter().zip(&w).all(|(a, b)| {
+                let hex = |t: &str| t.len() == 8 && t.chars().all(|c| c.is_ascii_hexdigit());
+                if a == b {
+                    return true;
+                }
+                if hex(a) && hex(b) {
+                    let f = |t: &str| f32::from_bits(u32::from_str_radix(t, 16).unwrap());
+                    return (f(a) - f(b)).abs() < 1e-3;
+                }
+                false
+            })
+    }
+
     /// initial fragment coordinates must be the ones CoordgenFragmentBuilder makes (`tests/data/coordgen_fbuild.txt`)
     #[test]
     fn fragment_builder_matches_cpp() {
@@ -1064,7 +1086,7 @@ mod tests {
             let (input, want) = rec.split_at(end);
             let got = run(input);
             n += 1;
-            if got != want {
+            if !same(&got, want) {
                 let pos = got
                     .lines()
                     .zip(want.lines())
