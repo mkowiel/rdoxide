@@ -208,3 +208,15 @@ atoms, `DONT_FLIP_BOND` between two of them), calls `layout_molecule` and restor
 in `canonizer.rs`; the scramble seed is the C file-level `seed` (starts at 13, `set_seed`). 627 cases (SMILES x flag
 combinations incl. `MAIN_PART|COMPONENT_SET`, `FORCE_OCTET`, `SCRAMBLE`, `TO_MONOMER`, `DY_AROMATICITY`, random SMILES of
 the same molecules, and salt removal) in `tests/data/avalon_cansmiles.jsonl` (driver `cs.c`) are identical to the C code.
+
+### A7b — pyAvalonTools: GetCanonSmiles, Generate2DCoords, data-string fingerprints
+
+`rdoxide.Avalon.pyAvalonTools` gained `GetCanonSmiles(mol|data, ...)`, `Generate2DCoords(mol|data, ...)`, the SMILES/molblock
+data flavours of `GetAvalonFP`, `GetAvalonCountFP`, `GetAvalonFPAsWords`, and `avalonSSSBits` / `avalonSimilarityBits`
+(`External/AvalonTools/nbWrap/pyAvalonTools.cpp`). Only the structure checker (`CheckMolecule`, ...) is still missing.
+Quirk kept: the data flavour of `GetAvalonCountFP` honours `bitFlags`, the molecule flavour does not (an upstream overload
+mix-up). `tests/data/avalon_pyapi.jsonl` (1248 cases) is made by `tools/make_avalon_pyapi_corpus.py`.
+Platform note: the layout uses the C library's `rand()`; the official macOS wheel gives other coordinates than a glibc
+build (verified: the C oracle with macOS `rand` reproduces the wheel exactly, the glibc emulation matches Linux). The
+corpus therefore takes `Generate2DCoords(data, ...)` from the C oracle with the glibc generator and, for
+`Generate2DCoords(mol)`, only compares success/failure and the conformer id with the wheel.
