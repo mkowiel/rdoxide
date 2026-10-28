@@ -3,6 +3,7 @@
 
 pub mod cip;
 pub mod fragment;
+pub mod fragment_builder;
 pub mod fragmenter;
 pub mod maths;
 pub mod model;

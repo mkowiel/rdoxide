@@ -27,6 +27,47 @@ pub struct Fragment {
     pub longest_chain_from_here: f32,
     pub number_of_children_atoms: usize,
     pub number_of_children_atoms_rank: f32,
+    /// ids (in `Model::dofs`) of the degrees of freedom of this fragment (`m_dofs`)
+    pub dofs: Vec<usize>,
+    /// the degrees of freedom that move an atom of this fragment (`m_dofsForAtom`)
+    pub atom_dofs: BTreeMap<AtomId, Vec<usize>>,
+}
+
+/// the kinds of `CoordgenFragmentDOF` the fragment builder creates
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DofKind {
+    /// `CoordgenFlipFragmentDOF`
+    FlipFragment,
+    /// `CoordgenChangeParentBondLengthFragmentDOF`
+    ChangeParentBondLength,
+    /// `CoordgenRotateFragmentDOF`
+    RotateFragment,
+    /// `CoordgenScaleAtomsDOF`
+    ScaleAtoms,
+    /// `CoordgenInvertBondDOF`
+    InvertBond,
+}
+
+impl DofKind {
+    /// `tier()`
+    pub fn tier(self) -> i32 {
+        match self {
+            DofKind::FlipFragment => 0,
+            DofKind::InvertBond => 1,
+            DofKind::ChangeParentBondLength => 2,
+            DofKind::RotateFragment => 3,
+            DofKind::ScaleAtoms => 4,
+        }
+    }
+}
+
+/// `CoordgenFragmentDOF`
+#[derive(Debug, Clone)]
+pub struct Dof {
+    pub kind: DofKind,
+    pub fragment: FragmentId,
+    pub pivot: Option<AtomId>,
+    pub atoms: Vec<AtomId>,
 }
 
 impl Fragment {
@@ -44,9 +85,57 @@ impl Fragment {
 }
 
 impl Model {
+    /// `CoordgenFragmentDOF::addAtom`
+    pub fn dof_add_atom(&mut self, dof: usize, atom: AtomId) {
+        self.dofs[dof].atoms.push(atom);
+        let f = self.atoms[atom].fragment.expect("atom in a fragment");
+        self.fragments[f]
+            .atom_dofs
+            .entry(atom)
+            .or_default()
+            .push(dof);
+    }
+
+    /// `getDofsOfAtom`
+    pub fn fragment_dofs_of_atom(&self, f: FragmentId, atom: AtomId) -> Vec<usize> {
+        self.fragments[f]
+            .atom_dofs
+            .get(&atom)
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    /// creates a DOF of the fragment of `pivot` (not yet added to the fragment)
+    pub fn new_dof(&mut self, kind: DofKind, pivot: AtomId) -> usize {
+        let fragment = self.atoms[pivot].fragment.expect("pivot in a fragment");
+        self.dofs.push(Dof {
+            kind,
+            fragment,
+            pivot: Some(pivot),
+            atoms: Vec::new(),
+        });
+        self.dofs.len() - 1
+    }
+
     pub fn new_fragment(&mut self) -> FragmentId {
+        let f = self.fragments.len();
         self.fragments.push(Fragment::default());
-        self.fragments.len() - 1
+        // the constructor adds the fragment-wide degrees of freedom
+        for kind in [
+            DofKind::FlipFragment,
+            DofKind::ChangeParentBondLength,
+            DofKind::RotateFragment,
+        ] {
+            self.dofs.push(Dof {
+                kind,
+                fragment: f,
+                pivot: None,
+                atoms: Vec::new(),
+            });
+            let id = self.dofs.len() - 1;
+            self.fragments[f].dofs.push(id);
+        }
+        f
     }
 
     /// `addAtom`: the atom belongs to the fragment from now on
