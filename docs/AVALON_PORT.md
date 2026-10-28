@@ -124,3 +124,8 @@ A4 (all fingerprint classes) and the first part of A7: `rdoxide.Avalon.pyAvalonT
   rule files (180 molecules, 915 pattern strings identical to the C code).
 * A3a `canonizer.rs`: `CanonicalNumbering` (property refinement, parity/cis-trans splits, tie breaking, stereo clean-up);
   192 molfiles identical to the C code (`tests/data/avalon_canon.jsonl`). `CanSmiles` itself still needs `SMIToMOL`.
+* A3b `canonizer.rs`/`utilities.rs`: `StripMolecule` (+ `NewParity`), `FloodFillFragments`, `SplitIonicBonds`,
+  `ForceOctet`, `RemoveInorganicFragments`, `ScrambleMolecule` (151 molfiles identical to the C code,
+  `tests/data/avalon_strip.jsonl`). `StripMolecule` rebuilds symbol lists and property lines by prepending, so
+  both come out reversed; the corpus only reaches the `M  RGP` branch (the C reader does not turn `M  ALS`
+  into symbol lists).

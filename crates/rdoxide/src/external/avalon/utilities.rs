@@ -628,6 +628,239 @@ pub fn sort_neighbourhood(np: &mut Neighbourhood, mp: &Molecule) {
     }
 }
 
+/// `stereo_parity` codes of `mdl.h`
+pub const ODD: i32 = 1;
+pub const EVEN: i32 = 2;
+
+/// `NewParity`: the parity of atom `atn` (1 based) after renumbering with `renumbering`
+/// (index origin 1, 0 for deleted atoms)
+pub fn new_parity(
+    atn: i32,
+    old_parity: i32,
+    bonds: &[super::reaccs::Bond],
+    renumbering: &[i32],
+) -> i32 {
+    let mut orient = [0i32; 4];
+    let mut index = 0;
+    for b in bonds {
+        if index >= 4 {
+            break;
+        }
+        if b.atoms[0] == atn && renumbering[b.atoms[1] as usize] != 0 {
+            orient[index] = b.atoms[1];
+            index += 1;
+        }
+        if b.atoms[1] == atn && renumbering[b.atoms[0] as usize] != 0 {
+            // the C loop condition `index < 4` is only tested between bonds
+            if index < 4 {
+                orient[index] = b.atoms[0];
+            }
+            index += 1;
+        }
+    }
+    if index < 3 {
+        return NONE;
+    }
+    let index = index.min(4);
+    for i in 1..index {
+        for j in (1..=i).rev() {
+            if orient[j - 1] < orient[j] {
+                orient.swap(j - 1, j);
+            }
+        }
+    }
+    for o in orient.iter_mut().take(index) {
+        *o = renumbering[*o as usize];
+    }
+    let mut n = 0;
+    for i in 1..index {
+        for j in (1..=i).rev() {
+            if orient[j - 1] < orient[j] {
+                n += 1;
+                orient.swap(j - 1, j);
+            }
+        }
+    }
+    if n % 2 == 0 || (old_parity != ODD && old_parity != EVEN) {
+        old_parity
+    } else if old_parity == ODD {
+        EVEN
+    } else {
+        ODD
+    }
+}
+
+/// `StripMolecule`: deletes the atoms and bonds that are not flagged in `good_atoms`
+/// (index origin 1) and `good_bonds`, fixing parities, symbol lists and R-group properties
+pub fn strip_molecule(mp: &mut Molecule, good_atoms: &[bool], good_bonds: &[bool]) {
+    if !mp.name.contains("stripped") {
+        mp.name.push_str(" stripped");
+        mp.name.truncate(80);
+    }
+    let rest: String = mp.user_initials.chars().skip(2).collect();
+    mp.user_initials = format!("BR{rest}");
+    mp.program_name = "StripMol".into();
+    mp.comment = "This file has been stripped".into();
+
+    let na = mp.atoms.len();
+    let mut new_number = vec![0i32; na + 1];
+    let had_parity = mp.atoms.iter().any(|a| a.stereo_parity != NONE);
+    let mut n = 1;
+    for i in 1..=na {
+        if good_atoms[i] {
+            new_number[i] = n;
+            n += 1;
+        }
+    }
+    for (i, b) in mp.bonds.iter().enumerate() {
+        if !good_bonds[i] {
+            mp.atoms[(b.atoms[0] - 1) as usize].stereo_parity = NONE;
+            mp.atoms[(b.atoms[1] - 1) as usize].stereo_parity = NONE;
+        }
+    }
+    let mut kept = Vec::new();
+    for (i, b) in mp.bonds.iter().enumerate() {
+        if good_bonds[i] {
+            kept.push(b.clone());
+        }
+    }
+    mp.bonds = kept;
+    for i in 0..na {
+        if mp.atoms[i].stereo_parity != NONE {
+            mp.atoms[i].stereo_parity = new_parity(
+                i as i32 + 1,
+                mp.atoms[i].stereo_parity,
+                &mp.bonds,
+                &new_number,
+            );
+        }
+    }
+    if had_parity {
+        if !mp.atoms.iter().any(|a| a.stereo_parity != NONE) {
+            mp.chiral_flag = 0;
+        }
+        for i in 0..mp.bonds.len() {
+            let h = mp.bonds[i].stereo_symbol;
+            if h == UP || h == DOWN {
+                let p0 = mp.atoms[(mp.bonds[i].atoms[0] - 1) as usize].stereo_parity;
+                if p0 == EVEN || p0 == ODD {
+                    continue;
+                }
+                let p1 = mp.atoms[(mp.bonds[i].atoms[1] - 1) as usize].stereo_parity;
+                if p1 == EVEN || p1 == ODD {
+                    continue;
+                }
+                mp.bonds[i].stereo_symbol = NONE;
+            }
+        }
+    }
+    let mut atoms = Vec::new();
+    for i in 0..na {
+        if good_atoms[i + 1] {
+            atoms.push(mp.atoms[i].clone());
+        }
+    }
+    mp.atoms = atoms;
+    for b in &mut mp.bonds {
+        b.atoms[0] = new_number[b.atoms[0] as usize];
+        b.atoms[1] = new_number[b.atoms[1] as usize];
+    }
+    mp.bonds.retain(|b| b.atoms[0] != 0 && b.atoms[1] != 0);
+
+    if !mp.symbol_lists.is_empty() {
+        // the C code rebuilds the list by prepending, which reverses the order
+        let mut kept = Vec::new();
+        for mut sl in std::mem::take(&mut mp.symbol_lists) {
+            let nn = new_number.get(sl.atom as usize).copied().unwrap_or(0);
+            if nn != 0 {
+                sl.atom = nn;
+                kept.push(sl);
+            }
+        }
+        kept.reverse();
+        mp.n_atom_lists = kept.len() as i32;
+        mp.symbol_lists = kept;
+    }
+
+    if !mp.prop_lines.is_empty() {
+        let mut known = Vec::new();
+        mp.n_props = 0;
+        for line in std::mem::take(&mut mp.prop_lines) {
+            if !line.starts_with("M  RGP") {
+                continue;
+            }
+            let mut sc = Scan::new(line.as_bytes());
+            sc.pos = 6;
+            let nrgp = sc.int(0).unwrap_or(0);
+            if nrgp > 4 {
+                continue;
+            }
+            let mut text = line.as_bytes().to_vec();
+            let mut cp = 9usize;
+            let (mut ratom, mut rval) = (0i32, 0i32);
+            for _ in 0..nrgp {
+                if cp > text.len() {
+                    text.resize(cp, b' ');
+                }
+                let mut sc = Scan::new(&text[cp..]);
+                if let Some(v) = sc.int(0) {
+                    ratom = v;
+                    if let Some(v) = sc.int(0) {
+                        rval = v;
+                    }
+                }
+                let nn = new_number.get(ratom as usize).copied().unwrap_or(0);
+                let piece = format!(" {nn:3} {rval:3}");
+                text.truncate(cp);
+                text.extend_from_slice(piece.as_bytes());
+                cp += 8;
+            }
+            known.push(String::from_utf8_lossy(&text).into_owned());
+            mp.n_props += 1;
+        }
+        known.reverse();
+        mp.prop_lines = known;
+    }
+}
+
+/// `FloodFillFragments`: smears atom colours out over the fragments
+pub fn flood_fill_fragments(mp: &mut Molecule) {
+    loop {
+        let mut changed = false;
+        for i in 0..mp.bonds.len() {
+            if mp.bonds[i].bond_type & 0xF == 0 {
+                continue;
+            }
+            let (a0, a1) = (
+                (mp.bonds[i].atoms[0] - 1) as usize,
+                (mp.bonds[i].atoms[1] - 1) as usize,
+            );
+            let (col1, col2) = (mp.atoms[a0].color, mp.atoms[a1].color);
+            if col1 == col2 {
+                continue;
+            }
+            if col1 != NONE {
+                if col2 == NONE {
+                    mp.atoms[a1].color = col1;
+                } else {
+                    for a in &mut mp.atoms {
+                        if a.color == col2 {
+                            a.color = col1;
+                        }
+                    }
+                }
+                changed = true;
+            } else if col2 != NONE {
+                mp.atoms[a0].color = col2;
+                changed = true;
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
