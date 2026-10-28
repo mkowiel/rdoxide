@@ -5,14 +5,18 @@
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use rdoxide::external::avalon_tools::{
-    DEFAULT_BIT_FLAGS, get_avalon_count_fp, get_avalon_count_fp_from_data, get_avalon_fp,
-    get_avalon_fp_as_words, get_avalon_fp_as_words_from_data, get_avalon_fp_from_data,
-    get_canon_smiles, get_canon_smiles_from_data, set_2d_coords, set_2d_coords_from_data,
+    DEFAULT_BIT_FLAGS, check_mol, check_mol_data, check_mol_string, close_check_mol_files,
+    get_avalon_count_fp, get_avalon_count_fp_from_data, get_avalon_fp, get_avalon_fp_as_words,
+    get_avalon_fp_as_words_from_data, get_avalon_fp_from_data, get_canon_smiles,
+    get_canon_smiles_from_data, get_check_mol_log, init_check_mol, set_2d_coords,
+    set_2d_coords_from_data,
 };
 
 use crate::datastructs::PyExplicitBitVect;
+use crate::datastructs_siv::PyUIntSIV;
 use crate::errors::IntoPyResult;
 use crate::mol::PyMol;
+use rdoxide::datastructs::sparse_int_vect::{IndexKind, SparseIntVect};
 
 type Args<'a, 'py> = &'a Bound<'py, pyo3::types::PyTuple>;
 type Kwargs<'a, 'py> = Option<&'a Bound<'py, pyo3::types::PyDict>>;
@@ -111,6 +115,16 @@ fn get_avalon_fp_as_words_py(
         .py()
 }
 
+fn counts_to_siv(counts: &[u32]) -> PyResult<PyUIntSIV> {
+    let mut v = SparseIntVect::new(IndexKind::U32, counts.len() as i128);
+    for (i, &c) in counts.iter().enumerate() {
+        if c > 0 {
+            v.set_val(i as i128, c as i32).py()?;
+        }
+    }
+    Ok(PyUIntSIV::wrap(v))
+}
+
 /// returns the Avalon count fingerprint of a molecule (or molecule data)
 #[pyfunction]
 #[pyo3(name = "GetAvalonCountFP", signature = (mol, *args, **kwargs))]
@@ -119,24 +133,27 @@ fn get_avalon_count_fp_py(
     mol: &Bound<'_, PyAny>,
     args: &Bound<'_, pyo3::types::PyTuple>,
     kwargs: Option<&Bound<'_, pyo3::types::PyDict>>,
-) -> PyResult<Vec<u32>> {
+) -> PyResult<PyUIntSIV> {
     if let Ok(data) = mol.extract::<String>() {
         let is_smiles: bool = arg(args, kwargs, 0, "isSmiles", None)?;
         let n_bits: u32 = arg(args, kwargs, 1, "nBits", Some(512))?;
         let is_query: bool = arg(args, kwargs, 2, "isQuery", Some(false))?;
         let bit_flags: i32 = arg(args, kwargs, 3, "bitFlags", Some(DEFAULT_BIT_FLAGS))?;
-        return py
+        let counts = py
             .detach(|| get_avalon_count_fp_from_data(&data, is_smiles, n_bits, is_query, bit_flags))
             .py()?
-            .ok_or_else(no_molecule);
+            .ok_or_else(no_molecule)?;
+        return counts_to_siv(&counts);
     }
     let mol: PyRef<'_, PyMol> = mol.extract()?;
     let n_bits: u32 = arg(args, kwargs, 0, "nBits", Some(512))?;
     let is_query: bool = arg(args, kwargs, 1, "isQuery", Some(false))?;
     let bit_flags: i32 = arg(args, kwargs, 2, "bitFlags", Some(DEFAULT_BIT_FLAGS))?;
     let m = &mol.mol;
-    py.detach(|| get_avalon_count_fp(m, n_bits, is_query, bit_flags))
-        .py()
+    let counts = py
+        .detach(|| get_avalon_count_fp(m, n_bits, is_query, bit_flags))
+        .py()?;
+    counts_to_siv(&counts)
 }
 
 /// returns the canonical SMILES of a molecule, or of molecule data (`GetCanonSmiles(molData, isSmiles, flags=-1)`)
@@ -180,26 +197,83 @@ fn generate_2d_coords_py(
     Ok(id.into_pyobject(py)?.into_any().unbind())
 }
 
-/// the parts of AvalonTools that are not ported raise an `ImportError`, so that code guarding
-/// `import MolKey` with `except ImportError` keeps treating AvalonTools as unavailable (dunder
-/// names still raise `AttributeError` for the import machinery and introspection)
-const MISSING_ATTRIBUTES: &std::ffi::CStr = c"
-def __getattr__(name):
-    if name.startswith('__'):
-        raise AttributeError(name)
-    raise ImportError(f'pyAvalonTools.{name} is not available in rdoxide yet')
+/// `InitializeCheckMol(options="")`: initializes the structure checker from option lines
+#[pyfunction]
+#[pyo3(name = "InitializeCheckMol", signature = (options = ""))]
+fn initialize_check_mol_py(py: Python<'_>, options: &str) -> i32 {
+    py.detach(|| init_check_mol(options))
+}
+
+/// `CloseCheckMolFiles()`
+#[pyfunction]
+#[pyo3(name = "CloseCheckMolFiles")]
+fn close_check_mol_files_py(py: Python<'_>) {
+    py.detach(close_check_mol_files)
+}
+
+/// `GetCheckMolLog()`: the struchk log of the last molecules processed
+#[pyfunction]
+#[pyo3(name = "GetCheckMolLog")]
+fn get_check_mol_log_py(py: Python<'_>) -> String {
+    py.detach(get_check_mol_log)
+}
+
+/// `CheckMolecule(molstring, isSmiles)` or `CheckMolecule(mol)`: `(errs, mol or None)`
+#[pyfunction]
+#[pyo3(name = "CheckMolecule", signature = (mol, *args, **kwargs))]
+fn check_molecule_py(
+    py: Python<'_>,
+    mol: &Bound<'_, PyAny>,
+    args: &Bound<'_, pyo3::types::PyTuple>,
+    kwargs: Option<&Bound<'_, pyo3::types::PyDict>>,
+) -> PyResult<(i32, Option<PyMol>)> {
+    let (errs, res) = if let Ok(data) = mol.extract::<String>() {
+        let is_smiles: bool = arg(args, kwargs, 0, "isSmiles", None)?;
+        py.detach(|| check_mol_data(&data, is_smiles)).py()?
+    } else {
+        let mol: PyRef<'_, PyMol> = mol.extract()?;
+        let m = &mol.mol;
+        py.detach(|| check_mol(m)).py()?
+    };
+    Ok((errs, res.map(|m| PyMol { mol: m })))
+}
+
+/// `CheckMoleculeString(molstring, isSmiles)`: `(errs, checked CTAB)`
+#[pyfunction]
+#[pyo3(name = "CheckMoleculeString", signature = (molstring, isSmiles))]
+#[allow(non_snake_case)]
+fn check_molecule_string_py(py: Python<'_>, molstring: &str, isSmiles: bool) -> (i32, String) {
+    py.detach(|| check_mol_string(molstring, isSmiles))
+}
+
+/// the enums of the structure checker as integer enums (they are used as ints in the MolKey code)
+const ENUMS: &std::ffi::CStr = c"
+import enum
+StruChkFlag = enum.IntEnum('StruChkFlag', {
+    'bad_molecule': 1, 'alias_conversion_failed': 2, 'transformed': 4, 'fragments_found': 8,
+    'either_warning': 16, 'stereo_error': 32, 'dubious_stereo_removed': 64, 'atom_clash': 128,
+    'atom_check_failed': 256, 'size_check_failed': 512, 'recharged': 1024, 'stereo_forced_bad': 2048,
+    'stereo_transformed': 4096, 'template_transformed': 8192})
+StruChkResult = enum.IntEnum('StruChkResult', {'success': 0, 'bad_set': 1 | 2 | 32 | 2048 | 128 | 256 | 512,
+    'transformed_set': 4 | 8 | 16 | 64 | 4096 | 8192 | 16384 | 1024})
 ";
 
 pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     let py = m.py();
     let globals = pyo3::types::PyDict::new(py);
-    py.run(MISSING_ATTRIBUTES, Some(&globals), None)?;
-    m.setattr("__getattr__", globals.get_item("__getattr__")?)?;
+    py.run(ENUMS, Some(&globals), None)?;
+    m.add("StruChkFlag", globals.get_item("StruChkFlag")?)?;
+    m.add("StruChkResult", globals.get_item("StruChkResult")?)?;
     m.add_function(wrap_pyfunction!(get_avalon_fp_py, m)?)?;
     m.add_function(wrap_pyfunction!(get_avalon_fp_as_words_py, m)?)?;
     m.add_function(wrap_pyfunction!(get_avalon_count_fp_py, m)?)?;
     m.add_function(wrap_pyfunction!(get_canon_smiles_py, m)?)?;
     m.add_function(wrap_pyfunction!(generate_2d_coords_py, m)?)?;
+    m.add_function(wrap_pyfunction!(initialize_check_mol_py, m)?)?;
+    m.add_function(wrap_pyfunction!(close_check_mol_files_py, m)?)?;
+    m.add_function(wrap_pyfunction!(get_check_mol_log_py, m)?)?;
+    m.add_function(wrap_pyfunction!(check_molecule_py, m)?)?;
+    m.add_function(wrap_pyfunction!(check_molecule_string_py, m)?)?;
     m.add("avalonSSSBits", 0x007FFF)?;
     m.add("avalonSimilarityBits", 0xF07FFF)?;
     Ok(())

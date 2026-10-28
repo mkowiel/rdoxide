@@ -362,3 +362,51 @@ pub fn set_2d_coords(mol: &mut ROMol, clear_confs: bool) -> Result<u32> {
         mol.add_conformer(conf, true)
     }
 }
+
+/// the structure checker entry points (`initCheckMol`, `getCheckMolLog`, `closeCheckMolFiles`)
+pub use crate::external::avalon::struchk::{
+    close_check_mol_files, get_msg_list as get_check_mol_log, init_check_mol,
+};
+
+/// `checkMolString(data, isSmiles, &mp)`: runs the structure checker; the molecule is `None` if the data
+/// could not be read (the result is then `BAD_MOLECULE`)
+pub fn check_mol_string_to_reaccs(data: &str, is_smiles: bool) -> (i32, Option<Molecule>) {
+    use crate::external::avalon::struchk::{BAD_MOLECULE, free_msg_list, run_struchk};
+    free_msg_list();
+    match string_to_reaccs(data, is_smiles) {
+        Some(mut mp) => {
+            let errs = run_struchk(&mut mp);
+            (errs, Some(mp))
+        }
+        None => (BAD_MOLECULE, None),
+    }
+}
+
+/// `checkMolString(data, isSmiles)`: the result bits and the checked molecule as MOL block (empty if unreadable)
+pub fn check_mol_string(data: &str, is_smiles: bool) -> (i32, String) {
+    let (errs, mp) = check_mol_string_to_reaccs(data, is_smiles);
+    (errs, mp.map(|m| mol_to_mol_str(&m)).unwrap_or_default())
+}
+
+fn reaccs_to_romol(mp: &Molecule) -> Result<Option<ROMol>> {
+    let mb = mol_to_mol_str(mp);
+    mol_from_mol_block(&mb, &MolFileParserParams::default())
+}
+
+/// `checkMol(errs, data, isSmiles)`
+pub fn check_mol_data(data: &str, is_smiles: bool) -> Result<(i32, Option<ROMol>)> {
+    let (errs, mp) = check_mol_string_to_reaccs(data, is_smiles);
+    match mp {
+        Some(mp) => Ok((errs, reaccs_to_romol(&mp)?)),
+        None => Ok((errs, None)),
+    }
+}
+
+/// `checkMol(errs, mol)`
+pub fn check_mol(mol: &ROMol) -> Result<(i32, Option<ROMol>)> {
+    use crate::external::avalon::struchk::{free_msg_list, run_struchk};
+    free_msg_list();
+    let mut mp = mol_to_reaccs(mol)?;
+    let errs = run_struchk(&mut mp);
+    Ok((errs, reaccs_to_romol(&mp)?))
+}

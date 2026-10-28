@@ -42,7 +42,7 @@ def _run(rec):
         return list(p.GetAvalonFPAsWords(inp, True, nb, q, False, fl))
     if kind == "count_smiles":
         cf = p.GetAvalonCountFP(inp, True, nb, q, fl)
-        return {str(i): c for i, c in enumerate(cf) if c}
+        return {str(i): c for i, c in cf.GetNonzeroElements().items()}
     raise AssertionError(kind)
 
 
