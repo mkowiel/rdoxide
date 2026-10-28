@@ -220,3 +220,13 @@ Platform note: the layout uses the C library's `rand()`; the official macOS whee
 build (verified: the C oracle with macOS `rand` reproduces the wheel exactly, the glibc emulation matches Linux). The
 corpus therefore takes `Generate2DCoords(data, ...)` from the C oracle with the glibc generator and, for
 `Generate2DCoords(mol)`, only compares success/failure and the conformer id with the wheel.
+
+### A5a — ssmatch.c: substructure matcher
+
+`ssmatch.rs` ports the matching code of `ssmatch.c` (the fingerprint part of that file is in `fingerprint.rs`):
+`AtomMatch`, `BondMatch`, `RecSSMatch`, `Refine`, `PerceiveAromaticity` (flags `BTF_*` in `bond_type_flags`),
+`SSMatchExt`/`SSMatch`, `FGMatch`, `RSSMatch`, `PruneDuplicateAtomSets`. Matches are returned in the order of the C
+linked list (last found first). As in C, `SSMatchExt` leaves the aromaticity flags in both molecules and the topography in
+the query. 380 molecule/query pairs (queries with `A`/`Q` atoms, bond types 5-8, mapping numbers) in
+`tests/data/avalon_ssmatch.jsonl` (driver `ss.c`) are identical to the C code. Next in the struchk chain: `fixcharges.c`,
+`patclean.c`, `shortcut.c`, the `struchk.c` driver itself.

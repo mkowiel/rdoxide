@@ -17,6 +17,7 @@ pub mod scan;
 pub mod set;
 pub mod smi2mol;
 pub mod smiles;
+pub mod ssmatch;
 pub mod stereo;
 pub mod tables;
 pub mod utilities;
