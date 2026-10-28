@@ -195,3 +195,9 @@ float differences are squared in single precision.
 identical coordinates, wedges and bond marks. Note for C's global `rand()`: `CombineRings` does `srand(1)` (unless the
 ring list is empty), so the stream `ImproveCollisions` draws from is the state left by the last ring perception
 (`LayoutRings`), not the one after `RandomCoordinates`. `combine_rings_rng` / `layout_rings_rng` carry that state.
+
+### L11 — SMIToMOL with DO_LAYOUT
+
+`smi_to_mol` no longer rejects `DO_LAYOUT`: it recolors, applies an optional coordinate string after `|` (`KEEP_POSITION`
+atoms, `DONT_FLIP_BOND` between two of them), calls `layout_molecule` and restores the atom ordinals as colors.
+159 inputs incl. coordinate strings with missing/garbled fields in `tests/data/avalon_layout11.jsonl` (driver `smil.c`).

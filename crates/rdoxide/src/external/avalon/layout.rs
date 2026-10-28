@@ -4702,4 +4702,26 @@ mod tests {
         }
         assert!(bad.is_empty(), "{} differ; first:\n{}", bad.len(), bad[0]);
     }
+
+    /// `SMIToMOL` with `DO_LAYOUT` and coordinate strings must agree with the C code
+    #[test]
+    fn smi_to_mol_layout_matches_c() {
+        use crate::external::avalon::smi2mol::smi_to_mol;
+        let text = include_str!("../../../../../tests/data/avalon_layout11.jsonl");
+        let mut bad = Vec::new();
+        for line in text.lines() {
+            let v: serde_json::Value = serde_json::from_str(line).expect("json");
+            let input = v["input"].as_str().unwrap();
+            let want = v["output"].as_str().unwrap();
+            let flags = v["flags"].as_i64().unwrap() as i32;
+            let out = match smi_to_mol(input, flags).unwrap() {
+                Some(mp) => dump3("mol", &mp),
+                None => "NULL\n".to_string(),
+            };
+            if out != want {
+                bad.push(format!("{flags} {input}\nwant:\n{want}\ngot:\n{out}"));
+            }
+        }
+        assert!(bad.is_empty(), "{} differ; first:\n{}", bad.len(), bad[0]);
+    }
 }
