@@ -187,3 +187,11 @@ Ported `CollectFragmentInfo` (fragments as chains: a shortcut fragment followed 
 `FragmentRenderedHeight` and `FragmentHeight`. Checked on 69 molfiles in `tests/data/avalon_layout9.jsonl`
 (driver `lay9.c`). C quirks kept: the x collision term multiplies by `ap->x - ap->x` (zero), the y term does not;
 float differences are squared in single precision.
+
+### L10 — layout.c: AlignShortcutsAndFragments and LayoutMolecule
+
+`layout.c` is complete: `AlignShortcutsAndFragments` and `LayoutMolecule` (`layout_molecule`) are ported, and 221 inputs
+(SMILES read with `SMIToMOL` plus shortcut molfiles, `tests/data/avalon_layout10.jsonl`, driver `lay10.c`) give
+identical coordinates, wedges and bond marks. Note for C's global `rand()`: `CombineRings` does `srand(1)` (unless the
+ring list is empty), so the stream `ImproveCollisions` draws from is the state left by the last ring perception
+(`LayoutRings`), not the one after `RandomCoordinates`. `combine_rings_rng` / `layout_rings_rng` carry that state.

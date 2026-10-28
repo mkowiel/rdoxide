@@ -149,10 +149,15 @@ pub fn sort_rings(list: &mut [BondSet]) {
 
 /// `CombineRings`
 pub fn combine_rings(list: &mut [BondSet]) {
+    combine_rings_rng(list, &mut CRand::new(1));
+}
+
+/// `CombineRings` that leaves the C `rand()` state in `rng`: the function does `srand(1)` unless the ring list is empty
+pub fn combine_rings_rng(list: &mut [BondSet], rng: &mut CRand) {
     if list.is_empty() {
         return;
     }
-    let mut rng = CRand::new(1);
+    *rng = CRand::new(1);
     let mut ntoggle = 0;
     let mut set = BitSet::new(list[0].bond_set.max_member());
     loop {
