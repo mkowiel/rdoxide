@@ -724,6 +724,28 @@ fn read_v3000(f: &mut Lines, mp: &mut Molecule) -> Result<(), Status> {
     Ok(())
 }
 
+/// the template molecules of a pattern file (`-pc`, `-pr`, `-ps`): molecules read one after the other, with
+/// the `$$$$` lines skipped; at most `max` of them are used
+pub fn read_pattern_molecules(text: &str, max: usize) -> Vec<Molecule> {
+    let mut f = Lines::open(text);
+    let mut out = Vec::new();
+    while let Ok(mp) = read_molecule(&mut f) {
+        if out.len() >= max {
+            eprintln!("More than {max} pattens\nUsing only the first {max} of them");
+            break;
+        }
+        while f.status == Status::Normal {
+            f.get_buffer();
+            if f.begins("$$$$") {
+                f.get_buffer();
+                break;
+            }
+        }
+        out.push(mp);
+    }
+    out
+}
+
 /// `MolStr2Mol`: `None` on an error
 pub fn mol_str_to_mol(mol_str: &str) -> Option<Molecule> {
     let mut f = Lines::open(mol_str);
