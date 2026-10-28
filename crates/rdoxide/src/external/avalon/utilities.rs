@@ -602,6 +602,32 @@ pub fn make_hydrogens_implicit(mp: &mut Molecule) {
     make_some_hydrogens_implicit(mp, ALL_HYDROGENS);
 }
 
+/// `SortNeighbourhood`: sorts the ligands by descending bond type, then descending atom
+/// symbol, then descending query H count
+pub fn sort_neighbourhood(np: &mut Neighbourhood, mp: &Molecule) {
+    for i in 1..np.atoms.len() {
+        for j in (0..i).rev() {
+            let (btj, btj1) = (
+                mp.bonds[np.bonds[j]].bond_type,
+                mp.bonds[np.bonds[j + 1]].bond_type,
+            );
+            let (aj, aj1) = (&mp.atoms[np.atoms[j]], &mp.atoms[np.atoms[j + 1]]);
+            let ord = aj.atom_symbol.as_bytes().cmp(aj1.atom_symbol.as_bytes());
+            if btj < btj1
+                || (btj == btj1 && ord == std::cmp::Ordering::Greater)
+                || (btj == btj1
+                    && ord == std::cmp::Ordering::Equal
+                    && aj.query_h_count < aj1.query_h_count)
+            {
+                np.bonds.swap(j, j + 1);
+                np.atoms.swap(j, j + 1);
+            } else {
+                break;
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
