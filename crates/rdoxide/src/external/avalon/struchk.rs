@@ -12,16 +12,18 @@ use super::aacheck::check_atoms;
 use super::fixcharges::{
     initialize_charge_data_tables, recharge_molecule, set_acidity_limit, total_charge,
 };
+use super::patclean::{force_stereo_template, template_clean, template_rotate};
 use super::pattern::{
     AugmentedAtom, read_aa_pairs, read_augmented_atoms, transform_augmented_atoms,
 };
 use super::reaccs::{MAXATOMS, Molecule, NONE};
+use super::reaccsio::read_pattern_molecules;
 use super::scan::Scan;
 use super::stereo::{
     CONVERTED_TO_2D, ClashLimit, EITHER_BOND_FOUND, add_msg, atom_clash, check_stereo,
     dubious_stereochemistry, fix_dubious_3d_molecule, remove_dubious_stereochemistry,
 };
-use super::utilities::strip_molecule;
+use super::utilities::{make_hydrogens_implicit, strip_molecule};
 
 pub const BAD_MOLECULE: i32 = 1;
 pub const ALIAS_CONVERSION_FAILED: i32 = 2;
@@ -74,6 +76,10 @@ struct State {
     convert_stext: bool,
     charges_read: bool,
     desired_charge: i32,
+    /// `-pc`, `-pr`, `-ps` templates
+    patterns: Vec<Molecule>,
+    rotate_patterns: Vec<Molecule>,
+    stereo_patterns: Vec<Molecule>,
     log_file: Option<std::fs::File>,
     /// `SetCollisionLimit` is not undone by `ClearParameters`
     clash_limit: ClashLimit,
@@ -96,6 +102,9 @@ impl State {
             convert_stext: false,
             charges_read: false,
             desired_charge: 0,
+            patterns: Vec::new(),
+            rotate_patterns: Vec::new(),
+            stereo_patterns: Vec::new(),
             log_file: None,
             clash_limit: ClashLimit(0.15),
             msgs: Vec::new(),
@@ -350,6 +359,28 @@ fn initialize(args: &[String]) -> i32 {
                 let limit = Scan::new(optarg.as_bytes()).double(0).unwrap_or(0.0);
                 if limit > 0.0 {
                     set_acidity_limit(limit);
+                }
+            }
+            "pc" | "pr" | "ps" => {
+                if let Some(text) = read_file(&optarg, "pattern") {
+                    let mut pats = read_pattern_molecules(&text, 10);
+                    for ssp in &mut pats {
+                        make_hydrogens_implicit(ssp);
+                        if option != "pc" {
+                            for a in &mut ssp.atoms {
+                                a.query_h_count = NONE;
+                            }
+                        }
+                    }
+                    if pats.is_empty() {
+                        eprintln!("LIBRARY: Format error in pattern file '{optarg}'");
+                        errflg += 1;
+                    }
+                    match option.as_str() {
+                        "pc" => st.patterns = pats,
+                        "pr" => st.rotate_patterns = pats,
+                        _ => st.stereo_patterns = pats,
+                    }
                 }
             }
             // accepted without effect on the checks
@@ -704,6 +735,44 @@ pub fn run_struchk(mp: &mut Molecule) -> i32 {
         if st.groups_to_sgroups {
             convert_groups_to_sgroups(mp);
         }
+        let st = &mut *st;
+        for ssp in &mut st.stereo_patterns {
+            // C compares with 15 where ForceStereoTemplate returns 1: STEREO_TRANSFORMED is never set
+            if force_stereo_template(mp, ssp, &mut st.msgs) == -1 {
+                result |= STEREO_FORCED_BAD;
+                add_msg(
+                    &mut st.msgs,
+                    format!(
+                        "{:>10}: problem enforcing stereochemistry of '{}'",
+                        mp.name, ssp.name
+                    ),
+                );
+            }
+        }
+        for ssp in &mut st.patterns {
+            if template_clean(mp, ssp, &mut st.log_file) {
+                result |= TEMPLATE_TRANSFORMED;
+                add_msg(
+                    &mut st.msgs,
+                    format!(
+                        "{:>10}: has been cleaned with template '{}'",
+                        mp.name, ssp.name
+                    ),
+                );
+            }
+        }
+        for ssp in &mut st.rotate_patterns {
+            if template_rotate(mp, ssp, &mut st.log_file) {
+                result |= TEMPLATE_TRANSFORMED;
+                add_msg(
+                    &mut st.msgs,
+                    format!(
+                        "{:>10}: has been rotated by template '{}'",
+                        mp.name, ssp.name
+                    ),
+                );
+            }
+        }
     }
     flush_log(st);
     result
@@ -721,6 +790,9 @@ mod tests {
     fn struchk_matches_c() {
         // one test: the checker state is global
         check_corpus(include_str!(
+            "../../../../../tests/data/avalon_patclean.jsonl"
+        ));
+        check_corpus(include_str!(
             "../../../../../tests/data/avalon_struchk.jsonl"
         ));
         check_corpus(include_str!(
@@ -730,6 +802,10 @@ mod tests {
 
     fn check_corpus(text: &str) {
         let data = concat!(env!("CARGO_MANIFEST_DIR"), "/src/external/avalon/data");
+        let patterns = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../tests/data/avalon_patterns"
+        );
         let mut bad = Vec::new();
         for line in text.lines() {
             let v: serde_json::Value = serde_json::from_str(line).expect("json");
@@ -738,6 +814,7 @@ mod tests {
                 .as_str()
                 .unwrap()
                 .replace("{D}", data)
+                .replace("{P}", patterns)
                 .replace('|', "\n")
                 + "\n";
             let input = v["input"].as_str().unwrap();

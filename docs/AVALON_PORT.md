@@ -261,5 +261,19 @@ on a malformed table, here the option is counted as an error). Numerics as in C:
 the cubic pKa transformation in double. Quirks kept: the acidity limit is global and survives `ClearParameters`; `cip`
 keeps pointing into the charge table between the increment steps (a bond-order increment without a matched atom uses
 0); molecules with symbol lists or property lines are reported as not rechargeable. The logging for parameter fitting
-(`SetChargeLog`) is not ported. `tests/data/avalon_fixcharges.jsonl` (230 inputs x option sets, driver `sc.c`) is
+(`SetChargeLog`) is not ported. `tests/data/avalon_fixcharges.jsonl` (226 inputs x option sets, driver `sc.c`) is
 identical to the C code. Still open for struchk: `-tt`, `-pc/-pr/-ps` (`patclean.c`), `-f`.
+
+### A5d — patclean.c: template cleaning, rotation and forced stereo (`-pc`, `-pr`, `-ps`)
+
+`patclean.rs` ports `ForceStereoTemplate`, `TemplateClean`, `TemplateRotate` and their helpers (`ClosestMatch`,
+`AlignMoleculeWithSubstructure`, `AdjustToSubstructureTemplate`, `ColorSubstituents`, `TransformColoredSubstituent`,
+`ScaleByTemplate`, `AddStereoHydrogen`); `struchk.rs` reads the template files (`read_pattern_molecules`) and applies
+them after the charge fixing in the C order (stereo, clean, rotate). The templates are modified by the substructure
+matcher as in C and kept between molecules. Quirks kept: the template reader skips every second record (the buffer is
+already at `$$$$`, `GetBuffer` then eats the next molecule); `STEREO_TRANSFORMED` is never set (C compares the result with
+15); `FlipMolecule` also swaps the wedges; `SQR()` of a `float` difference and the sum of two of them are `float`
+operations; `ring_size` is read after `free` for the `either` bond fix (first four entries count as non-zero, no corpus
+case reaches it). The C code crashes when a later option set frees templates of an earlier one, so the corpus is built with
+one process per record. `tests/data/avalon_patclean.jsonl` (196 inputs x option sets, 12 template files in
+`tests/data/avalon_patterns/`, driver `sc.c`) is identical to the C code. Still open for struchk: `-tt`, `-f`.
