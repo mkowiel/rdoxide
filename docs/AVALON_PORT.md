@@ -158,3 +158,11 @@ A4 (all fingerprint classes) and the first part of A7: `rdoxide.Avalon.pyAvalonT
 
 Ported `LayoutAtomStereo`, `ClearFlipFlags`, `ClearDBStereoInSmallRings`, `LayoutBondStereo` and `MakeLandscape`.
 Verified against the C code on 155 SMILES (`tests/data/avalon_layout5.jsonl`, driver `lay5.c`, atoms with parity column).
+
+### L6 — layout.c collisions and bridgeheads
+
+Ported `BondLengthSQR`, `AtomBondClash`, `CountCollisions`, `BondLinksAtoms`, `StretchBond`, `ImproveCollisions`,
+`ScaleByFixedFragments`, `FixLinearBridgeHeads` and `FixInwardHydrogens`. Float coordinate differences are formed in
+single precision as in C (`fd`, and `SQR` of float differences in `ScaleByFixedFragments`). Checked on 90 SMILES
+(`tests/data/avalon_layout6.jsonl`, driver `lay6.c`), including randomly placed colliding layouts that exercise the
+stretch and random-nudge paths. `FixInwardHydrogens` never fires on this corpus (the test only proves it a no-op there).
