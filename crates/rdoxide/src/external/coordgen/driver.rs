@@ -334,15 +334,12 @@ impl Sketcher {
             for a in m.molecules[mol].atoms.clone() {
                 m.atoms[a].general_use_visited = false;
             }
-            loop {
-                let Some(start) = m.molecules[mol]
-                    .atoms
-                    .iter()
-                    .copied()
-                    .find(|&a| !m.atoms[a].general_use_visited)
-                else {
-                    break;
-                };
+            while let Some(start) = m.molecules[mol]
+                .atoms
+                .iter()
+                .copied()
+                .find(|&a| !m.atoms[a].general_use_visited)
+            {
                 let mut q = VecDeque::new();
                 q.push_back(start);
                 while let Some(last) = q.pop_front() {
