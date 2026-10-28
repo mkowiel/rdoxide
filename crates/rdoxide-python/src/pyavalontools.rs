@@ -1,22 +1,56 @@
-//! `rdoxide.Avalon.pyAvalonTools`: Avalon fingerprints (upstream
-//! `External/AvalonTools/Wrap/pyAvalonTools.cpp`). Functions that need the Avalon structure
-//! check, SMILES reader or 2D layout are not available yet.
+//! `rdoxide.Avalon.pyAvalonTools`: Avalon fingerprints, canonical SMILES and 2D coordinates (upstream
+//! `External/AvalonTools/nbWrap/pyAvalonTools.cpp`). The structure checker (`CheckMolecule`, ...) is
+//! not available yet.
 
-use pyo3::exceptions::PyNotImplementedError;
+use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use rdoxide::external::avalon_tools::{
-    DEFAULT_BIT_FLAGS, get_avalon_count_fp, get_avalon_fp, get_avalon_fp_as_words,
-    get_avalon_fp_from_molblock,
+    DEFAULT_BIT_FLAGS, get_avalon_count_fp, get_avalon_count_fp_from_data, get_avalon_fp,
+    get_avalon_fp_as_words, get_avalon_fp_as_words_from_data, get_avalon_fp_from_data,
+    get_canon_smiles, get_canon_smiles_from_data, set_2d_coords, set_2d_coords_from_data,
 };
 
 use crate::datastructs::PyExplicitBitVect;
 use crate::errors::IntoPyResult;
 use crate::mol::PyMol;
 
-/// returns an Avalon fingerprint for a molecule (or a MOL block when `isSmiles` is False)
+type Args<'a, 'py> = &'a Bound<'py, pyo3::types::PyTuple>;
+type Kwargs<'a, 'py> = Option<&'a Bound<'py, pyo3::types::PyDict>>;
+
+/// the argument called `name` at position `pos` of the overload, or its keyword, or `default`
+fn arg<'py, T: for<'a> FromPyObject<'a, 'py>>(
+    args: Args<'_, 'py>,
+    kwargs: Kwargs<'_, 'py>,
+    pos: usize,
+    name: &str,
+    default: Option<T>,
+) -> PyResult<T>
+where
+    for<'a> <T as FromPyObject<'a, 'py>>::Error: Into<PyErr>,
+{
+    let v = match args.get_item(pos) {
+        Ok(v) => Some(v),
+        Err(_) => match kwargs {
+            Some(d) => d.get_item(name)?,
+            None => None,
+        },
+    };
+    match v {
+        Some(v) => v.extract::<T>().map_err(Into::into),
+        None => default.ok_or_else(|| {
+            pyo3::exceptions::PyTypeError::new_err(format!("missing required argument '{name}'"))
+        }),
+    }
+}
+
+fn no_molecule() -> PyErr {
+    PyRuntimeError::new_err("could not build a molecule from the data")
+}
+
+/// returns an Avalon fingerprint for a molecule or for molecule data (SMILES or MDL mol block)
 ///
 /// The calling conventions are `GetAvalonFP(mol, nBits=512, isQuery=False, resetVect=False,
-/// bitFlags=15761407)` and `GetAvalonFP(molBlock, isSmiles=False, nBits=512, ...)`.
+/// bitFlags=avalonSimilarityBits)` and `GetAvalonFP(molData, isSmiles, nBits=512, ...)`.
 #[pyfunction]
 #[pyo3(name = "GetAvalonFP", signature = (mol, *args, **kwargs))]
 fn get_avalon_fp_py(
@@ -25,55 +59,21 @@ fn get_avalon_fp_py(
     args: &Bound<'_, pyo3::types::PyTuple>,
     kwargs: Option<&Bound<'_, pyo3::types::PyDict>>,
 ) -> PyResult<PyExplicitBitVect> {
-    let kw = |name: &str| -> PyResult<Option<Bound<'_, PyAny>>> {
-        match kwargs {
-            Some(d) => d.get_item(name),
-            None => Ok(None),
-        }
-    };
     if let Ok(data) = mol.extract::<String>() {
-        // (data, isSmiles, nBits, isQuery, resetVect, bitFlags)
-        let pos = |i: usize| args.get_item(i).ok();
-        let is_smiles: bool = match pos(0).or(kw("isSmiles")?) {
-            Some(v) => v.extract()?,
-            None => true,
-        };
-        let n_bits: u32 = match pos(1).or(kw("nBits")?) {
-            Some(v) => v.extract()?,
-            None => 512,
-        };
-        let is_query: bool = match pos(2).or(kw("isQuery")?) {
-            Some(v) => v.extract()?,
-            None => false,
-        };
-        let bit_flags: i32 = match pos(4).or(kw("bitFlags")?) {
-            Some(v) => v.extract()?,
-            None => DEFAULT_BIT_FLAGS,
-        };
-        if is_smiles {
-            return Err(PyNotImplementedError::new_err(
-                "SMILES input needs the Avalon SMILES reader and layout, which are not ported yet",
-            ));
-        }
+        let is_smiles: bool = arg(args, kwargs, 0, "isSmiles", None)?;
+        let n_bits: u32 = arg(args, kwargs, 1, "nBits", Some(512))?;
+        let is_query: bool = arg(args, kwargs, 2, "isQuery", Some(false))?;
+        let bit_flags: i32 = arg(args, kwargs, 4, "bitFlags", Some(DEFAULT_BIT_FLAGS))?;
         let res = py
-            .detach(|| get_avalon_fp_from_molblock(&data, n_bits, is_query, bit_flags))
-            .py()?;
+            .detach(|| get_avalon_fp_from_data(&data, is_smiles, n_bits, is_query, bit_flags))
+            .py()?
+            .ok_or_else(no_molecule)?;
         return Ok(PyExplicitBitVect::wrap(res));
     }
     let mol: PyRef<'_, PyMol> = mol.extract()?;
-    let pos = |i: usize| args.get_item(i).ok();
-    let n_bits: u32 = match pos(0).or(kw("nBits")?) {
-        Some(v) => v.extract()?,
-        None => 512,
-    };
-    let is_query: bool = match pos(1).or(kw("isQuery")?) {
-        Some(v) => v.extract()?,
-        None => false,
-    };
-    let bit_flags: i32 = match pos(3).or(kw("bitFlags")?) {
-        Some(v) => v.extract()?,
-        None => DEFAULT_BIT_FLAGS,
-    };
+    let n_bits: u32 = arg(args, kwargs, 0, "nBits", Some(512))?;
+    let is_query: bool = arg(args, kwargs, 1, "isQuery", Some(false))?;
+    let bit_flags: i32 = arg(args, kwargs, 3, "bitFlags", Some(DEFAULT_BIT_FLAGS))?;
     let m = &mol.mol;
     let res = py
         .detach(|| get_avalon_fp(m, n_bits, is_query, bit_flags))
@@ -81,38 +81,103 @@ fn get_avalon_fp_py(
     Ok(PyExplicitBitVect::wrap(res))
 }
 
-/// returns the Avalon fingerprint of a molecule as a list of 32 bit words
+/// returns the Avalon fingerprint of a molecule (or molecule data) as a list of 32 bit words
 #[pyfunction]
-#[pyo3(name = "GetAvalonFPAsWords", signature = (mol, nBits = 512, isQuery = false, resetVect = false, bitFlags = DEFAULT_BIT_FLAGS))]
-#[allow(non_snake_case)]
+#[pyo3(name = "GetAvalonFPAsWords", signature = (mol, *args, **kwargs))]
 fn get_avalon_fp_as_words_py(
     py: Python<'_>,
-    mol: PyRef<'_, PyMol>,
-    nBits: u32,
-    isQuery: bool,
-    resetVect: bool,
-    bitFlags: i32,
+    mol: &Bound<'_, PyAny>,
+    args: &Bound<'_, pyo3::types::PyTuple>,
+    kwargs: Option<&Bound<'_, pyo3::types::PyDict>>,
 ) -> PyResult<Vec<u32>> {
-    let _ = resetVect;
+    if let Ok(data) = mol.extract::<String>() {
+        let is_smiles: bool = arg(args, kwargs, 0, "isSmiles", None)?;
+        let n_bits: u32 = arg(args, kwargs, 1, "nBits", Some(512))?;
+        let is_query: bool = arg(args, kwargs, 2, "isQuery", Some(false))?;
+        let bit_flags: i32 = arg(args, kwargs, 4, "bitFlags", Some(DEFAULT_BIT_FLAGS))?;
+        return py
+            .detach(|| {
+                get_avalon_fp_as_words_from_data(&data, is_smiles, n_bits, is_query, bit_flags)
+            })
+            .py()?
+            .ok_or_else(no_molecule);
+    }
+    let mol: PyRef<'_, PyMol> = mol.extract()?;
+    let n_bits: u32 = arg(args, kwargs, 0, "nBits", Some(512))?;
+    let is_query: bool = arg(args, kwargs, 1, "isQuery", Some(false))?;
+    let bit_flags: i32 = arg(args, kwargs, 3, "bitFlags", Some(DEFAULT_BIT_FLAGS))?;
     let m = &mol.mol;
-    py.detach(|| get_avalon_fp_as_words(m, nBits, isQuery, bitFlags))
+    py.detach(|| get_avalon_fp_as_words(m, n_bits, is_query, bit_flags))
         .py()
 }
 
-/// returns the Avalon count fingerprint of a molecule
+/// returns the Avalon count fingerprint of a molecule (or molecule data)
 #[pyfunction]
-#[pyo3(name = "GetAvalonCountFP", signature = (mol, nBits = 512, isQuery = false, bitFlags = DEFAULT_BIT_FLAGS))]
-#[allow(non_snake_case)]
+#[pyo3(name = "GetAvalonCountFP", signature = (mol, *args, **kwargs))]
 fn get_avalon_count_fp_py(
     py: Python<'_>,
-    mol: PyRef<'_, PyMol>,
-    nBits: u32,
-    isQuery: bool,
-    bitFlags: i32,
+    mol: &Bound<'_, PyAny>,
+    args: &Bound<'_, pyo3::types::PyTuple>,
+    kwargs: Option<&Bound<'_, pyo3::types::PyDict>>,
 ) -> PyResult<Vec<u32>> {
+    if let Ok(data) = mol.extract::<String>() {
+        let is_smiles: bool = arg(args, kwargs, 0, "isSmiles", None)?;
+        let n_bits: u32 = arg(args, kwargs, 1, "nBits", Some(512))?;
+        let is_query: bool = arg(args, kwargs, 2, "isQuery", Some(false))?;
+        let bit_flags: i32 = arg(args, kwargs, 3, "bitFlags", Some(DEFAULT_BIT_FLAGS))?;
+        return py
+            .detach(|| get_avalon_count_fp_from_data(&data, is_smiles, n_bits, is_query, bit_flags))
+            .py()?
+            .ok_or_else(no_molecule);
+    }
+    let mol: PyRef<'_, PyMol> = mol.extract()?;
+    let n_bits: u32 = arg(args, kwargs, 0, "nBits", Some(512))?;
+    let is_query: bool = arg(args, kwargs, 1, "isQuery", Some(false))?;
+    let bit_flags: i32 = arg(args, kwargs, 2, "bitFlags", Some(DEFAULT_BIT_FLAGS))?;
     let m = &mol.mol;
-    py.detach(|| get_avalon_count_fp(m, nBits, isQuery, bitFlags))
+    py.detach(|| get_avalon_count_fp(m, n_bits, is_query, bit_flags))
         .py()
+}
+
+/// returns the canonical SMILES of a molecule, or of molecule data (`GetCanonSmiles(molData, isSmiles, flags=-1)`)
+#[pyfunction]
+#[pyo3(name = "GetCanonSmiles", signature = (mol, *args, **kwargs))]
+fn get_canon_smiles_py(
+    py: Python<'_>,
+    mol: &Bound<'_, PyAny>,
+    args: &Bound<'_, pyo3::types::PyTuple>,
+    kwargs: Option<&Bound<'_, pyo3::types::PyDict>>,
+) -> PyResult<String> {
+    if let Ok(data) = mol.extract::<String>() {
+        let is_smiles: bool = arg(args, kwargs, 0, "isSmiles", None)?;
+        let flags: i32 = arg(args, kwargs, 1, "flags", Some(-1))?;
+        return Ok(py.detach(|| get_canon_smiles_from_data(&data, is_smiles, flags)));
+    }
+    let mol: PyRef<'_, PyMol> = mol.extract()?;
+    let flags: i32 = arg(args, kwargs, 0, "flags", Some(-1))?;
+    let m = &mol.mol;
+    py.detach(|| get_canon_smiles(m, flags)).py()
+}
+
+/// generates 2D coordinates with the Avalon layout: `Generate2DCoords(mol, clearConfs=True)` returns the
+/// conformer id, `Generate2DCoords(molData, isSmiles)` returns an MDL mol block
+#[pyfunction]
+#[pyo3(name = "Generate2DCoords", signature = (mol, *args, **kwargs))]
+fn generate_2d_coords_py(
+    py: Python<'_>,
+    mol: &Bound<'_, PyAny>,
+    args: &Bound<'_, pyo3::types::PyTuple>,
+    kwargs: Option<&Bound<'_, pyo3::types::PyDict>>,
+) -> PyResult<Py<PyAny>> {
+    if let Ok(data) = mol.extract::<String>() {
+        let is_smiles: bool = arg(args, kwargs, 0, "isSmiles", None)?;
+        let mb = py.detach(|| set_2d_coords_from_data(&data, is_smiles));
+        return Ok(mb.into_pyobject(py)?.into_any().unbind());
+    }
+    let mut mol: PyRefMut<'_, PyMol> = mol.extract()?;
+    let clear: bool = arg(args, kwargs, 0, "clearConfs", Some(true))?;
+    let id = set_2d_coords(&mut mol.mol, clear).py()?;
+    Ok(id.into_pyobject(py)?.into_any().unbind())
 }
 
 /// the parts of AvalonTools that are not ported raise an `ImportError`, so that code guarding
@@ -133,5 +198,9 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_avalon_fp_py, m)?)?;
     m.add_function(wrap_pyfunction!(get_avalon_fp_as_words_py, m)?)?;
     m.add_function(wrap_pyfunction!(get_avalon_count_fp_py, m)?)?;
+    m.add_function(wrap_pyfunction!(get_canon_smiles_py, m)?)?;
+    m.add_function(wrap_pyfunction!(generate_2d_coords_py, m)?)?;
+    m.add("avalonSSSBits", 0x007FFF)?;
+    m.add("avalonSimilarityBits", 0xF07FFF)?;
     Ok(())
 }

@@ -40,5 +40,6 @@ def test_defaults_and_molblock_input():
     assert fp.GetNumOnBits() > 0
     mb = Chem.MolToMolBlock(m)
     assert list(p.GetAvalonFP(mb, False).GetOnBits()) == list(fp.GetOnBits())
-    with pytest.raises(NotImplementedError):
-        p.GetAvalonFP("CCO", True)
+    assert p.GetAvalonFP("CCO", True).GetNumOnBits() > 0
+    with pytest.raises(TypeError):
+        p.GetAvalonFP("CCO")
