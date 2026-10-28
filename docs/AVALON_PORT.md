@@ -129,3 +129,6 @@ A4 (all fingerprint classes) and the first part of A7: `rdoxide.Avalon.pyAvalonT
   `tests/data/avalon_strip.jsonl`). `StripMolecule` rebuilds symbol lists and property lines by prepending, so
   both come out reversed; the corpus only reaches the `M  RGP` branch (the C reader does not turn `M  ALS`
   into symbol lists).
+* A6a `smi2mol.rs`: `SmilesToMDLAtom`, `ComputeSmilesValenceAndHCount`, `QuickCheck` (2525 SMILES strings and
+  351 molfiles identical to the C code). Still missing for `SMIToMOL`: the main parser (ring closures, branches,
+  stereo, coordinates section) and the layout it calls.
