@@ -132,3 +132,6 @@ A4 (all fingerprint classes) and the first part of A7: `rdoxide.Avalon.pyAvalonT
 * A6a `smi2mol.rs`: `SmilesToMDLAtom`, `ComputeSmilesValenceAndHCount`, `QuickCheck` (2525 SMILES strings and
   351 molfiles identical to the C code). Still missing for `SMIToMOL`: the main parser (ring closures, branches,
   stereo, coordinates section) and the layout it calls.
+* A6b `smi2mol.rs`: `SMIToMOL` without layout (flags 0, `TRUE_DB_STEREO`, `EXPECT_SMARTS`; `DO_LAYOUT` returns an
+  error until `layout.c` is ported): 1152 results (384 SMILES x 3 flag sets) identical to the C code
+  (`tests/data/avalon_smi2mol.jsonl`).
