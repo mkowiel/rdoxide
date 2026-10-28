@@ -4,7 +4,9 @@
 
 #![allow(clippy::approx_constant)]
 
-use super::geometry::transform_points;
+use super::geometry::{
+    H_GEOMETRY, NO_RAY_CROSSING, USE_INWARDS, next_substituent_point, transform_points,
+};
 use super::graph::{BondSet, CRand, combine_rings, ring_list};
 use super::perceive::{DOUBLE, Neighbourhood, SINGLE, TRIPLE, ring_state};
 use super::reaccs::{Molecule, NONE};
@@ -847,6 +849,363 @@ pub fn count_color(mp: &Molecule, color: i32) -> usize {
     mp.atoms.iter().filter(|a| a.color == color).count()
 }
 
+/// the indices of the carbonyl O, amide N and second C ligand of the large-ring lactam
+/// carbonyl carbon `i`, if it is one (shared by `LayoutLargeLactams` and `FlipRingCarbonyls`)
+fn lactam_atoms(
+    mp: &Molecule,
+    i: usize,
+    is_ring_atom: &[i32],
+    ring_size: &[i32],
+    nbp: &[Neighbourhood],
+) -> Option<(usize, usize, usize)> {
+    let nb = &nbp[i];
+    if nb.atoms.len() != 3 || is_ring_atom[i] == 0 || mp.atoms[i].atom_symbol != "C" {
+        return None;
+    }
+    let jo = (0..3).find(|&j| {
+        mp.bonds[nb.bonds[j]].bond_type == DOUBLE
+            && mp.atoms[nb.atoms[j]].atom_symbol == "O"
+            && nbp[nb.atoms[j]].atoms.len() == 1
+    })?;
+    let nrings = |a: usize| {
+        nbp[a]
+            .atoms
+            .iter()
+            .filter(|&&x| is_ring_atom[x] != 0)
+            .count()
+    };
+    let jn = (0..3).find(|&j| {
+        mp.bonds[nb.bonds[j]].bond_type == SINGLE
+            && mp.atoms[nb.atoms[j]].atom_symbol == "N"
+            && ring_size[nb.bonds[j]] > 12
+    })?;
+    if nrings(nb.atoms[jn]) > 2 {
+        return None;
+    }
+    let jx = (0..3).find(|&j| {
+        mp.bonds[nb.bonds[j]].bond_type == SINGLE && mp.atoms[nb.atoms[j]].atom_symbol == "C"
+    })?;
+    if nrings(nb.atoms[jx]) > 2 {
+        return None;
+    }
+    Some((nb.atoms[jo], nb.atoms[jn], nb.atoms[jx]))
+}
+
+/// `LayoutLargeLactams`: makes O=C-N of large lactam amides trigonal
+pub fn layout_large_lactams(
+    mp: &mut Molecule,
+    is_ring_atom: &[i32],
+    ring_size: &[i32],
+    nbp: &[Neighbourhood],
+) {
+    for i in 0..mp.atoms.len() {
+        let Some((o, n, x)) = lactam_atoms(mp, i, is_ring_atom, ring_size, nbp) else {
+            continue;
+        };
+        let color = mp.atoms[i].color;
+        mp.atoms[i].x = 0.0;
+        mp.atoms[i].y = 0.0;
+        mp.atoms[o].x = 1.514;
+        mp.atoms[o].y = 0.0;
+        mp.atoms[o].color = color;
+        mp.atoms[n].x = (-1.514 * (3.1415926f64 / 3.0).cos()) as f32;
+        mp.atoms[n].y = (1.514 * (3.1415926f64 / 3.0).sin()) as f32;
+        mp.atoms[n].color = color;
+        mp.atoms[x].x = (-1.514 * (3.1415926f64 / 3.0).cos()) as f32;
+        mp.atoms[x].y = (-1.514 * (3.1415926f64 / 3.0).sin()) as f32;
+        mp.atoms[x].color = color;
+    }
+}
+
+/// `FlipRingCarbonyls`: lets laid-out large lactam carbonyls point into the ring
+pub fn flip_ring_carbonyls(
+    mp: &mut Molecule,
+    is_ring_atom: &[i32],
+    ring_size: &[i32],
+    nbp: &[Neighbourhood],
+) {
+    for i in 0..mp.atoms.len() {
+        let Some((o, n, x)) = lactam_atoms(mp, i, is_ring_atom, ring_size, nbp) else {
+            continue;
+        };
+        let c = mp.atoms[i].color;
+        if c != mp.atoms[o].color || c != mp.atoms[n].color || c != mp.atoms[x].color {
+            continue;
+        }
+        let sx: f32 = mp.atoms[x].x + mp.atoms[n].x;
+        let sy: f32 = mp.atoms[x].y + mp.atoms[n].y;
+        let (xref, yref) = (f64::from(sx) / 2.0, f64::from(sy) / 2.0);
+        for k in [i, o] {
+            mp.atoms[k].x = (xref - (f64::from(mp.atoms[k].x) - xref)) as f32;
+            mp.atoms[k].y = (yref - (f64::from(mp.atoms[k].y) - yref)) as f32;
+        }
+    }
+}
+
+/// `SproutRingSubstituents`: attaches the first atom of non-ring substituents to laid-out
+/// rings in a symmetrical way (only at ring atoms with exclusively non-ring attachments)
+pub fn sprout_ring_substituents(
+    mp: &mut Molecule,
+    is_ring_atom: &[i32],
+    ring_size: &[i32],
+    nbp: &[Neighbourhood],
+) {
+    if mp.bonds.is_empty() {
+        return;
+    }
+    for j in 0..mp.atoms.len() {
+        if is_ring_atom[j] == 0 {
+            continue;
+        }
+        let mut subst: Vec<usize> = Vec::new();
+        let mut n_rbonds = 0;
+        let mut problem = NONE;
+        let mut min_rsize = 100;
+        for i in 0..nbp[j].atoms.len() {
+            let bo = nbp[j].bonds[i];
+            if mp.bonds[bo].bond_type & RUBBER_BOND != 0 {
+                continue;
+            }
+            if ring_size[bo] != 0 {
+                if ring_size[bo] < min_rsize {
+                    min_rsize = ring_size[bo];
+                }
+                n_rbonds += 1;
+            } else {
+                let iatom = nbp[j].atoms[i];
+                if is_ring_atom[iatom] != 0 {
+                    problem = problem.max(NONE + 1);
+                } else {
+                    if count_color(mp, mp.atoms[iatom].color) != 1 {
+                        problem = problem.max(NONE + 2);
+                    }
+                    subst.push(iatom);
+                }
+            }
+        }
+        let n_subst = subst.len();
+        if n_subst == 0 || n_rbonds != 2 || problem != NONE {
+            continue;
+        }
+        let (edges, coords, numbers) = get_colored_graph(mp, mp.atoms[j].color);
+        let seed = numbers[j];
+        let p1 = coords[seed];
+        let mut p2 = [0.0f64; 2];
+        let flags = if min_rsize <= 8 { 0 } else { USE_INWARDS };
+        next_substituent_point(&mut p2, &coords, &edges, seed, flags);
+        let d = [p2[0] - p1[0], p2[1] - p1[1]];
+        let ns = n_subst as f64;
+        if n_subst > 1 {
+            for i in 1..n_subst {
+                for k in (0..i).rev() {
+                    if nbp[subst[k]].atoms.len() < nbp[subst[k + 1]].atoms.len() {
+                        subst.swap(k, k + 1);
+                    } else {
+                        break;
+                    }
+                }
+            }
+            let ang = (0.5 * PI / ns - PI / 2.0) * 80.0 / 90.0;
+            let (cosa, sina) = (ang.cos(), ang.sin());
+            let dp = [
+                cosa * d[0] - sina * d[1] + p1[0],
+                sina * d[0] + cosa * d[1] + p1[1],
+            ];
+            let mut c = [0.0f64; 2];
+            for co in &coords {
+                c[0] += co[0];
+                c[1] += co[1];
+            }
+            c[0] /= coords.len() as f64;
+            c[1] /= coords.len() as f64;
+            if (dp[0] - c[0]) * (dp[0] - c[0]) + (dp[1] - c[1]) * (dp[1] - c[1])
+                < (p2[0] - c[0]) * (p2[0] - c[0]) + (p2[1] - c[1]) * (p2[1] - c[1])
+            {
+                subst.swap(0, n_subst - 1);
+            }
+        }
+        let color = mp.atoms[j].color;
+        for (i, &sa) in subst.iter().enumerate() {
+            let ang = ((i as f64 + 0.5) * PI / ns - PI / 2.0) * 80.0 / 90.0;
+            let (cosa, sina) = (ang.cos(), ang.sin());
+            mp.atoms[sa].x = (cosa * d[0] - sina * d[1] + p1[0]) as f32;
+            mp.atoms[sa].y = (sina * d[0] + cosa * d[1] + p1[1]) as f32;
+            mp.atoms[sa].color = color;
+        }
+    }
+}
+
+/// the two-fragment move shared by `LinkRingFragments` and `LinkRemainingFragments`: the
+/// smaller fragment (colour `col1`, bond atom 0) is moved next to the reference fragment
+fn move_fragment(
+    mp: &mut Molecule,
+    bi: usize,
+    col1: i32,
+    col2: i32,
+    flags_ref: i32,
+    flags_move: i32,
+) {
+    let (a0, a1) = (
+        (mp.bonds[bi].atoms[0] - 1) as usize,
+        (mp.bonds[bi].atoms[1] - 1) as usize,
+    );
+    let (edges, coords, numbers) = get_colored_graph(mp, col2);
+    let seed = numbers[a1];
+    let p2p = coords[seed];
+    let mut p1p = [0.0f64; 2];
+    next_substituent_point(&mut p1p, &coords, &edges, seed, flags_ref);
+    let (edges, mut coords, numbers) = get_colored_graph(mp, col1);
+    let seed = numbers[a0];
+    let p1 = coords[seed];
+    let mut p2 = [0.0f64; 2];
+    next_substituent_point(&mut p2, &coords, &edges, seed, flags_move);
+    transform_points(&mut coords, p1, p2, p1p, p2p);
+    for i in 0..mp.atoms.len() {
+        if mp.atoms[i].color == col1 {
+            mp.atoms[i].x = coords[numbers[i]][0] as f32;
+            mp.atoms[i].y = coords[numbers[i]][1] as f32;
+        }
+    }
+}
+
+/// orders the bond so that the larger fragment comes second; returns (col1, col2)
+fn order_bond_by_fragment_size(mp: &mut Molecule, bi: usize) -> (i32, i32) {
+    let mut col1 = mp.atoms[(mp.bonds[bi].atoms[0] - 1) as usize].color;
+    let mut col2 = mp.atoms[(mp.bonds[bi].atoms[1] - 1) as usize].color;
+    if count_color(mp, col1) > count_color(mp, col2) {
+        mp.bonds[bi].atoms.swap(0, 1);
+        std::mem::swap(&mut col1, &mut col2);
+    }
+    (col1, col2)
+}
+
+/// `LinkRingFragments`: links directly connected ring fragments
+pub fn link_ring_fragments(mp: &mut Molecule, is_ring_atom: &[i32]) {
+    if mp.bonds.is_empty() {
+        return;
+    }
+    for j in 0..mp.bonds.len() {
+        let (a0, a1) = (
+            (mp.bonds[j].atoms[0] - 1) as usize,
+            (mp.bonds[j].atoms[1] - 1) as usize,
+        );
+        if mp.atoms[a0].color == mp.atoms[a1].color
+            || mp.bonds[j].bond_type & RUBBER_BOND != 0
+            || is_ring_atom[a0] == 0
+            || is_ring_atom[a1] == 0
+        {
+            continue;
+        }
+        let (col1, col2) = order_bond_by_fragment_size(mp, j);
+        move_fragment(mp, j, col1, col2, NO_RAY_CROSSING | USE_INWARDS, 0);
+        improve_bond_by_flip(mp, j, 0.01);
+        improve_bond_by_stretch(mp, j);
+        for a in &mut mp.atoms {
+            if a.color == col2 {
+                a.color = col1;
+            }
+        }
+    }
+}
+
+/// `LinkRemainingFragments`: links the fragments that are not laid out yet
+pub fn link_remaining_fragments(mp: &mut Molecule) {
+    if mp.bonds.is_empty() {
+        return;
+    }
+    for j in 0..mp.bonds.len() {
+        let (a0, a1) = (
+            (mp.bonds[j].atoms[0] - 1) as usize,
+            (mp.bonds[j].atoms[1] - 1) as usize,
+        );
+        if mp.atoms[a0].color != mp.atoms[a1].color
+            && mp.bonds[j].bond_type & RUBBER_BOND != 0
+            && (atom_symbol_match(&mp.atoms[a0].atom_symbol, "H,D,T")
+                || atom_symbol_match(&mp.atoms[a1].atom_symbol, "H,D,T"))
+        {
+            mp.bonds[j].bond_type &= !RUBBER_BOND;
+        }
+    }
+    for j in 0..mp.bonds.len() {
+        let (a0, a1) = (
+            (mp.bonds[j].atoms[0] - 1) as usize,
+            (mp.bonds[j].atoms[1] - 1) as usize,
+        );
+        if mp.atoms[a0].color == mp.atoms[a1].color || mp.bonds[j].bond_type & RUBBER_BOND != 0 {
+            continue;
+        }
+        let (col1, col2) = order_bond_by_fragment_size(mp, j);
+        let (b0, b1) = (
+            (mp.bonds[j].atoms[0] - 1) as usize,
+            (mp.bonds[j].atoms[1] - 1) as usize,
+        );
+        let h_flags = |sym: &str| {
+            if sym == "H" {
+                USE_INWARDS | H_GEOMETRY
+            } else {
+                USE_INWARDS
+            }
+        };
+        let flags_ref = h_flags(&mp.atoms[b1].atom_symbol);
+        let flags_move = h_flags(&mp.atoms[b0].atom_symbol);
+        move_fragment(mp, j, col1, col2, flags_ref, flags_move);
+        for a in &mut mp.atoms {
+            if a.color == col1 {
+                a.color = col2;
+            }
+        }
+    }
+}
+
+/// `BranchQuality`: how well atom `ai` is suited to be laid out next (-1: not at all)
+pub fn branch_quality(mp: &Molecule, ai: usize, nbp: &[Neighbourhood], used_atoms: &[i32]) -> i32 {
+    let mut nbranch = vec![0i32; nbp[ai].atoms.len()];
+    let mut already_layouted = 0;
+    let mut can_be_candidate = false;
+    let mut placed_neighbour = false;
+    for j in 0..nbp[ai].atoms.len() {
+        if mp.bonds[nbp[ai].bonds[j]].bond_type & RUBBER_BOND != 0 {
+            continue;
+        }
+        if mp.atoms[ai].color != mp.atoms[nbp[ai].atoms[j]].color {
+            can_be_candidate = true;
+        } else {
+            already_layouted += 1;
+        }
+        if used_atoms[nbp[ai].atoms[j]] != 0 {
+            placed_neighbour = true;
+        }
+        let nbph = &nbp[nbp[ai].atoms[j]];
+        nbranch[j] = nbph
+            .bonds
+            .iter()
+            .filter(|&&b| mp.bonds[b].bond_type & RUBBER_BOND == 0)
+            .count() as i32;
+    }
+    if !can_be_candidate || already_layouted > 1 {
+        return -1;
+    }
+    let (mut nsingle, mut nmore, mut ntotal) = (0, 0, 0);
+    for &nb in &nbranch {
+        if nb == 1 {
+            nsingle += 1;
+        } else if nb > 0 {
+            nmore += 1;
+        }
+        ntotal += nb;
+    }
+    if placed_neighbour {
+        1000 + nsingle * 100 + nmore * 10 + ntotal
+    } else {
+        nsingle * 100 + nmore * 10 + ntotal
+    }
+}
+
+/// `ColorSize`: the number of atoms with colour `col`
+pub fn color_size(mp: &Molecule, col: i32) -> usize {
+    count_color(mp, col)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1015,6 +1374,63 @@ mod tests {
             }
             if !base.atoms.is_empty() {
                 out += &graph_dump(&base);
+            }
+            if out != want {
+                bad.push(format!("{input}\nwant:\n{want}\ngot:\n{out}"));
+            }
+        }
+        assert!(bad.is_empty(), "{} differ; first:\n{}", bad.len(), bad[0]);
+    }
+
+    /// the third part of the layout must leave the same coordinates as the C code
+    #[test]
+    fn layout_part3_matches_c() {
+        let text = include_str!("../../../../../tests/data/avalon_layout3.jsonl");
+        let mut bad = Vec::new();
+        for line in text.lines() {
+            let v: serde_json::Value = serde_json::from_str(line).expect("json");
+            let input = v["input"].as_str().unwrap();
+            let want = v["output"].as_str().unwrap();
+            let mp = mol_str_to_mol(input).expect("molecule");
+            let mut base = seeded(7, &mp);
+            recolor_molecule(&mut base);
+            layout_rings(&mut base);
+            let nbp = setup_neighbourhood(&base).unwrap();
+            let (as_, bs) = ring_state(&base);
+            let mut out = dump("base", &base);
+            let rs: Vec<i32> = bs.iter().map(|&b| if b != 0 { 14 } else { 0 }).collect();
+
+            let mut c = base.clone();
+            layout_large_lactams(&mut c, &as_, &rs, &nbp);
+            out += &dump("lactam", &c);
+            flip_ring_carbonyls(&mut c, &as_, &rs, &nbp);
+            out += &dump("carbonyl", &c);
+            let mut c = base.clone();
+            flip_ring_carbonyls(&mut c, &as_, &rs, &nbp);
+            out += &dump("carbonyl0", &c);
+            let mut c = base.clone();
+            sprout_ring_substituents(&mut c, &as_, &bs, &nbp);
+            out += &dump("sprout", &c);
+            let mut c = base.clone();
+            link_ring_fragments(&mut c, &as_);
+            out += &dump("linkring", &c);
+            let mut c = base.clone();
+            link_remaining_fragments(&mut c);
+            out += &dump("linkrest", &c);
+            let mut c = base.clone();
+            sprout_ring_substituents(&mut c, &as_, &bs, &nbp);
+            link_ring_fragments(&mut c, &as_);
+            link_remaining_fragments(&mut c);
+            out += &dump("pipeline", &c);
+            let used: Vec<i32> = (0..base.atoms.len() as i32).map(|i| i % 2).collect();
+            let mut c = base.clone();
+            sprout_ring_substituents(&mut c, &as_, &bs, &nbp);
+            for i in 0..c.atoms.len() {
+                out += &format!(
+                    "bq{i}={} size={}\n",
+                    branch_quality(&c, i, &nbp, &used),
+                    color_size(&c, c.atoms[i].color)
+                );
             }
             if out != want {
                 bad.push(format!("{input}\nwant:\n{want}\ngot:\n{out}"));

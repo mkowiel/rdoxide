@@ -146,3 +146,7 @@ A4 (all fingerprint classes) and the first part of A7: `rdoxide.Avalon.pyAvalonT
 * L2 `layout.rs` (layout.c lines 736-1176): `GetColoredGraph`, `ColorStrain`, `ImproveBondByFlip`,
   `ImproveBondByStretch`, `ImproveMoleculeByBondFlip`, `ImproveSPAtoms`, `CountColor`; 94 molfiles identical to the C
   code (`tests/data/avalon_layout2.jsonl`). `ColorStrain` adds two single precision products to a double, as C does.
+* L3 `layout.rs` (layout.c lines 1177-1727): `LayoutLargeLactams`, `FlipRingCarbonyls`, `SproutRingSubstituents`,
+  `LinkRingFragments`, `LinkRemainingFragments`, `BranchQuality`, `ColorSize`; 126 molfiles identical to the C code
+  (`tests/data/avalon_layout3.jsonl`; the lactam functions are driven with a synthetic ring size array because
+  `RingState` only counts rings per bond).
