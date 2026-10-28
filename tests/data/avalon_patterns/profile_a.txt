@@ -1,0 +1,7 @@
+# a profile
+tm
+cc   # check collisions
+cl 3
+cn "999"
+cs
+

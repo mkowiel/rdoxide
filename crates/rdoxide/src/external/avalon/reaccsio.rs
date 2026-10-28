@@ -746,6 +746,43 @@ pub fn read_pattern_molecules(text: &str, max: usize) -> Vec<Molecule> {
     out
 }
 
+/// `SearchString`: advances to a line beginning with `string`; false at `stop_string` or the end of the data
+fn search_string(f: &mut Lines, string: &str, stop_string: &str) -> bool {
+    while f.status != Status::Eof && !f.begins(string) {
+        if f.begins(stop_string) {
+            return false;
+        }
+        f.get_buffer();
+    }
+    f.status != Status::Eof
+}
+
+/// the tautomer rules of an RD file (`-tt`): the source and target patterns of the `$RXN` records. As in C
+/// only the first rule is read; `None` if no rule could be read
+pub fn read_tautomer_rules(text: &str) -> Option<Vec<(Molecule, Molecule)>> {
+    let mut f = Lines::open(text);
+    let mut rules = Vec::new();
+    // the C loop over the `$RXN` records always ends after its first pass
+    'rule: {
+        if !search_string(&mut f, "$RXN", "##EOF##") || !search_string(&mut f, "$MOL", "##EOF##") {
+            break 'rule;
+        }
+        f.get_buffer();
+        let Ok(from) = read_molecule(&mut f) else {
+            break 'rule;
+        };
+        if !search_string(&mut f, "$MOL", "##EOF##") {
+            break 'rule;
+        }
+        f.get_buffer();
+        let Ok(to) = read_molecule(&mut f) else {
+            break 'rule;
+        };
+        rules.push((from, to));
+    }
+    (!rules.is_empty()).then_some(rules)
+}
+
 /// `MolStr2Mol`: `None` on an error
 pub fn mol_str_to_mol(mol_str: &str) -> Option<Molecule> {
     let mut f = Lines::open(mol_str);

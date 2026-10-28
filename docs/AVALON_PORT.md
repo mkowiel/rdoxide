@@ -277,3 +277,16 @@ operations; `ring_size` is read after `free` for the `either` bond fix (first fo
 case reaches it). The C code crashes when a later option set frees templates of an earlier one, so the corpus is built with
 one process per record. `tests/data/avalon_patclean.jsonl` (196 inputs x option sets, 12 template files in
 `tests/data/avalon_patterns/`, driver `sc.c`) is identical to the C code. Still open for struchk: `-tt`, `-f`.
+
+### A5e — struchk: tautomer rules (`-tt`) and option profiles (`-f`)
+
+`-tt <rd file>` reads the source and target pattern of a `$RXN` record (`read_tautomer_rules`; the C loop ends after the
+first rule, so only one rule is ever used) and `ApplyTautomer` rewrites bond orders, charges and radicals of the first
+match, at most three times per rule, after the fragment removal. Quirks kept: the bond and charge changes are driven by the
+atom mapping numbers of the *molecule* (the colours set from the pattern mapping are restored without being used), so a rule
+only changes molecules that carry atom maps, while the message "has been tautomerized with rule" is added for every match.
+`-f <profile>` makes the following options come from the file (`<option> [<parameter>] [<comment>]`, `#` comments, quoted
+parameters) before the rest of the command line, as `GetOption` does in the library path; an undefined option counts as an
+error. A profile option without its parameter and a missing rule file crash or exit the C code and are errors here.
+`tests/data/avalon_tautomer.jsonl` (84 inputs x option sets, rule and profile files in `tests/data/avalon_patterns/`,
+driver `sc.c`) is identical to the C code. All struchk options of the library are ported now.
