@@ -59,3 +59,10 @@ into `sketcherMinimizerMolecule`, runs `runGenerateCoordinates` and copies the c
   `tools/make_coordgen_model_corpus.py`). The CIP ranking (`CIPAtom`, `setCIPPriorities`), the chirality info and the
   residue classes follow with the stereo stage; ties in `clockwiseOrderedNeighbors` use the atom index where C++ compares
   pointers.
+* CG2 `external::coordgen::{fragment,fragmenter}`: `sketcherMinimizerFragment` data (no degrees of freedom yet) and
+  `CoordgenFragmenter` (rigid fragments, ring/bond information, fixed/constrained flags, main fragment by the eight-step
+  priority, long chains taking over the main fragment, parent/child tree with bond swaps, breadth first fragment order,
+  flip info). 108 molecules (ring systems with alkyl chains of the length around every threshold, macrocycles, fixed and
+  constrained atoms; the driver aborts on several unbonded atoms, so molecules are split into components as the sketcher
+  does) give identical fragment lists, trees and bond directions (`tests/data/coordgen_frag.txt`,
+  `tools/coordgen_drv/frag.cpp`, `tools/make_coordgen_frag_corpus.py`).
