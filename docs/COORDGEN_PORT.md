@@ -50,3 +50,12 @@ into `sketcherMinimizerMolecule`, runs `runGenerateCoordinates` and copies the c
   distance). 7998 calls with pseudo random input are bit-identical to the C++ header
   (`tests/data/coordgen_maths.txt`, driver `tools/coordgen_drv/maths.cpp`, built with `-ffp-contract=off`); the four
   functions using `acos`/`atan2` are compared to 2e-6 relative because the platform libm may differ in the last bit.
+* CG1b `external::coordgen::model`: the arena model (`Model` owning atoms, bonds, rings, molecules; objects refer to each
+  other by index) with atom (`findHsNumber`, `shareARing`, `canBeChiral`, `clockwiseOrderedNeighbors`, addition
+  vectors, `getSubmolecule`, `mirrorCoordinates`), bond (`isStereo`, `isInterFragment`, `flip`, ring tests), ring
+  (`isBenzene`, `isAromatic`, `contains`) and molecule (`forceUpdateStruct`, the SSSR ring search, bounding box)
+  methods. 68 molecules (hetero, fused, spiro, bridged, macrocycles, ions) give the same lists, ring bond/atom order,
+  flags, coordinates and flips as the C++ classes (`tests/data/coordgen_model.txt`, drivers `tools/coordgen_drv/`,
+  `tools/make_coordgen_model_corpus.py`). The CIP ranking (`CIPAtom`, `setCIPPriorities`), the chirality info and the
+  residue classes follow with the stereo stage; ties in `clockwiseOrderedNeighbors` use the atom index where C++ compares
+  pointers.

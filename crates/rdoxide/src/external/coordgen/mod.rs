@@ -2,3 +2,4 @@
 //! and `docs/COORDGEN_PORT.md`), the 2D coordinate generator RDKit uses for `rdCoordGen`.
 
 pub mod maths;
+pub mod model;
