@@ -1,7 +1,7 @@
 //! Port of the library entry points of Avalon Toolkit's `struchk.c` (`InitCheckMol`, `CheckMol`/`RunStruchk`)
 //! for the options RDKit's MolKey uses: `-ta`, `-ca`, `-cc`, `-cl`, `-cn`, `-cs`, `-tm`, `-da`, `-dg`, `-ds`,
-//! `-or`, `-l`, and the charge fixing `-tc`, `-tq`, `-tl`. Options that need the tautomer or pattern machinery
-//! (`-tt`, `-pc`, `-pr`, `-ps`, `-f`) are reported as errors by `init_check_mol`.
+//! `-or`, `-l`, the charge fixing `-tc`, `-tq`, `-tl`, the templates `-pc`, `-pr`, `-ps`, the tautomer rules `-tt` and
+//! option profiles `-f`.
 //!
 //! The state is global as in C (parameters, the message list, the collision limit).
 
@@ -17,8 +17,9 @@ use super::pattern::{
     AugmentedAtom, read_aa_pairs, read_augmented_atoms, transform_augmented_atoms,
 };
 use super::reaccs::{MAXATOMS, Molecule, NONE};
-use super::reaccsio::read_pattern_molecules;
+use super::reaccsio::{read_pattern_molecules, read_tautomer_rules};
 use super::scan::Scan;
+use super::ssmatch::ss_match;
 use super::stereo::{
     CONVERTED_TO_2D, ClashLimit, EITHER_BOND_FOUND, add_msg, atom_clash, check_stereo,
     dubious_stereochemistry, fix_dubious_3d_molecule, remove_dubious_stereochemistry,
@@ -80,6 +81,8 @@ struct State {
     patterns: Vec<Molecule>,
     rotate_patterns: Vec<Molecule>,
     stereo_patterns: Vec<Molecule>,
+    /// `-tt` rules (from, to)
+    tautomers: Vec<(Molecule, Molecule)>,
     log_file: Option<std::fs::File>,
     /// `SetCollisionLimit` is not undone by `ClearParameters`
     clash_limit: ClashLimit,
@@ -105,6 +108,7 @@ impl State {
             patterns: Vec::new(),
             rotate_patterns: Vec::new(),
             stereo_patterns: Vec::new(),
+            tautomers: Vec::new(),
             log_file: None,
             clash_limit: ClashLimit(0.15),
             msgs: Vec::new(),
@@ -284,24 +288,46 @@ fn initialize(args: &[String]) -> i32 {
     st.clear_parameters();
     let mut optind = if args[0].starts_with('-') { 0 } else { 1 };
     let mut errflg = 0;
-    while optind < args.len() {
-        let option = args[optind].get(1..).unwrap_or("").to_string();
-        optind += 1;
-        let Some(&(_, has_par)) = OPTIONS.iter().find(|(n, _)| *n == option) else {
-            eprintln!("Illegal option '{option}' with argument ''");
-            errflg += 1;
-            continue;
-        };
-        let mut optarg = String::new();
-        if has_par {
-            if optind >= args.len() {
+    // `-f <profile>`: the lines of the profile are read as options before the rest of the command line
+    let mut profile: std::collections::VecDeque<String> = std::collections::VecDeque::new();
+    loop {
+        let (option, optarg) = if let Some(line) = profile.pop_front() {
+            match profile_option(&line) {
+                ProfileLine::Skip => continue,
+                ProfileLine::Undefined(o) => {
+                    eprintln!("Illegal option '{o}' with argument ''");
+                    errflg += 1;
+                    continue;
+                }
+                ProfileLine::MissingParameter(o) => {
+                    eprintln!("Illegal option '{o}' with argument ''");
+                    errflg += 1;
+                    continue;
+                }
+                ProfileLine::Option(o, par) => (o, par),
+            }
+        } else if optind < args.len() {
+            let option = args[optind].get(1..).unwrap_or("").to_string();
+            optind += 1;
+            let Some(&(_, has_par)) = OPTIONS.iter().find(|(n, _)| *n == option) else {
                 eprintln!("Illegal option '{option}' with argument ''");
                 errflg += 1;
                 continue;
+            };
+            let mut optarg = String::new();
+            if has_par {
+                if optind >= args.len() {
+                    eprintln!("Illegal option '{option}' with argument ''");
+                    errflg += 1;
+                    continue;
+                }
+                optarg = args[optind].clone();
+                optind += 1;
             }
-            optarg = args[optind].clone();
-            optind += 1;
-        }
+            (option, optarg)
+        } else {
+            break;
+        };
         match option.as_str() {
             "or" => st.result_as_data = true,
             "l" => match std::fs::File::create(&optarg) {
@@ -344,6 +370,35 @@ fn initialize(args: &[String]) -> i32 {
             "da" => st.convert_atom_texts = true,
             "dg" => st.groups_to_sgroups = true,
             "ds" => st.convert_stext = true,
+            "f" => match std::fs::read(&optarg) {
+                Ok(b) => {
+                    profile = String::from_utf8_lossy(&b)
+                        .split_inclusive('\n')
+                        .map(str::to_string)
+                        .collect();
+                }
+                Err(_) => {
+                    eprintln!("LIBRARY: Could not open profile file '{optarg}'");
+                    errflg += 1;
+                }
+            },
+            "tt" => {
+                if let Some(text) = read_file(&optarg, "tautomer rule") {
+                    match read_tautomer_rules(&text) {
+                        Some(mut rules) => {
+                            for (from, to) in &mut rules {
+                                make_hydrogens_implicit(from);
+                                make_hydrogens_implicit(to);
+                            }
+                            st.tautomers = rules;
+                        }
+                        None => {
+                            eprintln!("LIBRARY: Format error in tautomer pattern file '{optarg}'");
+                            errflg += 1;
+                        }
+                    }
+                }
+            }
             "tc" => {
                 if let Some(text) = read_file(&optarg, "charge") {
                     if initialize_charge_data_tables(&text) {
@@ -393,6 +448,86 @@ fn initialize(args: &[String]) -> i32 {
         }
     }
     errflg
+}
+
+/// a line of an option profile
+enum ProfileLine {
+    Skip,
+    Undefined(String),
+    MissingParameter(String),
+    Option(String, String),
+}
+
+/// `GetOption` on a profile line: `<option> [<parameter>] [<comment>]`, parameters may be quoted
+fn profile_option(line: &str) -> ProfileLine {
+    let Some(first) = line.split_ascii_whitespace().next() else {
+        return ProfileLine::Skip;
+    };
+    let option: String = first.chars().take(19).collect();
+    if option.starts_with('#') {
+        return ProfileLine::Skip;
+    }
+    let Some(&(_, has_par)) = OPTIONS.iter().find(|(n, _)| *n == option) else {
+        return ProfileLine::Undefined(option);
+    };
+    if !has_par {
+        return ProfileLine::Option(option, String::new());
+    }
+    let Some(par) = line.split_ascii_whitespace().nth(1) else {
+        return ProfileLine::MissingParameter(option);
+    };
+    if par.starts_with('"') {
+        let rest = &line[line.find('"').map_or(line.len(), |p| p + 1)..];
+        let end = rest.find('"').unwrap_or(rest.len());
+        let value: String = rest[..end].chars().take(1023).collect();
+        // C searches for the quote after the option string
+        return ProfileLine::Option(option, value);
+    }
+    ProfileLine::Option(option, par.chars().take(1023).collect())
+}
+
+/// `ApplyTautomer`: applies the bond order and charge changes of a rule to the first match of its source pattern
+fn apply_tautomer(mp: &mut Molecule, from: &mut Molecule, to: &Molecule) -> bool {
+    if ss_match(mp, from, true).is_empty() {
+        return false;
+    }
+    // bonds between two mapped atoms take the bond order of the target bond with the same mapping pair
+    for bi in 0..mp.bonds.len() {
+        let map1 = mp.atoms[(mp.bonds[bi].atoms[0] - 1) as usize].mapping;
+        let map2 = mp.atoms[(mp.bonds[bi].atoms[1] - 1) as usize].mapping;
+        if map1 <= 0 || map2 <= 0 {
+            continue;
+        }
+        for bph in &to.bonds {
+            let tmap1 = to.atoms[(bph.atoms[0] - 1) as usize].mapping;
+            let tmap2 = to.atoms[(bph.atoms[1] - 1) as usize].mapping;
+            if tmap1 <= 0 || tmap2 <= 0 {
+                continue;
+            }
+            if (tmap1 == map1 && tmap2 == map2) || (tmap2 == map1 && tmap1 == map2) {
+                if mp.bonds[bi].bond_type == bph.bond_type {
+                    break;
+                }
+                mp.bonds[bi].bond_type = bph.bond_type;
+            }
+        }
+    }
+    for ap in &mut mp.atoms {
+        if ap.mapping == 0 {
+            continue;
+        }
+        for aph in &to.atoms {
+            if ap.mapping != aph.mapping {
+                continue;
+            }
+            if ap.charge == aph.charge && ap.radical == aph.radical {
+                break;
+            }
+            ap.charge = aph.charge;
+            ap.radical = aph.radical;
+        }
+    }
+    true
 }
 
 /// `InitCheckMol`: sets the options from `opt` (linefeed separated); returns the number of option errors
@@ -693,6 +828,22 @@ pub fn run_struchk(mp: &mut Molecule) -> i32 {
                 result |= FRAGMENTS_FOUND;
             }
         }
+        for (from, to) in &mut st.tautomers {
+            // at most 3 runs per rule
+            for _ in 0..3 {
+                if !apply_tautomer(mp, from, to) {
+                    break;
+                }
+                result |= TAUTOMER_TRANSFORMED;
+                add_msg(
+                    &mut st.msgs,
+                    format!(
+                        "{:>10}: has been tautomerized with rule '{}'",
+                        mp.name, from.name
+                    ),
+                );
+            }
+        }
         if stereo_result == EITHER_BOND_FOUND {
             result |= EITHER_WARNING;
             if let Some(f) = st.log_file.as_mut() {
@@ -789,6 +940,9 @@ mod tests {
     #[test]
     fn struchk_matches_c() {
         // one test: the checker state is global
+        check_corpus(include_str!(
+            "../../../../../tests/data/avalon_tautomer.jsonl"
+        ));
         check_corpus(include_str!(
             "../../../../../tests/data/avalon_patclean.jsonl"
         ));
