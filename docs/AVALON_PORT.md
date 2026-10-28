@@ -135,3 +135,7 @@ A4 (all fingerprint classes) and the first part of A7: `rdoxide.Avalon.pyAvalonT
 * A6b `smi2mol.rs`: `SMIToMOL` without layout (flags 0, `TRUE_DB_STEREO`, `EXPECT_SMARTS`; `DO_LAYOUT` returns an
   error until `layout.c` is ported): 1152 results (384 SMILES x 3 flag sets) identical to the C code
   (`tests/data/avalon_smi2mol.jsonl`).
+* A6c `geometry.rs`: all of `geometry.c` (`TransformPoints`, `PointSetMatchTransformation`, `NextGraphNeighbour`,
+  `HasCusp`, `PointsIntoRing`, `NextSubstituentPoint`, `TransformGraphSubstituent`), bit-identical to the C code on
+  2027 cases (`tests/data/avalon_geometry.jsonl`; the C driver must be built with `-ffp-contract=off`). C quirks are
+  kept. `CanSmiles` needs `LayoutMolecule` (`layout.c`, ~5400 lines), which comes next in slices.
