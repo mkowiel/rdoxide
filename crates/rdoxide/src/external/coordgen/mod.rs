@@ -5,5 +5,6 @@ pub mod fragment;
 pub mod fragmenter;
 pub mod maths;
 pub mod model;
+pub mod templates;
 #[cfg(test)]
 mod testutil;
