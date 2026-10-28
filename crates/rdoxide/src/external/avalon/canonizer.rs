@@ -1,8 +1,13 @@
 //! Port of Avalon Toolkit's `canonizer.c`: canonical atom numbering used for canonical SMILES.
 
-use super::perceive::{DOUBLE, Neighbourhood, ring_state, set_ring_size_flags};
+use super::graph::CRand;
+use super::pattern::{AugmentedAtom, string_to_augmented_atom, transform_augmented_atoms};
+use super::perceive::{DOUBLE, Neighbourhood, SINGLE, TRIPLE, ring_state, set_ring_size_flags};
 use super::reaccs::{CIS_TRANS_EITHER, CIS_TRANS_SWAPPED, Molecule, NONE, number_of};
-use super::utilities::{DOWN, UP, get_num_property};
+use super::utilities::{
+    DOWN, UP, atom_symbol_match, compute_implicit_h, flood_fill_fragments, get_num_property,
+    reset_colors, strip_molecule,
+};
 
 /// `TO_MONOMER` of `smi2mol.h`
 pub const TO_MONOMER: i32 = 0x1000;
@@ -433,6 +438,163 @@ pub fn canonical_numbering(mp: &mut Molecule, nbp: &mut [Neighbourhood], flags: 
     result
 }
 
+/// `ScrambleMolecule`: renumbers `mp` pseudo-randomly (for tests of order independence);
+/// `seed` is the C file-level `seed`, which is advanced on each call
+pub fn scramble_molecule(mp: &mut Molecule, seed: &mut u32) {
+    let mut rng = CRand::new(*seed);
+    *seed = seed.wrapping_mul(4).wrapping_add(3);
+    let n = mp.atoms.len();
+    let mut numbering: Vec<usize> = (0..n).collect();
+    for _ in 0..2 * n {
+        let i1 = (n as f64 * (f64::from(rng.next_value()) / 2147483647.0)) as usize;
+        let i2 = (n as f64 * (f64::from(rng.next_value()) / 2147483647.0)) as usize;
+        numbering.swap(i1, i2);
+        mp.atoms.swap(numbering[i1], numbering[i2]);
+    }
+    for b in &mut mp.bonds {
+        b.atoms[0] = numbering[(b.atoms[0] - 1) as usize] as i32 + 1;
+        b.atoms[1] = numbering[(b.atoms[1] - 1) as usize] as i32 + 1;
+    }
+}
+
+/// `SplitIonicBonds`: converts bonds between main group metals and hetero atoms to charge
+/// separated atoms; true if a bond was deleted
+pub fn split_ionic_bonds(mp: &mut Molecule) -> bool {
+    let mut deleted = false;
+    for i in 0..mp.bonds.len() {
+        if mp.bonds[i].bond_type != SINGLE {
+            continue;
+        }
+        let (ai1, ai2) = (
+            (mp.bonds[i].atoms[0] - 1) as usize,
+            (mp.bonds[i].atoms[1] - 1) as usize,
+        );
+        let (s1, s2) = (&mp.atoms[ai1].atom_symbol, &mp.atoms[ai2].atom_symbol);
+        if atom_symbol_match(s1, "alk,gr2") && atom_symbol_match(s2, "Q") {
+            mp.bonds[i].bond_type = -1;
+            mp.atoms[ai1].charge += 1;
+            mp.atoms[ai2].charge -= 1;
+            deleted = true;
+        } else if atom_symbol_match(s2, "alk,gr2") && atom_symbol_match(s1, "Q") {
+            mp.bonds[i].bond_type = -1;
+            mp.atoms[ai2].charge += 1;
+            mp.atoms[ai1].charge -= 1;
+            deleted = true;
+        }
+    }
+    if !deleted {
+        return false;
+    }
+    let good_atoms = vec![true; mp.atoms.len() + 1];
+    let good_bonds: Vec<bool> = mp.bonds.iter().map(|b| b.bond_type >= 0).collect();
+    strip_molecule(mp, &good_atoms, &good_bonds);
+    true
+}
+
+const TFM_STRINGS: [[&str; 2]; 3] = [
+    ["N(-C,N,O)(=C,N,O)(=O:1)", "N+1(-C,N,O)(=C,N,O)(-O-1)"],
+    ["N(=C,N,O)(#C,N:1)", "N+1(=C,N,O)(=C,N-1)"],
+    ["B(-A)(-A)(-A)(-A)", "B-1(-A)(-A)(-A)(-A)"],
+];
+
+/// `ForceOctet`: converts bipolar bonds to double bonds, neutralizes charged non-metals and
+/// applies the octet-rule transformations; `msgs` receives the transformation messages
+pub fn force_octet(mp: &mut Molecule, msgs: &mut Vec<String>) {
+    const ZERO_COUNT: i32 = 1;
+    let mut h_count = vec![0i32; mp.atoms.len() + 1];
+    compute_implicit_h(mp, &mut h_count);
+    for (i, ap) in mp.atoms.iter().enumerate() {
+        if ap.query_h_count != NONE {
+            h_count[i + 1] = ap.query_h_count - ZERO_COUNT;
+        }
+    }
+    for bi in 0..mp.bonds.len() {
+        let (mut ai1, mut ai2) = (
+            (mp.bonds[bi].atoms[0] - 1) as usize,
+            (mp.bonds[bi].atoms[1] - 1) as usize,
+        );
+        if mp.atoms[ai1].charge <= 0 && mp.atoms[ai2].charge <= 0 {
+            continue;
+        }
+        if mp.atoms[ai2].charge > 0 {
+            std::mem::swap(&mut ai1, &mut ai2);
+        }
+        if mp.atoms[ai2].charge < 0 {
+            match mp.bonds[bi].bond_type {
+                SINGLE => mp.bonds[bi].bond_type = DOUBLE,
+                DOUBLE => mp.bonds[bi].bond_type = TRIPLE,
+                _ => continue,
+            }
+            mp.atoms[ai1].charge -= 1;
+            mp.atoms[ai2].charge += 1;
+        } else if h_count[ai2 + 1] > 0 && atom_symbol_match(&mp.atoms[ai2].atom_symbol, "Q") {
+            mp.atoms[ai1].charge -= 1;
+            h_count[ai2 + 1] -= 1;
+            mp.bonds[bi].bond_type = DOUBLE;
+        }
+    }
+    for (i, ap) in mp.atoms.iter_mut().enumerate() {
+        if ap.charge == 0 || !atom_symbol_match(&ap.atom_symbol, "Q") {
+            continue;
+        }
+        if ap.charge < 0 {
+            if ap.query_h_count == NONE {
+                h_count[i + 1] -= ap.charge;
+                ap.charge = 0;
+            }
+        } else {
+            let mut tmp = ap.charge;
+            if h_count[i + 1] < ap.charge {
+                tmp = h_count[i + 1];
+            }
+            h_count[i + 1] -= tmp;
+            ap.charge -= tmp;
+        }
+        if ap.query_h_count != NONE {
+            ap.query_h_count = h_count[i + 1] + ZERO_COUNT;
+        }
+    }
+    let table: Vec<[AugmentedAtom; 2]> = TFM_STRINGS
+        .iter()
+        .map(|p| {
+            [
+                string_to_augmented_atom(p[0]).expect("rule"),
+                string_to_augmented_atom(p[1]).expect("rule"),
+            ]
+        })
+        .collect();
+    let _ = transform_augmented_atoms(mp, &table, msgs);
+}
+
+/// `RemoveInorganicFragments`: removes fully inorganic fragments if the molecule has carbon
+pub fn remove_inorganic_fragments(mp: &mut Molecule) {
+    reset_colors(mp);
+    let mut ncarbon = 0;
+    for a in &mut mp.atoms {
+        if a.atom_symbol == "C" {
+            ncarbon += 1;
+            a.color = 1;
+        }
+    }
+    if ncarbon > 0 {
+        flood_fill_fragments(mp);
+        let mut good_atoms = vec![false; mp.atoms.len() + 1];
+        for (i, a) in mp.atoms.iter().enumerate() {
+            good_atoms[i + 1] = a.color == 1;
+        }
+        let good_bonds: Vec<bool> = mp
+            .bonds
+            .iter()
+            .map(|b| {
+                mp.atoms[(b.atoms[0] - 1) as usize].color != NONE
+                    || mp.atoms[(b.atoms[1] - 1) as usize].color != NONE
+            })
+            .collect();
+        strip_molecule(mp, &good_atoms, &good_bonds);
+    }
+    reset_colors(mp);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -469,6 +631,90 @@ mod tests {
                 out += "\n";
                 out += &mol_to_mol_str(&c);
             }
+            n += 1;
+            if out != want {
+                bad.push(format!("{input}\nwant:\n{want}\ngot:\n{out}"));
+            }
+        }
+        assert!(
+            bad.is_empty(),
+            "{} of {n} differ; first:\n{}",
+            bad.len(),
+            bad[0]
+        );
+    }
+
+    fn show(tag: &str, c: &Molecule, msgs: &mut Vec<String>) -> String {
+        let mut out = format!("{tag} msgs:\n");
+        for m in msgs.drain(..) {
+            out += &m;
+            out += "\n";
+        }
+        out += &format!(
+            "{tag} name=[{}] init=[{}] prog=[{}] comment=[{}] nlists={} nprops={} chiral={}\n",
+            c.name,
+            c.user_initials,
+            c.program_name,
+            c.comment,
+            c.n_atom_lists,
+            c.n_props,
+            c.chiral_flag
+        );
+        for s in &c.symbol_lists {
+            out += &format!("SL {} {} {}\n", s.atom, s.string, s.logic);
+        }
+        for p in &c.prop_lines {
+            out += &format!("PL [{p}]\n");
+        }
+        out + &mol_to_mol_str(c)
+    }
+
+    /// the clean-up functions must leave the same molecule as the C code
+    #[test]
+    fn strip_functions_match_c() {
+        let text = include_str!("../../../../../tests/data/avalon_strip.jsonl");
+        let mut bad = Vec::new();
+        let mut n = 0;
+        for line in text.lines() {
+            let v: serde_json::Value = serde_json::from_str(line).expect("json");
+            let input = v["input"].as_str().unwrap();
+            let want = v["output"].as_str().unwrap();
+            let mp = mol_str_to_mol(input).expect("molecule");
+            let mut msgs = Vec::new();
+            let mut out = String::new();
+            let mut c = mp.clone();
+            out += &format!("split={}\n", i32::from(split_ionic_bonds(&mut c)));
+            out += &show("split", &c, &mut msgs);
+            let mut c = mp.clone();
+            force_octet(&mut c, &mut msgs);
+            out += &show("octet", &c, &mut msgs);
+            let mut c = mp.clone();
+            remove_inorganic_fragments(&mut c);
+            out += &show("inorg", &c, &mut msgs);
+            for (tag, k) in [("strip", 0), ("strip2", 1)] {
+                let mut c = mp.clone();
+                let mut ga = vec![false; c.atoms.len() + 1];
+                for i in 0..c.atoms.len() {
+                    ga[i + 1] = if k == 0 { i % 4 != 3 } else { i % 3 != 1 };
+                }
+                let gb: Vec<bool> = c
+                    .bonds
+                    .iter()
+                    .enumerate()
+                    .map(|(i, b)| {
+                        ga[b.atoms[0] as usize] && ga[b.atoms[1] as usize] && (k == 0 || i % 5 != 4)
+                    })
+                    .collect();
+                strip_molecule(&mut c, &ga, &gb);
+                out += &show(tag, &c, &mut msgs);
+            }
+            let mut seed = 5;
+            let mut c = mp.clone();
+            scramble_molecule(&mut c, &mut seed);
+            out += &show("scr1", &c, &mut msgs);
+            let mut c = mp.clone();
+            scramble_molecule(&mut c, &mut seed);
+            out += &show("scr2", &c, &mut msgs);
             n += 1;
             if out != want {
                 bad.push(format!("{input}\nwant:\n{want}\ngot:\n{out}"));
