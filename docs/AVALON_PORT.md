@@ -139,3 +139,7 @@ A4 (all fingerprint classes) and the first part of A7: `rdoxide.Avalon.pyAvalonT
   `HasCusp`, `PointsIntoRing`, `NextSubstituentPoint`, `TransformGraphSubstituent`), bit-identical to the C code on
   2027 cases (`tests/data/avalon_geometry.jsonl`; the C driver must be built with `-ffp-contract=off`). C quirks are
   kept. `CanSmiles` needs `LayoutMolecule` (`layout.c`, ~5400 lines), which comes next in slices.
+* L1 `layout.rs` (layout.c lines 74-735): `RandomCoordinates`, `RecolorMolecule`, `FloodColor`/`FloodClearColor`,
+  `MakeBondTrans`, `InvertFragmentColor`, ring node table, `LayoutRingSegment`, `LayoutRings`,
+  `HideMetalComplexProblems`, `MergeConnectedFragmentColors` (keeps the `if (color = col2)` typo); 72 molfiles
+  identical to the C code including the single precision steps (`tests/data/avalon_layout1.jsonl`).

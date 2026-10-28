@@ -8,6 +8,7 @@ pub mod denormal;
 pub mod fingerprint;
 pub mod geometry;
 pub mod graph;
+pub mod layout;
 pub mod pattern;
 pub mod perceive;
 pub mod reaccs;
