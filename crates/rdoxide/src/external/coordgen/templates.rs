@@ -287,9 +287,8 @@ impl Model {
         if mol_iter != templ_iter {
             return None;
         }
-        // filled by the double bond stereo check once the CIP ranking exists
-        let mol_cis_trans_chains: Vec<Vec<usize>> = Vec::new();
-        let mol_is_cis: Vec<bool> = Vec::new();
+        let mut mol_cis_trans_chains: Vec<Vec<usize>> = Vec::new();
+        let mut mol_is_cis: Vec<bool> = Vec::new();
         for &bond in bonds {
             let b = &self.bonds[bond];
             if b.bond_order != 2 || b.ignore_ze {
@@ -312,11 +311,26 @@ impl Model {
             };
             let start_n = find_n(b.start_atom, b.end_atom);
             let end_n = find_n(b.end_atom, b.start_atom);
-            if start_n.is_some() && end_n.is_some() {
-                // needs the CIP priorities (`startAtomCIPFirstNeighbor`), which are ported with the stereo stage
-                unimplemented!(
-                    "double bonds in macrocycles of a template ring system need the CIP ranking"
-                );
+            let start_a = self.bond_start_atom_cip_first_neighbor(bond);
+            let end_a = self.bond_end_atom_cip_first_neighbor(bond);
+            if let (Some(start_n), Some(end_n), Some(start_a), Some(end_a)) =
+                (start_n, end_n, start_a, end_a)
+            {
+                let mut is_cis = b.is_z;
+                if start_n != start_a {
+                    is_cis = !is_cis;
+                }
+                if end_n != end_a {
+                    is_cis = !is_cis;
+                }
+                let n = |a: AtomId| self.atoms[a].general_use_n as usize;
+                mol_cis_trans_chains.push(vec![
+                    n(start_n),
+                    n(b.start_atom),
+                    n(b.end_atom),
+                    n(end_n),
+                ]);
+                mol_is_cis.push(is_cis);
             }
         }
         let mut mol_bonds: Vec<Vec<usize>> = vec![Vec::new(); size];

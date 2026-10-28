@@ -1,0 +1,3210 @@
+MOL 6 5
+A 6 0 42960000 4281e760
+A 6 0 42160000 2881e760
+A 7 0 42960000 c281e760
+A 6 0 c2160000 a7db9d81
+A 8 0 c2960000 4281e760
+A 8 0 c2960000 c281e760
+B 1 0 1 2
+B 1 2 1 0
+B 1 3 1 0
+B 3 4 2 0
+B 3 5 1 0
+END
+p 1 0 1 2
+p 1 0 2 3
+p 1 1 2 2
+p 3 0 1 4
+p 3 0 2 5
+p 3 1 2 4
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 1 stereogenic 1 ring 0 inv 0 rs 2 0 1 3
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 0 stereogenic 0 ring 0 inv 0 rs
+r 5 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 1 ring 0
+w 2 set 0 ring 0
+w 3 set 0 ring 0
+w 4 set 0 ring 0
+w 5 set 0 ring 0
+b 0 disp 0 wedge 0 rev 0 first -1 -1
+b 1 disp 1 wedge 0 rev 0 first -1 -1
+b 2 disp 0 wedge 0 rev 0 first -1 -1
+b 3 disp 0 wedge 0 rev 0 first 5 -1
+b 4 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 6 5
+A 6 0 42960000 4281e760
+A 6 0 42160000 2881e760
+A 7 0 42960000 c281e760
+A 6 0 c2160000 a7db9d81
+A 8 0 c2960000 4281e760
+A 8 0 c2960000 c281e760
+B 1 0 1 1
+B 1 2 1 0
+B 1 3 1 0
+B 3 4 2 0
+B 3 5 1 0
+END
+p 1 0 1 2
+p 1 0 2 3
+p 1 1 2 2
+p 3 0 1 4
+p 3 0 2 5
+p 3 1 2 4
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 -1 stereogenic 1 ring 0 inv 0 rs 2 0 1 3
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 0 stereogenic 0 ring 0 inv 0 rs
+r 5 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 1 ring 0
+w 2 set 0 ring 0
+w 3 set 0 ring 0
+w 4 set 0 ring 0
+w 5 set 0 ring 0
+b 0 disp 0 wedge 1 rev 0 first -1 -1
+b 1 disp 1 wedge 0 rev 0 first -1 -1
+b 2 disp 0 wedge 0 rev 0 first -1 -1
+b 3 disp 0 wedge 0 rev 0 first 5 -1
+b 4 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 12 12
+A 7 0 c277d28d 42a80c01
+A 6 0 c2a1d7ef 413760e3
+A 6 0 c1dc8322 c224fb07
+A 6 0 42330a0f c1ab1cfb
+A 6 0 42c43c2f c29430de
+A 6 0 432a70ff c258f534
+A 6 0 433d6854 4192952a
+A 6 0 43080cc0 428e0eea
+A 6 0 427ee761 424cb14b
+A 6 0 c3193ee0 c1065142
+A 8 0 c32c3634 c2a1ea0d
+A 8 0 c34e9a73 42313eef
+B 1 0 1 1
+B 1 2 1 0
+B 2 3 1 0
+B 3 4 2 0
+B 4 5 1 0
+B 5 6 2 0
+B 6 7 1 0
+B 7 8 2 0
+B 1 9 1 0
+B 9 10 2 0
+B 9 11 1 0
+B 8 3 1 0
+END
+p 1 0 1 0
+p 1 0 2 0
+p 1 1 2 9
+p 2 0 1 1
+p 3 0 1 4
+p 3 0 2 8
+p 3 1 2 -1
+p 4 0 1 3
+p 5 0 1 4
+p 6 0 1 -1
+p 7 0 1 8
+p 8 0 1 3
+p 9 0 1 10
+p 9 0 2 11
+p 9 1 2 10
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 1 stereogenic 1 ring 0 inv 1 rs 0 2 1 3
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 0 stereogenic 0 ring 0 inv 0 rs
+r 5 0 stereogenic 0 ring 0 inv 0 rs
+r 6 0 stereogenic 0 ring 0 inv 0 rs
+r 7 0 stereogenic 0 ring 0 inv 0 rs
+r 8 0 stereogenic 0 ring 0 inv 0 rs
+r 9 0 stereogenic 0 ring 0 inv 0 rs
+r 10 0 stereogenic 0 ring 0 inv 0 rs
+r 11 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 1 ring 0
+w 2 set 0 ring 0
+w 3 set 0 ring 0
+w 4 set 0 ring 0
+w 5 set 0 ring 0
+w 6 set 0 ring 0
+w 7 set 0 ring 0
+w 8 set 0 ring 0
+w 9 set 0 ring 0
+w 10 set 0 ring 0
+w 11 set 0 ring 0
+b 0 disp 1 wedge 1 rev 0 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first -1 -1
+b 2 disp 0 wedge 0 rev 0 first -1 -1
+b 3 disp 0 wedge 0 rev 0 first 8 5
+b 4 disp 0 wedge 0 rev 0 first -1 -1
+b 5 disp 0 wedge 0 rev 0 first 4 7
+b 6 disp 0 wedge 0 rev 0 first -1 -1
+b 7 disp 0 wedge 0 rev 0 first 6 3
+b 8 disp 0 wedge 0 rev 0 first -1 -1
+b 9 disp 0 wedge 0 rev 0 first 11 -1
+b 10 disp 0 wedge 0 rev 0 first -1 -1
+b 11 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 10 9
+A 8 0 c342db10 40f00000
+A 6 0 c301e760 c1f00000
+A 6 0 c281e760 40f00000
+A 8 0 c281e760 42a50000
+A 6 0 00000000 c1f00000
+A 8 0 00000000 c2d20000
+A 6 0 4281e760 40f00000
+A 8 0 4281e760 42a50000
+A 6 0 4301e760 c1f00000
+A 8 0 4342db10 40f00000
+B 0 1 1 0
+B 1 2 1 0
+B 2 3 1 2
+B 2 4 1 0
+B 4 5 1 2
+B 4 6 1 0
+B 6 7 1 2
+B 6 8 1 0
+B 8 9 1 0
+END
+p 1 0 1 0
+p 2 0 1 3
+p 2 0 2 4
+p 2 1 2 3
+p 4 0 1 5
+p 4 0 2 -1
+p 4 1 2 5
+p 6 0 1 7
+p 6 0 2 4
+p 6 1 2 7
+p 8 0 1 9
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 0 stereogenic 0 ring 0 inv 0 rs
+r 2 1 stereogenic 1 ring 0 inv 0 rs 2 0 1 3
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 0 stereogenic 0 ring 0 inv 1 rs 2 0 2 3
+r 5 0 stereogenic 0 ring 0 inv 0 rs
+r 6 -1 stereogenic 1 ring 0 inv 1 rs 1 0 2 3
+r 7 0 stereogenic 0 ring 0 inv 0 rs
+r 8 0 stereogenic 0 ring 0 inv 0 rs
+r 9 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 0 ring 0
+w 2 set 1 ring 0
+w 3 set 0 ring 0
+w 4 set 1 ring 0
+w 5 set 0 ring 0
+w 6 set 1 ring 0
+w 7 set 0 ring 0
+w 8 set 0 ring 0
+w 9 set 0 ring 0
+b 0 disp 0 wedge 0 rev 0 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first -1 -1
+b 2 disp 1 wedge 1 rev 0 first -1 -1
+b 3 disp 0 wedge 0 rev 0 first -1 -1
+b 4 disp 0 wedge 0 rev 0 first -1 -1
+b 5 disp 0 wedge 0 rev 0 first -1 -1
+b 6 disp 1 wedge 0 rev 0 first -1 -1
+b 7 disp 0 wedge 0 rev 0 first -1 -1
+b 8 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 5 4
+A 9 0 42960000 a7200000
+A 6 0 27045e1e a7200000
+A 17 0 c2960000 27faeb4c
+A 35 0 27e7a4b5 42960000
+A 53 0 a85718f2 c2960000
+B 1 0 1 2
+B 1 2 1 0
+B 1 3 1 0
+B 1 4 1 0
+END
+p 1 0 1 2
+p 1 0 2 3
+p 1 0 3 4
+p 1 1 2 3
+p 1 1 3 4
+p 1 2 3 4
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 1 stereogenic 1 ring 0 inv 0 rs 3 2 1 0
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 1 ring 0
+w 2 set 0 ring 0
+w 3 set 0 ring 0
+w 4 set 0 ring 0
+b 0 disp 1 wedge 0 rev 0 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first -1 -1
+b 2 disp 1 wedge 1 rev 0 first -1 -1
+b 3 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 6 5
+A 6 0 42960000 4281e760
+A 6 0 42160000 2851cec0
+A 9 0 42960000 c281e760
+A 6 0 c2160000 a7db9d81
+A 17 0 c2960000 c281e760
+A 35 0 c2960000 4281e760
+B 1 0 1 2
+B 1 2 1 0
+B 1 3 1 0
+B 3 4 1 1
+B 3 5 1 0
+END
+p 1 0 1 2
+p 1 0 2 3
+p 1 1 2 2
+p 3 0 1 4
+p 3 0 2 5
+p 3 1 2 5
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 1 stereogenic 1 ring 0 inv 0 rs 2 0 1 3
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 1 stereogenic 1 ring 0 inv 1 rs 2 1 0 3
+r 4 0 stereogenic 0 ring 0 inv 0 rs
+r 5 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 1 ring 0
+w 2 set 0 ring 0
+w 3 set 1 ring 0
+w 4 set 0 ring 0
+w 5 set 0 ring 0
+b 0 disp 0 wedge 0 rev 0 first -1 -1
+b 1 disp 1 wedge 0 rev 0 first -1 -1
+b 2 disp 0 wedge 0 rev 0 first -1 -1
+b 3 disp 0 wedge 1 rev 0 first -1 -1
+b 4 disp 1 wedge 1 rev 0 first -1 -1
+$$
+MOL 5 4
+A 6 0 c2b5dd87 c2160000
+A 16 0 c1cfd89a 27c80000
+A 8 0 c1cfd89a 42960000
+A 6 0 421be273 c2160000
+A 6 0 42cfd89a a8960000
+B 1 0 1 2
+B 1 2 2 0
+B 1 3 1 0
+B 3 4 1 0
+END
+p 1 0 1 2
+p 1 0 2 3
+p 1 1 2 2
+p 3 0 1 1
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 1 stereogenic 1 ring 0 inv 0 rs 2 0 1 3
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 1 ring 0
+w 2 set 0 ring 0
+w 3 set 0 ring 0
+w 4 set 0 ring 0
+b 0 disp 1 wedge 0 rev 0 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first 3 -1
+b 2 disp 0 wedge 0 rev 0 first -1 -1
+b 3 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 11 10
+A 6 0 c240eb0a 42e363b5
+A 7 1 c2096865 421ff597
+A 6 0 c1a3cb80 c206dc3b
+A 6 0 42492dd1 c26a325d
+A 6 0 c2d81d1c 41d0e5e4
+A 6 0 c304e416 c232a09f
+A 6 0 c34e988b c26a2344
+A 6 0 421d696d 4257783c
+A 6 0 42b0728f c0418b06
+A 6 0 4321edbc 412da7d2
+A 6 0 4352cca8 c23826f8
+B 1 0 1 2
+B 1 2 1 0
+B 2 3 1 0
+B 1 4 1 0
+B 4 5 1 0
+B 5 6 1 0
+B 1 7 1 0
+B 7 8 1 0
+B 8 9 1 0
+B 9 10 1 0
+END
+p 1 0 1 2
+p 1 0 2 4
+p 1 0 3 7
+p 1 1 2 4
+p 1 1 3 7
+p 1 2 3 7
+p 2 0 1 1
+p 4 0 1 1
+p 5 0 1 4
+p 7 0 1 1
+p 8 0 1 7
+p 9 0 1 8
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 1 stereogenic 1 ring 0 inv 0 rs 3 2 1 0
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 0 stereogenic 0 ring 0 inv 0 rs
+r 5 0 stereogenic 0 ring 0 inv 0 rs
+r 6 0 stereogenic 0 ring 0 inv 0 rs
+r 7 0 stereogenic 0 ring 0 inv 0 rs
+r 8 0 stereogenic 0 ring 0 inv 0 rs
+r 9 0 stereogenic 0 ring 0 inv 0 rs
+r 10 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 1 ring 0
+w 2 set 0 ring 0
+w 3 set 0 ring 0
+w 4 set 0 ring 0
+w 5 set 0 ring 0
+w 6 set 0 ring 0
+w 7 set 0 ring 0
+w 8 set 0 ring 0
+w 9 set 0 ring 0
+w 10 set 0 ring 0
+b 0 disp 1 wedge 0 rev 0 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first -1 -1
+b 2 disp 0 wedge 0 rev 0 first -1 -1
+b 3 disp 0 wedge 0 rev 0 first -1 -1
+b 4 disp 0 wedge 0 rev 0 first -1 -1
+b 5 disp 0 wedge 0 rev 0 first -1 -1
+b 6 disp 1 wedge 1 rev 0 first -1 -1
+b 7 disp 0 wedge 0 rev 0 first -1 -1
+b 8 disp 0 wedge 0 rev 0 first -1 -1
+b 9 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 8 7
+A 6 0 c301e760 41e10000
+A 6 0 c281e760 c1160000
+A 6 0 c281e760 c2a8c000
+A 6 0 a7c56d88 41e10000
+A 7 0 a95ba789 42ce4000
+A 6 0 4281e760 c1160000
+A 6 0 4301e760 41e10000
+A 6 0 4281e760 c2a8c000
+B 0 1 1 0
+B 1 2 1 0
+B 1 3 1 0
+B 3 4 1 0
+B 3 5 1 0
+B 5 6 1 0
+B 5 7 1 0
+END
+p 1 0 1 -1
+p 1 0 2 3
+p 1 1 2 3
+p 3 0 1 4
+p 3 0 2 -1
+p 3 1 2 4
+p 5 0 1 3
+p 5 0 2 3
+p 5 1 2 -1
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 0 stereogenic 0 ring 0 inv 0 rs 2 2 0 3
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 1 rs 2 0 2 3
+r 4 0 stereogenic 0 ring 0 inv 0 rs
+r 5 0 stereogenic 0 ring 0 inv 0 rs 0 2 2 3
+r 6 0 stereogenic 0 ring 0 inv 0 rs
+r 7 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 1 ring 0
+w 2 set 0 ring 0
+w 3 set 1 ring 0
+w 4 set 0 ring 0
+w 5 set 1 ring 0
+w 6 set 0 ring 0
+w 7 set 0 ring 0
+b 0 disp 0 wedge 0 rev 0 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first -1 -1
+b 2 disp 0 wedge 0 rev 0 first -1 -1
+b 3 disp 0 wedge 0 rev 0 first -1 -1
+b 4 disp 0 wedge 0 rev 0 first -1 -1
+b 5 disp 0 wedge 0 rev 0 first -1 -1
+b 6 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 8 8
+A 6 0 43160000 28160000
+A 6 0 42960000 a7480000
+A 6 0 42160000 4281e760
+A 6 0 c2160000 4281e760
+A 6 0 c2960000 27e6eb4c
+A 6 0 c3160000 28af0000
+A 6 0 c2160000 c281e760
+A 6 0 42160000 c281e760
+B 1 0 1 2
+B 1 2 1 0
+B 2 3 1 0
+B 3 4 1 0
+B 4 5 1 2
+B 4 6 1 0
+B 6 7 1 0
+B 7 1 1 0
+END
+p 1 0 1 2
+p 1 0 2 7
+p 1 1 2 -1
+p 2 0 1 1
+p 3 0 1 4
+p 4 0 1 3
+p 4 0 2 -1
+p 4 1 2 6
+p 6 0 1 4
+p 7 0 1 1
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 1 stereogenic 1 ring 1 inv 1 rs 2 1 0 3
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 -1 stereogenic 1 ring 1 inv 0 rs 1 2 0 3
+r 5 0 stereogenic 0 ring 0 inv 0 rs
+r 6 0 stereogenic 0 ring 0 inv 0 rs
+r 7 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 1 ring 1
+w 2 set 0 ring 0
+w 3 set 0 ring 0
+w 4 set 1 ring 1
+w 5 set 0 ring 0
+w 6 set 0 ring 0
+w 7 set 0 ring 0
+b 0 disp 1 wedge 0 rev 0 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first -1 -1
+b 2 disp 0 wedge 0 rev 0 first -1 -1
+b 3 disp 0 wedge 0 rev 0 first -1 -1
+b 4 disp 1 wedge 0 rev 0 first -1 -1
+b 5 disp 0 wedge 0 rev 0 first -1 -1
+b 6 disp 0 wedge 0 rev 0 first -1 -1
+b 7 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 8 8
+A 6 0 43160000 28160000
+A 6 0 42960000 a7480000
+A 6 0 42160000 4281e760
+A 6 0 c2160000 4281e760
+A 6 0 c2960000 27e6eb4c
+A 6 0 c3160000 28af0000
+A 6 0 c2160000 c281e760
+A 6 0 42160000 c281e760
+B 1 0 1 2
+B 1 2 1 0
+B 2 3 1 0
+B 3 4 1 0
+B 4 5 1 1
+B 4 6 1 0
+B 6 7 1 0
+B 7 1 1 0
+END
+p 1 0 1 2
+p 1 0 2 7
+p 1 1 2 -1
+p 2 0 1 1
+p 3 0 1 4
+p 4 0 1 3
+p 4 0 2 -1
+p 4 1 2 6
+p 6 0 1 4
+p 7 0 1 1
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 1 stereogenic 1 ring 1 inv 1 rs 2 1 0 3
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 1 stereogenic 1 ring 1 inv 0 rs 1 2 0 3
+r 5 0 stereogenic 0 ring 0 inv 0 rs
+r 6 0 stereogenic 0 ring 0 inv 0 rs
+r 7 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 1 ring 1
+w 2 set 0 ring 0
+w 3 set 0 ring 0
+w 4 set 1 ring 1
+w 5 set 0 ring 0
+w 6 set 0 ring 0
+w 7 set 0 ring 0
+b 0 disp 1 wedge 0 rev 0 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first -1 -1
+b 2 disp 0 wedge 0 rev 0 first -1 -1
+b 3 disp 0 wedge 0 rev 0 first -1 -1
+b 4 disp 1 wedge 0 rev 0 first -1 -1
+b 5 disp 0 wedge 0 rev 0 first -1 -1
+b 6 disp 0 wedge 0 rev 0 first -1 -1
+b 7 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 8 8
+A 6 0 4301e760 c2610000
+A 6 0 4281e760 c1960000
+A 6 0 4281e760 42610000
+A 6 0 a7a9adff 42bb8000
+A 6 0 c281e760 42610000
+A 6 0 c281e760 c1960000
+A 6 0 c301e760 c2610000
+A 6 0 a90090d0 c2610000
+B 1 0 1 1
+B 1 2 1 0
+B 2 3 1 0
+B 3 4 1 0
+B 4 5 1 0
+B 5 6 1 1
+B 5 7 1 0
+B 7 1 1 0
+END
+p 1 0 1 2
+p 1 0 2 7
+p 1 1 2 7
+p 2 0 1 1
+p 3 0 1 -1
+p 4 0 1 5
+p 5 0 1 4
+p 5 0 2 7
+p 5 1 2 7
+p 7 0 1 -1
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 -1 stereogenic 1 ring 0 inv 1 rs 2 1 0 3
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 0 stereogenic 0 ring 0 inv 0 rs
+r 5 1 stereogenic 1 ring 0 inv 0 rs 1 2 0 3
+r 6 0 stereogenic 0 ring 0 inv 0 rs
+r 7 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 1 ring 0
+w 2 set 0 ring 0
+w 3 set 0 ring 0
+w 4 set 0 ring 0
+w 5 set 1 ring 0
+w 6 set 0 ring 0
+w 7 set 0 ring 0
+b 0 disp 1 wedge 0 rev 0 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first -1 -1
+b 2 disp 0 wedge 0 rev 0 first -1 -1
+b 3 disp 0 wedge 0 rev 0 first -1 -1
+b 4 disp 0 wedge 0 rev 0 first -1 -1
+b 5 disp 1 wedge 1 rev 0 first -1 -1
+b 6 disp 0 wedge 0 rev 0 first -1 -1
+b 7 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 6 6
+A 6 0 43000873 27055555
+A 6 0 425421cd a7855555
+A 6 0 27af7f12 425421cd
+A 6 0 c25421cd 274952db
+A 6 0 c3000873 28055555
+A 6 0 a8123f3a c25421cd
+B 1 0 1 2
+B 1 2 1 0
+B 2 3 1 0
+B 3 4 1 2
+B 3 5 1 0
+B 5 1 1 0
+END
+p 1 0 1 2
+p 1 0 2 5
+p 1 1 2 -1
+p 2 0 1 -1
+p 3 0 1 2
+p 3 0 2 -1
+p 3 1 2 5
+p 5 0 1 -1
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 1 stereogenic 1 ring 1 inv 1 rs 2 1 0 3
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 -1 stereogenic 1 ring 1 inv 0 rs 1 2 0 3
+r 4 0 stereogenic 0 ring 0 inv 0 rs
+r 5 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 1 ring 1
+w 2 set 0 ring 0
+w 3 set 1 ring 1
+w 4 set 0 ring 0
+w 5 set 0 ring 0
+b 0 disp 1 wedge 0 rev 0 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first -1 -1
+b 2 disp 0 wedge 0 rev 0 first -1 -1
+b 3 disp 1 wedge 1 rev 0 first -1 -1
+b 4 disp 0 wedge 0 rev 0 first -1 -1
+b 5 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 7 8
+A 6 0 429b40fe c2160000
+A 6 0 429b40fe 42160000
+A 6 0 40c986c0 4272b481
+A 6 0 c2821026 42160000
+A 6 0 c2821026 c2160000
+A 6 0 40c986c0 c272b481
+A 6 0 c2172510 26a41929
+B 0 1 1 0
+B 2 1 1 2
+B 2 3 1 0
+B 3 4 1 0
+B 5 4 1 2
+B 5 6 1 0
+B 5 0 1 0
+B 6 2 1 0
+END
+p 0 0 1 5
+p 1 0 1 2
+p 2 0 1 -1
+p 2 0 2 6
+p 2 1 2 6
+p 3 0 1 2
+p 4 0 1 5
+p 5 0 1 6
+p 5 0 2 -1
+p 5 1 2 6
+p 6 0 1 -1
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 0 stereogenic 0 ring 0 inv 0 rs
+r 2 0 stereogenic 0 ring 0 inv 0 rs 2 2 0 3
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 0 stereogenic 0 ring 0 inv 0 rs
+r 5 0 stereogenic 0 ring 0 inv 1 rs 2 0 2 3
+r 6 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 0 ring 0
+w 2 set 1 ring 0
+w 3 set 0 ring 0
+w 4 set 0 ring 0
+w 5 set 1 ring 0
+w 6 set 0 ring 0
+b 0 disp 0 wedge 0 rev 0 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first -1 -1
+b 2 disp 0 wedge 0 rev 0 first -1 -1
+b 3 disp 0 wedge 0 rev 0 first -1 -1
+b 4 disp 0 wedge 0 rev 0 first -1 -1
+b 5 disp 0 wedge 0 rev 0 first -1 -1
+b 6 disp 0 wedge 0 rev 0 first -1 -1
+b 7 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 6 5
+A 6 0 42960000 4281e760
+A 6 0 42160000 2851cec0
+A 8 0 42960000 c281e760
+A 6 0 c2160000 a7db9d81
+A 6 0 c2960000 c281e760
+A 8 0 c2960000 4281e760
+B 1 0 1 2
+B 1 2 1 0
+B 1 3 1 0
+B 3 4 1 2
+B 3 5 1 0
+END
+p 1 0 1 2
+p 1 0 2 3
+p 1 1 2 2
+p 3 0 1 1
+p 3 0 2 5
+p 3 1 2 5
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 1 stereogenic 1 ring 0 inv 0 rs 2 0 1 3
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 1 stereogenic 1 ring 0 inv 0 rs 1 2 0 3
+r 4 0 stereogenic 0 ring 0 inv 0 rs
+r 5 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 1 ring 0
+w 2 set 0 ring 0
+w 3 set 1 ring 0
+w 4 set 0 ring 0
+w 5 set 0 ring 0
+b 0 disp 0 wedge 0 rev 0 first -1 -1
+b 1 disp 1 wedge 0 rev 0 first -1 -1
+b 2 disp 0 wedge 0 rev 0 first -1 -1
+b 3 disp 0 wedge 0 rev 0 first -1 -1
+b 4 disp 1 wedge 0 rev 0 first -1 -1
+$$
+MOL 12 12
+A 8 0 43160000 28a6aaab
+A 6 0 42960000 28055555
+A 6 0 42160000 4281e760
+A 8 0 42960000 4301e760
+A 6 0 c2160000 4281e760
+A 8 0 c2960000 4301e760
+A 6 0 c2960000 2895657e
+A 8 0 c3160000 29055555
+A 6 0 c2160000 c281e760
+A 8 0 c2960000 c301e760
+A 6 0 42160000 c281e760
+A 8 0 42960000 c301e760
+B 1 0 1 2
+B 1 2 1 0
+B 2 3 1 1
+B 2 4 1 0
+B 4 5 1 2
+B 4 6 1 0
+B 6 7 1 1
+B 6 8 1 0
+B 8 9 1 2
+B 8 10 1 0
+B 10 11 1 1
+B 10 1 1 0
+END
+p 1 0 1 0
+p 1 0 2 0
+p 1 1 2 -1
+p 2 0 1 3
+p 2 0 2 -1
+p 2 1 2 3
+p 4 0 1 5
+p 4 0 2 -1
+p 4 1 2 5
+p 6 0 1 7
+p 6 0 2 -1
+p 6 1 2 7
+p 8 0 1 9
+p 8 0 2 -1
+p 8 1 2 9
+p 10 0 1 11
+p 10 0 2 -1
+p 10 1 2 11
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 1 stereogenic 1 ring 1 inv 1 rs 0 2 1 3
+r 2 1 stereogenic 1 ring 1 inv 0 rs 2 0 1 3
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 -1 stereogenic 1 ring 1 inv 0 rs 2 0 1 3
+r 5 0 stereogenic 0 ring 0 inv 0 rs
+r 6 1 stereogenic 1 ring 1 inv 0 rs 2 0 1 3
+r 7 0 stereogenic 0 ring 0 inv 0 rs
+r 8 -1 stereogenic 1 ring 1 inv 0 rs 2 0 1 3
+r 9 0 stereogenic 0 ring 0 inv 0 rs
+r 10 1 stereogenic 1 ring 1 inv 0 rs 2 0 1 3
+r 11 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 1 ring 1
+w 2 set 1 ring 1
+w 3 set 0 ring 0
+w 4 set 1 ring 1
+w 5 set 0 ring 0
+w 6 set 1 ring 1
+w 7 set 0 ring 0
+w 8 set 1 ring 1
+w 9 set 0 ring 0
+w 10 set 1 ring 1
+w 11 set 0 ring 0
+b 0 disp 1 wedge 0 rev 0 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first -1 -1
+b 2 disp 1 wedge 0 rev 0 first -1 -1
+b 3 disp 0 wedge 0 rev 0 first -1 -1
+b 4 disp 1 wedge 0 rev 0 first -1 -1
+b 5 disp 0 wedge 0 rev 0 first -1 -1
+b 6 disp 1 wedge 0 rev 0 first -1 -1
+b 7 disp 0 wedge 0 rev 0 first -1 -1
+b 8 disp 1 wedge 0 rev 0 first -1 -1
+b 9 disp 0 wedge 0 rev 0 first -1 -1
+b 10 disp 1 wedge 0 rev 0 first -1 -1
+b 11 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 20 23
+A 6 0 c333704e 42a681ff
+A 6 0 c3086179 41aec333
+A 6 0 c2c396c3 42ac50cc
+A 6 0 c1b670bc 42a9cb70
+A 6 0 415991a8 419a9853
+A 6 0 c1c7e7ea c233f3d6
+A 6 0 4136a34b c2dd1f47
+A 6 0 42accefd c2dfa4a3
+A 6 0 42f9fb2d c23e0946
+A 6 0 4347fae0 c24313fe
+A 6 0 436e90f8 4178b006
+A 8 0 439cc721 41648526
+A 6 0 434a29c6 42a23b5c
+A 6 0 42fe58f8 42a4c0b8
+A 6 0 42b12cc9 419082e3
+A 6 0 c2c7f48e c22ee91e
+A 6 0 c3171792 c2c53976
+A 6 0 c35b15eb c285eb6a
+A 6 0 c351fe58 40ef95ff
+A 8 0 c3847066 426a67ea
+B 1 0 1 2
+B 1 2 1 0
+B 2 3 1 0
+B 4 3 1 2
+B 4 5 1 0
+B 5 6 1 1
+B 6 7 1 0
+B 7 8 1 0
+B 8 9 1 0
+B 9 10 2 0
+B 10 11 1 0
+B 10 12 1 0
+B 12 13 2 0
+B 13 14 1 0
+B 5 15 1 0
+B 15 16 1 2
+B 16 17 1 0
+B 17 18 1 0
+B 18 19 1 2
+B 15 1 1 0
+B 18 1 1 0
+B 14 4 1 0
+B 14 8 2 0
+END
+p 1 0 1 2
+p 1 0 2 15
+p 1 0 3 18
+p 1 1 2 15
+p 1 1 3 18
+p 1 2 3 18
+p 2 0 1 1
+p 3 0 1 4
+p 4 0 1 5
+p 4 0 2 14
+p 4 1 2 14
+p 5 0 1 4
+p 5 0 2 15
+p 5 1 2 15
+p 6 0 1 5
+p 7 0 1 8
+p 8 0 1 9
+p 8 0 2 14
+p 8 1 2 14
+p 9 0 1 10
+p 10 0 1 11
+p 10 0 2 9
+p 10 1 2 11
+p 12 0 1 10
+p 13 0 1 14
+p 14 0 1 4
+p 14 0 2 8
+p 14 1 2 8
+p 15 0 1 5
+p 15 0 2 1
+p 15 1 2 1
+p 16 0 1 15
+p 17 0 1 18
+p 18 0 1 19
+p 18 0 2 1
+p 18 1 2 19
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 1 stereogenic 1 ring 0 inv 0 rs 3 2 1 0
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 1 stereogenic 1 ring 0 inv 1 rs 2 1 0 3
+r 5 -1 stereogenic 1 ring 0 inv 0 rs 1 2 0 3
+r 6 0 stereogenic 0 ring 0 inv 0 rs
+r 7 0 stereogenic 0 ring 0 inv 0 rs
+r 8 0 stereogenic 0 ring 0 inv 0 rs
+r 9 0 stereogenic 0 ring 0 inv 0 rs
+r 10 0 stereogenic 0 ring 0 inv 0 rs
+r 11 0 stereogenic 0 ring 0 inv 0 rs
+r 12 0 stereogenic 0 ring 0 inv 0 rs
+r 13 0 stereogenic 0 ring 0 inv 0 rs
+r 14 0 stereogenic 0 ring 0 inv 0 rs
+r 15 1 stereogenic 1 ring 0 inv 0 rs 1 2 0 3
+r 16 0 stereogenic 0 ring 0 inv 0 rs
+r 17 0 stereogenic 0 ring 0 inv 0 rs
+r 18 1 stereogenic 1 ring 0 inv 0 rs 2 0 1 3
+r 19 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 1 ring 0
+w 2 set 0 ring 0
+w 3 set 0 ring 0
+w 4 set 1 ring 0
+w 5 set 1 ring 0
+w 6 set 0 ring 0
+w 7 set 0 ring 0
+w 8 set 0 ring 0
+w 9 set 0 ring 0
+w 10 set 0 ring 0
+w 11 set 0 ring 0
+w 12 set 0 ring 0
+w 13 set 0 ring 0
+w 14 set 0 ring 0
+w 15 set 1 ring 0
+w 16 set 0 ring 0
+w 17 set 0 ring 0
+w 18 set 1 ring 0
+w 19 set 0 ring 0
+b 0 disp 1 wedge 0 rev 0 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first -1 -1
+b 2 disp 0 wedge 0 rev 0 first -1 -1
+b 3 disp 1 wedge 1 rev 0 first -1 -1
+b 4 disp 0 wedge 0 rev 0 first -1 -1
+b 5 disp 0 wedge 1 rev 0 first -1 -1
+b 6 disp 0 wedge 0 rev 0 first -1 -1
+b 7 disp 0 wedge 0 rev 0 first -1 -1
+b 8 disp 0 wedge 0 rev 0 first -1 -1
+b 9 disp 0 wedge 0 rev 0 first 8 11
+b 10 disp 0 wedge 0 rev 0 first -1 -1
+b 11 disp 0 wedge 0 rev 0 first -1 -1
+b 12 disp 0 wedge 0 rev 0 first 10 14
+b 13 disp 0 wedge 0 rev 0 first -1 -1
+b 14 disp 0 wedge 0 rev 0 first -1 -1
+b 15 disp 1 wedge 0 rev 0 first -1 -1
+b 16 disp 0 wedge 0 rev 0 first -1 -1
+b 17 disp 0 wedge 0 rev 0 first -1 -1
+b 18 disp 1 wedge 1 rev 0 first -1 -1
+b 19 disp 0 wedge 0 rev 0 first -1 -1
+b 20 disp 0 wedge 0 rev 0 first -1 -1
+b 21 disp 0 wedge 0 rev 0 first -1 -1
+b 22 disp 0 wedge 0 rev 0 first 4 9
+$$
+MOL 4 3
+A 6 0 c2c5f618 c0da6635
+A 6 0 c1efc05f 41b454b8
+A 6 0 41efc05f c1b454b8
+A 6 0 42c5f618 40da6635
+B 0 1 1 0
+B 1 2 2 0
+B 2 3 1 0
+END
+p 1 0 1 2
+p 2 0 1 1
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 0 stereogenic 0 ring 0 inv 0 rs
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 0 ring 0
+w 2 set 0 ring 0
+w 3 set 0 ring 0
+b 0 disp 0 wedge 0 rev 0 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first 0 3
+b 2 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 4 3
+A 6 0 c2960000 c201e760
+A 6 0 c2160000 4201e760
+A 6 0 42160000 4201e760
+A 6 0 42960000 c201e760
+B 0 1 1 0
+B 1 2 2 0
+B 2 3 1 0
+END
+p 1 0 1 2
+p 2 0 1 1
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 0 stereogenic 0 ring 0 inv 0 rs
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 0 ring 0
+w 2 set 0 ring 0
+w 3 set 0 ring 0
+b 0 disp 0 wedge 0 rev 0 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first 0 3
+b 2 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 4 3
+A 9 0 c2c5f618 c0da6635
+A 6 0 c1efc05f 41b454b8
+A 6 0 41efc05f c1b454b8
+A 17 0 42c5f618 40da6635
+B 0 1 1 0
+B 1 2 2 0
+B 2 3 1 0
+END
+p 1 0 1 0
+p 2 0 1 3
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 0 stereogenic 0 ring 0 inv 0 rs
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 0 ring 0
+w 2 set 0 ring 0
+w 3 set 0 ring 0
+b 0 disp 0 wedge 0 rev 0 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first 0 3
+b 2 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 4 3
+A 9 0 c2960000 c201e760
+A 6 0 c2160000 4201e760
+A 6 0 42160000 4201e760
+A 17 0 42960000 c201e760
+B 0 1 1 0
+B 1 2 2 0
+B 2 3 1 0
+END
+p 1 0 1 0
+p 2 0 1 3
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 0 stereogenic 0 ring 0 inv 0 rs
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 0 ring 0
+w 2 set 0 ring 0
+w 3 set 0 ring 0
+b 0 disp 0 wedge 0 rev 0 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first 0 3
+b 2 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 5 4
+A 6 0 42b5dd87 c2160000
+A 6 0 41cfd89a a6b40000
+A 9 0 41cfd89a 42960000
+A 6 0 c21be273 c2160000
+A 6 0 c2cfd89a 27b40000
+B 0 1 1 0
+B 1 2 1 0
+B 1 3 2 0
+B 3 4 1 0
+END
+p 1 0 1 2
+p 1 0 2 3
+p 1 1 2 2
+p 3 0 1 1
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 0 stereogenic 0 ring 0 inv 0 rs
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 0 ring 0
+w 2 set 0 ring 0
+w 3 set 0 ring 0
+w 4 set 0 ring 0
+b 0 disp 0 wedge 0 rev 0 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first -1 -1
+b 2 disp 0 wedge 0 rev 0 first 2 4
+b 3 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 7 6
+A 6 0 c32fb2f8 41779f5e
+A 6 0 c2e20481 c1cd8b68
+A 6 0 c2380a12 410037a8
+A 6 0 4185719a c2049fa1
+A 6 0 42a75bdf 3f0cff27
+A 6 0 43125ea7 c222798f
+A 6 0 42aff9e8 4296da93
+B 0 1 1 0
+B 1 2 1 0
+B 2 3 2 0
+B 3 4 1 0
+B 4 5 1 0
+B 4 6 1 0
+END
+p 1 0 1 2
+p 2 0 1 3
+p 3 0 1 2
+p 4 0 1 3
+p 4 0 2 3
+p 4 1 2 -1
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 0 stereogenic 0 ring 0 inv 0 rs
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 0 stereogenic 0 ring 0 inv 0 rs 0 2 2 3
+r 5 0 stereogenic 0 ring 0 inv 0 rs
+r 6 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 0 ring 0
+w 2 set 0 ring 0
+w 3 set 0 ring 0
+w 4 set 1 ring 0
+w 5 set 0 ring 0
+w 6 set 0 ring 0
+b 0 disp 0 wedge 0 rev 0 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first -1 -1
+b 2 disp 0 wedge 0 rev 0 first 1 4
+b 3 disp 0 wedge 0 rev 0 first -1 -1
+b 4 disp 0 wedge 0 rev 0 first -1 -1
+b 5 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 6 5
+A 6 0 c3231f3e c127c5b7
+A 6 0 c2c0b3a3 41bd5bed
+A 6 0 c2058ad9 c1889f64
+A 6 0 42058ad9 41889f64
+A 6 0 42c0b3a3 c1bd5bed
+A 6 0 43231f3e 4127c5b7
+B 0 1 1 0
+B 1 2 2 0
+B 2 3 1 0
+B 3 4 2 0
+B 4 5 1 0
+END
+p 1 0 1 2
+p 2 0 1 3
+p 3 0 1 2
+p 4 0 1 3
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 0 stereogenic 0 ring 0 inv 0 rs
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 0 stereogenic 0 ring 0 inv 0 rs
+r 5 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 0 ring 0
+w 2 set 0 ring 0
+w 3 set 0 ring 0
+w 4 set 0 ring 0
+w 5 set 0 ring 0
+b 0 disp 0 wedge 0 rev 0 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first 0 3
+b 2 disp 0 wedge 0 rev 0 first -1 -1
+b 3 disp 0 wedge 0 rev 0 first 2 5
+b 4 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 11 11
+A 8 0 c3527195 426b28a2
+A 6 0 c31ed1b8 408c4e7a
+A 8 0 c3341f89 c2870d58
+A 6 0 c2abc815 41af1ef9
+A 6 0 c20910b8 c2020f56
+A 6 0 421aa5fe c17026a4
+A 6 0 42b492b8 c28ad43e
+A 6 0 4323370a c24fa2cf
+A 6 0 433884db 41a00363
+A 6 0 4304e4fe 4294d042
+A 6 0 426fdd42 42639ad7
+B 0 1 1 0
+B 1 2 2 0
+B 1 3 1 0
+B 3 4 2 0
+B 4 5 1 0
+B 5 6 2 0
+B 6 7 1 0
+B 7 8 2 0
+B 8 9 1 0
+B 9 10 2 0
+B 10 5 1 0
+END
+p 1 0 1 2
+p 1 0 2 0
+p 1 1 2 2
+p 3 0 1 1
+p 4 0 1 5
+p 5 0 1 4
+p 5 0 2 4
+p 5 1 2 -1
+p 6 0 1 5
+p 7 0 1 6
+p 8 0 1 -1
+p 9 0 1 10
+p 10 0 1 5
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 0 stereogenic 0 ring 0 inv 0 rs
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 0 stereogenic 0 ring 0 inv 0 rs
+r 5 0 stereogenic 0 ring 0 inv 0 rs
+r 6 0 stereogenic 0 ring 0 inv 0 rs
+r 7 0 stereogenic 0 ring 0 inv 0 rs
+r 8 0 stereogenic 0 ring 0 inv 0 rs
+r 9 0 stereogenic 0 ring 0 inv 0 rs
+r 10 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 0 ring 0
+w 2 set 0 ring 0
+w 3 set 0 ring 0
+w 4 set 0 ring 0
+w 5 set 0 ring 0
+w 6 set 0 ring 0
+w 7 set 0 ring 0
+w 8 set 0 ring 0
+w 9 set 0 ring 0
+w 10 set 0 ring 0
+b 0 disp 0 wedge 0 rev 0 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first 0 -1
+b 2 disp 0 wedge 0 rev 0 first -1 -1
+b 3 disp 0 wedge 0 rev 0 first 1 5
+b 4 disp 0 wedge 0 rev 0 first -1 -1
+b 5 disp 0 wedge 0 rev 0 first 4 7
+b 6 disp 0 wedge 0 rev 0 first -1 -1
+b 7 disp 0 wedge 0 rev 0 first 6 9
+b 8 disp 0 wedge 0 rev 0 first -1 -1
+b 9 disp 0 wedge 0 rev 0 first 8 5
+b 10 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 14 14
+A 6 0 29e1a3c8 c32623aa
+A 6 0 42923d3b c3157343
+A 6 0 4303c1c8 c2cd6085
+A 6 0 43244c59 c20c76a1
+A 6 0 43244c59 421f895f
+A 6 0 4303c1c8 42d6e9e4
+A 6 0 42923d3b 431a37f3
+A 6 0 a95049fe 4309878c
+A 6 0 c2923d3b 431a37f3
+A 6 0 c303c1c8 42d6e9e4
+A 6 0 c3244c59 421f895f
+A 6 0 c3244c59 c20c76a1
+A 6 0 c303c1c8 c2cd6085
+A 6 0 c2923d3b c3157343
+B 0 1 1 0
+B 1 2 1 0
+B 2 3 1 0
+B 3 4 1 0
+B 4 5 1 0
+B 5 6 1 0
+B 6 7 1 0
+B 7 8 2 0
+B 8 9 1 0
+B 9 10 1 0
+B 10 11 1 0
+B 11 12 1 0
+B 12 13 1 0
+B 13 0 1 0
+END
+p 0 0 1 13
+p 1 0 1 2
+p 2 0 1 3
+p 3 0 1 4
+p 4 0 1 5
+p 5 0 1 6
+p 6 0 1 7
+p 7 0 1 8
+p 8 0 1 7
+p 9 0 1 8
+p 10 0 1 9
+p 11 0 1 10
+p 12 0 1 11
+p 13 0 1 12
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 0 stereogenic 0 ring 0 inv 0 rs
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 0 stereogenic 0 ring 0 inv 0 rs
+r 5 0 stereogenic 0 ring 0 inv 0 rs
+r 6 0 stereogenic 0 ring 0 inv 0 rs
+r 7 0 stereogenic 0 ring 0 inv 0 rs
+r 8 0 stereogenic 0 ring 0 inv 0 rs
+r 9 0 stereogenic 0 ring 0 inv 0 rs
+r 10 0 stereogenic 0 ring 0 inv 0 rs
+r 11 0 stereogenic 0 ring 0 inv 0 rs
+r 12 0 stereogenic 0 ring 0 inv 0 rs
+r 13 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 0 ring 0
+w 2 set 0 ring 0
+w 3 set 0 ring 0
+w 4 set 0 ring 0
+w 5 set 0 ring 0
+w 6 set 0 ring 0
+w 7 set 0 ring 0
+w 8 set 0 ring 0
+w 9 set 0 ring 0
+w 10 set 0 ring 0
+w 11 set 0 ring 0
+w 12 set 0 ring 0
+w 13 set 0 ring 0
+b 0 disp 0 wedge 0 rev 0 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first -1 -1
+b 2 disp 0 wedge 0 rev 0 first -1 -1
+b 3 disp 0 wedge 0 rev 0 first -1 -1
+b 4 disp 0 wedge 0 rev 0 first -1 -1
+b 5 disp 0 wedge 0 rev 0 first -1 -1
+b 6 disp 0 wedge 0 rev 0 first -1 -1
+b 7 disp 0 wedge 0 rev 0 first 6 9
+b 8 disp 0 wedge 0 rev 0 first -1 -1
+b 9 disp 0 wedge 0 rev 0 first -1 -1
+b 10 disp 0 wedge 0 rev 0 first -1 -1
+b 11 disp 0 wedge 0 rev 0 first -1 -1
+b 12 disp 0 wedge 0 rev 0 first -1 -1
+b 13 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 14 14
+A 6 0 43288602 280edb6e
+A 6 0 4317d59b 42923d3b
+A 6 0 42d22534 4303c1c8
+A 6 0 42160000 43244c59
+A 6 0 c2160000 43244c59
+A 6 0 c2d22534 4303c1c8
+A 6 0 c317d59b 42923d3b
+A 6 0 c3288602 2900a90d
+A 6 0 c317d59b c2923d3b
+A 6 0 c2d22534 c303c1c8
+A 6 0 c2160000 c3244c59
+A 6 0 42160000 c3244c59
+A 6 0 42d22534 c303c1c8
+A 6 0 4317d59b c2923d3b
+B 0 1 1 0
+B 1 2 1 0
+B 2 3 1 0
+B 3 4 1 0
+B 4 5 1 0
+B 5 6 1 0
+B 6 7 1 0
+B 7 8 2 0
+B 8 9 1 0
+B 9 10 1 0
+B 10 11 1 0
+B 11 12 1 0
+B 12 13 1 0
+B 13 0 1 0
+END
+p 0 0 1 13
+p 1 0 1 2
+p 2 0 1 3
+p 3 0 1 4
+p 4 0 1 5
+p 5 0 1 6
+p 6 0 1 7
+p 7 0 1 8
+p 8 0 1 7
+p 9 0 1 8
+p 10 0 1 9
+p 11 0 1 10
+p 12 0 1 11
+p 13 0 1 12
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 0 stereogenic 0 ring 0 inv 0 rs
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 0 stereogenic 0 ring 0 inv 0 rs
+r 5 0 stereogenic 0 ring 0 inv 0 rs
+r 6 0 stereogenic 0 ring 0 inv 0 rs
+r 7 0 stereogenic 0 ring 0 inv 0 rs
+r 8 0 stereogenic 0 ring 0 inv 0 rs
+r 9 0 stereogenic 0 ring 0 inv 0 rs
+r 10 0 stereogenic 0 ring 0 inv 0 rs
+r 11 0 stereogenic 0 ring 0 inv 0 rs
+r 12 0 stereogenic 0 ring 0 inv 0 rs
+r 13 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 0 ring 0
+w 2 set 0 ring 0
+w 3 set 0 ring 0
+w 4 set 0 ring 0
+w 5 set 0 ring 0
+w 6 set 0 ring 0
+w 7 set 0 ring 0
+w 8 set 0 ring 0
+w 9 set 0 ring 0
+w 10 set 0 ring 0
+w 11 set 0 ring 0
+w 12 set 0 ring 0
+w 13 set 0 ring 0
+b 0 disp 0 wedge 0 rev 0 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first -1 -1
+b 2 disp 0 wedge 0 rev 0 first -1 -1
+b 3 disp 0 wedge 0 rev 0 first -1 -1
+b 4 disp 0 wedge 0 rev 0 first -1 -1
+b 5 disp 0 wedge 0 rev 0 first -1 -1
+b 6 disp 0 wedge 0 rev 0 first -1 -1
+b 7 disp 0 wedge 0 rev 0 first 6 9
+b 8 disp 0 wedge 0 rev 0 first -1 -1
+b 9 disp 0 wedge 0 rev 0 first -1 -1
+b 10 disp 0 wedge 0 rev 0 first -1 -1
+b 11 disp 0 wedge 0 rev 0 first -1 -1
+b 12 disp 0 wedge 0 rev 0 first -1 -1
+b 13 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 13 13
+A 6 0 c31b8de7 c1ad3140
+A 6 0 c300f57d c2b78cf0
+A 6 0 c291a42a c30d826c
+A 6 0 2a123f2e c2f71f20
+A 6 0 4291a42a c30d826c
+A 6 0 4300f57d c2b78cf0
+A 6 0 431b8de7 c1ad3140
+A 6 0 43128399 4253376b
+A 6 0 42cfd183 42e50e4a
+A 6 0 42160000 431561d4
+A 6 0 c2160000 431561d4
+A 6 0 c2cfd183 42e50e4a
+A 6 0 c3128399 4253376b
+B 0 1 1 0
+B 1 2 1 0
+B 2 3 1 0
+B 3 4 2 0
+B 4 5 1 0
+B 5 6 1 0
+B 6 7 1 0
+B 7 8 1 0
+B 8 9 1 0
+B 9 10 1 0
+B 10 11 1 0
+B 11 12 1 0
+B 12 0 1 0
+END
+p 0 0 1 1
+p 1 0 1 2
+p 2 0 1 3
+p 3 0 1 4
+p 4 0 1 3
+p 5 0 1 4
+p 6 0 1 5
+p 7 0 1 6
+p 8 0 1 7
+p 9 0 1 8
+p 10 0 1 -1
+p 11 0 1 12
+p 12 0 1 0
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 0 stereogenic 0 ring 0 inv 0 rs
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 0 stereogenic 0 ring 0 inv 0 rs
+r 5 0 stereogenic 0 ring 0 inv 0 rs
+r 6 0 stereogenic 0 ring 0 inv 0 rs
+r 7 0 stereogenic 0 ring 0 inv 0 rs
+r 8 0 stereogenic 0 ring 0 inv 0 rs
+r 9 0 stereogenic 0 ring 0 inv 0 rs
+r 10 0 stereogenic 0 ring 0 inv 0 rs
+r 11 0 stereogenic 0 ring 0 inv 0 rs
+r 12 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 0 ring 0
+w 2 set 0 ring 0
+w 3 set 0 ring 0
+w 4 set 0 ring 0
+w 5 set 0 ring 0
+w 6 set 0 ring 0
+w 7 set 0 ring 0
+w 8 set 0 ring 0
+w 9 set 0 ring 0
+w 10 set 0 ring 0
+w 11 set 0 ring 0
+w 12 set 0 ring 0
+b 0 disp 0 wedge 0 rev 0 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first -1 -1
+b 2 disp 0 wedge 0 rev 0 first -1 -1
+b 3 disp 0 wedge 0 rev 0 first 2 5
+b 4 disp 0 wedge 0 rev 0 first -1 -1
+b 5 disp 0 wedge 0 rev 0 first -1 -1
+b 6 disp 0 wedge 0 rev 0 first -1 -1
+b 7 disp 0 wedge 0 rev 0 first -1 -1
+b 8 disp 0 wedge 0 rev 0 first -1 -1
+b 9 disp 0 wedge 0 rev 0 first -1 -1
+b 10 disp 0 wedge 0 rev 0 first -1 -1
+b 11 disp 0 wedge 0 rev 0 first -1 -1
+b 12 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 15 15
+A 6 0 43345d73 28ad5555
+A 6 0 4324c58c 4292b8de
+A 6 0 42f16023 4306098f
+A 6 0 425ef186 432b898f
+A 6 0 c196d385 43336082
+A 6 0 c2b45d73 431c3361
+A 6 0 c311eb1b 42d40825
+A 6 0 c3306c73 42160000
+A 6 0 c3306c73 c2160000
+A 6 0 c311eb1b c2d40825
+A 6 0 c2b45d73 c31c3361
+A 6 0 c196d385 c3336082
+A 6 0 425ef186 c32b898f
+A 6 0 42f16023 c306098f
+A 6 0 4324c58c c292b8de
+B 0 1 1 0
+B 1 2 1 0
+B 2 3 1 0
+B 3 4 1 0
+B 4 5 1 0
+B 5 6 1 0
+B 6 7 1 0
+B 7 8 1 0
+B 8 9 1 0
+B 9 10 1 0
+B 10 11 1 0
+B 11 12 1 0
+B 12 13 2 0
+B 13 14 1 0
+B 14 0 1 0
+END
+p 0 0 1 14
+p 1 0 1 0
+p 2 0 1 1
+p 3 0 1 2
+p 4 0 1 3
+p 5 0 1 -1
+p 6 0 1 7
+p 7 0 1 8
+p 8 0 1 9
+p 9 0 1 10
+p 10 0 1 11
+p 11 0 1 12
+p 12 0 1 13
+p 13 0 1 12
+p 14 0 1 13
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 0 stereogenic 0 ring 0 inv 0 rs
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 0 stereogenic 0 ring 0 inv 0 rs
+r 5 0 stereogenic 0 ring 0 inv 0 rs
+r 6 0 stereogenic 0 ring 0 inv 0 rs
+r 7 0 stereogenic 0 ring 0 inv 0 rs
+r 8 0 stereogenic 0 ring 0 inv 0 rs
+r 9 0 stereogenic 0 ring 0 inv 0 rs
+r 10 0 stereogenic 0 ring 0 inv 0 rs
+r 11 0 stereogenic 0 ring 0 inv 0 rs
+r 12 0 stereogenic 0 ring 0 inv 0 rs
+r 13 0 stereogenic 0 ring 0 inv 0 rs
+r 14 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 0 ring 0
+w 2 set 0 ring 0
+w 3 set 0 ring 0
+w 4 set 0 ring 0
+w 5 set 0 ring 0
+w 6 set 0 ring 0
+w 7 set 0 ring 0
+w 8 set 0 ring 0
+w 9 set 0 ring 0
+w 10 set 0 ring 0
+w 11 set 0 ring 0
+w 12 set 0 ring 0
+w 13 set 0 ring 0
+w 14 set 0 ring 0
+b 0 disp 0 wedge 0 rev 0 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first -1 -1
+b 2 disp 0 wedge 0 rev 0 first -1 -1
+b 3 disp 0 wedge 0 rev 0 first -1 -1
+b 4 disp 0 wedge 0 rev 0 first -1 -1
+b 5 disp 0 wedge 0 rev 0 first -1 -1
+b 6 disp 0 wedge 0 rev 0 first -1 -1
+b 7 disp 0 wedge 0 rev 0 first -1 -1
+b 8 disp 0 wedge 0 rev 0 first -1 -1
+b 9 disp 0 wedge 0 rev 0 first -1 -1
+b 10 disp 0 wedge 0 rev 0 first -1 -1
+b 11 disp 0 wedge 0 rev 0 first -1 -1
+b 12 disp 0 wedge 0 rev 0 first 11 14
+b 13 disp 0 wedge 0 rev 0 first -1 -1
+b 14 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 5 4
+A 6 0 c281e760 c2160000
+A 6 0 00000000 a7c80000
+A 6 0 4281e760 42160000
+A 6 0 42160000 c281e760
+A 6 0 c2160000 4281e760
+B 0 1 1 0
+B 1 2 1 0
+B 1 3 1 0
+B 1 4 1 0
+END
+p 1 0 1 -1
+p 1 0 2 -1
+p 1 0 3 -1
+p 1 1 2 -1
+p 1 1 3 -1
+p 1 2 3 -1
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 0 stereogenic 0 ring 0 inv 0 rs 3 3 3 3
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 1 ring 0
+w 2 set 0 ring 0
+w 3 set 0 ring 0
+w 4 set 0 ring 0
+b 0 disp 0 wedge 0 rev 0 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first -1 -1
+b 2 disp 0 wedge 0 rev 0 first -1 -1
+b 3 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 11 10
+A 7 0 4316dc10 c29780ba
+A 6 0 42f64a4f c0c1eab9
+A 6 0 4329a47c 42532632
+A 6 0 4243bbab 409919e5
+A 8 0 41a9c014 4294f3ad
+A 7 0 401be58a c258404d
+A 6 0 c28f8d4d c22cdfb9
+A 6 0 c2ec8bf6 c2cc21a1
+A 6 0 c2c6fb1e 41d3c8c9
+A 8 0 c253f8e9 42aaa3f7
+A 8 0 c32db3cc 421544f8
+B 0 1 1 0
+B 1 2 1 1
+B 1 3 1 0
+B 3 4 2 0
+B 3 5 1 0
+B 5 6 1 0
+B 6 7 1 1
+B 6 8 1 0
+B 8 9 2 0
+B 8 10 1 0
+END
+p 1 0 1 0
+p 1 0 2 0
+p 1 1 2 3
+p 3 0 1 4
+p 3 0 2 5
+p 3 1 2 4
+p 5 0 1 3
+p 6 0 1 5
+p 6 0 2 5
+p 6 1 2 8
+p 8 0 1 9
+p 8 0 2 10
+p 8 1 2 9
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 -1 stereogenic 1 ring 0 inv 1 rs 0 2 1 3
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 0 stereogenic 0 ring 0 inv 0 rs
+r 5 0 stereogenic 0 ring 0 inv 0 rs
+r 6 1 stereogenic 1 ring 0 inv 1 rs 0 2 1 3
+r 7 0 stereogenic 0 ring 0 inv 0 rs
+r 8 0 stereogenic 0 ring 0 inv 0 rs
+r 9 0 stereogenic 0 ring 0 inv 0 rs
+r 10 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 1 ring 0
+w 2 set 0 ring 0
+w 3 set 0 ring 0
+w 4 set 0 ring 0
+w 5 set 0 ring 0
+w 6 set 1 ring 0
+w 7 set 0 ring 0
+w 8 set 0 ring 0
+w 9 set 0 ring 0
+w 10 set 0 ring 0
+b 0 disp 1 wedge 0 rev 1 first -1 -1
+b 1 disp 0 wedge 1 rev 0 first -1 -1
+b 2 disp 0 wedge 0 rev 0 first -1 -1
+b 3 disp 0 wedge 0 rev 0 first 5 -1
+b 4 disp 0 wedge 0 rev 0 first -1 -1
+b 5 disp 0 wedge 0 rev 0 first -1 -1
+b 6 disp 1 wedge 0 rev 0 first -1 -1
+b 7 disp 0 wedge 0 rev 0 first -1 -1
+b 8 disp 0 wedge 0 rev 0 first 10 -1
+b 9 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 6 5
+A 6 0 42960000 4281e760
+A 6 0 42160000 2851cec0
+A 17 0 42960000 c281e760
+A 6 0 c2160000 a7db9d81
+A 6 0 c2960000 c281e760
+A 35 0 c2960000 4281e760
+B 1 0 1 2
+B 1 2 1 0
+B 1 3 1 0
+B 3 4 1 2
+B 3 5 1 0
+END
+p 1 0 1 2
+p 1 0 2 3
+p 1 1 2 2
+p 3 0 1 1
+p 3 0 2 5
+p 3 1 2 5
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 1 stereogenic 1 ring 0 inv 0 rs 2 0 1 3
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 1 stereogenic 1 ring 0 inv 0 rs 1 2 0 3
+r 4 0 stereogenic 0 ring 0 inv 0 rs
+r 5 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 1 ring 0
+w 2 set 0 ring 0
+w 3 set 1 ring 0
+w 4 set 0 ring 0
+w 5 set 0 ring 0
+b 0 disp 0 wedge 0 rev 0 first -1 -1
+b 1 disp 1 wedge 0 rev 0 first -1 -1
+b 2 disp 0 wedge 0 rev 0 first -1 -1
+b 3 disp 0 wedge 0 rev 0 first -1 -1
+b 4 disp 1 wedge 0 rev 0 first -1 -1
+$$
+MOL 8 7
+A 6 0 420fa31c 42dfb0bf
+A 6 0 42a4a7dd 4253be48
+A 6 0 425a149b c185bf90
+A 6 0 42c9e09d c297417f
+A 6 0 c19da648 c1dbb542
+A 6 0 c23e0e44 c2c23c59
+A 6 0 c2843fe1 41fb912b
+A 6 0 c30c59e0 41a59b78
+B 0 1 1 0
+B 1 2 1 0
+B 2 3 1 2
+B 2 4 1 0
+B 4 5 1 1
+B 4 6 1 0
+B 6 7 1 0
+END
+p 1 0 1 2
+p 2 0 1 1
+p 2 0 2 4
+p 2 1 2 4
+p 4 0 1 2
+p 4 0 2 2
+p 4 1 2 6
+p 6 0 1 4
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 0 stereogenic 0 ring 0 inv 0 rs
+r 2 1 stereogenic 1 ring 0 inv 0 rs 1 2 0 3
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 1 stereogenic 1 ring 0 inv 1 rs 0 2 1 3
+r 5 0 stereogenic 0 ring 0 inv 0 rs
+r 6 0 stereogenic 0 ring 0 inv 0 rs
+r 7 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 0 ring 0
+w 2 set 1 ring 0
+w 3 set 0 ring 0
+w 4 set 1 ring 0
+w 5 set 0 ring 0
+w 6 set 0 ring 0
+w 7 set 0 ring 0
+b 0 disp 0 wedge 0 rev 0 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first -1 -1
+b 2 disp 1 wedge 1 rev 0 first -1 -1
+b 3 disp 0 wedge 0 rev 0 first -1 -1
+b 4 disp 1 wedge 0 rev 0 first -1 -1
+b 5 disp 0 wedge 0 rev 0 first -1 -1
+b 6 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 5 4
+A 1 0 a860bc3d c2960000
+A 6 0 26bba1e2 a7200000
+A 9 0 42960000 a7200000
+A 17 0 c2960000 27faeb4c
+A 35 0 27d45e1e 42960000
+B 1 0 1 2
+B 1 2 1 0
+B 1 3 1 0
+B 1 4 1 0
+END
+p 1 0 1 2
+p 1 0 2 3
+p 1 0 3 4
+p 1 1 2 3
+p 1 1 3 4
+p 1 2 3 4
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 1 stereogenic 1 ring 0 inv 0 rs 3 2 1 0
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 1 ring 0
+w 2 set 0 ring 0
+w 3 set 0 ring 0
+w 4 set 0 ring 0
+b 0 disp 1 wedge 0 rev 0 first -1 -1
+b 1 disp 1 wedge 1 rev 0 first -1 -1
+b 2 disp 0 wedge 0 rev 0 first -1 -1
+b 3 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 9 9
+A 6 0 43012aab c281e760
+A 6 0 42b75555 281b8e39
+A 6 0 41855555 a731c71c
+A 6 0 c1a6aaab 4281e760
+A 6 0 c2bfaaab 4281e760
+A 6 0 c3055555 27f207be
+A 6 0 c2bfaaab c281e760
+A 6 0 c1a6aaab c281e760
+A 7 0 43012aab 4281e760
+B 1 0 1 1
+B 1 2 1 0
+B 2 3 2 0
+B 3 4 1 0
+B 4 5 2 0
+B 5 6 1 0
+B 6 7 2 0
+B 1 8 1 0
+B 7 2 1 0
+END
+p 1 0 1 2
+p 1 0 2 8
+p 1 1 2 8
+p 2 0 1 1
+p 2 0 2 1
+p 2 1 2 -1
+p 3 0 1 2
+p 4 0 1 3
+p 5 0 1 -1
+p 6 0 1 7
+p 7 0 1 2
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 1 stereogenic 1 ring 0 inv 1 rs 2 1 0 3
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 0 stereogenic 0 ring 0 inv 0 rs
+r 5 0 stereogenic 0 ring 0 inv 0 rs
+r 6 0 stereogenic 0 ring 0 inv 0 rs
+r 7 0 stereogenic 0 ring 0 inv 0 rs
+r 8 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 1 ring 0
+w 2 set 0 ring 0
+w 3 set 0 ring 0
+w 4 set 0 ring 0
+w 5 set 0 ring 0
+w 6 set 0 ring 0
+w 7 set 0 ring 0
+w 8 set 0 ring 0
+b 0 disp 1 wedge 1 rev 0 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first -1 -1
+b 2 disp 0 wedge 0 rev 0 first 1 4
+b 3 disp 0 wedge 0 rev 0 first -1 -1
+b 4 disp 0 wedge 0 rev 0 first 3 6
+b 5 disp 0 wedge 0 rev 0 first -1 -1
+b 6 disp 0 wedge 0 rev 0 first 5 2
+b 7 disp 1 wedge 1 rev 0 first -1 -1
+b 8 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 8 8
+A 7 0 c2c2db10 c2960000
+A 6 0 c201e760 c2160000
+A 6 0 4201e760 c2960000
+A 6 0 42c2db10 c2160000
+A 6 0 42c2db10 42160000
+A 6 0 4201e760 42960000
+A 6 0 c201e760 42160000
+A 7 0 c2c2db10 42960000
+B 1 0 1 1
+B 1 2 1 0
+B 2 3 1 0
+B 3 4 1 0
+B 4 5 1 0
+B 5 6 1 0
+B 6 7 1 2
+B 6 1 1 0
+END
+p 1 0 1 0
+p 1 0 2 0
+p 1 1 2 6
+p 2 0 1 1
+p 3 0 1 2
+p 4 0 1 5
+p 5 0 1 6
+p 6 0 1 7
+p 6 0 2 1
+p 6 1 2 7
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 -1 stereogenic 1 ring 0 inv 1 rs 0 2 1 3
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 0 stereogenic 0 ring 0 inv 0 rs
+r 5 0 stereogenic 0 ring 0 inv 0 rs
+r 6 -1 stereogenic 1 ring 0 inv 0 rs 2 0 1 3
+r 7 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 1 ring 0
+w 2 set 0 ring 0
+w 3 set 0 ring 0
+w 4 set 0 ring 0
+w 5 set 0 ring 0
+w 6 set 1 ring 0
+w 7 set 0 ring 0
+b 0 disp 1 wedge 0 rev 0 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first -1 -1
+b 2 disp 0 wedge 0 rev 0 first -1 -1
+b 3 disp 0 wedge 0 rev 0 first -1 -1
+b 4 disp 0 wedge 0 rev 0 first -1 -1
+b 5 disp 0 wedge 0 rev 0 first -1 -1
+b 6 disp 1 wedge 0 rev 0 first -1 -1
+b 7 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 10 10
+A 6 0 c3139cc6 c197c196
+A 6 0 c2a580c9 41958072
+A 6 0 c18dabfa c1953d12
+A 6 0 c2838eb4 c2987316
+A 6 0 41f51cf7 c297fb7e
+A 6 0 42d0ef98 c27b279c
+A 6 0 4301f2db 40f801a5
+A 6 0 42a3337a 42822c53
+A 6 0 40f8b1f8 424f8948
+A 6 0 c2224e39 42da70dd
+B 0 1 1 0
+B 1 2 1 0
+B 2 3 1 1
+B 2 4 1 0
+B 4 5 1 0
+B 5 6 1 0
+B 6 7 1 0
+B 7 8 1 0
+B 8 9 1 2
+B 8 2 1 0
+END
+p 1 0 1 2
+p 2 0 1 1
+p 2 0 2 4
+p 2 0 3 8
+p 2 1 2 4
+p 2 1 3 8
+p 2 2 3 8
+p 4 0 1 2
+p 5 0 1 4
+p 6 0 1 7
+p 7 0 1 8
+p 8 0 1 7
+p 8 0 2 2
+p 8 1 2 2
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 0 stereogenic 0 ring 0 inv 0 rs
+r 2 1 stereogenic 1 ring 0 inv 1 rs 2 3 1 0
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 0 stereogenic 0 ring 0 inv 0 rs
+r 5 0 stereogenic 0 ring 0 inv 0 rs
+r 6 0 stereogenic 0 ring 0 inv 0 rs
+r 7 0 stereogenic 0 ring 0 inv 0 rs
+r 8 -1 stereogenic 1 ring 0 inv 0 rs 1 2 0 3
+r 9 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 0 ring 0
+w 2 set 1 ring 0
+w 3 set 0 ring 0
+w 4 set 0 ring 0
+w 5 set 0 ring 0
+w 6 set 0 ring 0
+w 7 set 0 ring 0
+w 8 set 1 ring 0
+w 9 set 0 ring 0
+b 0 disp 0 wedge 0 rev 0 first -1 -1
+b 1 disp 1 wedge 1 rev 1 first -1 -1
+b 2 disp 1 wedge 0 rev 0 first -1 -1
+b 3 disp 0 wedge 0 rev 0 first -1 -1
+b 4 disp 0 wedge 0 rev 0 first -1 -1
+b 5 disp 0 wedge 0 rev 0 first -1 -1
+b 6 disp 0 wedge 0 rev 0 first -1 -1
+b 7 disp 0 wedge 0 rev 0 first -1 -1
+b 8 disp 1 wedge 0 rev 0 first -1 -1
+b 9 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 8 7
+A 6 0 c1ea2f65 42ded763
+A 6 0 c213feec 42134755
+A 6 0 c2d2efbb 40c6b773
+A 6 0 c2e26358 c288c842
+A 6 0 41bdf4cb c0e57daf
+A 6 0 42b86d78 41bb8161
+A 6 0 4318f510 c1a46cb4
+A 6 0 41802659 c2a38b94
+B 1 0 1 1
+B 1 2 1 0
+B 2 3 1 0
+B 1 4 1 0
+B 4 5 1 0
+B 5 6 1 0
+B 4 7 1 2
+END
+p 1 0 1 2
+p 1 0 2 4
+p 1 1 2 4
+p 2 0 1 1
+p 4 0 1 1
+p 4 0 2 1
+p 4 1 2 5
+p 5 0 1 4
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 -1 stereogenic 1 ring 0 inv 1 rs 2 1 0 3
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 1 stereogenic 1 ring 0 inv 0 rs 0 1 2 3
+r 5 0 stereogenic 0 ring 0 inv 0 rs
+r 6 0 stereogenic 0 ring 0 inv 0 rs
+r 7 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 1 ring 0
+w 2 set 0 ring 0
+w 3 set 0 ring 0
+w 4 set 1 ring 0
+w 5 set 0 ring 0
+w 6 set 0 ring 0
+w 7 set 0 ring 0
+b 0 disp 1 wedge 0 rev 0 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first -1 -1
+b 2 disp 0 wedge 0 rev 0 first -1 -1
+b 3 disp 0 wedge 0 rev 0 first -1 -1
+b 4 disp 0 wedge 0 rev 0 first -1 -1
+b 5 disp 0 wedge 0 rev 0 first -1 -1
+b 6 disp 1 wedge 1 rev 0 first -1 -1
+$$
+MOL 12 12
+A 8 0 c337b76f c1959f5b
+A 6 0 c2faaee4 c283955b
+A 6 0 c25d7ee6 c21b20bc
+A 8 0 404010e6 c2abbde3
+A 6 0 4291eff9 c26b71cb
+A 8 0 430357f9 c2d3e66a
+A 6 0 42a91f70 4173cce0
+A 8 0 431a8771 4228fd32
+A 6 0 41d17dd7 42794e41
+A 8 0 42171dda 43086cd1
+A 6 0 c22f1ff7 420d4447
+A 8 0 c2cc4ff6 42a4cfa8
+B 0 1 1 0
+B 2 1 1 1
+B 2 3 1 0
+B 3 4 1 0
+B 4 5 1 1
+B 4 6 1 0
+B 6 7 1 1
+B 6 8 1 0
+B 8 9 1 2
+B 8 10 1 0
+B 10 11 1 1
+B 10 2 1 0
+END
+p 1 0 1 0
+p 2 0 1 3
+p 2 0 2 10
+p 2 1 2 3
+p 3 0 1 4
+p 4 0 1 3
+p 4 0 2 3
+p 4 1 2 5
+p 6 0 1 7
+p 6 0 2 4
+p 6 1 2 7
+p 8 0 1 9
+p 8 0 2 6
+p 8 1 2 9
+p 10 0 1 11
+p 10 0 2 2
+p 10 1 2 11
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 0 stereogenic 0 ring 0 inv 0 rs
+r 2 1 stereogenic 1 ring 0 inv 0 rs 2 0 1 3
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 1 stereogenic 1 ring 0 inv 0 rs 0 1 2 3
+r 5 0 stereogenic 0 ring 0 inv 0 rs
+r 6 -1 stereogenic 1 ring 0 inv 1 rs 1 0 2 3
+r 7 0 stereogenic 0 ring 0 inv 0 rs
+r 8 1 stereogenic 1 ring 0 inv 1 rs 1 0 2 3
+r 9 0 stereogenic 0 ring 0 inv 0 rs
+r 10 1 stereogenic 1 ring 0 inv 0 rs 2 0 1 3
+r 11 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 0 ring 0
+w 2 set 1 ring 0
+w 3 set 0 ring 0
+w 4 set 1 ring 0
+w 5 set 0 ring 0
+w 6 set 1 ring 0
+w 7 set 0 ring 0
+w 8 set 1 ring 0
+w 9 set 0 ring 0
+w 10 set 1 ring 0
+w 11 set 0 ring 0
+b 0 disp 0 wedge 0 rev 0 first -1 -1
+b 1 disp 1 wedge 0 rev 0 first -1 -1
+b 2 disp 0 wedge 0 rev 0 first -1 -1
+b 3 disp 0 wedge 0 rev 0 first -1 -1
+b 4 disp 1 wedge 0 rev 0 first -1 -1
+b 5 disp 0 wedge 0 rev 0 first -1 -1
+b 6 disp 1 wedge 1 rev 0 first -1 -1
+b 7 disp 0 wedge 0 rev 0 first -1 -1
+b 8 disp 1 wedge 1 rev 0 first -1 -1
+b 9 disp 0 wedge 0 rev 0 first -1 -1
+b 10 disp 1 wedge 0 rev 0 first -1 -1
+b 11 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 7 6
+A 6 0 c2d64925 a7ab275c
+A 15 0 c2009249 a75eb137
+A 8 0 c2009249 c2960000
+A 8 0 c2009249 42960000
+A 6 0 422b6db7 282e3b12
+A 6 0 42a0b6db 4281e760
+A 7 0 42a0b6db c281e760
+B 0 1 1 0
+B 1 2 2 0
+B 1 3 1 0
+B 1 4 1 0
+B 4 5 1 2
+B 4 6 1 0
+END
+p 1 0 1 2
+p 1 0 2 3
+p 1 0 3 4
+p 1 1 2 2
+p 1 1 3 2
+p 1 2 3 3
+p 4 0 1 1
+p 4 0 2 1
+p 4 1 2 6
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 0 stereogenic 1 ring 0 inv 1 rs 3 0 1 2
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 -1 stereogenic 1 ring 0 inv 1 rs 0 2 1 3
+r 5 0 stereogenic 0 ring 0 inv 0 rs
+r 6 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 1 ring 0
+w 2 set 0 ring 0
+w 3 set 0 ring 0
+w 4 set 1 ring 0
+w 5 set 0 ring 0
+w 6 set 0 ring 0
+b 0 disp 0 wedge 0 rev 0 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first -1 -1
+b 2 disp 1 wedge 0 rev 0 first -1 -1
+b 3 disp 1 wedge 1 rev 0 first -1 -1
+b 4 disp 0 wedge 0 rev 0 first -1 -1
+b 5 disp 1 wedge 0 rev 0 first -1 -1
+$$
+MOL 11 11
+A 6 0 c249611a c2c2f81c
+A 15 0 c28327de c1c061fe
+A 8 0 c30b03bd c21d1fa0
+A 6 0 c2a19f2e 42458e3a
+A 6 0 c3180687 4291d483
+A 6 0 40fb7bea c10d0976
+A 6 0 426713e9 c28197be
+A 6 0 430334c8 c24640db
+A 6 0 431abb7c 41ad35ca
+A 6 0 42d1a4c1 429b4402
+A 6 0 41fb1494 42799962
+B 1 0 1 2
+B 1 2 2 0
+B 1 3 1 0
+B 3 4 1 0
+B 1 5 1 0
+B 5 6 2 0
+B 6 7 1 0
+B 7 8 2 0
+B 8 9 1 0
+B 9 10 2 0
+B 10 5 1 0
+END
+p 1 0 1 2
+p 1 0 2 3
+p 1 0 3 5
+p 1 1 2 2
+p 1 1 3 2
+p 1 2 3 5
+p 3 0 1 1
+p 5 0 1 1
+p 5 0 2 1
+p 5 1 2 -1
+p 6 0 1 5
+p 7 0 1 6
+p 8 0 1 -1
+p 9 0 1 10
+p 10 0 1 5
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 1 stereogenic 1 ring 0 inv 0 rs 3 0 2 1
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 0 stereogenic 0 ring 0 inv 0 rs
+r 5 0 stereogenic 0 ring 0 inv 0 rs
+r 6 0 stereogenic 0 ring 0 inv 0 rs
+r 7 0 stereogenic 0 ring 0 inv 0 rs
+r 8 0 stereogenic 0 ring 0 inv 0 rs
+r 9 0 stereogenic 0 ring 0 inv 0 rs
+r 10 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 1 ring 0
+w 2 set 0 ring 0
+w 3 set 0 ring 0
+w 4 set 0 ring 0
+w 5 set 0 ring 0
+w 6 set 0 ring 0
+w 7 set 0 ring 0
+w 8 set 0 ring 0
+w 9 set 0 ring 0
+w 10 set 0 ring 0
+b 0 disp 1 wedge 0 rev 0 first -1 -1
+b 1 disp 1 wedge 1 rev 0 first -1 -1
+b 2 disp 0 wedge 0 rev 0 first -1 -1
+b 3 disp 0 wedge 0 rev 0 first -1 -1
+b 4 disp 0 wedge 0 rev 0 first -1 -1
+b 5 disp 0 wedge 0 rev 0 first 1 7
+b 6 disp 0 wedge 0 rev 0 first -1 -1
+b 7 disp 0 wedge 0 rev 0 first 6 9
+b 8 disp 0 wedge 0 rev 0 first -1 -1
+b 9 disp 0 wedge 0 rev 0 first 8 5
+b 10 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 1 0
+A 6 0 00000000 00000000
+END
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+$$
+MOL 6 6
+A 6 0 42960000 27855555
+A 6 0 42160000 4281e760
+A 6 0 c2160000 4281e760
+A 6 0 c2960000 28682051
+A 6 0 c2160000 c281e760
+A 6 0 42160000 c281e760
+B 0 1 1 0
+B 1 2 2 0
+B 2 3 1 0
+B 3 4 2 0
+B 4 5 1 0
+B 5 0 2 0
+END
+p 0 0 1 -1
+p 1 0 1 -1
+p 2 0 1 -1
+p 3 0 1 -1
+p 4 0 1 -1
+p 5 0 1 -1
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 0 stereogenic 0 ring 0 inv 0 rs
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 0 stereogenic 0 ring 0 inv 0 rs
+r 5 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 0 ring 0
+w 2 set 0 ring 0
+w 3 set 0 ring 0
+w 4 set 0 ring 0
+w 5 set 0 ring 0
+b 0 disp 0 wedge 0 rev 0 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first 0 3
+b 2 disp 0 wedge 0 rev 0 first -1 -1
+b 3 disp 0 wedge 0 rev 0 first 2 5
+b 4 disp 0 wedge 0 rev 0 first -1 -1
+b 5 disp 0 wedge 0 rev 0 first 4 1
+$$
+MOL 13 15
+A 6 0 433838de c0fd4724
+A 6 0 43210bbe 427da83f
+A 6 0 42af5e9e 429e03ef
+A 6 0 42160000 41ba2cb0
+A 6 0 4272b481 c2403acc
+A 6 0 4306098f c27e9a6a
+A 7 0 29c1c9ad c2b8485a
+A 6 0 c272b481 c2403acc
+A 6 0 c306098f c27e9a6a
+A 6 0 c33838de c0fd4724
+A 6 0 c3210bbe 427da83f
+A 6 0 c2af5e9e 429e03ef
+A 6 0 c2160000 41ba2cb0
+B 0 1 2 0
+B 1 2 1 0
+B 2 3 2 0
+B 3 4 1 0
+B 4 5 2 0
+B 4 6 1 0
+B 6 7 1 0
+B 7 8 2 0
+B 8 9 1 0
+B 9 10 2 0
+B 10 11 1 0
+B 11 12 2 0
+B 5 0 1 0
+B 12 7 1 0
+B 12 3 1 0
+END
+p 0 0 1 5
+p 1 0 1 2
+p 2 0 1 3
+p 3 0 1 4
+p 3 0 2 12
+p 3 1 2 4
+p 4 0 1 3
+p 4 0 2 6
+p 4 1 2 6
+p 5 0 1 4
+p 6 0 1 -1
+p 7 0 1 6
+p 7 0 2 6
+p 7 1 2 12
+p 8 0 1 7
+p 9 0 1 8
+p 10 0 1 11
+p 11 0 1 12
+p 12 0 1 7
+p 12 0 2 3
+p 12 1 2 7
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 0 stereogenic 0 ring 0 inv 0 rs
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 0 stereogenic 0 ring 0 inv 0 rs
+r 5 0 stereogenic 0 ring 0 inv 0 rs
+r 6 0 stereogenic 0 ring 0 inv 0 rs
+r 7 0 stereogenic 0 ring 0 inv 0 rs
+r 8 0 stereogenic 0 ring 0 inv 0 rs
+r 9 0 stereogenic 0 ring 0 inv 0 rs
+r 10 0 stereogenic 0 ring 0 inv 0 rs
+r 11 0 stereogenic 0 ring 0 inv 0 rs
+r 12 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 0 ring 0
+w 2 set 0 ring 0
+w 3 set 0 ring 0
+w 4 set 0 ring 0
+w 5 set 0 ring 0
+w 6 set 0 ring 0
+w 7 set 0 ring 0
+w 8 set 0 ring 0
+w 9 set 0 ring 0
+w 10 set 0 ring 0
+w 11 set 0 ring 0
+w 12 set 0 ring 0
+b 0 disp 0 wedge 0 rev 0 first 5 2
+b 1 disp 0 wedge 0 rev 0 first -1 -1
+b 2 disp 0 wedge 0 rev 0 first 1 4
+b 3 disp 0 wedge 0 rev 0 first -1 -1
+b 4 disp 0 wedge 0 rev 0 first 6 0
+b 5 disp 0 wedge 0 rev 0 first -1 -1
+b 6 disp 0 wedge 0 rev 0 first -1 -1
+b 7 disp 0 wedge 0 rev 0 first 6 9
+b 8 disp 0 wedge 0 rev 0 first -1 -1
+b 9 disp 0 wedge 0 rev 0 first 8 11
+b 10 disp 0 wedge 0 rev 0 first -1 -1
+b 11 disp 0 wedge 0 rev 0 first 10 7
+b 12 disp 0 wedge 0 rev 0 first -1 -1
+b 13 disp 0 wedge 0 rev 0 first -1 -1
+b 14 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 10 10
+A 6 0 42a50000 c2960000
+A 6 0 42a50000 28200000
+A 6 0 42a50000 42960000
+A 6 0 431d8000 a7200000
+A 6 0 40f00000 a7200000
+A 6 0 c1f00000 4281e760
+A 6 0 c2d20000 4281e760
+A 6 0 c30e8000 27faeb4c
+A 6 0 c2d20000 c281e760
+A 6 0 c1f00000 c281e760
+B 0 1 1 0
+B 1 2 1 0
+B 1 3 1 0
+B 1 4 1 0
+B 4 5 2 0
+B 5 6 1 0
+B 6 7 2 0
+B 7 8 1 0
+B 8 9 2 0
+B 9 4 1 0
+END
+p 1 0 1 -1
+p 1 0 2 -1
+p 1 0 3 4
+p 1 1 2 -1
+p 1 1 3 4
+p 1 2 3 4
+p 4 0 1 1
+p 4 0 2 1
+p 4 1 2 -1
+p 5 0 1 4
+p 6 0 1 5
+p 7 0 1 -1
+p 8 0 1 9
+p 9 0 1 4
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 0 stereogenic 0 ring 0 inv 0 rs 3 3 3 0
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 0 stereogenic 0 ring 0 inv 0 rs
+r 5 0 stereogenic 0 ring 0 inv 0 rs
+r 6 0 stereogenic 0 ring 0 inv 0 rs
+r 7 0 stereogenic 0 ring 0 inv 0 rs
+r 8 0 stereogenic 0 ring 0 inv 0 rs
+r 9 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 1 ring 0
+w 2 set 0 ring 0
+w 3 set 0 ring 0
+w 4 set 0 ring 0
+w 5 set 0 ring 0
+w 6 set 0 ring 0
+w 7 set 0 ring 0
+w 8 set 0 ring 0
+w 9 set 0 ring 0
+b 0 disp 0 wedge 0 rev 0 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first -1 -1
+b 2 disp 0 wedge 0 rev 0 first -1 -1
+b 3 disp 0 wedge 0 rev 0 first -1 -1
+b 4 disp 0 wedge 0 rev 0 first 1 6
+b 5 disp 0 wedge 0 rev 0 first -1 -1
+b 6 disp 0 wedge 0 rev 0 first 5 8
+b 7 disp 0 wedge 0 rev 0 first -1 -1
+b 8 disp 0 wedge 0 rev 0 first 7 4
+b 9 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 14 15
+A 6 0 c3139318 428c93c7
+A 6 0 c35d2ab5 425f4d4e
+A 6 0 c3757000 c17238a1
+A 6 0 c3441dae c28f47af
+A 6 0 c2f50c22 c264b51c
+A 6 0 c2c4818c 415c9967
+A 6 0 c1c54948 41e20135
+A 6 0 41c54948 c1e20135
+A 6 0 42c4818c c15c9967
+A 6 0 43139318 c28c93c7
+A 6 0 435d2ab5 c25f4d4e
+A 6 0 43757000 417238a1
+A 6 0 43441dae 428f47af
+A 6 0 42f50c22 4264b51c
+B 0 1 1 0
+B 1 2 2 0
+B 2 3 1 0
+B 3 4 2 0
+B 4 5 1 0
+B 5 6 1 0
+B 6 7 2 0
+B 7 8 1 0
+B 8 9 2 0
+B 9 10 1 0
+B 10 11 2 0
+B 11 12 1 0
+B 12 13 2 0
+B 5 0 2 0
+B 13 8 1 0
+END
+p 0 0 1 5
+p 1 0 1 0
+p 2 0 1 -1
+p 3 0 1 4
+p 4 0 1 5
+p 5 0 1 6
+p 5 0 2 -1
+p 5 1 2 6
+p 6 0 1 5
+p 7 0 1 8
+p 8 0 1 7
+p 8 0 2 7
+p 8 1 2 -1
+p 9 0 1 8
+p 10 0 1 9
+p 11 0 1 -1
+p 12 0 1 13
+p 13 0 1 8
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 0 stereogenic 0 ring 0 inv 0 rs
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 0 stereogenic 0 ring 0 inv 0 rs
+r 5 0 stereogenic 0 ring 0 inv 0 rs
+r 6 0 stereogenic 0 ring 0 inv 0 rs
+r 7 0 stereogenic 0 ring 0 inv 0 rs
+r 8 0 stereogenic 0 ring 0 inv 0 rs
+r 9 0 stereogenic 0 ring 0 inv 0 rs
+r 10 0 stereogenic 0 ring 0 inv 0 rs
+r 11 0 stereogenic 0 ring 0 inv 0 rs
+r 12 0 stereogenic 0 ring 0 inv 0 rs
+r 13 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 0 ring 0
+w 2 set 0 ring 0
+w 3 set 0 ring 0
+w 4 set 0 ring 0
+w 5 set 0 ring 0
+w 6 set 0 ring 0
+w 7 set 0 ring 0
+w 8 set 0 ring 0
+w 9 set 0 ring 0
+w 10 set 0 ring 0
+w 11 set 0 ring 0
+w 12 set 0 ring 0
+w 13 set 0 ring 0
+b 0 disp 0 wedge 0 rev 0 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first 0 3
+b 2 disp 0 wedge 0 rev 0 first -1 -1
+b 3 disp 0 wedge 0 rev 0 first 2 5
+b 4 disp 0 wedge 0 rev 0 first -1 -1
+b 5 disp 0 wedge 0 rev 0 first -1 -1
+b 6 disp 0 wedge 0 rev 0 first 5 8
+b 7 disp 0 wedge 0 rev 0 first -1 -1
+b 8 disp 0 wedge 0 rev 0 first 7 10
+b 9 disp 0 wedge 0 rev 0 first -1 -1
+b 10 disp 0 wedge 0 rev 0 first 9 12
+b 11 disp 0 wedge 0 rev 0 first -1 -1
+b 12 disp 0 wedge 0 rev 0 first 11 8
+b 13 disp 0 wedge 0 rev 0 first 6 1
+b 14 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 12 13
+A 6 0 433b8000 365cf88b
+A 6 0 43160000 4281e760
+A 6 0 42960000 4281e760
+A 6 0 42160000 b5c27451
+A 6 0 42960000 c281e760
+A 6 0 43160000 c281e760
+A 6 0 c2160000 b5c27451
+A 6 0 c2960000 4281e760
+A 6 0 c3160000 4281e760
+A 6 0 c33b8000 b5c27451
+A 6 0 c3160000 c281e760
+A 6 0 c2960000 c281e760
+B 0 1 2 0
+B 1 2 1 0
+B 2 3 2 0
+B 3 4 1 0
+B 4 5 2 0
+B 3 6 1 0
+B 6 7 2 0
+B 7 8 1 0
+B 8 9 2 0
+B 9 10 1 0
+B 10 11 2 0
+B 5 0 1 0
+B 11 6 1 0
+END
+p 0 0 1 -1
+p 1 0 1 2
+p 2 0 1 3
+p 3 0 1 -1
+p 3 0 2 6
+p 3 1 2 6
+p 4 0 1 3
+p 5 0 1 4
+p 6 0 1 3
+p 6 0 2 3
+p 6 1 2 -1
+p 7 0 1 6
+p 8 0 1 7
+p 9 0 1 -1
+p 10 0 1 11
+p 11 0 1 6
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 0 stereogenic 0 ring 0 inv 0 rs
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 0 stereogenic 0 ring 0 inv 0 rs
+r 5 0 stereogenic 0 ring 0 inv 0 rs
+r 6 0 stereogenic 0 ring 0 inv 0 rs
+r 7 0 stereogenic 0 ring 0 inv 0 rs
+r 8 0 stereogenic 0 ring 0 inv 0 rs
+r 9 0 stereogenic 0 ring 0 inv 0 rs
+r 10 0 stereogenic 0 ring 0 inv 0 rs
+r 11 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 0 ring 0
+w 2 set 0 ring 0
+w 3 set 0 ring 0
+w 4 set 0 ring 0
+w 5 set 0 ring 0
+w 6 set 0 ring 0
+w 7 set 0 ring 0
+w 8 set 0 ring 0
+w 9 set 0 ring 0
+w 10 set 0 ring 0
+w 11 set 0 ring 0
+b 0 disp 0 wedge 0 rev 0 first 5 2
+b 1 disp 0 wedge 0 rev 0 first -1 -1
+b 2 disp 0 wedge 0 rev 0 first 1 6
+b 3 disp 0 wedge 0 rev 0 first -1 -1
+b 4 disp 0 wedge 0 rev 0 first 3 0
+b 5 disp 0 wedge 0 rev 0 first -1 -1
+b 6 disp 0 wedge 0 rev 0 first 3 8
+b 7 disp 0 wedge 0 rev 0 first -1 -1
+b 8 disp 0 wedge 0 rev 0 first 7 10
+b 9 disp 0 wedge 0 rev 0 first -1 -1
+b 10 disp 0 wedge 0 rev 0 first 9 6
+b 11 disp 0 wedge 0 rev 0 first -1 -1
+b 12 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 10 12
+A 6 0 c1e5bbd3 c0afa991
+A 6 0 414a082a c2882146
+A 6 0 42aefb51 c27e3136
+A 6 0 42f205a3 4062d79a
+A 6 0 429f55a9 42843d6a
+A 6 0 4099b5cd 4276697e
+A 6 0 c28c1eef 42645828
+A 6 0 c2cf2941 c1201a20
+A 6 0 c278f28d c29129f1
+A 6 0 c2240527 41fab2d8
+B 0 1 1 0
+B 1 2 1 0
+B 2 3 1 0
+B 3 4 1 0
+B 4 5 1 0
+B 5 6 1 0
+B 6 7 1 0
+B 7 8 1 0
+B 7 9 1 0
+B 5 0 1 0
+B 8 1 1 0
+B 9 3 1 0
+END
+p 0 0 1 -1
+p 1 0 1 -1
+p 1 0 2 -1
+p 1 1 2 -1
+p 2 0 1 -1
+p 3 0 1 -1
+p 3 0 2 -1
+p 3 1 2 -1
+p 4 0 1 -1
+p 5 0 1 -1
+p 5 0 2 -1
+p 5 1 2 -1
+p 6 0 1 -1
+p 7 0 1 -1
+p 7 0 2 -1
+p 7 1 2 -1
+p 8 0 1 -1
+p 9 0 1 -1
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 0 stereogenic 1 ring 1 inv 0 rs 2 0 1 3
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 1 ring 1 inv 1 rs 2 1 0 3
+r 4 0 stereogenic 0 ring 0 inv 0 rs
+r 5 0 stereogenic 1 ring 1 inv 1 rs 2 1 0 3
+r 6 0 stereogenic 0 ring 0 inv 0 rs
+r 7 0 stereogenic 1 ring 1 inv 1 rs 2 1 0 3
+r 8 0 stereogenic 0 ring 0 inv 0 rs
+r 9 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 1 ring 1
+w 2 set 0 ring 0
+w 3 set 1 ring 1
+w 4 set 0 ring 0
+w 5 set 1 ring 1
+w 6 set 0 ring 0
+w 7 set 1 ring 1
+w 8 set 0 ring 0
+w 9 set 0 ring 0
+b 0 disp 1 wedge 0 rev 1 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first -1 -1
+b 2 disp 1 wedge 0 rev 1 first -1 -1
+b 3 disp 0 wedge 0 rev 0 first -1 -1
+b 4 disp 1 wedge 0 rev 1 first -1 -1
+b 5 disp 0 wedge 0 rev 0 first -1 -1
+b 6 disp 1 wedge 0 rev 1 first -1 -1
+b 7 disp 0 wedge 0 rev 0 first -1 -1
+b 8 disp 0 wedge 0 rev 0 first -1 -1
+b 9 disp 0 wedge 0 rev 0 first -1 -1
+b 10 disp 0 wedge 0 rev 0 first -1 -1
+b 11 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 8 7
+A 9 0 c2e10000 280c75a6
+A 6 0 c2160000 a6c80000
+A 9 0 c2160000 42960000
+A 9 0 c2160000 c2960000
+A 6 0 42160000 a6c80000
+A 9 0 42e10000 a6c80000
+A 9 0 42160000 c2960000
+A 9 0 42160000 42960000
+B 0 1 1 0
+B 1 2 1 0
+B 1 3 1 0
+B 1 4 1 0
+B 4 5 1 0
+B 4 6 1 0
+B 4 7 1 0
+END
+p 1 0 1 -1
+p 1 0 2 -1
+p 1 0 3 0
+p 1 1 2 -1
+p 1 1 3 2
+p 1 2 3 3
+p 4 0 1 5
+p 4 0 2 6
+p 4 0 3 7
+p 4 1 2 -1
+p 4 1 3 -1
+p 4 2 3 -1
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 0 stereogenic 0 ring 0 inv 1 rs 2 2 2 3
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 0 stereogenic 0 ring 0 inv 0 rs 3 2 2 2
+r 5 0 stereogenic 0 ring 0 inv 0 rs
+r 6 0 stereogenic 0 ring 0 inv 0 rs
+r 7 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 1 ring 0
+w 2 set 0 ring 0
+w 3 set 0 ring 0
+w 4 set 1 ring 0
+w 5 set 0 ring 0
+w 6 set 0 ring 0
+w 7 set 0 ring 0
+b 0 disp 0 wedge 0 rev 0 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first -1 -1
+b 2 disp 0 wedge 0 rev 0 first -1 -1
+b 3 disp 0 wedge 0 rev 0 first -1 -1
+b 4 disp 0 wedge 0 rev 0 first -1 -1
+b 5 disp 0 wedge 0 rev 0 first -1 -1
+b 6 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 5 5
+A 6 0 427f31fb a7200000
+A 6 0 419db826 4272b481
+A 6 0 c24e7511 42160000
+A 16 0 c24e7511 c2160000
+A 6 0 419db826 c272b481
+B 0 1 1 0
+B 1 2 2 0
+B 2 3 1 0
+B 3 4 1 0
+B 4 0 2 0
+END
+p 0 0 1 4
+p 1 0 1 2
+p 2 0 1 3
+p 3 0 1 -1
+p 4 0 1 3
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 0 stereogenic 0 ring 0 inv 0 rs
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 0 ring 0
+w 2 set 0 ring 0
+w 3 set 0 ring 0
+w 4 set 0 ring 0
+b 0 disp 0 wedge 0 rev 0 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first 0 3
+b 2 disp 0 wedge 0 rev 0 first -1 -1
+b 3 disp 0 wedge 0 rev 0 first -1 -1
+b 4 disp 0 wedge 0 rev 0 first 3 1
+$$
+MOL 10 10
+A 8 0 42a50000 c2960000
+A 16 0 42a50000 28200000
+A 8 0 42a50000 42960000
+A 7 0 431d8000 a7200000
+A 6 0 40f00000 a7200000
+A 6 0 c1f00000 4281e760
+A 6 0 c2d20000 4281e760
+A 6 0 c30e8000 27faeb4c
+A 6 0 c2d20000 c281e760
+A 6 0 c1f00000 c281e760
+B 0 1 2 0
+B 1 2 2 0
+B 1 3 1 0
+B 1 4 1 0
+B 4 5 2 0
+B 5 6 1 0
+B 6 7 2 0
+B 7 8 1 0
+B 8 9 2 0
+B 9 4 1 0
+END
+p 1 0 1 -1
+p 1 0 2 0
+p 1 0 3 0
+p 1 1 2 2
+p 1 1 3 2
+p 1 2 3 3
+p 4 0 1 1
+p 4 0 2 1
+p 4 1 2 -1
+p 5 0 1 4
+p 6 0 1 5
+p 7 0 1 -1
+p 8 0 1 9
+p 9 0 1 4
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 0 stereogenic 0 ring 0 inv 0 rs 1 1 2 3
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 0 stereogenic 0 ring 0 inv 0 rs
+r 5 0 stereogenic 0 ring 0 inv 0 rs
+r 6 0 stereogenic 0 ring 0 inv 0 rs
+r 7 0 stereogenic 0 ring 0 inv 0 rs
+r 8 0 stereogenic 0 ring 0 inv 0 rs
+r 9 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 1 ring 0
+w 2 set 0 ring 0
+w 3 set 0 ring 0
+w 4 set 0 ring 0
+w 5 set 0 ring 0
+w 6 set 0 ring 0
+w 7 set 0 ring 0
+w 8 set 0 ring 0
+w 9 set 0 ring 0
+b 0 disp 0 wedge 0 rev 0 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first -1 -1
+b 2 disp 0 wedge 0 rev 0 first -1 -1
+b 3 disp 0 wedge 0 rev 0 first -1 -1
+b 4 disp 0 wedge 0 rev 0 first 1 6
+b 5 disp 0 wedge 0 rev 0 first -1 -1
+b 6 disp 0 wedge 0 rev 0 first 5 8
+b 7 disp 0 wedge 0 rev 0 first -1 -1
+b 8 disp 0 wedge 0 rev 0 first 7 4
+b 9 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 12 13
+A 6 0 433b8000 365cf88b
+A 6 0 43160000 4281e760
+A 6 0 42960000 4281e760
+A 6 0 42160000 b5c27451
+A 6 0 42960000 c281e760
+A 6 0 43160000 c281e760
+A 6 0 c2160000 b5c27451
+A 6 0 c2960000 4281e760
+A 6 0 c3160000 4281e760
+A 6 0 c33b8000 b5c27451
+A 6 0 c3160000 c281e760
+A 6 0 c2960000 c281e760
+B 0 1 2 0
+B 1 2 1 0
+B 2 3 2 0
+B 3 4 1 0
+B 4 5 2 0
+B 3 6 1 0
+B 6 7 2 0
+B 7 8 1 0
+B 8 9 2 0
+B 9 10 1 0
+B 10 11 2 0
+B 5 0 1 0
+B 11 6 1 0
+END
+p 0 0 1 -1
+p 1 0 1 2
+p 2 0 1 3
+p 3 0 1 -1
+p 3 0 2 6
+p 3 1 2 6
+p 4 0 1 3
+p 5 0 1 4
+p 6 0 1 3
+p 6 0 2 3
+p 6 1 2 -1
+p 7 0 1 6
+p 8 0 1 7
+p 9 0 1 -1
+p 10 0 1 11
+p 11 0 1 6
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 0 stereogenic 0 ring 0 inv 0 rs
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 0 stereogenic 0 ring 0 inv 0 rs
+r 5 0 stereogenic 0 ring 0 inv 0 rs
+r 6 0 stereogenic 0 ring 0 inv 0 rs
+r 7 0 stereogenic 0 ring 0 inv 0 rs
+r 8 0 stereogenic 0 ring 0 inv 0 rs
+r 9 0 stereogenic 0 ring 0 inv 0 rs
+r 10 0 stereogenic 0 ring 0 inv 0 rs
+r 11 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 0 ring 0
+w 2 set 0 ring 0
+w 3 set 0 ring 0
+w 4 set 0 ring 0
+w 5 set 0 ring 0
+w 6 set 0 ring 0
+w 7 set 0 ring 0
+w 8 set 0 ring 0
+w 9 set 0 ring 0
+w 10 set 0 ring 0
+w 11 set 0 ring 0
+b 0 disp 0 wedge 0 rev 0 first 5 2
+b 1 disp 0 wedge 0 rev 0 first -1 -1
+b 2 disp 0 wedge 0 rev 0 first 1 6
+b 3 disp 0 wedge 0 rev 0 first -1 -1
+b 4 disp 0 wedge 0 rev 0 first 3 0
+b 5 disp 0 wedge 0 rev 0 first -1 -1
+b 6 disp 0 wedge 0 rev 0 first 3 8
+b 7 disp 0 wedge 0 rev 0 first -1 -1
+b 8 disp 0 wedge 0 rev 0 first 7 10
+b 9 disp 0 wedge 0 rev 0 first -1 -1
+b 10 disp 0 wedge 0 rev 0 first 9 6
+b 11 disp 0 wedge 0 rev 0 first -1 -1
+b 12 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 7 8
+A 6 0 429b40fe c2160000
+A 6 0 429b40fe 42160000
+A 6 0 40c986c0 4272b481
+A 6 0 c2172510 28c8c8e6
+A 6 0 40c986c0 c272b481
+A 6 0 c2821026 c2160000
+A 6 0 c2821026 42160000
+B 0 1 1 0
+B 1 2 1 0
+B 2 3 1 0
+B 3 4 1 0
+B 4 5 1 0
+B 5 6 1 0
+B 4 0 1 0
+B 6 2 1 0
+END
+p 0 0 1 4
+p 1 0 1 2
+p 2 0 1 3
+p 2 0 2 -1
+p 2 1 2 3
+p 3 0 1 -1
+p 4 0 1 3
+p 4 0 2 3
+p 4 1 2 -1
+p 5 0 1 4
+p 6 0 1 2
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 0 stereogenic 0 ring 0 inv 0 rs
+r 2 0 stereogenic 0 ring 0 inv 1 rs 2 0 2 3
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 0 stereogenic 0 ring 0 inv 1 rs 2 1 1 3
+r 5 0 stereogenic 0 ring 0 inv 0 rs
+r 6 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 0 ring 0
+w 2 set 1 ring 0
+w 3 set 0 ring 0
+w 4 set 1 ring 0
+w 5 set 0 ring 0
+w 6 set 0 ring 0
+b 0 disp 0 wedge 0 rev 0 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first -1 -1
+b 2 disp 0 wedge 0 rev 0 first -1 -1
+b 3 disp 0 wedge 0 rev 0 first -1 -1
+b 4 disp 0 wedge 0 rev 0 first -1 -1
+b 5 disp 0 wedge 0 rev 0 first -1 -1
+b 6 disp 0 wedge 0 rev 0 first -1 -1
+b 7 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 5 6
+A 6 0 4281e760 c2160000
+A 6 0 4281e760 42160000
+A 6 0 a7c80000 a6a00000
+A 6 0 c281e760 42160000
+A 6 0 c281e760 c2160000
+B 0 1 1 0
+B 1 2 1 0
+B 2 3 1 0
+B 3 4 1 0
+B 2 0 1 0
+B 4 2 1 0
+END
+p 0 0 1 2
+p 1 0 1 2
+p 2 0 1 -1
+p 2 0 2 -1
+p 2 0 3 -1
+p 2 1 2 -1
+p 2 1 3 -1
+p 2 2 3 -1
+p 3 0 1 2
+p 4 0 1 2
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 0 stereogenic 0 ring 0 inv 0 rs
+r 2 0 stereogenic 0 ring 0 inv 0 rs 3 3 2 2
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 0 ring 0
+w 2 set 1 ring 0
+w 3 set 0 ring 0
+w 4 set 0 ring 0
+b 0 disp 0 wedge 0 rev 0 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first -1 -1
+b 2 disp 0 wedge 0 rev 0 first -1 -1
+b 3 disp 0 wedge 0 rev 0 first -1 -1
+b 4 disp 0 wedge 0 rev 0 first -1 -1
+b 5 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 8 8
+A 6 0 43160000 28160000
+A 6 0 42960000 a7480000
+A 6 0 42160000 4281e760
+A 6 0 c2160000 4281e760
+A 6 0 c2960000 27e6eb4c
+A 6 0 c3160000 28af0000
+A 6 0 c2160000 c281e760
+A 6 0 42160000 c281e760
+B 1 0 1 2
+B 1 2 1 0
+B 2 3 1 0
+B 3 4 1 0
+B 4 5 1 1
+B 4 6 1 0
+B 6 7 1 0
+B 7 1 1 0
+END
+p 1 0 1 2
+p 1 0 2 7
+p 1 1 2 -1
+p 2 0 1 1
+p 3 0 1 4
+p 4 0 1 3
+p 4 0 2 -1
+p 4 1 2 6
+p 6 0 1 4
+p 7 0 1 1
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 1 stereogenic 1 ring 1 inv 1 rs 2 1 0 3
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 1 stereogenic 1 ring 1 inv 0 rs 1 2 0 3
+r 5 0 stereogenic 0 ring 0 inv 0 rs
+r 6 0 stereogenic 0 ring 0 inv 0 rs
+r 7 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 1 ring 1
+w 2 set 0 ring 0
+w 3 set 0 ring 0
+w 4 set 1 ring 1
+w 5 set 0 ring 0
+w 6 set 0 ring 0
+w 7 set 0 ring 0
+b 0 disp 1 wedge 0 rev 0 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first -1 -1
+b 2 disp 0 wedge 0 rev 0 first -1 -1
+b 3 disp 0 wedge 0 rev 0 first -1 -1
+b 4 disp 1 wedge 0 rev 0 first -1 -1
+b 5 disp 0 wedge 0 rev 0 first -1 -1
+b 6 disp 0 wedge 0 rev 0 first -1 -1
+b 7 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 6 6
+A 6 0 c318e8d2 bea7a4c1
+A 6 0 c2a20cde 41a8857d
+A 6 0 c1d4738e c1f3eff5
+A 6 0 42354fc5 c11197c9
+A 6 0 42ec8e43 c1d41f15
+A 6 0 42c1c53f 42357a02
+B 0 1 1 0
+B 1 2 2 0
+B 2 3 1 0
+B 3 4 1 0
+B 4 5 1 0
+B 5 3 1 0
+END
+p 1 0 1 2
+p 2 0 1 3
+p 3 0 1 2
+p 3 0 2 2
+p 3 1 2 -1
+p 4 0 1 3
+p 5 0 1 3
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 0 stereogenic 0 ring 0 inv 0 rs
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 1 ring 1 inv 1 rs 0 2 1 3
+r 4 0 stereogenic 0 ring 0 inv 0 rs
+r 5 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 0 ring 0
+w 2 set 0 ring 0
+w 3 set 1 ring 1
+w 4 set 0 ring 0
+w 5 set 0 ring 0
+b 0 disp 0 wedge 0 rev 0 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first 0 3
+b 2 disp 1 wedge 0 rev 1 first -1 -1
+b 3 disp 0 wedge 0 rev 0 first -1 -1
+b 4 disp 0 wedge 0 rev 0 first -1 -1
+b 5 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 11 11
+A 8 0 c3341f89 c2870d58
+A 6 0 c31ed1b8 408c4e7a
+A 6 0 c2abc815 41af1ef9
+A 6 0 c20910b8 c2020f56
+A 6 0 421aa5fe c17026a4
+A 6 0 42b492b8 c28ad43e
+A 6 0 4323370a c24fa2cf
+A 6 0 433884db 41a00363
+A 6 0 4304e4fe 4294d042
+A 6 0 426fdd42 42639ad7
+A 8 0 c3527195 426b28a2
+B 0 1 2 0
+B 1 2 1 0
+B 2 3 2 0
+B 3 4 1 0
+B 4 5 2 0
+B 5 6 1 0
+B 6 7 2 0
+B 7 8 1 0
+B 8 9 2 0
+B 1 10 1 0
+B 9 4 1 0
+END
+p 1 0 1 0
+p 1 0 2 0
+p 1 1 2 10
+p 2 0 1 1
+p 3 0 1 4
+p 4 0 1 3
+p 4 0 2 3
+p 4 1 2 -1
+p 5 0 1 4
+p 6 0 1 5
+p 7 0 1 -1
+p 8 0 1 9
+p 9 0 1 4
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 0 stereogenic 0 ring 0 inv 0 rs
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 0 stereogenic 0 ring 0 inv 0 rs
+r 5 0 stereogenic 0 ring 0 inv 0 rs
+r 6 0 stereogenic 0 ring 0 inv 0 rs
+r 7 0 stereogenic 0 ring 0 inv 0 rs
+r 8 0 stereogenic 0 ring 0 inv 0 rs
+r 9 0 stereogenic 0 ring 0 inv 0 rs
+r 10 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 0 ring 0
+w 2 set 0 ring 0
+w 3 set 0 ring 0
+w 4 set 0 ring 0
+w 5 set 0 ring 0
+w 6 set 0 ring 0
+w 7 set 0 ring 0
+w 8 set 0 ring 0
+w 9 set 0 ring 0
+w 10 set 0 ring 0
+b 0 disp 0 wedge 0 rev 0 first -1 10
+b 1 disp 0 wedge 0 rev 0 first -1 -1
+b 2 disp 0 wedge 0 rev 0 first 1 4
+b 3 disp 0 wedge 0 rev 0 first -1 -1
+b 4 disp 0 wedge 0 rev 0 first 3 6
+b 5 disp 0 wedge 0 rev 0 first -1 -1
+b 6 disp 0 wedge 0 rev 0 first 5 8
+b 7 disp 0 wedge 0 rev 0 first -1 -1
+b 8 disp 0 wedge 0 rev 0 first 7 4
+b 9 disp 0 wedge 0 rev 0 first -1 -1
+b 10 disp 0 wedge 0 rev 0 first -1 -1
+$$
+MOL 9 9
+A 6 0 43012aab c281e760
+A 16 0 42b75555 281b8e39
+A 8 0 43012aab 4281e760
+A 6 0 41855555 a731c71c
+A 6 0 c1a6aaab 4281e760
+A 6 0 c2bfaaab 4281e760
+A 6 0 c3055555 27f207be
+A 6 0 c2bfaaab c281e760
+A 6 0 c1a6aaab c281e760
+B 1 0 1 1
+B 1 2 2 0
+B 1 3 1 0
+B 3 4 2 0
+B 4 5 1 0
+B 5 6 2 0
+B 6 7 1 0
+B 7 8 2 0
+B 8 3 1 0
+END
+p 1 0 1 2
+p 1 0 2 3
+p 1 1 2 2
+p 3 0 1 1
+p 3 0 2 1
+p 3 1 2 -1
+p 4 0 1 3
+p 5 0 1 4
+p 6 0 1 -1
+p 7 0 1 8
+p 8 0 1 3
+r 0 0 stereogenic 0 ring 0 inv 0 rs
+r 1 1 stereogenic 1 ring 0 inv 0 rs 2 0 1 3
+r 2 0 stereogenic 0 ring 0 inv 0 rs
+r 3 0 stereogenic 0 ring 0 inv 0 rs
+r 4 0 stereogenic 0 ring 0 inv 0 rs
+r 5 0 stereogenic 0 ring 0 inv 0 rs
+r 6 0 stereogenic 0 ring 0 inv 0 rs
+r 7 0 stereogenic 0 ring 0 inv 0 rs
+r 8 0 stereogenic 0 ring 0 inv 0 rs
+w 0 set 0 ring 0
+w 1 set 1 ring 0
+w 2 set 0 ring 0
+w 3 set 0 ring 0
+w 4 set 0 ring 0
+w 5 set 0 ring 0
+w 6 set 0 ring 0
+w 7 set 0 ring 0
+w 8 set 0 ring 0
+b 0 disp 1 wedge 1 rev 0 first -1 -1
+b 1 disp 0 wedge 0 rev 0 first 3 -1
+b 2 disp 0 wedge 0 rev 0 first -1 -1
+b 3 disp 0 wedge 0 rev 0 first 1 5
+b 4 disp 0 wedge 0 rev 0 first -1 -1
+b 5 disp 0 wedge 0 rev 0 first 4 7
+b 6 disp 0 wedge 0 rev 0 first -1 -1
+b 7 disp 0 wedge 0 rev 0 first 6 3
+b 8 disp 0 wedge 0 rev 0 first -1 -1
+$$

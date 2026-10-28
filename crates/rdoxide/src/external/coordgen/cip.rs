@@ -1072,3 +1072,105 @@ impl Model {
         cis
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::super::testutil::build;
+    use super::*;
+
+    fn run(input: &str) -> String {
+        let (mut model, mol) = build(input);
+        // the wedge column of the bond lines
+        let bond_lines = input.lines().filter(|l| l.starts_with("B "));
+        for (b, l) in bond_lines.enumerate() {
+            let w: i32 = l.split(' ').nth(4).map_or(0, |x| x.parse().unwrap());
+            if w != 0 {
+                model.bonds[b].has_stereochemistry_display = true;
+                model.bonds[b].is_wedge = w == 1;
+            }
+        }
+        model.force_update_struct(mol);
+        let mut out = String::new();
+        let n = model.molecules[mol].atoms.len();
+        let atoms = model.molecules[mol].atoms.clone();
+        let idx = |a: Option<AtomId>| {
+            a.map_or(-1, |a| atoms.iter().position(|&x| x == a).unwrap() as i64)
+        };
+        for (i, &a) in atoms.iter().enumerate() {
+            let nb = model.atoms[a].neighbors.clone();
+            for j in 0..nb.len().saturating_sub(1) {
+                for k in j + 1..nb.len() {
+                    let r = model.cip_priority(nb[j], nb[k], a);
+                    out += &format!("p {i} {j} {k} {}\n", idx(r));
+                }
+            }
+        }
+        for (i, &a) in atoms.iter().enumerate() {
+            let r = model.read_stereochemistry(a, false);
+            let at = &model.atoms[a];
+            out += &format!(
+                "r {i} {r} stereogenic {} ring {} inv {} rs",
+                at.is_stereogenic as i32, at.has_ring_chirality as i32, at.clockwise_invert as i32
+            );
+            for p in &at.rs_priorities {
+                out += &format!(" {p}");
+            }
+            out += "\n";
+        }
+        for (i, &a) in atoms.iter().enumerate() {
+            model.atoms[a].has_stereochemistry_set = true;
+            model.atoms[a].is_r = i % 2 == 0;
+            model.write_stereo_chemistry(a);
+            let at = &model.atoms[a];
+            out += &format!(
+                "w {i} set {} ring {}\n",
+                at.has_stereochemistry_set as i32, at.has_ring_chirality as i32
+            );
+        }
+        let bonds = model.molecules[mol].bonds.clone();
+        for (i, &b) in bonds.iter().enumerate() {
+            let f = model.bond_start_atom_cip_first_neighbor(b);
+            let e = model.bond_end_atom_cip_first_neighbor(b);
+            let bd = &model.bonds[b];
+            out += &format!(
+                "b {i} disp {} wedge {} rev {} first {} {}\n",
+                bd.has_stereochemistry_display as i32,
+                bd.is_wedge as i32,
+                bd.is_reversed as i32,
+                idx(f),
+                idx(e)
+            );
+        }
+        let _ = n;
+        out
+    }
+
+    /// CIP ranking and stereo reading/writing must be the ones of coordgenlibs (`tests/data/coordgen_cip.txt`)
+    #[test]
+    fn cip_matches_cpp() {
+        let text = include_str!("../../../../../tests/data/coordgen_cip.txt");
+        let mut bad = Vec::new();
+        let mut n = 0;
+        for rec in text.split("$$\n").filter(|r| !r.is_empty()) {
+            let end = rec.find("END\n").unwrap() + 4;
+            let (input, want) = rec.split_at(end);
+            let got = run(input);
+            n += 1;
+            if got != want {
+                let pos = got
+                    .lines()
+                    .zip(want.lines())
+                    .position(|(a, b)| a != b)
+                    .unwrap_or(0);
+                bad.push(format!(
+                    "{}\nline {pos}\nwant {:?}\ngot  {:?}",
+                    input.lines().next().unwrap(),
+                    want.lines().nth(pos),
+                    got.lines().nth(pos)
+                ));
+            }
+        }
+        assert!(n > 50, "{n}");
+        assert!(bad.is_empty(), "{} differ; first:\n{}", bad.len(), bad[0]);
+    }
+}
