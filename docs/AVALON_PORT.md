@@ -242,3 +242,12 @@ error. The charge (`-tc`), tautomer (`-tt`), pattern (`-pc -pr -ps`) and profile
 `patclean.c` and the RD file reader; `init_check_mol` counts them as option errors for now. 306 option set x input
 combinations (SMILES, 2D/3D/shrunk/either-bond/alias molfiles) in `tests/data/avalon_struchk.jsonl` (driver `sc.c`)
 are identical to the C code. `fixcharges.c` was not needed for this step after all (MolKey does not use `-tc`).
+
+### A7c — pyAvalonTools: structure checker, count fingerprints as sparse vectors
+
+`CheckMolecule`, `CheckMoleculeString`, `InitializeCheckMol`, `CloseCheckMolFiles`, `GetCheckMolLog` and the
+`StruChkFlag` / `StruChkResult` enums are exposed (the enums as `enum.IntEnum`); `RDConfig.RDDataDir/struchk` now ships the
+three struchk files. `GetAvalonCountFP` returns a `UIntSparseIntVect` like upstream (it returned a list before).
+`tests/data/avalon_checkmol.jsonl` (153 inputs, from the official wheel with the MolKey option set) is compared in
+`tests/python/test_avalon_checkmol.py`. The upstream tests `External/AvalonTools/Wrap/testAvalonTools.py` (12) and
+`Chem/MolKey/UnitTestMolKey.py` (all 16, 6 more than before) are now in the ratchet.

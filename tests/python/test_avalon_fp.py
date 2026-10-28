@@ -23,7 +23,7 @@ def test_all_cases_match_reference():
         kw = dict(nBits=rec["nBits"], isQuery=rec["isQuery"], bitFlags=rec["bitFlags"])
         got = {
             "onBits": list(p.GetAvalonFP(m, **kw).GetOnBits()),
-            "counts": {i: c for i, c in enumerate(p.GetAvalonCountFP(m, **kw)) if c},
+            "counts": dict(p.GetAvalonCountFP(m, **kw).GetNonzeroElements()),
             "words": list(p.GetAvalonFPAsWords(m, **kw)),
         }
         want = {"onBits": rec["onBits"], "counts": {int(k): v for k, v in rec["counts"].items()},
