@@ -108,8 +108,8 @@ A4 (all fingerprint classes) and the first part of A7: `rdoxide.Avalon.pyAvalonT
   `isQuery`); the count fingerprint ignores `bitFlags` (always `USE_ALL_FEATURES`) and adds a second
   accumulating pass in query mode;
 * `GetAvalonFPAsWords` packs signed `char`s, so bytes >= 0x80 sign-extend;
-* still open: SMILES input (`SMIToMOL` needs layout), `GetCanonSmiles`, `CheckMolecule`,
-  `Generate2DCoords`, `PerceiveMarkush`, `MolKey` wiring.
+* all of that has been ported since (stages L1-L11, A3, A5a-e, A7b-c); the Python API equals the official
+  module's (`dir()` identical). Only C code RDKit never reaches is left.
 
 ### A5 (structure check), progress
 
