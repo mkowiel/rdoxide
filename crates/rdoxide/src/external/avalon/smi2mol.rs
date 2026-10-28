@@ -4,6 +4,7 @@
 
 use super::denormal::cct_denormalize;
 use super::graph::ring_list;
+use super::layout::{DONT_FLIP_BOND, KEEP_POSITION, layout_molecule, recolor_molecule};
 use super::perceive::{AROMATIC, DOUBLE, SINGLE, TRIPLE, setup_neighbourhood};
 use super::reaccs::{Atom, Bond, CIS_TRANS_EITHER, Molecule, NONE};
 use super::tables::PTABLE;
@@ -387,17 +388,108 @@ fn push_bond_pair(bonds: &mut Vec<Bond>, from: i32, to: i32, bond_type: i32, bon
     bonds.push(r);
 }
 
-/// `SMIToMOL`: converts a SMILES to a molecule; `Ok(None)` if the SMILES is illegal. The
-/// atom colours hold the ordinal numbers of the explicit atoms. The layout (`DO_LAYOUT`) is
-/// not ported yet and reported as an error.
-pub fn smi_to_mol(smiles: &str, flags: i32) -> Result<Option<Molecule>, &'static str> {
-    if flags & DO_LAYOUT != 0 {
-        return Err("layout is not ported");
+/// the `%lf` conversion of `sscanf` at the start of `s` (leading white space skipped)
+fn scan_double(s: &[u8]) -> Option<f64> {
+    let mut i = 0;
+    while i < s.len() && s[i].is_ascii_whitespace() {
+        i += 1;
     }
+    let st = i;
+    if i < s.len() && (s[i] == b'-' || s[i] == b'+') {
+        i += 1;
+    }
+    let mut digits = 0;
+    while i < s.len() && s[i].is_ascii_digit() {
+        i += 1;
+        digits += 1;
+    }
+    if i < s.len() && s[i] == b'.' {
+        i += 1;
+        while i < s.len() && s[i].is_ascii_digit() {
+            i += 1;
+            digits += 1;
+        }
+    }
+    if digits == 0 {
+        return None;
+    }
+    if i < s.len() && (s[i] == b'e' || s[i] == b'E') {
+        let mut j = i + 1;
+        if j < s.len() && (s[j] == b'-' || s[j] == b'+') {
+            j += 1;
+        }
+        let ed = j;
+        while j < s.len() && s[j].is_ascii_digit() {
+            j += 1;
+        }
+        if j > ed {
+            i = j;
+        }
+    }
+    std::str::from_utf8(&s[st..i]).ok()?.parse().ok()
+}
+
+/// the coordinate string of `SMIToMOL`: `x,y,x,y,...` for the atoms with the given ordinal numbers
+fn apply_coordinate_string(mp: &mut Molecule, coords: &str, atnos: &[i32]) {
+    let cs = coords.as_bytes();
+    let mut cp = 0usize;
+    let mut atno = 0;
+    let skip_field = |cp: &mut usize| {
+        while *cp < cs.len() && cs[*cp] != b',' {
+            *cp += 1;
+        }
+        if *cp < cs.len() {
+            *cp += 1;
+        }
+    };
+    loop {
+        atno += 1;
+        let mut novalue = false;
+        let x = scan_double(&cs[cp..]).unwrap_or_else(|| {
+            novalue = true;
+            0.0
+        });
+        skip_field(&mut cp);
+        let y = scan_double(&cs[cp..]).unwrap_or_else(|| {
+            novalue = true;
+            0.0
+        });
+        skip_field(&mut cp);
+        if !novalue {
+            if let Some(i) = atnos.iter().position(|&n| n == atno) {
+                mp.atoms[i].x = x as f32;
+                mp.atoms[i].y = y as f32;
+                mp.atoms[i].color = KEEP_POSITION;
+            }
+        }
+        if cp >= cs.len() {
+            break;
+        }
+        if atno > mp.atoms.len() as i32 {
+            break;
+        }
+    }
+    for b in &mut mp.bonds {
+        if mp.atoms[(b.atoms[0] - 1) as usize].color & KEEP_POSITION != 0
+            && mp.atoms[(b.atoms[1] - 1) as usize].color & KEEP_POSITION != 0
+        {
+            b.bond_type |= DONT_FLIP_BOND;
+        }
+    }
+}
+
+/// `SMIToMOL`: converts a SMILES to a molecule; `Ok(None)` if the SMILES is illegal. The
+/// atom colours hold the ordinal numbers of the explicit atoms. With `DO_LAYOUT` the molecule gets
+/// 2D coordinates; a coordinate string after a `|` fixes the positions of the listed atoms.
+pub fn smi_to_mol(smiles: &str, flags: i32) -> Result<Option<Molecule>, &'static str> {
     if !quick_check(smiles) {
         return Ok(None);
     }
-    let smiles = smiles.split('|').next().unwrap_or("").as_bytes();
+    let (smiles, coordp) = match smiles.split_once('|') {
+        Some((s, c)) => (s, Some(c)),
+        None => (smiles, None),
+    };
+    let smiles = smiles.as_bytes();
     let at = |i: usize| smiles.get(i).copied().unwrap_or(0);
     let mut mp = Molecule {
         dimensionality: "2D".into(),
@@ -848,6 +940,13 @@ pub fn smi_to_mol(smiles: &str, flags: i32) -> Result<Option<Molecule>, &'static
                 mp.atoms[i].query_h_count = old_h[i + 1];
             }
         }
+    }
+    if flags & DO_LAYOUT != 0 {
+        recolor_molecule(&mut mp);
+        if let Some(coords) = coordp {
+            apply_coordinate_string(&mut mp, coords, &atnos);
+        }
+        mp = layout_molecule(&mp);
     }
     for (a, c) in mp.atoms.iter_mut().zip(atnos) {
         a.color = c;
