@@ -3050,6 +3050,598 @@ pub fn layout_shortcut_chains(mp: &mut Molecule, shortcut_class: &[i32], nbp: &[
     }
 }
 
+const FRAME_HEIGHT: f64 = 1.54 * 4.0 / 3.0;
+pub const FT_SHORTCUTS: i32 = 1;
+pub const FT_ATOMS: i32 = 2;
+const MAX_FRAGMENT_NEIGHBOURS: usize = 3;
+
+/// `struct fragment_t`: a fragment (one color) to be placed
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Fragment {
+    pub color: i32,
+    pub first_index: usize,
+    pub xcenter: f64,
+    pub ycenter: f64,
+    pub radius: f64,
+    pub xoffset: f64,
+    pub yoffset: f64,
+    pub fragment_type: i32,
+    pub nsymbols: i32,
+    pub nneighbours: usize,
+    pub neighbour_cols: [i32; MAX_FRAGMENT_NEIGHBOURS],
+    pub nsneighbours: i32,
+    pub used: bool,
+}
+
+/// the neighbour bookkeeping of `CollectFragmentInfo` for fragment `col` seeing `other` through a bond
+fn connect_fragments(frags: &mut [Fragment], col: i32, other: i32) {
+    let Some(fi) = frags.iter().position(|f| f.color == col) else {
+        return;
+    };
+    let nn = frags[fi].nneighbours;
+    let mut j = 0;
+    while j < nn && j < MAX_FRAGMENT_NEIGHBOURS {
+        if frags[fi].neighbour_cols[j] == other {
+            break;
+        }
+        j += 1;
+    }
+    if j < nn {
+        return;
+    }
+    if let Some(h) = frags.iter().find(|f| f.color == other) {
+        if h.fragment_type == FT_SHORTCUTS {
+            frags[fi].nsneighbours += 1;
+        }
+    }
+    if j == MAX_FRAGMENT_NEIGHBOURS {
+        return;
+    }
+    frags[fi].neighbour_cols[nn] = other;
+    frags[fi].nneighbours += 1;
+}
+
+/// `CollectFragmentInfo`: shortcut fragments, each followed by the atom fragments linked to it
+pub fn collect_fragment_info(
+    mp: &Molecule,
+    shortcut_class: &[i32],
+    nbp: &[Neighbourhood],
+) -> Vec<Vec<Fragment>> {
+    if mp.atoms.is_empty() {
+        return Vec::new();
+    }
+    // list in creation order; C prepends, so the list proper is the reverse
+    let mut frags: Vec<Fragment> = Vec::new();
+    for (i, ap) in mp.atoms.iter().enumerate() {
+        let shortcut = is_shortcut_like_atom(mp, i, nbp) && shortcut_class[i] != SHORTCUT_SINGLE;
+        if let Some(fp) = frags.iter_mut().find(|f| f.color == ap.color) {
+            if shortcut {
+                fp.fragment_type = FT_SHORTCUTS;
+            }
+            fp.xcenter += f64::from(ap.x);
+            fp.ycenter += f64::from(ap.y);
+            fp.nsymbols += 1;
+        } else {
+            frags.push(Fragment {
+                color: ap.color,
+                first_index: i,
+                xcenter: f64::from(ap.x),
+                ycenter: f64::from(ap.y),
+                nsymbols: 1,
+                fragment_type: if shortcut { FT_SHORTCUTS } else { FT_ATOMS },
+                radius: FRAME_HEIGHT * 1.0 / 3.0,
+                ..Fragment::default()
+            });
+        }
+    }
+    frags.reverse();
+    for fp in &mut frags {
+        fp.xcenter /= f64::from(fp.nsymbols);
+        fp.ycenter /= f64::from(fp.nsymbols);
+    }
+    for fp in &mut frags {
+        fp.radius = FRAME_HEIGHT * 1.0 / 3.0;
+        if fp.fragment_type == FT_SHORTCUTS {
+            continue;
+        }
+        for ap in &mp.atoms {
+            if fp.color != ap.color {
+                continue;
+            }
+            let dx = fp.xcenter - f64::from(ap.x);
+            let dy = fp.ycenter - f64::from(ap.y);
+            let d = (dx * dx + dy * dy).sqrt();
+            if d > fp.radius {
+                fp.radius = d;
+            }
+        }
+    }
+    for b in &mp.bonds {
+        let col1 = mp.atoms[(b.atoms[0] - 1) as usize].color;
+        let col2 = mp.atoms[(b.atoms[1] - 1) as usize].color;
+        if col1 == col2 {
+            continue;
+        }
+        connect_fragments(&mut frags, col1, col2);
+        connect_fragments(&mut frags, col2, col1);
+    }
+    for fp in &mut frags {
+        for i in 1..fp.nneighbours {
+            for j in (0..i).rev() {
+                if fp.neighbour_cols[j] > fp.neighbour_cols[j + 1] {
+                    fp.neighbour_cols.swap(j, j + 1);
+                } else {
+                    break;
+                }
+            }
+        }
+    }
+    // shortcut fragments go to the array, the others are collected in reversed order
+    let mut farray: Vec<Vec<Fragment>> = Vec::new();
+    let mut atoms_list: Vec<Fragment> = Vec::new();
+    for f in frags {
+        if f.fragment_type == FT_SHORTCUTS {
+            farray.push(vec![f]);
+        } else {
+            atoms_list.insert(0, f);
+        }
+    }
+    for i in 1..farray.len() {
+        for j in (0..i).rev() {
+            if farray[j + 1][0].first_index < farray[j][0].first_index {
+                farray.swap(j, j + 1);
+            } else {
+                break;
+            }
+        }
+    }
+    for f in atoms_list {
+        let target = farray.iter().position(|chain| {
+            let c = chain[0].color;
+            f.neighbour_cols[..f.nneighbours].contains(&c)
+        });
+        match target {
+            Some(i) => farray[i].insert(1, f),
+            None => farray.push(vec![f]),
+        }
+    }
+    farray
+}
+
+/// `ColorScore`: how well the connections of the `moving_color` atoms to the `fixed_color` atoms have standard length
+pub fn color_score(mp: &Molecule, moving_color: i32, fixed_color: i32) -> f64 {
+    let mut result = 0.0;
+    for b in &mp.bonds {
+        let mut ap1 = &mp.atoms[(b.atoms[0] - 1) as usize];
+        let mut ap2 = &mp.atoms[(b.atoms[1] - 1) as usize];
+        if ap1.color == ap2.color {
+            continue;
+        }
+        if ap1.color == moving_color && ap2.color == fixed_color {
+            std::mem::swap(&mut ap1, &mut ap2);
+        } else if !(ap2.color == moving_color && ap1.color == fixed_color) {
+            continue;
+        }
+        let dx = ap1.x - ap2.x;
+        let dy = ap1.y - ap2.y;
+        let d = f64::from(dx * dx + dy * dy).sqrt();
+        result += (d - 1.54) * (d - 1.54);
+    }
+    result
+}
+
+const MAX_ATTACHMENTS: usize = 10;
+
+/// `struct attachment_t`
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Attachment {
+    pub iattachment: usize,
+    pub iligand: usize,
+    pub cligand: i32,
+    pub nneighbours: i32,
+    pub has_symbol: bool,
+    pub x: f64,
+    pub y: f64,
+    pub xlig: f64,
+    pub ylig: f64,
+    pub xdir: f64,
+    pub ydir: f64,
+}
+
+/// `CollectAttachments`: the off-fragment attachments of the fragment `color` (at most 10)
+pub fn collect_attachments(mp: &Molecule, color: i32, nbp: &[Neighbourhood]) -> Vec<Attachment> {
+    let mut atts: Vec<Attachment> = Vec::new();
+    for b in &mp.bonds {
+        let mut i1 = (b.atoms[0] - 1) as usize;
+        let mut i2 = (b.atoms[1] - 1) as usize;
+        if mp.atoms[i1].color != color && mp.atoms[i2].color != color {
+            continue;
+        }
+        if mp.atoms[i1].color == mp.atoms[i2].color {
+            continue;
+        }
+        if mp.atoms[i2].color == color {
+            std::mem::swap(&mut i1, &mut i2);
+        }
+        let (a1, a2) = (&mp.atoms[i1], &mp.atoms[i2]);
+        atts.push(Attachment {
+            iattachment: i1,
+            iligand: i2,
+            cligand: a2.color,
+            has_symbol: a1.atom_symbol != "C",
+            x: f64::from(a1.x),
+            y: f64::from(a1.y),
+            xlig: f64::from(a2.x),
+            ylig: f64::from(a2.y),
+            ..Attachment::default()
+        });
+        if atts.len() >= MAX_ATTACHMENTS {
+            break;
+        }
+    }
+    for att in &mut atts {
+        let nb = &nbp[att.iattachment];
+        for &a in &nb.atoms {
+            if mp.atoms[a].color == color {
+                att.nneighbours += 1;
+            } else {
+                att.xdir = f64::from(mp.atoms[a].x);
+                att.ydir = f64::from(mp.atoms[a].y);
+            }
+        }
+        if att.nneighbours > 0 {
+            let (edges, coords, numbers) = get_colored_graph(mp, color);
+            let seed = numbers[att.iattachment];
+            let mut p = [0.0, 0.0];
+            next_substituent_point(&mut p, &coords, &edges, seed, 0);
+            att.xdir = p[0] - att.x;
+            att.ydir = p[1] - att.y;
+        }
+    }
+    atts
+}
+
+/// `struct tfm_t`: rotation, optionally preceded by a flip along the Y axis
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Tfm {
+    pub cos_alpha: f64,
+    pub sin_alpha: f64,
+    pub do_flip: bool,
+}
+
+/// `TfmPoint`
+pub fn tfm_point(x: f64, y: f64, from: [f64; 2], to: [f64; 2], t: &Tfm) -> [f64; 2] {
+    let mut x = x - from[0];
+    let y = y - from[1];
+    if t.do_flip {
+        x = -x;
+    }
+    [
+        x * t.cos_alpha - y * t.sin_alpha + to[0],
+        x * t.sin_alpha + y * t.cos_alpha + to[1],
+    ]
+}
+
+/// `ScoreTransformation`
+#[allow(clippy::too_many_arguments)]
+pub fn score_transformation(
+    t: &Tfm,
+    atts: &[Attachment],
+    from: [f64; 2],
+    to: [f64; 2],
+    mp: &Molecule,
+    color: i32,
+    bottom_color: i32,
+    top_color: i32,
+    target_height: f64,
+) -> f64 {
+    let na = atts.len() as i32;
+    let mut score = 0.0f64;
+    let (mut yamin, mut yamax) = (1.0e10f64, -1.0e10f64);
+    let (mut xamin, mut xamax) = (1.0e10f64, -1.0e10f64);
+    let mut natoms = 0;
+    for ap in &mp.atoms {
+        if ap.color != color {
+            continue;
+        }
+        natoms += 1;
+        let [xnew, ynew] = tfm_point(f64::from(ap.x), f64::from(ap.y), from, to, t);
+        yamin = yamin.min_c(ynew);
+        yamax = yamax.max_c(ynew);
+        xamin = xamin.min_c(xnew);
+        xamax = xamax.max_c(xnew);
+        for aph in &mp.atoms {
+            if aph.color != color && (aph.color == top_color || aph.color == bottom_color) {
+                // C multiplies the x difference by (ap->x - ap->x), which is zero; the y term is a plain square.
+                // Products of float differences are formed in single precision.
+                #[allow(clippy::eq_op)]
+                let fx: f32 = (ap.x - aph.x) * (ap.x - ap.x);
+                let sq: f32 = (ap.y - aph.y) * (ap.y - aph.y);
+                score += 0.1 / (0.1 + f64::from(fx) + f64::from(sq));
+                score += 0.2 / (0.1 + f64::from(sq));
+            }
+        }
+    }
+    let (mut ymin, mut ymax) = (1.0e10f64, -1.0e10f64);
+    for att in atts {
+        let l = &mp.atoms[att.iligand];
+        let [_, ynew] = tfm_point(f64::from(l.x), f64::from(l.y), from, to, t);
+        ymin = ymin.min_c(ynew);
+        ymax = ymax.max_c(ynew);
+    }
+    for att in atts {
+        let [xnew, ynew] = tfm_point(att.x, att.y, from, to, t);
+        if att.nneighbours <= 1 && att.has_symbol && na > 1 {
+            score += 1.0 * ((xnew - att.xlig) * (xnew - att.xlig));
+            score += 1.0 * ((ynew - att.ylig) * (ynew - att.ylig));
+        } else {
+            let [xdir, ydir] = tfm_point(att.xdir, att.ydir, [0.0, 0.0], [0.0, 0.0], t);
+            score += (xnew + xdir - att.xlig) * (xnew + xdir - att.xlig);
+            score += (ynew + ydir - att.ylig) * (ynew + ydir - att.ylig);
+        }
+    }
+    let nat = f64::from(natoms);
+    let naf = f64::from(na);
+    if natoms <= 2 {
+        0.01 * score + 1.0 * nat * ((yamax - yamin) - 0.00001 * (xamax - xamin))
+    } else if na <= 1 {
+        1.00 * score
+            + 0.0 * naf * (ymax - ymin)
+            + 0.0 * nat * ((yamax - yamin) - 0.1 * (xamax - xamin))
+    } else {
+        let h = target_height - (yamax - yamin);
+        1.00 * score
+            + 0.0100 * ((ymax - ymin) * (ymax - ymin))
+            + 0.0100 * nat * ((yamax - yamin) - (xamax - xamin) + 1.0 * (h * h))
+    }
+}
+
+/// C's `if (a < m) m = a` / `if (a > m) m = a` as methods that keep `m` for NaN
+trait MinMaxC {
+    fn min_c(self, a: f64) -> f64;
+    fn max_c(self, a: f64) -> f64;
+}
+
+impl MinMaxC for f64 {
+    fn min_c(self, a: f64) -> f64 {
+        if a < self { a } else { self }
+    }
+    fn max_c(self, a: f64) -> f64 {
+        if a > self { a } else { self }
+    }
+}
+
+const DEGREE_STEP: i32 = 15;
+
+/// `FindBestTransformation`: the best rotation (with or without flip) in 15 degree steps and its score
+#[allow(clippy::too_many_arguments)]
+pub fn find_best_transformation(
+    atts: &[Attachment],
+    from: [f64; 2],
+    to: [f64; 2],
+    mp: &Molecule,
+    color: i32,
+    bottom_color: i32,
+    top_color: i32,
+    target_height: f64,
+) -> (Tfm, f64) {
+    let mut t = Tfm {
+        cos_alpha: 1.0,
+        sin_alpha: 0.0,
+        do_flip: false,
+    };
+    let mut best = t;
+    let mut score = score_transformation(
+        &t,
+        atts,
+        from,
+        to,
+        mp,
+        color,
+        bottom_color,
+        top_color,
+        target_height,
+    );
+    let angle = |i: i32| f64::from(i * DEGREE_STEP) * 3.14159265358979 / 180.0;
+    for i in 1..=360 / DEGREE_STEP {
+        t.cos_alpha = angle(i).cos();
+        t.sin_alpha = -angle(i).sin();
+        let ns = score_transformation(
+            &t,
+            atts,
+            from,
+            to,
+            mp,
+            color,
+            bottom_color,
+            top_color,
+            target_height,
+        );
+        if ns < score {
+            best = t;
+            score = ns;
+        }
+    }
+    t.do_flip = true;
+    for i in 0..=360 / DEGREE_STEP {
+        t.cos_alpha = angle(i).cos();
+        t.sin_alpha = -angle(i).sin();
+        let ns = score_transformation(
+            &t,
+            atts,
+            from,
+            to,
+            mp,
+            color,
+            bottom_color,
+            top_color,
+            target_height,
+        );
+        if ns < score {
+            best = t;
+            score = ns;
+        }
+    }
+    (best, score)
+}
+
+/// `AlignFragment`: places the `color` fragment between the shortcut rows `top_y` and `bottom_y`;
+/// returns the spacing the rows need
+#[allow(clippy::too_many_arguments)]
+pub fn align_fragment(
+    mp: &mut Molecule,
+    nbp: &[Neighbourhood],
+    color: i32,
+    top_y: f64,
+    bottom_y: f64,
+    top_color: i32,
+    bottom_color: i32,
+    mut min_spacing: f64,
+    nsneighbours: i32,
+) -> f64 {
+    let atts = collect_attachments(mp, color, nbp);
+    let na = atts.len() as f64;
+    let n = mp.atoms.iter().filter(|a| a.color == color).count();
+    let (mut xcenter, mut ycenter, mut xnew) = (0.0f64, 0.0f64, 0.0f64);
+    for att in &atts {
+        xcenter += att.x;
+        ycenter += att.y;
+        xnew += att.xlig;
+    }
+    xcenter /= na;
+    ycenter /= na;
+    xnew /= na;
+    // the y coordinate of the sequence atoms is not used: both branches set it from the row positions
+    let ynew;
+    if nsneighbours == 1 {
+        if atts.len() > 1 && n > 2 {
+            ynew = bottom_y + (na + 0.1 * (n as f64 - 2.0)).sqrt() * 1.54;
+        } else {
+            ynew = bottom_y + 1.54;
+        }
+    } else {
+        ynew = (top_y + bottom_y) / 2.0;
+    }
+    let (tfm, _) = find_best_transformation(
+        &atts,
+        [xcenter, ycenter],
+        [xnew, ynew],
+        mp,
+        color,
+        bottom_color,
+        top_color,
+        top_y - bottom_y,
+    );
+    let (mut ymin, mut ymax) = (ynew, ynew);
+    for ap in &mut mp.atoms {
+        if ap.color != color {
+            continue;
+        }
+        let [x, y] = tfm_point(
+            f64::from(ap.x),
+            f64::from(ap.y),
+            [xcenter, ycenter],
+            [xnew, ynew],
+            &tfm,
+        );
+        ap.x = x as f32;
+        ap.y = y as f32;
+        if ymin > f64::from(ap.y) {
+            ymin = f64::from(ap.y);
+        }
+        if ymax < f64::from(ap.y) {
+            ymax = f64::from(ap.y);
+        }
+    }
+    for att in &atts {
+        let [_, y] = tfm_point(
+            att.x + att.xdir,
+            att.y + att.ydir,
+            [xcenter, ycenter],
+            [xnew, ynew],
+            &tfm,
+        );
+        if ymin > y {
+            ymin = y;
+        }
+        if ymax < y {
+            ymax = y;
+        }
+    }
+    let h = FRAME_HEIGHT + ymax - ymin;
+    min_spacing = if min_spacing > h { min_spacing } else { h };
+    min_spacing
+}
+
+/// `FragmentRenderedHeight`
+pub fn fragment_rendered_height(mp: &Molecule, color: i32) -> f64 {
+    let (mut ymin, mut ymax) = (1e10f64, -1e10f64);
+    let mut nmatch = 0;
+    for ap in &mp.atoms {
+        if ap.color != color {
+            continue;
+        }
+        nmatch += 1;
+        if ymin > f64::from(ap.y) {
+            ymin = f64::from(ap.y);
+        }
+        if ymax < f64::from(ap.y) {
+            ymax = f64::from(ap.y);
+        }
+    }
+    if nmatch == 0 {
+        return 1.5 * FRAME_HEIGHT;
+    }
+    (ymax - ymin) + 1.5 * FRAME_HEIGHT
+}
+
+/// `FragmentHeight`: the extent of the fragment perpendicular to its largest dimension
+pub fn fragment_height(mp: &Molecule, color: i32) -> f64 {
+    let mut dmax = -1.0f64;
+    let mut ex = [0.0f64; 2];
+    let mut r1 = [0.0f64; 2];
+    for i1 in 0..mp.atoms.len() {
+        let a1 = &mp.atoms[i1];
+        if a1.color != color {
+            continue;
+        }
+        for a2 in &mp.atoms[i1 + 1..] {
+            if a2.color != color {
+                continue;
+            }
+            let dx = a1.x - a2.x;
+            let dy = a1.y - a2.y;
+            let d = f64::from(dx * dx + dy * dy);
+            if d > dmax {
+                dmax = d;
+                ex = [fd(a2.x, a1.x), fd(a2.y, a1.y)];
+                r1 = [f64::from(a1.x), f64::from(a1.y)];
+            }
+        }
+    }
+    if dmax <= 0.0 {
+        return 1.5 * FRAME_HEIGHT;
+    }
+    dmax = dmax.sqrt();
+    ex[0] /= dmax;
+    ex[1] /= dmax;
+    let ey = [ex[1], -ex[0]];
+    let (mut ymin, mut ymax) = (1.0e10f64, -1.0e10f64);
+    for a in &mp.atoms {
+        if a.color != color {
+            continue;
+        }
+        let lambda = ey[0] * (r1[0] - f64::from(a.x)) + ey[1] * (r1[1] - f64::from(a.y));
+        if lambda < ymin {
+            ymin = lambda;
+        }
+        if lambda > ymax {
+            ymax = lambda;
+        }
+    }
+    (ymax - ymin) + 1.5 * FRAME_HEIGHT
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3646,6 +4238,100 @@ mod tests {
                 out += "\n";
                 layout_shortcut_chains(&mut d, &sc, &nbp);
                 out += &dump3("chains", &d);
+            }
+            if out != want {
+                bad.push(format!("{}\nwant:\n{want}\ngot:\n{out}", v["name"]));
+            }
+        }
+        assert!(bad.is_empty(), "{} differ; first:\n{}", bad.len(), bad[0]);
+    }
+
+    /// fragment bookkeeping, attachments and alignment must agree with the C code
+    #[test]
+    fn layout_fragment_alignment_matches_c() {
+        let text = include_str!("../../../../../tests/data/avalon_layout9.jsonl");
+        let g = |v: f64| fmt_gp(v, 9);
+        let mut bad = Vec::new();
+        for line in text.lines() {
+            let v: serde_json::Value = serde_json::from_str(line).expect("json");
+            let input = v["input"].as_str().unwrap();
+            let want = v["output"].as_str().unwrap();
+            let Some(mp) = mol_str_to_mol(input) else {
+                assert_eq!(want, "NULL\n");
+                continue;
+            };
+            let mut c = mp.clone();
+            let nbp = setup_neighbourhood(&c).unwrap();
+            let (as_, _bs) = ring_state(&c);
+            recolor_molecule(&mut c);
+            let mut sc = vec![0i32; c.atoms.len()];
+            perceive_shortcut_classes(&c, &as_, &mut sc, &nbp, 14);
+            let fa = collect_fragment_info(&c, &sc, &nbp);
+            let mut out = format!("nf {}\n", fa.len());
+            for (i, chain) in fa.iter().enumerate() {
+                out += &format!("chain {i}\n");
+                for f in chain {
+                    out += &format!(
+                        "f {} {} {} {} {} {} {} {} {} {} {},{},{} {} {}\n",
+                        f.color,
+                        f.first_index,
+                        g(f.xcenter),
+                        g(f.ycenter),
+                        g(f.radius),
+                        g(f.xoffset),
+                        g(f.yoffset),
+                        f.fragment_type,
+                        f.nsymbols,
+                        f.nneighbours,
+                        f.neighbour_cols[0],
+                        f.neighbour_cols[1],
+                        f.neighbour_cols[2],
+                        f.nsneighbours,
+                        i32::from(f.used)
+                    );
+                }
+            }
+            for k in 0..c.atoms.len() {
+                let col = c.atoms[k].color;
+                if c.atoms[..k].iter().any(|a| a.color == col) {
+                    continue;
+                }
+                let at = collect_attachments(&c, col, &nbp);
+                out += &format!(
+                    "color {col} fh {} frh {} na {}\n",
+                    g(fragment_height(&c, col)),
+                    g(fragment_rendered_height(&c, col)),
+                    at.len()
+                );
+                for a in &at {
+                    out += &format!(
+                        "att {} {} {} {} {} {} {} {} {} {} {}\n",
+                        a.iattachment,
+                        a.iligand,
+                        a.cligand,
+                        a.nneighbours,
+                        i32::from(a.has_symbol),
+                        g(a.x),
+                        g(a.y),
+                        g(a.xlig),
+                        g(a.ylig),
+                        g(a.xdir),
+                        g(a.ydir)
+                    );
+                }
+                if let Some(a) = c.atoms.iter().find(|a| a.color != col) {
+                    out += &format!("score {} {}\n", a.color, g(color_score(&c, col, a.color)));
+                }
+                if !at.is_empty() {
+                    let topc = at[0].cligand;
+                    let botc = at[at.len() - 1].cligand;
+                    for ns in 1..=2 {
+                        let mut d = c.clone();
+                        let sp = align_fragment(&mut d, &nbp, col, 2.0, -2.0, topc, botc, 1.0, ns);
+                        out += &format!("align {ns} {}\n", g(sp));
+                        out += &dump3("aligned", &d);
+                    }
+                }
             }
             if out != want {
                 bad.push(format!("{}\nwant:\n{want}\ngot:\n{out}", v["name"]));
