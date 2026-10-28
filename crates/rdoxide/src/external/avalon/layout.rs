@@ -9,8 +9,8 @@ use super::geometry::{
 };
 use super::graph::{BondSet, CRand, combine_rings, ring_list};
 use super::perceive::{DOUBLE, Neighbourhood, SINGLE, TRIPLE, ring_state};
-use super::reaccs::{Molecule, NONE};
-use super::utilities::{atom_symbol_match, flip_stereo_symbols};
+use super::reaccs::{CIS_TRANS_EITHER, CIS_TRANS_SWAPPED, Molecule, NONE};
+use super::utilities::{DOWN, UP, atom_symbol_match, flip_stereo_symbols, reset_colors};
 
 pub const RUBBER_BOND: i32 = 0x40;
 pub const DONT_FLIP_BOND: i32 = 0x20;
@@ -1710,6 +1710,403 @@ pub fn layout_fragments(mp: &mut Molecule, ring_size: &[i32], ring_count: &[i32]
     }
 }
 
+const TRANS_MASK: i32 = 0x10;
+const CIS_MASK: i32 = 0x20;
+const ALL_BOND_TYPES: i32 = 0xF;
+
+/// `Volume` of four points (x, y, z)
+fn volume4(t: &[[f64; 3]; 4]) -> f64 {
+    let (ax, ay, az) = (t[1][0] - t[0][0], t[1][1] - t[0][1], t[1][2] - t[0][2]);
+    let (bx, by, bz) = (t[2][0] - t[0][0], t[2][1] - t[0][1], t[2][2] - t[0][2]);
+    let (cx, cy, cz) = (t[3][0] - t[0][0], t[3][1] - t[0][1], t[3][2] - t[0][2]);
+    ax * (by * cz - bz * cy) + ay * (bz * cx - bx * cz) + az * (bx * cy - by * cx)
+}
+
+/// `LayoutAtomStereo`: turns the stereo parities of the atoms into wedged and hashed bonds
+pub fn layout_atom_stereo(
+    mp: &mut Molecule,
+    nbp: &[Neighbourhood],
+    is_ring_atom: &[i32],
+    ring_size: &[i32],
+) {
+    const CHAIN_ONLY: i32 = 0;
+    const ALLOW_RING_BONDS: i32 = 1;
+    const USE_ALL: i32 = 2;
+    reset_colors(mp);
+    for i in 0..mp.atoms.len() {
+        if mp.atoms[i].stereo_parity == NONE {
+            continue;
+        }
+        if nbp[i].atoms.len() != 4 {
+            continue;
+        }
+        let (x, y) = (f64::from(mp.atoms[i].x), f64::from(mp.atoms[i].y));
+        let mut tetra = [[0.0f64; 3]; 4];
+        let mut number = [0usize; 4];
+        let mut ligands = [0usize; 4];
+        for j in 0..4 {
+            number[j] = nbp[i].bonds[j];
+            ligands[j] = nbp[i].atoms[j];
+            tetra[j][0] = f64::from(mp.atoms[nbp[i].atoms[j]].x);
+            tetra[j][1] = f64::from(mp.atoms[nbp[i].atoms[j]].y);
+        }
+        let mut parity = 1;
+        for j in 1..4 {
+            for k in (0..j).rev() {
+                if ligands[k] > ligands[k + 1] {
+                    parity *= -1;
+                    ligands.swap(k, k + 1);
+                } else {
+                    break;
+                }
+            }
+        }
+        let mut maxvol = 0.0f64;
+        for irun in CHAIN_ONLY..=USE_ALL {
+            maxvol = 0.0;
+            let mut d = [0i32; 4];
+            // whether stereo mark `v` (-1, 0, 1) is allowed on ligand `j`
+            let allowed = |mp: &Molecule, j: usize, v: i32| -> bool {
+                if v == 0 {
+                    return true;
+                }
+                let bp = &mp.bonds[number[j]];
+                if (bp.bond_type != 1) || bp.stereo_symbol != NONE {
+                    return false;
+                }
+                let h = if bp.atoms[0] == i as i32 + 1 {
+                    bp.atoms[1]
+                } else {
+                    bp.atoms[0]
+                };
+                let h = (h - 1) as usize;
+                if irun <= CHAIN_ONLY && is_ring_atom[h] != 0 {
+                    return false;
+                }
+                if irun < ALLOW_RING_BONDS && ring_size[number[j]] != 0 {
+                    return false;
+                }
+                if irun < USE_ALL
+                    && (mp.atoms[h].stereo_parity != NONE || mp.atoms[h].color != NONE)
+                {
+                    return false;
+                }
+                true
+            };
+            let zval =
+                |j: usize, v: i32| f64::from(v) * 0.1 / nbp[nbp[i].atoms[j]].atoms.len() as f64;
+            for i0 in -1..=1 {
+                if !allowed(mp, 0, i0) {
+                    continue;
+                }
+                tetra[0][2] = zval(0, i0);
+                for i1 in -1..=1 {
+                    if !allowed(mp, 1, i1) {
+                        continue;
+                    }
+                    tetra[1][2] = zval(1, i1);
+                    for i2 in -1..=1 {
+                        if !allowed(mp, 2, i2) {
+                            continue;
+                        }
+                        tetra[2][2] = zval(2, i2);
+                        for i3 in -1..=1 {
+                            if !allowed(mp, 3, i3) {
+                                continue;
+                            }
+                            tetra[3][2] = zval(3, i3);
+                            let cnt = i0 * i0 + i1 * i1 + i2 * i2 + i3 * i3;
+                            if !(1..=2).contains(&cnt) {
+                                continue;
+                            }
+                            let v = [i0, i1, i2, i3];
+                            if cnt == 1 {
+                                // umbrella check
+                                let k = (0..4).find(|&q| v[q] != 0).unwrap();
+                                let mut nclose = 0;
+                                for j in 0..4 {
+                                    if j != k
+                                        && (tetra[k][0] - x) * (tetra[j][0] - x)
+                                            + (tetra[k][1] - y) * (tetra[j][1] - y)
+                                            > ((tetra[k][0] - x) * (tetra[k][0] - x)
+                                                + (tetra[k][1] - y) * (tetra[k][1] - y))
+                                                * 0.1
+                                    {
+                                        nclose += 1;
+                                    }
+                                }
+                                if nclose < 1 || (nclose < 2 && irun < USE_ALL) {
+                                    continue;
+                                }
+                            }
+                            if cnt == 2 {
+                                // opposing stereo bonds
+                                let nz: Vec<usize> = (0..4).filter(|&q| v[q] != 0).collect();
+                                let (j, k) = (nz[0], nz[1]);
+                                let dot = (tetra[j][0] - x) * (tetra[k][0] - x)
+                                    + (tetra[j][1] - y) * (tetra[k][1] - y);
+                                if dot
+                                    < -0.3
+                                        * ((tetra[j][0] - x) * (tetra[j][0] - x)
+                                            + (tetra[j][1] - y) * (tetra[j][1] - y))
+                                {
+                                    continue;
+                                }
+                                if dot
+                                    < -0.3
+                                        * ((tetra[k][0] - x) * (tetra[k][0] - x)
+                                            + (tetra[k][1] - y) * (tetra[k][1] - y))
+                                {
+                                    continue;
+                                }
+                            }
+                            if irun <= ALLOW_RING_BONDS && cnt > 1 {
+                                continue;
+                            }
+                            if maxvol < volume4(&tetra) / f64::from(cnt) {
+                                maxvol = volume4(&tetra) / f64::from(cnt);
+                                d = v;
+                            }
+                        }
+                    }
+                }
+            }
+            if maxvol > 0.00001 {
+                for j in 0..4 {
+                    if d[j] == 0 {
+                        continue;
+                    }
+                    if mp.atoms[i].stereo_parity == 1 {
+                        d[j] *= -1;
+                    }
+                    if parity < 0 {
+                        d[j] *= -1;
+                    }
+                    let bp = &mut mp.bonds[number[j]];
+                    if bp.atoms[0] != i as i32 + 1 {
+                        bp.atoms.swap(0, 1);
+                    }
+                    bp.stereo_symbol = if d[j] > 0 { UP } else { DOWN };
+                }
+                mp.atoms[i].stereo_parity = NONE;
+                mp.atoms[i].color = NONE + 1;
+                break;
+            }
+        }
+        let _ = maxvol;
+    }
+    reset_colors(mp);
+}
+
+/// `ClearFlipFlags`
+pub fn clear_flip_flags(mp: &mut Molecule) {
+    for b in &mut mp.bonds {
+        b.bond_type &= !DONT_FLIP_BOND;
+    }
+}
+
+/// `ClearDBStereoInSmallRings`
+pub fn clear_db_stereo_in_small_rings(mp: &mut Molecule, ring_size: &[i32]) {
+    for (i, b) in mp.bonds.iter_mut().enumerate() {
+        if ALL_BOND_TYPES & b.bond_type == DOUBLE && ring_size[i] < 8 && ring_size[i] > 0 {
+            b.stereo_symbol = NONE;
+        }
+    }
+}
+
+/// the cis/trans product of `LayoutBondStereo` for the reference ligands `l1`, `l2`
+fn db_q(mp: &Molecule, ai1: usize, ai2: usize, l1: usize, l2: usize) -> f64 {
+    let (a1, a2) = (&mp.atoms[ai1], &mp.atoms[ai2]);
+    let p1 = [
+        f64::from(mp.atoms[l1].x - a1.x),
+        f64::from(mp.atoms[l1].y - a1.y),
+    ];
+    let p2 = [
+        f64::from(mp.atoms[l2].x - a2.x),
+        f64::from(mp.atoms[l2].y - a2.y),
+    ];
+    let r12 = [f64::from(a2.x - a1.x), f64::from(a2.y - a1.y)];
+    (p1[0] * r12[1] - p1[1] * r12[0]) * (p2[0] * r12[1] - p2[1] * r12[0])
+}
+
+fn db_ok(symbol: i32, q: f64) -> bool {
+    ((symbol & TRANS_MASK) != 0 && q < 0.0) || ((symbol & CIS_MASK) != 0 && q > 0.0)
+}
+
+/// rotates the double bond atoms around their center (`first`: +30 degrees, else -30 degrees)
+fn rotate_bond(
+    mp: &mut Molecule,
+    ai1: usize,
+    ai2: usize,
+    pdb1: [f64; 2],
+    pdb2: [f64; 2],
+    pcenter: [f64; 2],
+    first: bool,
+) {
+    let (m00, m01, m10, m11) = if first {
+        (
+            (PI / 6.0).cos(),
+            (PI / 6.0).sin(),
+            -(PI / 6.0).sin(),
+            (PI / 6.0).cos(),
+        )
+    } else {
+        (
+            (PI / 6.0).cos(),
+            -(PI / 6.0).sin(),
+            (PI / 6.0).sin(),
+            (PI / 6.0).cos(),
+        )
+    };
+    for (ai, p) in [(ai1, pdb1), (ai2, pdb2)] {
+        mp.atoms[ai].x =
+            (pcenter[0] + m00 * (p[0] - pcenter[0]) + m01 * (p[1] - pcenter[1])) as f32;
+        mp.atoms[ai].y =
+            (pcenter[1] + m10 * (p[0] - pcenter[0]) + m11 * (p[1] - pcenter[1])) as f32;
+    }
+}
+
+/// `LayoutBondStereo`: flips double bonds (or marks them swapped) to match their stereo marks
+pub fn layout_bond_stereo(mp: &mut Molecule, nbp: &[Neighbourhood], ring_size: &[i32]) {
+    let atom_colors: Vec<i32> = mp.atoms.iter().map(|a| a.color).collect();
+    for a in &mut mp.atoms {
+        a.color = NONE;
+    }
+    let natoms = mp.atoms.len();
+    for i in 0..mp.bonds.len() {
+        if ALL_BOND_TYPES & mp.bonds[i].bond_type != DOUBLE {
+            continue;
+        }
+        if ring_size[i] < 8 && ring_size[i] > 0 {
+            mp.bonds[i].stereo_symbol = NONE;
+            continue;
+        }
+        let (ai1, ai2) = (
+            (mp.bonds[i].atoms[0] - 1) as usize,
+            (mp.bonds[i].atoms[1] - 1) as usize,
+        );
+        let sym = mp.bonds[i].stereo_symbol;
+        if sym == NONE || sym == CIS_TRANS_SWAPPED || sym == CIS_TRANS_EITHER {
+            continue;
+        }
+        if nbp[ai1].atoms.len() < 2
+            || nbp[ai1].atoms.len() > 3
+            || nbp[ai2].atoms.len() < 2
+            || nbp[ai2].atoms.len() > 3
+        {
+            mp.bonds[i].stereo_symbol = NONE;
+            continue;
+        }
+        let mut l1 = natoms;
+        for &a in &nbp[ai1].atoms {
+            if a != ai2 && a < l1 {
+                l1 = a;
+            }
+        }
+        let mut l2 = natoms;
+        for &a in &nbp[ai2].atoms {
+            if a != ai1 && a < l2 {
+                l2 = a;
+            }
+        }
+        let mut q = db_q(mp, ai1, ai2, l1, l2);
+        if db_ok(mp.bonds[i].stereo_symbol, q) {
+            mp.bonds[i].stereo_symbol = NONE;
+            continue;
+        }
+        if ring_size[i] != 0 && ring_size[i] < 10 {
+            mp.bonds[i].stereo_symbol = CIS_TRANS_SWAPPED;
+            continue;
+        } else if ring_size[i] != 0 {
+            let pdb1 = [f64::from(mp.atoms[ai1].x), f64::from(mp.atoms[ai1].y)];
+            let pdb2 = [f64::from(mp.atoms[ai2].x), f64::from(mp.atoms[ai2].y)];
+            let pcenter = [0.5 * (pdb1[0] + pdb2[0]), 0.5 * (pdb1[1] + pdb2[1])];
+            let (mut pdb1_new, mut pdb2_new) = ([0.0f64; 2], [0.0f64; 2]);
+            rotate_bond(mp, ai1, ai2, pdb1, pdb2, pcenter, true);
+            let mut lastq = 0.0f64;
+            q = db_q(mp, ai1, ai2, l1, l2);
+            if db_ok(mp.bonds[i].stereo_symbol, q) {
+                mp.bonds[i].stereo_symbol = NONE;
+                pdb1_new = [f64::from(mp.atoms[ai1].x), f64::from(mp.atoms[ai1].y)];
+                pdb2_new = [f64::from(mp.atoms[ai2].x), f64::from(mp.atoms[ai2].y)];
+                lastq = q.abs();
+            }
+            rotate_bond(mp, ai1, ai2, pdb1, pdb2, pcenter, false);
+            q = db_q(mp, ai1, ai2, l1, l2);
+            if db_ok(mp.bonds[i].stereo_symbol, q) {
+                if mp.bonds[i].stereo_symbol != NONE && lastq < q.abs() {
+                    pdb1_new = [f64::from(mp.atoms[ai1].x), f64::from(mp.atoms[ai1].y)];
+                    pdb2_new = [f64::from(mp.atoms[ai2].x), f64::from(mp.atoms[ai2].y)];
+                }
+                mp.bonds[i].stereo_symbol = NONE;
+            }
+            if lastq > 0.0 {
+                mp.atoms[ai1].x = pdb1_new[0] as f32;
+                mp.atoms[ai1].y = pdb1_new[1] as f32;
+                mp.atoms[ai2].x = pdb2_new[0] as f32;
+                mp.atoms[ai2].y = pdb2_new[1] as f32;
+                continue;
+            }
+            mp.atoms[ai1].x = pdb1[0] as f32;
+            mp.atoms[ai1].y = pdb1[1] as f32;
+            mp.atoms[ai2].x = pdb2[0] as f32;
+            mp.atoms[ai2].y = pdb2[1] as f32;
+            mp.bonds[i].stereo_symbol = CIS_TRANS_SWAPPED;
+            continue;
+        }
+
+        // a chain bond that has to be flipped
+        mp.atoms[ai1].color = -1;
+        mp.atoms[ai2].color = 1;
+        flood_color(mp, nbp, ai2, 1);
+        mp.atoms[ai1].color = 0;
+        let p1 = [f64::from(mp.atoms[ai1].x), f64::from(mp.atoms[ai1].y)];
+        let p2 = [f64::from(mp.atoms[ai2].x), f64::from(mp.atoms[ai2].y)];
+        let r12 = [p2[0] - p1[0], p2[1] - p1[1]];
+        for j in 0..natoms {
+            if mp.atoms[j].color == 1 {
+                mirror_on_bond(mp, j, p1, r12);
+            }
+        }
+        flip_stereo_symbols(mp, 1);
+        reset_colors(mp);
+        mp.bonds[i].stereo_symbol = NONE;
+    }
+    for (a, c) in mp.atoms.iter_mut().zip(atom_colors) {
+        a.color = c;
+    }
+}
+
+/// `MakeLandscape`: rotates the molecule by 90 degrees if it is higher than wide
+pub fn make_landscape(mp: &mut Molecule) {
+    if mp.atoms.is_empty() {
+        return;
+    }
+    let (mut xmin, mut xmax, mut ymin, mut ymax) =
+        (mp.atoms[0].x, mp.atoms[0].x, mp.atoms[0].y, mp.atoms[0].y);
+    for a in mp.atoms.iter().skip(1) {
+        if xmin > a.x {
+            xmin = a.x;
+        }
+        if xmax < a.x {
+            xmax = a.x;
+        }
+        if ymin > a.y {
+            ymin = a.y;
+        }
+        if ymax < a.y {
+            ymax = a.y;
+        }
+    }
+    if xmax - xmin < ymax - ymin {
+        for a in &mut mp.atoms {
+            let h = a.x;
+            a.x = a.y;
+            a.y = -h;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2025,6 +2422,90 @@ mod tests {
                 out += &format!("diam{i}={} proj={}\n", fmt_gp(d, 17), fmt_gp(proj, 17));
                 out += &dump2("diam", &c);
             }
+            if out != want {
+                bad.push(format!("{input}\nwant:\n{want}\ngot:\n{out}"));
+            }
+        }
+        assert!(bad.is_empty(), "{} differ; first:\n{}", bad.len(), bad[0]);
+    }
+
+    fn dump3(tag: &str, c: &Molecule) -> String {
+        let g = |v: f32| fmt_gp(f64::from(v), 9);
+        let mut out = format!("{tag}\n");
+        for (i, a) in c.atoms.iter().enumerate() {
+            out += &format!(
+                "a {} {} {} {} {} {} {}\n",
+                i + 1,
+                g(a.x),
+                g(a.y),
+                g(a.z),
+                a.color,
+                a.value as i32,
+                a.stereo_parity
+            );
+        }
+        for (i, b) in c.bonds.iter().enumerate() {
+            out += &format!(
+                "b {} {} {} {} {}\n",
+                i + 1,
+                b.atoms[0],
+                b.atoms[1],
+                b.bond_type,
+                b.stereo_symbol
+            );
+        }
+        out
+    }
+
+    /// the stereo part of the layout must leave the same wedges and coordinates as the C code
+    #[test]
+    fn layout_stereo_matches_c() {
+        use crate::external::avalon::smi2mol::{TRUE_DB_STEREO, smi_to_mol};
+        let text = include_str!("../../../../../tests/data/avalon_layout5.jsonl");
+        let mut bad = Vec::new();
+        for line in text.lines() {
+            let v: serde_json::Value = serde_json::from_str(line).expect("json");
+            let input = v["input"].as_str().unwrap();
+            let want = v["output"].as_str().unwrap();
+            let Some(mp) = smi_to_mol(input, TRUE_DB_STEREO).unwrap() else {
+                assert_eq!(want, "NULL\n");
+                continue;
+            };
+            let mut base = seeded(7, &mp);
+            recolor_molecule(&mut base);
+            layout_rings(&mut base);
+            let nbp = setup_neighbourhood(&base).unwrap();
+            let (as_, bs) = ring_state(&base);
+            let mut rs = vec![0i32; base.bonds.len()];
+            for i in 0..base.bonds.len() {
+                if bs[i] != 0 {
+                    let col = base.atoms[(base.bonds[i].atoms[0] - 1) as usize].color;
+                    rs[i] = (0..base.atoms.len())
+                        .filter(|&j| as_[j] != 0 && base.atoms[j].color == col)
+                        .count() as i32;
+                }
+            }
+            sprout_ring_substituents(&mut base, &as_, &rs, &nbp);
+            link_ring_fragments(&mut base, &as_);
+            layout_chain_atoms(&mut base, &as_, &nbp);
+            layout_rubber_fragments(&mut base);
+            link_remaining_fragments(&mut base);
+            let mut out = dump3("base", &base);
+
+            let mut c = base.clone();
+            layout_bond_stereo(&mut c, &nbp, &rs);
+            out += &dump3("bondstereo", &c);
+            let mut c = base.clone();
+            layout_atom_stereo(&mut c, &nbp, &as_, &rs);
+            out += &dump3("atomstereo", &c);
+            layout_bond_stereo(&mut c, &nbp, &rs);
+            clear_db_stereo_in_small_rings(&mut c, &rs);
+            clear_flip_flags(&mut c);
+            make_landscape(&mut c);
+            out += &dump3("all", &c);
+            let mut c = base.clone();
+            clear_db_stereo_in_small_rings(&mut c, &rs);
+            out += &dump3("cleardb", &c);
             if out != want {
                 bad.push(format!("{input}\nwant:\n{want}\ngot:\n{out}"));
             }
