@@ -150,3 +150,6 @@ A4 (all fingerprint classes) and the first part of A7: `rdoxide.Avalon.pyAvalonT
   `LinkRingFragments`, `LinkRemainingFragments`, `BranchQuality`, `ColorSize`; 126 molfiles identical to the C code
   (`tests/data/avalon_layout3.jsonl`; the lactam functions are driven with a synthetic ring size array because
   `RingState` only counts rings per bond).
+* L4 `layout.rs` (layout.c lines 1728-2390): `LayoutChainAtoms`, `LayoutRubberFragments`, `BestBondColor`, `Diameter`,
+  `OrientFragment`, `LayoutFragments`; 156 molfiles identical to the C code (`tests/data/avalon_layout4.jsonl`).
+  Watch for `int * float` products (`200*ap->x`), which C evaluates in single precision.
