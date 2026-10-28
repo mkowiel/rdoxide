@@ -66,3 +66,11 @@ into `sketcherMinimizerMolecule`, runs `runGenerateCoordinates` and copies the c
   constrained atoms; the driver aborts on several unbonded atoms, so molecules are split into components as the sketcher
   does) give identical fragment lists, trees and bond directions (`tests/data/coordgen_frag.txt`,
   `tools/coordgen_drv/frag.cpp`, `tools/make_coordgen_frag_corpus.py`).
+* CG3a `external::coordgen::templates`: the 82 built-in ring system templates (`data/templates.txt`, converted from
+  `CoordgenTemplates.cpp` by `tools/gen_coordgen_templates.py`, coordinates rounded and normalized to bond length 1 as
+  `normalizeTemplate` does), `morganScores`, the template matching `compare`/`checkIdentity` (molecule atom -> template atom
+  mapping), and the 2x2 `svd`/`alignmentMatrix`. Templates and Morgan scores are bit-identical to the C++ code; 116 molecules
+  (76 of the 82 templates with permuted/rotated/mirrored atoms, plus polycyclic RDKit molecules) give the same scores,
+  first matching template, mapping and alignment matrix (`tests/data/coordgen_templates.txt`, `tools/coordgen_drv/tmpl.cpp`,
+  `tools/make_coordgen_templates_corpus.py`). Not yet: the double bond stereo check inside `compare` for macrocycle double
+  bonds (needs the CIP ranking; `unimplemented!` until the stereo stage), and the user template file (maeparser).
