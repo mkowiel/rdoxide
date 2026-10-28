@@ -173,3 +173,9 @@ Ported `TopBottomSeparation`, `AttachmentCenterDistance`, `FloodInvertColor`, `C
 `ImproveFragmentByBondFlip` and `ImproveFragmentByAllBondFlips`. Checked on 56 SMILES with a synthetic coloring
 (ring atoms = fragment, others = top/bottom attachments) in `tests/data/avalon_layout7.jsonl` (driver `lay7.c`).
 The flip-and-undo trials reproduce C's float round-off since the undo is a second reflection, not a restore.
+
+### L8 — layout.c shortcut chains
+
+Ported `IsShortcutLikeAtom`, `PerceiveShortcutClasses` (without the stderr diagnostics) and `LayoutShortcutChains`.
+69 molfiles with `R` + atext atoms and three `max_line_size` values (0, 8, 14) in `tests/data/avalon_layout8.jsonl`
+(driver `lay8.c`, records separated by `$$$$`); line splitting changes the classes in 5 of them.

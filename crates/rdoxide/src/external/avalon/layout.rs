@@ -2820,6 +2820,236 @@ pub fn improve_fragment_by_all_bond_flips(
     }
 }
 
+pub const SHORTCUT_NONE: i32 = 0;
+pub const SHORTCUT_START: i32 = 1;
+pub const SHORTCUT_END: i32 = 2;
+pub const SHORTCUT_INNER: i32 = 4;
+pub const SHORTCUT_BRANCH: i32 = 8;
+pub const SHORTCUT_RING: i32 = 16;
+pub const SHORTCUT_SINGLE: i32 = 32;
+
+fn is_shortcut_atom(a: &crate::external::avalon::reaccs::Atom) -> bool {
+    a.atom_symbol == "R" && !a.atext.is_empty()
+}
+
+/// `IsShortcutLikeAtom`: R atoms with text, and terminal single-symbol atoms attached to such shortcuts
+pub fn is_shortcut_like_atom(mp: &Molecule, i: usize, nbp: &[Neighbourhood]) -> bool {
+    let ap = &mp.atoms[i];
+    if is_shortcut_atom(ap) {
+        // repeat atoms are not rendered as strings
+        if ap.atext.bytes().any(|c| c.is_ascii_digit()) {
+            return false;
+        }
+        return nbp[i].atoms.iter().any(|&j| is_shortcut_atom(&mp.atoms[j]));
+    }
+    if ap.atom_symbol.len() > 1 || nbp[i].atoms.len() > 1 {
+        return false;
+    }
+    // C reads the (zeroed) first neighbour slot of an atom without neighbours
+    let n0 = nbp[i].atoms.first().copied().unwrap_or(0);
+    let nap = &mp.atoms[n0];
+    if is_shortcut_atom(nap) {
+        if nap.atext.bytes().any(|c| c.is_ascii_digit()) {
+            return false;
+        }
+        return nbp[n0]
+            .atoms
+            .iter()
+            .any(|&j| is_shortcut_atom(&mp.atoms[j]));
+    }
+    false
+}
+
+const SEQ: i32 = SHORTCUT_INNER | SHORTCUT_START | SHORTCUT_END;
+
+/// `PerceiveShortcutClasses`: fills `shortcut_class` and tells whether a chain of shortcuts was found
+pub fn perceive_shortcut_classes(
+    mp: &Molecule,
+    is_ring_atom: &[i32],
+    shortcut_class: &mut [i32],
+    nbp: &[Neighbourhood],
+    max_line_size: usize,
+) -> bool {
+    let n = mp.atoms.len();
+    let mut used = vec![false; n];
+    for i in 0..n {
+        shortcut_class[i] = SHORTCUT_NONE;
+        if !is_shortcut_like_atom(mp, i, nbp) {
+            used[i] = true;
+            continue;
+        }
+        let nshortcuts = nbp[i]
+            .atoms
+            .iter()
+            .filter(|&&j| is_shortcut_like_atom(mp, j, nbp))
+            .count();
+        if nshortcuts > 2 {
+            shortcut_class[i] |= SHORTCUT_BRANCH;
+        } else if nshortcuts == 0 {
+            shortcut_class[i] |= SHORTCUT_SINGLE;
+        }
+        if is_ring_atom[i] != 0 && shortcut_class[i] & SHORTCUT_BRANCH != 0 {
+            shortcut_class[i] |= SHORTCUT_RING;
+        }
+        if shortcut_class[i] != SHORTCUT_NONE {
+            used[i] = true;
+        }
+    }
+    let mut chain_found = false;
+    for i in 0..n {
+        if used[i] {
+            continue;
+        }
+        let cands: Vec<usize> = (0..nbp[i].atoms.len())
+            .filter(|&j| {
+                mp.bonds[nbp[i].bonds[j]].bond_type != NONE
+                    && !used[nbp[i].atoms[j]]
+                    && is_shortcut_like_atom(mp, nbp[i].atoms[j], nbp)
+            })
+            .collect();
+        if cands.len() == 2 {
+            chain_found = true;
+            shortcut_class[i] |= SHORTCUT_INNER;
+        } else if cands.len() == 1 {
+            if nbp[i].atoms[cands[0]] > i {
+                shortcut_class[i] |= SHORTCUT_START;
+            } else {
+                shortcut_class[i] |= SHORTCUT_END;
+            }
+        } else {
+            used[i] = true;
+        }
+    }
+    // split long sequences
+    let tlen = |i: usize| mp.atoms[i].atext.len();
+    loop {
+        let mut next_start: Option<usize> = None;
+        for i in 0..n {
+            if used[i] {
+                continue;
+            }
+            if shortcut_class[i] & SHORTCUT_START != 0 {
+                next_start = Some(i);
+                break;
+            } else if next_start.is_none() && shortcut_class[i] & SEQ != 0 {
+                next_start = Some(i);
+            }
+        }
+        let Some(mut cur) = next_start else {
+            break;
+        };
+        shortcut_class[cur] = SHORTCUT_START;
+        let mut line_size = tlen(cur);
+        loop {
+            used[cur] = true;
+            let nb = &nbp[cur];
+            let found = (0..nb.atoms.len())
+                .find(|&j| !used[nb.atoms[j]] && shortcut_class[nb.atoms[j]] & SEQ != 0);
+            let Some(j) = found else {
+                if shortcut_class[cur] == SHORTCUT_START {
+                    shortcut_class[cur] = SHORTCUT_START;
+                } else {
+                    shortcut_class[cur] = SHORTCUT_END;
+                }
+                break;
+            };
+            let nxt = nb.atoms[j];
+            line_size += tlen(cur);
+            if max_line_size > 1
+                && line_size > max_line_size
+                && nb.atoms.len() == 2
+                && nbp[nxt].atoms.len() == 2
+                && shortcut_class[nxt] & SHORTCUT_END == 0
+            {
+                line_size = tlen(cur);
+                let singleton = !nbp[nxt]
+                    .atoms
+                    .iter()
+                    .any(|&a| !used[a] && shortcut_class[a] & SEQ != 0);
+                if !singleton {
+                    shortcut_class[cur] = SHORTCUT_END;
+                    shortcut_class[nxt] = SHORTCUT_START;
+                }
+            }
+            cur = nxt;
+        }
+    }
+    chain_found
+}
+
+/// `LayoutShortcutChains`: arranges chains of acyclic shortcut atoms linearly and rubber-bands their links
+pub fn layout_shortcut_chains(mp: &mut Molecule, shortcut_class: &[i32], nbp: &[Neighbourhood]) {
+    let n = mp.atoms.len();
+    let mut used = vec![false; n];
+    let half = |a: &crate::external::avalon::reaccs::Atom| {
+        let len = if a.atext.is_empty() {
+            a.atom_symbol.len()
+        } else {
+            a.atext.len()
+        };
+        0.5 * 1.54 * f64::from(3 + len as i32) / 4.0
+    };
+    loop {
+        let mut start = None;
+        let (mut col, mut x, mut y) = (0, 0f32, 0f32);
+        for i in 0..n {
+            if shortcut_class[i] & (SHORTCUT_START | SHORTCUT_INNER | SHORTCUT_END) == 0 {
+                used[i] = true;
+            }
+            if used[i] {
+                continue;
+            }
+            if shortcut_class[i] & SHORTCUT_START != 0 {
+                let ap = &mp.atoms[i];
+                col = ap.color;
+                x = (f64::from(ap.x) + half(ap)) as f32;
+                y = ap.y;
+                start = Some(i);
+                break;
+            }
+        }
+        let Some(mut i) = start else {
+            break;
+        };
+        used[i] = true;
+        loop {
+            let nb = &nbp[i];
+            let found = (0..nb.atoms.len())
+                .find(|&j| !used[nb.atoms[j]] && shortcut_class[nb.atoms[j]] & SEQ != 0);
+            let Some(j) = found else {
+                break;
+            };
+            i = nb.atoms[j];
+            used[i] = true;
+            let h = half(&mp.atoms[i]);
+            let ap = &mut mp.atoms[i];
+            ap.color = col;
+            x = (f64::from(x) + h) as f32;
+            ap.x = x;
+            ap.y = y;
+            x = (f64::from(x) + h) as f32;
+            if shortcut_class[i] & SHORTCUT_END != 0 {
+                break;
+            }
+        }
+    }
+    for b in &mut mp.bonds {
+        let (c0, c1) = (
+            shortcut_class[(b.atoms[0] - 1) as usize],
+            shortcut_class[(b.atoms[1] - 1) as usize],
+        );
+        if c0 & SEQ != 0 && c1 == SHORTCUT_NONE {
+            b.bond_type |= RUBBER_BOND;
+        }
+        if c1 & SEQ != 0 && c0 == SHORTCUT_NONE {
+            b.bond_type |= RUBBER_BOND;
+        }
+        if c1 & (SHORTCUT_START | SHORTCUT_END) != 0 && c0 & (SHORTCUT_START | SHORTCUT_END) != 0 {
+            b.bond_type |= RUBBER_BOND;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3378,6 +3608,47 @@ mod tests {
             }
             if out != want {
                 bad.push(format!("{input}\nwant:\n{want}\ngot:\n{out}"));
+            }
+        }
+        assert!(bad.is_empty(), "{} differ; first:\n{}", bad.len(), bad[0]);
+    }
+
+    /// shortcut perception and linear shortcut layout must agree with the C code
+    #[test]
+    fn layout_shortcuts_match_c() {
+        let text = include_str!("../../../../../tests/data/avalon_layout8.jsonl");
+        let mut bad = Vec::new();
+        for line in text.lines() {
+            let v: serde_json::Value = serde_json::from_str(line).expect("json");
+            let input = v["input"].as_str().unwrap();
+            let want = v["output"].as_str().unwrap();
+            let Some(mp) = mol_str_to_mol(input) else {
+                assert_eq!(want, "NULL\n");
+                continue;
+            };
+            let mut c = mp.clone();
+            let nbp = setup_neighbourhood(&c).unwrap();
+            let (as_, _bs) = ring_state(&c);
+            recolor_molecule(&mut c);
+            let mut out = String::from("like");
+            for i in 0..c.atoms.len() {
+                out += &format!(" {}", i32::from(is_shortcut_like_atom(&c, i, &nbp)));
+            }
+            out += "\n";
+            for mls in [0usize, 8, 14] {
+                let mut d = c.clone();
+                let mut sc = vec![0i32; d.atoms.len()];
+                let found = perceive_shortcut_classes(&d, &as_, &mut sc, &nbp, mls);
+                out += &format!("classes {mls} {}:", i32::from(found));
+                for x in &sc {
+                    out += &format!(" {x}");
+                }
+                out += "\n";
+                layout_shortcut_chains(&mut d, &sc, &nbp);
+                out += &dump3("chains", &d);
+            }
+            if out != want {
+                bad.push(format!("{}\nwant:\n{want}\ngot:\n{out}", v["name"]));
             }
         }
         assert!(bad.is_empty(), "{} differ; first:\n{}", bad.len(), bad[0]);
