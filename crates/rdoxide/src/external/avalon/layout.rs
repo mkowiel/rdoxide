@@ -750,9 +750,7 @@ pub fn improve_molecule_by_bond_flip(
                     && nbp[ai0].atoms.len() > 1
                     && nbp[ai1].atoms.len() > 1
                     && (pass == 1 || nbp[ai1].atoms.len() > 2 || nbp[ai0].atoms.len() > 2)
-                    && (frag_color == 0
-                        || (mp.atoms[ai0].color == frag_color
-                            && mp.atoms[ai0].color == frag_color));
+                    && (frag_color == 0 || mp.atoms[ai0].color == frag_color/* C tests atom 0 twice here */);
                 if cond {
                     if only_single_bonds && mp.bonds[i].bond_type != SINGLE {
                         continue;
