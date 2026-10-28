@@ -1,0 +1,734 @@
+//! Port of the library entry points of Avalon Toolkit's `struchk.c` (`InitCheckMol`, `CheckMol`/`RunStruchk`)
+//! for the options RDKit's MolKey uses: `-ta`, `-ca`, `-cc`, `-cl`, `-cn`, `-cs`, `-tm`, `-da`, `-dg`, `-ds`,
+//! `-or`, `-l`. Options that need the charge, tautomer or pattern machinery (`-tc`, `-tt`, `-pc`, `-pr`, `-ps`,
+//! `-f`) are reported as errors by `init_check_mol`.
+//!
+//! The state is global as in C (parameters, the message list, the collision limit).
+
+use std::io::Write;
+use std::sync::Mutex;
+
+use super::aacheck::check_atoms;
+use super::pattern::{
+    AugmentedAtom, read_aa_pairs, read_augmented_atoms, transform_augmented_atoms,
+};
+use super::reaccs::{MAXATOMS, Molecule, NONE};
+use super::scan::Scan;
+use super::stereo::{
+    CONVERTED_TO_2D, ClashLimit, EITHER_BOND_FOUND, add_msg, atom_clash, check_stereo,
+    dubious_stereochemistry, fix_dubious_3d_molecule, remove_dubious_stereochemistry,
+};
+use super::utilities::strip_molecule;
+
+pub const BAD_MOLECULE: i32 = 1;
+pub const ALIAS_CONVERSION_FAILED: i32 = 2;
+pub const TRANSFORMED: i32 = 4;
+pub const FRAGMENTS_FOUND: i32 = 8;
+pub const EITHER_WARNING: i32 = 16;
+pub const STEREO_ERROR: i32 = 32;
+pub const DUBIOUS_STEREO_REMOVED: i32 = 64;
+pub const ATOM_CLASH: i32 = 128;
+pub const ATOM_CHECK_FAILED: i32 = 256;
+pub const SIZE_CHECK_FAILED: i32 = 512;
+pub const RECHARGED: i32 = 1024;
+pub const STEREO_FORCED_BAD: i32 = 2048;
+pub const STEREO_TRANSFORMED: i32 = 4096;
+pub const TEMPLATE_TRANSFORMED: i32 = 8192;
+pub const TAUTOMER_TRANSFORMED: i32 = 16384;
+pub const BAD_SET: i32 = BAD_MOLECULE
+    | ALIAS_CONVERSION_FAILED
+    | STEREO_ERROR
+    | STEREO_FORCED_BAD
+    | ATOM_CLASH
+    | ATOM_CHECK_FAILED
+    | SIZE_CHECK_FAILED;
+pub const TRANSFORMED_SET: i32 = TRANSFORMED
+    | FRAGMENTS_FOUND
+    | EITHER_WARNING
+    | DUBIOUS_STEREO_REMOVED
+    | STEREO_TRANSFORMED
+    | TEMPLATE_TRANSFORMED
+    | TAUTOMER_TRANSFORMED
+    | RECHARGED;
+
+const SINGLET: i32 = 1;
+const DOUBLET: i32 = 2;
+const TRIPLET: i32 = 3;
+const MAX_OPT: usize = 100;
+
+/// the parameters set by `InitCheckMol`
+struct State {
+    result_as_data: bool,
+    trans_pairs: Option<Vec<[AugmentedAtom; 2]>>,
+    remove_minor_fragments: bool,
+    good_atoms: Option<Vec<AugmentedAtom>>,
+    check_collision: bool,
+    percent: i32,
+    max_mol_size: i32,
+    check_stereo: bool,
+    convert_atom_texts: bool,
+    groups_to_sgroups: bool,
+    convert_stext: bool,
+    log_file: Option<std::fs::File>,
+    /// `SetCollisionLimit` is not undone by `ClearParameters`
+    clash_limit: ClashLimit,
+    msgs: Vec<String>,
+}
+
+impl State {
+    const fn new() -> Self {
+        State {
+            result_as_data: false,
+            trans_pairs: None,
+            remove_minor_fragments: false,
+            good_atoms: None,
+            check_collision: false,
+            percent: 15,
+            max_mol_size: 255,
+            check_stereo: false,
+            convert_atom_texts: false,
+            groups_to_sgroups: false,
+            convert_stext: false,
+            log_file: None,
+            clash_limit: ClashLimit(0.15),
+            msgs: Vec::new(),
+        }
+    }
+
+    /// `ClearParameters`
+    fn clear_parameters(&mut self) {
+        let (log, clash, msgs) = (
+            self.log_file.take(),
+            self.clash_limit,
+            std::mem::take(&mut self.msgs),
+        );
+        *self = State::new();
+        self.log_file = log;
+        self.clash_limit = clash;
+        self.msgs = msgs;
+    }
+}
+
+static STATE: Mutex<State> = Mutex::new(State::new());
+
+fn state() -> std::sync::MutexGuard<'static, State> {
+    STATE.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+/// `FreeMsgList`
+pub fn free_msg_list() {
+    state().msgs.clear();
+}
+
+/// `GetMsgList`: the messages in the order they were added, each followed by a newline
+pub fn get_msg_list() -> String {
+    state().msgs.iter().map(|m| format!("{m}\n")).collect()
+}
+
+/// `ClearParameters`
+pub fn clear_parameters() {
+    state().clear_parameters();
+}
+
+/// `ClearParameters` and closing the log file (`closeCheckMolFiles`)
+pub fn close_check_mol_files() {
+    let mut st = state();
+    st.clear_parameters();
+    st.log_file = None;
+}
+
+fn is_c_space(c: u8) -> bool {
+    matches!(c, b' ' | b'\t' | b'\n' | 0x0b | 0x0c | b'\r')
+}
+
+/// the tokenizer of `InitCheckMol`: blank separated words, optionally quoted; for the second word of a line
+/// the rest of the line is a comment
+fn tokenize_options(opt: &str) -> Vec<String> {
+    let b = opt.as_bytes();
+    let mut pos = 0usize;
+    let mut args: Vec<String> = Vec::new();
+    // `strchr(opt, '\r') >= 0` is a pointer comparison in C and always true
+    let has_crlf = true;
+    let mut word_in_line = 0;
+    let at = |i: usize| b.get(i).copied().unwrap_or(0);
+    if b.is_empty() {
+        return args;
+    }
+    loop {
+        let mut has_quote = false;
+        let mut eol_found = false;
+        while is_c_space(at(pos)) {
+            if at(pos) == b'\r' || at(pos) == b'\n' {
+                eol_found = true;
+            }
+            pos += 1;
+        }
+        if at(pos) == b'"' {
+            has_quote = true;
+            pos += 1;
+        }
+        let mut eos_found = false;
+        if has_quote {
+            word_in_line += 1;
+            let mut cp = pos;
+            while at(cp) != b'"' && at(cp) != 0 {
+                cp += 1;
+            }
+            eos_found = at(cp) == 0;
+            args.push(String::from_utf8_lossy(&b[pos..cp.min(b.len())]).into_owned());
+            if !eos_found {
+                pos = cp + 1;
+            }
+        } else if at(pos) != 0 {
+            word_in_line += 1;
+            let mut cp = pos;
+            while !is_c_space(at(cp)) && at(cp) != 0 {
+                cp += 1;
+            }
+            eos_found = at(cp) == 0;
+            if at(cp) == b'\r' || at(cp) == b'\n' {
+                eol_found = true;
+            }
+            args.push(String::from_utf8_lossy(&b[pos..cp.min(b.len())]).into_owned());
+            if !eos_found {
+                pos = cp + 1;
+            }
+        }
+        if word_in_line == 2 && has_crlf && !eol_found {
+            while at(pos) != 0 && at(pos) != b'\r' && at(pos) != b'\n' {
+                pos += 1;
+            }
+            if at(pos) == b'\r' || at(pos) == b'\n' {
+                eol_found = true;
+            }
+            let _ = eol_found;
+            word_in_line = 0;
+        } else if eol_found {
+            word_in_line = 0;
+        }
+        // C would repeat the last word of a string that does not end in a newline up to MAX_OPT times
+        if eos_found || args.len() >= MAX_OPT || at(pos) == 0 {
+            break;
+        }
+    }
+    args
+}
+
+/// options with a parameter
+const OPTIONS: &[(&str, bool)] = &[
+    ("i", true),
+    ("o", true),
+    ("ov", false),
+    ("or", false),
+    ("b", true),
+    ("br", false),
+    ("s", true),
+    ("l", true),
+    ("la", true),
+    ("f", true),
+    ("ft", true),
+    ("ta", true),
+    ("tc", true),
+    ("tl", true),
+    ("tm", false),
+    ("tq", true),
+    ("tt", true),
+    ("pc", true),
+    ("pr", true),
+    ("ps", true),
+    ("ca", true),
+    ("cc", false),
+    ("cl", true),
+    ("cn", true),
+    ("cs", false),
+    ("da", false),
+    ("dg", false),
+    ("dk", true),
+    ("ds", false),
+    ("dw", false),
+    ("dz", false),
+];
+
+fn read_file(name: &str, what: &str) -> Option<String> {
+    match std::fs::read(name) {
+        Ok(b) => Some(String::from_utf8_lossy(&b).into_owned()),
+        Err(_) => {
+            eprintln!("LIBRARY: Could not open {what} file '{name}'");
+            None
+        }
+    }
+}
+
+/// `Initialize` for library use: returns the number of option errors
+fn initialize(args: &[String]) -> i32 {
+    if args.is_empty() {
+        return 0;
+    }
+    let mut st = state();
+    st.clear_parameters();
+    let mut optind = if args[0].starts_with('-') { 0 } else { 1 };
+    let mut errflg = 0;
+    while optind < args.len() {
+        let option = args[optind].get(1..).unwrap_or("").to_string();
+        optind += 1;
+        let Some(&(_, has_par)) = OPTIONS.iter().find(|(n, _)| *n == option) else {
+            eprintln!("Illegal option '{option}' with argument ''");
+            errflg += 1;
+            continue;
+        };
+        let mut optarg = String::new();
+        if has_par {
+            if optind >= args.len() {
+                eprintln!("Illegal option '{option}' with argument ''");
+                errflg += 1;
+                continue;
+            }
+            optarg = args[optind].clone();
+            optind += 1;
+        }
+        match option.as_str() {
+            "or" => st.result_as_data = true,
+            "l" => match std::fs::File::create(&optarg) {
+                Ok(f) => st.log_file = Some(f),
+                Err(_) => {
+                    st.log_file = None;
+                    eprintln!("LIBRARY: Could not open log file '{optarg}'");
+                }
+            },
+            "ta" => {
+                if let Some(text) = read_file(&optarg, "translation") {
+                    match read_aa_pairs(&text) {
+                        Some((pairs, _)) => st.trans_pairs = Some(pairs),
+                        None => eprintln!("LIBRARY: Error in translation file '{optarg}'"),
+                    }
+                }
+            }
+            "tm" => st.remove_minor_fragments = true,
+            "ca" => {
+                if let Some(text) = read_file(&optarg, "check") {
+                    match read_augmented_atoms(&text) {
+                        Some((atoms, _)) => st.good_atoms = Some(atoms),
+                        None => eprintln!("LIBRARY: Error in augmented atom file '{optarg}'"),
+                    }
+                }
+            }
+            "cc" => st.check_collision = true,
+            "cl" => {
+                let mut sc = Scan::new(optarg.as_bytes());
+                match sc.int(0) {
+                    Some(p) => {
+                        st.percent = p;
+                        st.clash_limit = ClashLimit::from_percent(p);
+                    }
+                    None => eprintln!("LIBRARY: argument of 'cl' ({optarg}) not an integer"),
+                }
+            }
+            "cn" => st.max_mol_size = Scan::new(optarg.as_bytes()).int(0).unwrap_or(0),
+            "cs" => st.check_stereo = true,
+            "da" => st.convert_atom_texts = true,
+            "dg" => st.groups_to_sgroups = true,
+            "ds" => st.convert_stext = true,
+            // accepted without effect on the checks
+            "i" | "o" | "ov" | "b" | "br" | "s" | "la" | "ft" | "tq" | "tl" | "dk" | "dw"
+            | "dz" => {}
+            // charge, tautomer, pattern and profile options are not ported
+            _ => {
+                eprintln!("LIBRARY: option '{option}' is not supported");
+                errflg += 1;
+            }
+        }
+    }
+    errflg
+}
+
+/// `InitCheckMol`: sets the options from `opt` (linefeed separated); returns the number of option errors
+pub fn init_check_mol(opt: &str) -> i32 {
+    let args = tokenize_options(opt);
+    initialize(&args)
+}
+
+fn squeeze_substring(s: &mut String, sub: &str) -> bool {
+    match s.find(sub) {
+        Some(p) => {
+            s.replace_range(p..p + sub.len(), "");
+            true
+        }
+        None => false,
+    }
+}
+
+/// `StringToAtomProperties`: symbol, charge and radical encoded in a ChemText atom text
+fn string_to_atom_properties(string: &str) -> (bool, String, i32, i32) {
+    let mut buffer: String = string.chars().take(255).collect();
+    let (mut charge, mut radical) = (0, NONE);
+    for (sym, id) in [("^^^^", TRIPLET), ("^^", DOUBLET), (":", SINGLET)] {
+        if squeeze_substring(&mut buffer, sym) {
+            radical = id;
+            break;
+        }
+    }
+    let mut table: Vec<(String, i32)> = Vec::new();
+    for v in (1..=15).rev() {
+        table.push((format!("+{v}"), v));
+        table.push((format!("-{v}"), -v));
+    }
+    table.push(("+".into(), 1));
+    table.push(("-".into(), -1));
+    for (sym, id) in &table {
+        if squeeze_substring(&mut buffer, sym) {
+            charge = *id;
+            break;
+        }
+    }
+    let b = buffer.as_bytes();
+    let first = b.first().copied().unwrap_or(0);
+    if first.is_ascii_alphabetic() && first.is_ascii_uppercase() {
+        if !b[1..]
+            .iter()
+            .all(|c| c.is_ascii_alphabetic() && c.is_ascii_lowercase())
+        {
+            return (false, String::new(), charge, radical);
+        }
+        if buffer.len() < 4 {
+            return (true, buffer, charge, radical);
+        }
+        (false, String::new(), charge, radical)
+    } else if first == b'r' && b.get(1).is_some_and(|c| c.is_ascii_digit()) {
+        match b[1] {
+            b'1' => (true, "Ra".into(), charge, radical),
+            b'2' => (true, "Rb".into(), charge, radical),
+            _ => (false, String::new(), charge, radical),
+        }
+    } else {
+        (false, String::new(), charge, radical)
+    }
+}
+
+/// `ConvertAtomAliases`: 1 if conversions went OK, 2 if none were done, 0 on failure
+pub fn convert_atom_aliases(mp: &mut Molecule, msgs: &mut Vec<String>) -> i32 {
+    let mut result = 2;
+    let mut lines = std::mem::take(&mut mp.prop_lines).into_iter();
+    let mut kept: Vec<String> = Vec::new();
+    while let Some(line) = lines.next() {
+        let atom = line
+            .strip_prefix("A  ")
+            .and_then(|rest| Scan::new(rest.as_bytes()).int(0))
+            .filter(|&a| a > 0);
+        let Some(atom) = atom else {
+            kept.push(line);
+            continue;
+        };
+        if result > 1 {
+            result = 1;
+        }
+        mp.n_props -= 1;
+        match lines.next() {
+            Some(text) => {
+                mp.n_props -= 1;
+                let (ok, symbol, charge, radical) = string_to_atom_properties(&text);
+                if !ok {
+                    add_msg(msgs, "atom alias syntax error".into());
+                    add_msg(msgs, text);
+                    result = 0;
+                }
+                if let Some(a) = mp.atoms.get_mut(atom as usize - 1) {
+                    if !symbol.is_empty() {
+                        a.atom_symbol = symbol;
+                    }
+                    if charge != 0 {
+                        a.charge = charge;
+                    }
+                    if radical != NONE {
+                        a.radical = radical;
+                    }
+                }
+            }
+            None => {
+                add_msg(msgs, "atom alias line missing".into());
+                result = 0;
+            }
+        }
+    }
+    mp.prop_lines = kept;
+    result
+}
+
+/// `ConvertGroupsToSGroups`: ISIS group line pairs to MACCS SGroup lines (fragment groups only)
+pub fn convert_groups_to_sgroups(mp: &mut Molecule) {
+    let mut nsgroups = 0;
+    let mut out: Vec<String> = Vec::new();
+    let mut lines = std::mem::take(&mut mp.prop_lines).into_iter();
+    while let Some(line) = lines.next() {
+        let parsed = line.strip_prefix("G  ").and_then(|rest| {
+            let mut sc = Scan::new(rest.as_bytes());
+            let a = sc.int(0)?;
+            let b = sc.int(0)?;
+            Some((a, b))
+        });
+        match parsed {
+            Some((group_atom, 0)) => {
+                mp.n_props -= 1;
+                if let Some(text) = lines.next() {
+                    mp.n_props -= 1;
+                    nsgroups += 1;
+                    out.push(format!("M  STY  1 {nsgroups:3} {:<3}", "DAT"));
+                    out.push(format!("M  SLB  1 {nsgroups:3} {nsgroups:3}"));
+                    out.push(format!("M  SAL {nsgroups:3} {:2} {group_atom:3}", 1));
+                    out.push(format!("M  SDT {nsgroups:3} {:<3}", "COMPONENT"));
+                    out.push(format!(
+                        "M  SDD {nsgroups:3}     0.0000    0.0000    AR    ALL  1       7"
+                    ));
+                    out.push(format!("M  SED {nsgroups:3} {text:<3}"));
+                    mp.n_props += 6;
+                }
+            }
+            _ => out.push(line),
+        }
+    }
+    mp.prop_lines = out;
+}
+
+/// `SplitMolecule`: the component of atom 1 is returned and removed from `mp`; `None` if `mp` is connected
+fn split_molecule(mp: &mut Molecule) -> Option<Molecule> {
+    let na = mp.atoms.len();
+    let mut marked = vec![false; na + 1];
+    marked[1] = true;
+    loop {
+        let mut changed = false;
+        for b in &mp.bonds {
+            let (a0, a1) = (b.atoms[0] as usize, b.atoms[1] as usize);
+            if marked[a0] != marked[a1] {
+                marked[a0] = true;
+                marked[a1] = true;
+                changed = true;
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
+    if marked[1..].iter().all(|&m| m) {
+        return None;
+    }
+    let bonds: Vec<bool> = mp
+        .bonds
+        .iter()
+        .map(|b| marked[b.atoms[0] as usize])
+        .collect();
+    let mut result = mp.clone();
+    strip_molecule(&mut result, &marked, &bonds);
+    let inv_atoms: Vec<bool> = marked
+        .iter()
+        .enumerate()
+        .map(|(i, &m)| i != 0 && !m)
+        .collect();
+    let inv_bonds: Vec<bool> = bonds.iter().map(|&b| !b).collect();
+    strip_molecule(mp, &inv_atoms, &inv_bonds);
+    Some(result)
+}
+
+/// `StripSmallFragments`: keeps the largest connected component; true if others were removed
+pub fn strip_small_fragments(mut mp: Molecule, msgs: &mut Vec<String>) -> (Molecule, bool) {
+    // `SplitMoleculeList` yields the last component first and the one with atom 1 last
+    let mut parts: Vec<Molecule> = Vec::new();
+    while let Some(f) = split_molecule(&mut mp) {
+        parts.push(f);
+    }
+    parts.push(mp);
+    let mut list = parts.into_iter().rev();
+    let mut result = list.next().expect("at least one component");
+    let mut found = false;
+    for m in list {
+        found = true;
+        if result.atoms.len() < m.atoms.len() {
+            add_msg(
+                msgs,
+                format!(
+                    "{:>10}    removed {} atoms",
+                    result.name,
+                    result.atoms.len()
+                ),
+            );
+            result = m;
+        } else {
+            add_msg(
+                msgs,
+                format!("{:>10}    removed {} atoms", result.name, m.atoms.len()),
+            );
+        }
+    }
+    (result, found)
+}
+
+fn flush_log(st: &mut State) {
+    if let Some(f) = st.log_file.as_mut() {
+        // newest message first
+        for m in st.msgs.iter().rev() {
+            let _ = writeln!(f, "{m}");
+        }
+        let _ = f.flush();
+        st.msgs.clear();
+    }
+}
+
+/// `RunStruchk`: checks and cleans `mp` in place; returns the bit coded result
+pub fn run_struchk(mp: &mut Molecule) -> i32 {
+    let mut guard = state();
+    let st = &mut *guard;
+    let mut result = 0;
+    let max = if MAXATOMS > st.max_mol_size {
+        st.max_mol_size
+    } else {
+        MAXATOMS
+    };
+    if mp.atoms.len() as i32 > st.max_mol_size
+        || mp.bonds.len() as i32 > st.max_mol_size
+        || mp.atoms.len() as i32 > MAXATOMS
+        || mp.bonds.len() as i32 > MAXATOMS
+    {
+        add_msg(
+            &mut st.msgs,
+            format!("{:>10}    : more than {} atoms or bonds", mp.name, max),
+        );
+        result |= SIZE_CHECK_FAILED;
+    }
+    if result & SIZE_CHECK_FAILED == 0 {
+        for (i, b) in mp.bonds.iter().enumerate() {
+            for j in 0..2 {
+                if b.atoms[j] < 1 || b.atoms[j] > mp.atoms.len() as i32 {
+                    add_msg(
+                        &mut st.msgs,
+                        format!(
+                            "{:>10}    : illegal atom # ({}, max allowed is {}) in bond {}",
+                            mp.name,
+                            b.atoms[j],
+                            mp.atoms.len(),
+                            i + 1
+                        ),
+                    );
+                    result |= SIZE_CHECK_FAILED;
+                }
+            }
+        }
+    }
+    if result & SIZE_CHECK_FAILED == 0 {
+        if st.convert_atom_texts {
+            match convert_atom_aliases(mp, &mut st.msgs) {
+                0 => result |= ALIAS_CONVERSION_FAILED,
+                1 => result |= TRANSFORMED,
+                _ => {}
+            }
+        }
+        if st.convert_stext {
+            mp.stext_lines.clear();
+        }
+        if let Some(pairs) = st.trans_pairs.clone() {
+            if let Ok(true) = transform_augmented_atoms(mp, &pairs, &mut st.msgs) {
+                result |= TRANSFORMED;
+            }
+        }
+        let mut stereo_result = dubious_stereochemistry(mp, &mut st.msgs).unwrap_or(0);
+        if fix_dubious_3d_molecule(mp, &mut st.msgs).unwrap_or(0) & CONVERTED_TO_2D != 0 {
+            stereo_result = 1;
+            result |= DUBIOUS_STEREO_REMOVED;
+        }
+        if st.remove_minor_fragments {
+            let (new_mp, found) = strip_small_fragments(mp.clone(), &mut st.msgs);
+            *mp = new_mp;
+            if found {
+                result |= FRAGMENTS_FOUND;
+            }
+        }
+        if stereo_result == EITHER_BOND_FOUND {
+            result |= EITHER_WARNING;
+            if let Some(f) = st.log_file.as_mut() {
+                for m in &st.msgs {
+                    let _ = writeln!(f, "{m}");
+                }
+            }
+            let _ = remove_dubious_stereochemistry(mp);
+            result |= DUBIOUS_STEREO_REMOVED;
+        } else if stereo_result > EITHER_BOND_FOUND {
+            result |= STEREO_ERROR;
+            if st.check_stereo {
+                result |= BAD_MOLECULE;
+            } else {
+                if let Some(f) = st.log_file.as_mut() {
+                    for m in &st.msgs {
+                        let _ = writeln!(f, "{m}");
+                    }
+                }
+                let _ = remove_dubious_stereochemistry(mp);
+                result |= DUBIOUS_STEREO_REMOVED;
+            }
+        }
+        if st.check_collision && atom_clash(mp, st.clash_limit, &mut st.msgs) {
+            result |= ATOM_CLASH;
+        }
+        if let Some(good) = &st.good_atoms {
+            if !check_atoms(mp, good, &mut st.msgs).unwrap_or(true) {
+                result |= ATOM_CHECK_FAILED;
+            }
+        }
+        if st.check_stereo && !check_stereo(mp, &mut st.msgs).unwrap_or(true) {
+            result |= STEREO_ERROR;
+        }
+        if st.groups_to_sgroups {
+            convert_groups_to_sgroups(mp);
+        }
+    }
+    flush_log(st);
+    result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::external::avalon::reaccsio::{mol_str_to_mol, mol_to_mol_str};
+    use crate::external::avalon::smi2mol::smi_to_mol;
+    use crate::external::avalon::smiles::DY_AROMATICITY;
+
+    /// the structure checker must answer what the Avalon C code answers (result bits, messages, molecule)
+    #[test]
+    fn struchk_matches_c() {
+        let data = concat!(env!("CARGO_MANIFEST_DIR"), "/src/external/avalon/data");
+        let text = include_str!("../../../../../tests/data/avalon_struchk.jsonl");
+        let mut bad = Vec::new();
+        for line in text.lines() {
+            let v: serde_json::Value = serde_json::from_str(line).expect("json");
+            let want = v["output"].as_str().unwrap();
+            let opts = v["options"]
+                .as_str()
+                .unwrap()
+                .replace("{D}", data)
+                .replace('|', "\n")
+                + "\n";
+            let input = v["input"].as_str().unwrap();
+            let mut out = format!("init {}\n", init_check_mol(&opts));
+            free_msg_list();
+            let mol = match input.strip_prefix("SMILES:") {
+                Some(smi) => smi_to_mol(smi.trim_end_matches('\n'), DY_AROMATICITY).unwrap(),
+                None => mol_str_to_mol(input),
+            };
+            match mol {
+                None => out += "NULL\n",
+                Some(mut mp) => {
+                    let r = run_struchk(&mut mp);
+                    out += &format!(
+                        "result {r}\nmsgs\n{}molecule\n{}",
+                        get_msg_list(),
+                        mol_to_mol_str(&mp)
+                    );
+                }
+            }
+            if out != want {
+                bad.push(format!(
+                    "{} / {}\nwant:\n{want}\ngot:\n{out}",
+                    v["options"], v["name"]
+                ));
+            }
+        }
+        close_check_mol_files();
+        assert!(bad.is_empty(), "{} differ; first:\n{}", bad.len(), bad[0]);
+    }
+}
