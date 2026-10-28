@@ -229,6 +229,7 @@ pub struct Model {
     pub bonds: Vec<Bond>,
     pub rings: Vec<Ring>,
     pub molecules: Vec<Molecule>,
+    pub fragments: Vec<super::fragment::Fragment>,
 }
 
 impl Model {
