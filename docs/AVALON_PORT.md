@@ -122,3 +122,5 @@ A4 (all fingerprint classes) and the first part of A7: `rdoxide.Avalon.pyAvalonT
   `AAMatch`, `TransformAA`, `AAFix`, `TransformAugmentedAtoms`, `AlternativeAATransformation`,
   `ConvertMoleculeToString`, `AAToString` and `CheckAtoms`, tested with the toolkit's real `checkfgs.chk`/`.trn`
   rule files (180 molecules, 915 pattern strings identical to the C code).
+* A3a `canonizer.rs`: `CanonicalNumbering` (property refinement, parity/cis-trans splits, tie breaking, stereo clean-up);
+  192 molfiles identical to the C code (`tests/data/avalon_canon.jsonl`). `CanSmiles` itself still needs `SMIToMOL`.
