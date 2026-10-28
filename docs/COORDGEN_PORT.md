@@ -108,3 +108,12 @@ into `sketcherMinimizerMolecule`, runs `runGenerateCoordinates` and copies the c
   `tools/coordgen_drv/clash.cpp`, `tools/make_coordgen_clash_corpus.py`). Deliberate difference: sets and maps keyed by pointer
   upstream use atom index order. `checkForClashes` is available but its caller in the fragment builder (atoms flagged
   `needsCheckForClashes`) is still `unimplemented!` until the driver sets that flag. Corpus gap: the atoms-inside-rings term is not exercised.
+* CG6a `external::coordgen::driver`: the `sketcherMinimizer` pipeline as RDKit's `CoordGen::addCoords` uses it:
+  canonical ordering (Morgan scores), splitting into molecules, cross-atom flags, fragment initialization (number of
+  children atoms, longest chain), `buildFromFragments`, `avoidClashes`, `bestRotation`, `maybeFlip`, arranging several
+  molecules (grid search for counterions and salts), `assignPseudoZ`, `runGenerateCoordinates`. RDKit passes no atom
+  chirality, only double bond stereo. 68 molecules (salts, mixtures, E/Z, fused and bridged rings; no macrocycles) give
+  the same coordinates as the C++ library (`tests/data/coordgen_sketch.txt`, `tools/coordgen_drv/sketch.cpp`,
+  `tools/make_coordgen_sketch_corpus.py`); molecules that need the macrocycle builder are skipped in the test (it counts
+  them). Not ported: residue/protein layouts, proximity relations (zero order bonds), the Maestro reader. Next: the
+  macrocycle builder, then `AddCoords` (scaling, centring, coordinate maps, template molecules) and the Python module.

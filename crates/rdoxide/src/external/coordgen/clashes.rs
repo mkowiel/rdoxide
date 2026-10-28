@@ -64,6 +64,49 @@ impl DofSolutions {
     }
 }
 
+/// `getChetoCs`: carbons doubly bonded to an oxygen
+pub fn cheto_cs(m: &Model, atoms: &[AtomId]) -> BTreeSet<AtomId> {
+    atoms
+        .iter()
+        .copied()
+        .filter(|&a| {
+            m.atoms[a].atomic_number == 6
+                && m.atoms[a].neighbors.iter().any(|&n| {
+                    m.atoms[n].atomic_number == 8
+                        && m.bond_to(a, n).is_some_and(|b| m.bonds[b].bond_order == 2)
+                })
+        })
+        .collect()
+}
+
+/// `getAminoNs`: all nitrogens
+pub fn amino_ns(m: &Model, atoms: &[AtomId]) -> BTreeSet<AtomId> {
+    atoms
+        .iter()
+        .copied()
+        .filter(|&a| m.atoms[a].atomic_number == 7)
+        .collect()
+}
+
+/// `getAlphaCs`: carbons bound to a nitrogen and a cheto carbon
+pub fn alpha_cs(
+    m: &Model,
+    atoms: &[AtomId],
+    cheto: &BTreeSet<AtomId>,
+    amino: &BTreeSet<AtomId>,
+) -> BTreeSet<AtomId> {
+    atoms
+        .iter()
+        .copied()
+        .filter(|&a| {
+            m.atoms[a].atomic_number == 6
+                && !cheto.contains(&a)
+                && m.atoms[a].neighbors.iter().any(|n| cheto.contains(n))
+                && m.atoms[a].neighbors.iter().any(|n| amino.contains(n))
+        })
+        .collect()
+}
+
 impl Minimizer {
     /// `scoreCurrentSolution`
     fn score_current_solution(&mut self, m: &mut Model, sol: &mut DofSolutions) -> f32 {

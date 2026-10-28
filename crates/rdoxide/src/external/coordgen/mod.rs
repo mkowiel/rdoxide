@@ -4,6 +4,7 @@
 pub mod cip;
 pub mod clashes;
 pub mod dofs;
+pub mod driver;
 pub mod fragment;
 pub mod fragment_builder;
 pub mod fragmenter;
