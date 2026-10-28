@@ -217,7 +217,7 @@ impl Clash {
         }
     }
 
-    fn energy(&mut self, m: &Model, e: &mut f32) {
+    pub fn energy(&mut self, m: &Model, e: &mut f32) {
         self.squared_distance = squared_distance_point_segment(
             m.atoms[self.atom2].coordinates,
             m.atoms[self.atom1].coordinates,
@@ -321,6 +321,9 @@ pub struct Minimizer {
     /// indices in `interactions` (`_intramolecularClashInteractions`)
     pub intramolecular_clash_interactions: Vec<usize>,
     pub even_angles: bool,
+    /// indices in `interactions` (`_extraInteractions`)
+    pub extra_interactions: Vec<usize>,
+    pub precision: f32,
 }
 
 impl Default for Minimizer {
@@ -332,6 +335,8 @@ impl Default for Minimizer {
             interactions: Vec::new(),
             intramolecular_clash_interactions: Vec::new(),
             even_angles: false,
+            extra_interactions: Vec::new(),
+            precision: 1.0,
         }
     }
 }
@@ -340,6 +345,7 @@ impl Minimizer {
     pub fn clear_interactions(&mut self) {
         self.interactions.clear();
         self.intramolecular_clash_interactions.clear();
+        self.extra_interactions.clear();
     }
 
     /// `scoreInteractions`
@@ -425,7 +431,7 @@ impl Minimizer {
         m.fragment_dofs_of_atom(f, a).is_empty()
     }
 
-    fn add_clash_interactions_of_molecule(
+    pub fn add_clash_interactions_of_molecule(
         &mut self,
         m: &Model,
         mol: MolId,

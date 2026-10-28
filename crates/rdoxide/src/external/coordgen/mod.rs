@@ -2,6 +2,8 @@
 //! and `docs/COORDGEN_PORT.md`), the 2D coordinate generator RDKit uses for `rdCoordGen`.
 
 pub mod cip;
+pub mod clashes;
+pub mod dofs;
 pub mod fragment;
 pub mod fragment_builder;
 pub mod fragmenter;
