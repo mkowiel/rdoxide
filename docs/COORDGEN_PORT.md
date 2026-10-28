@@ -90,3 +90,11 @@ into `sketcherMinimizerMolecule`, runs `runGenerateCoordinates` and copies the c
   DOF lists and fragment-local coordinates (`tests/data/coordgen_fbuild.txt`, `tools/coordgen_drv/fbuild.cpp`,
   `tools/make_coordgen_fbuild_corpus.py`). `unimplemented!`: the macrocycle builder and `checkForClashes`. Known gaps in
   the corpus: only one templated fragment, and the gap-scaling of ring-atom neighbours (`gap > PI`) is not exercised.
+* CG5a `external::coordgen::minimizer`: the force field of `CoordgenMinimizer`: stretch, bend, clash, constraint and E/Z
+  constraint interactions, the clash/stretch/bend/chiral-inversion interactions of a molecule (macrocycle bend rules
+  included), `applyForces`, `run` (upstream never restores the lowest-energy coordinates because its running minimum is
+  never updated; replicated) and `minimizeMolecule`. 72 molecules with randomly displaced coordinates (incl. macrocycles
+  and E/Z) give bit-identical interaction counts, energies and final coordinates on macOS; the test allows 1e-3 relative
+  for the platform `acos`. Not yet: `scoreClashes`/`scoreCrossBonds`, `avoidClashes*`, `checkForClashes`, conformer search,
+  peptide constraints (residues). (`tests/data/coordgen_minim.txt`, `tools/coordgen_drv/minim.cpp`,
+  `tools/make_coordgen_minim_corpus.py`.)

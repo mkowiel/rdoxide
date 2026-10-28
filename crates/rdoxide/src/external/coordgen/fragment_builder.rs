@@ -286,7 +286,7 @@ impl Model {
     }
 
     /// `orderChainOfAtoms`
-    fn order_chain_of_atoms(&self, atoms: &[AtomId], start: AtomId) -> Vec<AtomId> {
+    pub(super) fn order_chain_of_atoms(&self, atoms: &[AtomId], start: AtomId) -> Vec<AtomId> {
         let mut ordered = Vec::new();
         let mut still: BTreeSet<AtomId> = atoms.iter().copied().collect();
         let mut atom_to_add = start;
