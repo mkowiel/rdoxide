@@ -2107,6 +2107,427 @@ pub fn make_landscape(mp: &mut Molecule) {
     }
 }
 
+const MAX_COLLISIONS: usize = 4;
+const SYM_EPS: f64 = 0.02;
+const NO_SYM_EPS: f64 = 0.004;
+const STRETCH: f64 = 1.4;
+
+/// difference of two float coordinates; C subtracts in single precision
+fn fd(a: f32, b: f32) -> f64 {
+    f64::from(a - b)
+}
+
+/// `BondLengthSQR`
+pub fn bond_length_sqr(mp: &Molecule, bi: usize) -> f64 {
+    let b = &mp.bonds[bi];
+    let dx = fd(
+        mp.atoms[(b.atoms[0] - 1) as usize].x,
+        mp.atoms[(b.atoms[1] - 1) as usize].x,
+    );
+    let dy = fd(
+        mp.atoms[(b.atoms[0] - 1) as usize].y,
+        mp.atoms[(b.atoms[1] - 1) as usize].y,
+    );
+    dx * dx + dy * dy
+}
+
+/// `AtomBondClash`: clash of atom `ai` with bond `bi` within `eps`; returns the clash and its distance
+pub fn atom_bond_clash(mp: &Molecule, ai: usize, bi: usize, eps: f64) -> (bool, f64) {
+    let b = &mp.bonds[bi];
+    let a0 = &mp.atoms[(b.atoms[0] - 1) as usize];
+    let a1 = &mp.atoms[(b.atoms[1] - 1) as usize];
+    let ap = &mp.atoms[ai];
+    let bx = fd(a1.x, a0.x);
+    let by = fd(a1.y, a0.y);
+    let ax = fd(ap.x, a0.x);
+    let ay = fd(ap.y, a0.y);
+    let a2 = ax * ax + ay * ay;
+    let b2 = bx * bx + by * by;
+    let ab = ax * bx + ay * by;
+    let amb2 = (ax - bx) * (ax - bx) + (ay - by) * (ay - by);
+    if b2 <= 0.0 {
+        return (false, STDBOND);
+    }
+    let y2 = a2 - ab * ab / b2;
+    if y2 >= eps * b2 {
+        (false, STDBOND)
+    } else if 0.0 <= ab && ab <= b2 {
+        (true, y2 / eps)
+    } else if a2 <= eps * b2 {
+        (true, a2 / eps)
+    } else if amb2 <= eps * b2 {
+        (true, amb2 / eps)
+    } else {
+        (false, STDBOND)
+    }
+}
+
+/// `CountCollisions`: number of collisions and the atom and bond of the closest one
+pub fn count_collisions(mp: &Molecule) -> (usize, Option<usize>, Option<usize>) {
+    let mut ncol = 0;
+    let mut dist = 100.0 * STDBOND;
+    let mut apcol = None;
+    let mut bpcol = None;
+    for (i, ap) in mp.atoms.iter().enumerate() {
+        let eps = if ap.charge != 0
+            || ap.radical != 0
+            || ap.mass_difference != 0
+            || ap.atom_symbol != "C"
+        {
+            SYM_EPS
+        } else {
+            NO_SYM_EPS
+        };
+        for (j, bp) in mp.bonds.iter().enumerate() {
+            if bp.bond_type & RUBBER_BOND != 0 {
+                continue;
+            }
+            if bp.atoms[0] as usize == i + 1 || bp.atoms[1] as usize == i + 1 {
+                continue;
+            }
+            if ap.color != mp.atoms[(bp.atoms[0] - 1) as usize].color {
+                continue;
+            }
+            if ap.color != mp.atoms[(bp.atoms[1] - 1) as usize].color {
+                continue;
+            }
+            let (clash, disth) = atom_bond_clash(mp, i, j, eps);
+            if clash {
+                if disth < 100.0 * STDBOND {
+                    ncol += 1;
+                }
+                if disth < dist {
+                    dist = disth;
+                    apcol = Some(i);
+                    bpcol = Some(j);
+                }
+            }
+        }
+    }
+    (ncol, apcol, bpcol)
+}
+
+fn flood_side(mp: &mut Molecule, nbp: &[Neighbourhood], bi: usize, root: usize) {
+    let col = mp.atoms[root].color;
+    loop {
+        let mut changed = false;
+        for (i, nb) in nbp.iter().enumerate().take(mp.atoms.len()) {
+            if mp.atoms[i].color != col {
+                continue;
+            }
+            for j in 0..nb.atoms.len() {
+                if mp.atoms[nb.atoms[j]].color == 0
+                    && bi != nb.bonds[j]
+                    && mp.bonds[nb.bonds[j]].bond_type & RUBBER_BOND == 0
+                {
+                    mp.atoms[nb.atoms[j]].color = col;
+                    changed = true;
+                }
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
+}
+
+/// `BondLinksAtoms`: true if bond `bi` is the only link between atoms `a1` and `a2`;
+/// the two sides are left colored with `col1` and `col2`
+pub fn bond_links_atoms(
+    mp: &mut Molecule,
+    nbp: &[Neighbourhood],
+    bi: usize,
+    a1: usize,
+    col1: i32,
+    a2: usize,
+    col2: i32,
+) -> bool {
+    for a in &mut mp.atoms {
+        a.color = 0;
+    }
+    mp.atoms[a1].color = col1;
+    flood_side(mp, nbp, bi, a1);
+    if mp.atoms[a2].color == col1 {
+        return false;
+    }
+    let b = &mp.bonds[bi];
+    let (b0, b1) = ((b.atoms[0] - 1) as usize, (b.atoms[1] - 1) as usize);
+    if mp.atoms[b0].color == mp.atoms[b1].color {
+        return false;
+    }
+    mp.atoms[a2].color = col2;
+    flood_side(mp, nbp, bi, a2);
+    !(mp.atoms[b0].color == 0 || mp.atoms[b1].color == 0)
+}
+
+/// `StretchBond`: moves the fragments colored `frag_col1` and `frag_col2` apart along bond `bi`
+pub fn stretch_bond(
+    mp: &mut Molecule,
+    bi: usize,
+    mut frag_col1: i32,
+    mut frag_col2: i32,
+    stretch_factor: f64,
+) {
+    let b = &mp.bonds[bi];
+    let (b0, b1) = ((b.atoms[0] - 1) as usize, (b.atoms[1] - 1) as usize);
+    if mp.atoms[b0].color == frag_col2 && mp.atoms[b1].color == frag_col1 {
+        std::mem::swap(&mut frag_col1, &mut frag_col2);
+    }
+    let r12 = [
+        fd(mp.atoms[b1].x, mp.atoms[b0].x),
+        fd(mp.atoms[b1].y, mp.atoms[b0].y),
+    ];
+    if r12[0] * r12[0] < 0.0000001 && r12[1] * r12[1] < 0.0000001 {
+        return;
+    }
+    let sf = stretch_factor.sqrt();
+    for ap in &mut mp.atoms {
+        if ap.color == frag_col1 {
+            ap.x = (f64::from(ap.x) - (sf - 1.0) * r12[0]) as f32;
+            ap.y = (f64::from(ap.y) - (sf - 1.0) * r12[1]) as f32;
+        } else if ap.color == frag_col2 {
+            ap.x = (f64::from(ap.x) + (sf - 1.0) * r12[0]) as f32;
+            ap.y = (f64::from(ap.y) + (sf - 1.0) * r12[1]) as f32;
+        }
+    }
+}
+
+/// `ImproveCollisions`: removes collisions by stretching chain bonds; `rng` is C's `rand()`
+pub fn improve_collisions(
+    mp: &mut Molecule,
+    nbp: &[Neighbourhood],
+    is_ring_atom: &[i32],
+    ring_count: &[i32],
+    rng: &mut CRand,
+) {
+    let mut atom_colors: Option<Vec<i32>> = None;
+    'outer: for _ in 0..MAX_COLLISIONS {
+        let (ncol, apcol, bpcol) = count_collisions(mp);
+        if ncol == 0 {
+            break;
+        }
+        if atom_colors.is_none() {
+            atom_colors = Some(mp.atoms.iter().map(|a| a.color).collect());
+        }
+        let apcol = apcol.expect("collision atom");
+        let bpcol = bpcol.expect("collision bond");
+        let mut moved = false;
+        'classes: for k in 1..=4 {
+            for j in 0..mp.bonds.len() {
+                if ring_count[j] > 0 {
+                    continue;
+                }
+                let (i0, i1) = (
+                    (mp.bonds[j].atoms[0] - 1) as usize,
+                    (mp.bonds[j].atoms[1] - 1) as usize,
+                );
+                match k {
+                    1 => {
+                        if is_ring_atom[i0] == 0 || is_ring_atom[i1] == 0 {
+                            continue;
+                        }
+                    }
+                    2 => {
+                        if (is_ring_atom[i0] != 0) == (is_ring_atom[i1] != 0) {
+                            continue;
+                        }
+                    }
+                    3 => {
+                        if is_ring_atom[i0] != 0 || is_ring_atom[i1] != 0 {
+                            continue;
+                        }
+                        if nbp[i0].atoms.len() < 3 || nbp[i1].atoms.len() < 3 {
+                            continue;
+                        }
+                    }
+                    _ => {
+                        if is_ring_atom[i0] != 0 || is_ring_atom[i1] != 0 {
+                            continue;
+                        }
+                        if nbp[i0].atoms.len() >= 3 && nbp[i1].atoms.len() >= 3 {
+                            continue;
+                        }
+                    }
+                }
+                let a2 = (mp.bonds[bpcol].atoms[0] - 1) as usize;
+                if bond_links_atoms(mp, nbp, j, apcol, 1, a2, 2) {
+                    stretch_bond(mp, j, 1, 2, STRETCH);
+                    let (ncolh, _, _) = count_collisions(mp);
+                    if ncol <= ncolh {
+                        stretch_bond(mp, j, 1, 2, 1.0 / STRETCH);
+                    } else if ncolh > 0 {
+                        moved = true;
+                        break 'classes;
+                    } else {
+                        break 'outer;
+                    }
+                }
+            }
+        }
+        if !moved {
+            // a hard case: nudge the atom randomly by up to a tenth of a bond
+            let dx = STDBOND * f64::from(rng.next_value() % 100 - 50) / 500.0;
+            let dy = STDBOND * f64::from(rng.next_value() % 100 - 50) / 500.0;
+            let a = &mut mp.atoms[apcol];
+            a.x = (f64::from(a.x) + dx) as f32;
+            a.y = (f64::from(a.y) + dy) as f32;
+        }
+    }
+    if let Some(cols) = atom_colors {
+        for (a, c) in mp.atoms.iter_mut().zip(cols) {
+            a.color = c;
+        }
+    }
+}
+
+/// `ScaleByFixedFragments`: scales such that already laid-out bonds average `STDBOND`
+pub fn scale_by_fixed_fragments(mp: &mut Molecule) {
+    let mut scale = 0.0f64;
+    let mut n = 0;
+    for b in &mp.bonds {
+        let a1 = &mp.atoms[(b.atoms[0] - 1) as usize];
+        let a2 = &mp.atoms[(b.atoms[1] - 1) as usize];
+        if a1.color == a2.color {
+            // SQR of a float difference is evaluated in single precision
+            let dx = a1.x - a2.x;
+            let dy = a1.y - a2.y;
+            scale += f64::from(dx * dx + dy * dy);
+            n += 1;
+        }
+    }
+    if scale == 0.0 {
+        return;
+    }
+    scale /= f64::from(n);
+    scale = STDBOND / scale.sqrt();
+    for a in &mut mp.atoms {
+        a.x = (f64::from(a.x) * scale) as f32;
+        a.y = (f64::from(a.y) * scale) as f32;
+    }
+}
+
+fn is_chain_h(
+    mp: &Molecule,
+    nbp: &[Neighbourhood],
+    ring_count: &[i32],
+    i: usize,
+    j: usize,
+) -> bool {
+    mp.atoms[nbp[i].atoms[j]].atom_symbol == "H"
+        && ring_count[nbp[i].bonds[j]] == 0
+        && nbp[nbp[i].atoms[j]].atoms.len() == 1
+}
+
+/// `FixLinearBridgeHeads`: deflects bridgeheads with a linear pair of ring bonds
+pub fn fix_linear_bridge_heads(mp: &mut Molecule, ring_count: &[i32], nbp: &[Neighbourhood]) {
+    for i in 0..mp.atoms.len() {
+        let nl = nbp[i].atoms.len();
+        if nl != 4 {
+            continue;
+        }
+        let mut nring = 0;
+        let mut nh = 0;
+        let mut jh = 0;
+        for j in 0..nl {
+            if is_chain_h(mp, nbp, ring_count, i, j) {
+                nh += 1;
+                jh = j;
+            } else if ring_count[nbp[i].bonds[j]] > 0 {
+                nring += 1;
+            }
+        }
+        if nring != 3 || nh != 1 {
+            continue;
+        }
+        let p = [f64::from(mp.atoms[i].x), f64::from(mp.atoms[i].y)];
+        let mut i3 = 0;
+        let mut found = false;
+        'search: for j in 0..nl {
+            if j == jh {
+                continue;
+            }
+            let q1 = &mp.atoms[nbp[i].atoms[j]];
+            let p1 = [f64::from(q1.x), f64::from(q1.y)];
+            let l1 = ((p1[0] - p[0]) * (p1[0] - p[0]) + (p1[1] - p[1]) * (p1[1] - p[1])).sqrt();
+            for jj in j + 1..nl {
+                if jj == jh {
+                    continue;
+                }
+                let q2 = &mp.atoms[nbp[i].atoms[jj]];
+                let p2 = [f64::from(q2.x), f64::from(q2.y)];
+                let l2 = ((p2[0] - p[0]) * (p2[0] - p[0]) + (p2[1] - p[1]) * (p2[1] - p[1])).sqrt();
+                let mut cosa = (p1[0] - p[0]) * (p2[0] - p[0]) + (p1[1] - p[1]) * (p2[1] - p[1]);
+                cosa /= l1 * l2;
+                if cosa < -0.99 {
+                    found = true;
+                    for k in 0..4 {
+                        if j != k && jj != k && jh != k {
+                            i3 = nbp[i].atoms[k];
+                        }
+                    }
+                    break 'search;
+                }
+            }
+        }
+        if !found {
+            continue;
+        }
+        let p3 = [f64::from(mp.atoms[i3].x), f64::from(mp.atoms[i3].y)];
+        let ap = &mut mp.atoms[i];
+        ap.x = (f64::from(ap.x) + 0.25 * (p3[0] - p[0])) as f32;
+        ap.y = (f64::from(ap.y) + 0.25 * (p3[1] - p[1])) as f32;
+    }
+}
+
+/// `FixInwardHydrogens`: moves hydrogens that point into a ring to the outside
+pub fn fix_inward_hydrogens(mp: &mut Molecule, ring_count: &[i32], nbp: &[Neighbourhood]) {
+    for i in 0..mp.atoms.len() {
+        let nl = nbp[i].atoms.len();
+        if nl != 4 {
+            continue;
+        }
+        let mut nring = 0;
+        let mut nh = 0;
+        let mut nbulk = 100;
+        let (mut ih, mut ichain, mut ibest) = (0, 0, 0);
+        for j in 0..nl {
+            if is_chain_h(mp, nbp, ring_count, i, j) {
+                nh += 1;
+                ih = nbp[i].atoms[j];
+            } else if ring_count[nbp[i].bonds[j]] > 0 {
+                nring += 1;
+                if nbulk > nbp[nbp[i].atoms[j]].atoms.len() {
+                    nbulk = nbp[nbp[i].atoms[j]].atoms.len();
+                    ibest = nbp[i].atoms[j];
+                }
+            } else {
+                ichain = nbp[i].atoms[j];
+            }
+        }
+        if nring != 2 || nh != 1 {
+            continue;
+        }
+        let p = [f64::from(mp.atoms[i].x), f64::from(mp.atoms[i].y)];
+        let ph = [f64::from(mp.atoms[ih].x), f64::from(mp.atoms[ih].y)];
+        let pchain = [f64::from(mp.atoms[ichain].x), f64::from(mp.atoms[ichain].y)];
+        let sprod = (ph[0] - p[0]) * (pchain[0] - p[0]) + (ph[1] - p[1]) * (pchain[1] - p[1]);
+        if sprod >= 0.0 {
+            continue;
+        }
+        let psum = [
+            f64::from(mp.atoms[ibest].x) - p[0] + pchain[0] - p[0],
+            f64::from(mp.atoms[ibest].y) - p[1] + pchain[1] - p[1],
+        ];
+        let lenh = ((ph[0] - p[0]) * (ph[0] - p[0]) + (ph[1] - p[1]) * (ph[1] - p[1])).sqrt();
+        let lensum = (psum[0] * psum[0] + psum[1] * psum[1]).sqrt();
+        if lensum < 0.25 * lenh {
+            continue;
+        }
+        mp.atoms[ih].x = (p[0] + psum[0] * lenh / lensum) as f32;
+        mp.atoms[ih].y = (p[1] + psum[1] * lenh / lensum) as f32;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2506,6 +2927,81 @@ mod tests {
             let mut c = base.clone();
             clear_db_stereo_in_small_rings(&mut c, &rs);
             out += &dump3("cleardb", &c);
+            if out != want {
+                bad.push(format!("{input}\nwant:\n{want}\ngot:\n{out}"));
+            }
+        }
+        assert!(bad.is_empty(), "{} differ; first:\n{}", bad.len(), bad[0]);
+    }
+
+    fn collisions_line(tag: &str, c: &Molecule) -> String {
+        let (n, a, b) = count_collisions(c);
+        let ix = |o: Option<usize>| o.map_or(-1, |v| v as i64);
+        format!("{tag} {n} {} {}\n", ix(a), ix(b))
+    }
+
+    /// collisions, stretching, scaling and bridgehead fixes must agree with the C code
+    #[test]
+    fn layout_collisions_match_c() {
+        use crate::external::avalon::smi2mol::{TRUE_DB_STEREO, smi_to_mol};
+        let text = include_str!("../../../../../tests/data/avalon_layout6.jsonl");
+        let mut bad = Vec::new();
+        for line in text.lines() {
+            let v: serde_json::Value = serde_json::from_str(line).expect("json");
+            let input = v["input"].as_str().unwrap();
+            let want = v["output"].as_str().unwrap();
+            let Some(mp) = smi_to_mol(input, TRUE_DB_STEREO).unwrap() else {
+                assert_eq!(want, "NULL\n");
+                continue;
+            };
+            let mut base = seeded(7, &mp);
+            recolor_molecule(&mut base);
+            layout_rings(&mut base);
+            let nbp = setup_neighbourhood(&base).unwrap();
+            let (as_, bs) = ring_state(&base);
+            let mut rs = vec![0i32; base.bonds.len()];
+            for i in 0..base.bonds.len() {
+                if bs[i] != 0 {
+                    let col = base.atoms[(base.bonds[i].atoms[0] - 1) as usize].color;
+                    rs[i] = (0..base.atoms.len())
+                        .filter(|&j| as_[j] != 0 && base.atoms[j].color == col)
+                        .count() as i32;
+                }
+            }
+            sprout_ring_substituents(&mut base, &as_, &rs, &nbp);
+            link_ring_fragments(&mut base, &as_);
+            layout_chain_atoms(&mut base, &as_, &nbp);
+            layout_rubber_fragments(&mut base);
+            link_remaining_fragments(&mut base);
+            let mut out = dump3("base", &base);
+            out += &collisions_line("collisions", &base);
+            if !base.bonds.is_empty() {
+                out += &format!("bondlen {}\n", fmt_gp(bond_length_sqr(&base, 0), 9));
+            } else {
+                out += "bondlen 0\n";
+            }
+            let mut c = base.clone();
+            improve_collisions(&mut c, &nbp, &as_, &bs, &mut CRand::new(11));
+            out += &dump3("improve", &c);
+            let mut c = base.clone();
+            scale_by_fixed_fragments(&mut c);
+            out += &dump3("scale", &c);
+            let mut c = base.clone();
+            fix_linear_bridge_heads(&mut c, &bs, &nbp);
+            out += &dump3("linear", &c);
+            let mut c = base.clone();
+            fix_inward_hydrogens(&mut c, &bs, &nbp);
+            out += &dump3("inward", &c);
+            let mut c = seeded(5, &mp);
+            recolor_molecule(&mut c);
+            for a in &mut c.atoms {
+                a.color = 1;
+            }
+            out += &collisions_line("rcollisions", &c);
+            improve_collisions(&mut c, &nbp, &as_, &bs, &mut CRand::new(11));
+            out += &dump3("rimprove", &c);
+            scale_by_fixed_fragments(&mut c);
+            out += &dump3("rscale", &c);
             if out != want {
                 bad.push(format!("{input}\nwant:\n{want}\ngot:\n{out}"));
             }
