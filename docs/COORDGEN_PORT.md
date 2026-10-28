@@ -42,3 +42,11 @@ into `sketcherMinimizerMolecule`, runs `runGenerateCoordinates` and copies the c
 | CG6 | `CoordgenMacrocycleBuilder` | macrocycle corpus |
 | CG7 | Python module, `Compute2DCoords(useCoordGen)`, coordinate maps / template molecules, ratchet | upstream `rdCoordGen` tests |
 | CG8 | Mae template reader (optional), `SetDefaultTemplateFileDir` | custom template file |
+
+## Progress
+
+* CG1a `external::coordgen::maths` (`sketcherMinimizerMaths.h`: `PointF` with the C++ `float`/`double` mixing, segment
+  intersection, angles, projections, tridiagonal/cyclic solvers, closed Bezier control points, 3D helpers, cannon ball
+  distance). 7998 calls with pseudo random input are bit-identical to the C++ header
+  (`tests/data/coordgen_maths.txt`, driver `tools/coordgen_drv/maths.cpp`, built with `-ffp-contract=off`); the four
+  functions using `acos`/`atan2` are compared to 2e-6 relative because the platform libm may differ in the last bit.
