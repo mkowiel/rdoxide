@@ -1333,6 +1333,8 @@ impl PyMolDraw2DCairo {
             false,
         )
         .py()?;
+        let mut d = d;
+        d.record_metadata = true;
         Ok(PyClassInitializer::from(PyMolDraw2D { d }).add_subclass(PyMolDraw2DCairo))
     }
 
@@ -1346,15 +1348,13 @@ impl PyMolDraw2DCairo {
         mut slf: PyRefMut<'py, Self>,
         py: Python<'py>,
     ) -> PyResult<Bound<'py, pyo3::types::PyBytes>> {
-        let svg = slf.as_super().d.get_drawing_text();
-        let png = rdoxide::graphmol::mol_draw2d::raster::svg_to_png(&svg).py()?;
+        let png = rdoxide::graphmol::mol_draw2d::raster::drawer_png(&slf.as_super().d).py()?;
         Ok(pyo3::types::PyBytes::new(py, &png))
     }
 
     /// write the PNG to a file
     fn WriteDrawingText(mut slf: PyRefMut<'_, Self>, fName: &str) -> PyResult<()> {
-        let svg = slf.as_super().d.get_drawing_text();
-        let png = rdoxide::graphmol::mol_draw2d::raster::svg_to_png(&svg).py()?;
+        let png = rdoxide::graphmol::mol_draw2d::raster::drawer_png(&slf.as_super().d).py()?;
         std::fs::write(fName, png)
             .map_err(|e| pyo3::exceptions::PyIOError::new_err(format!("cannot write {fName}: {e}")))
     }

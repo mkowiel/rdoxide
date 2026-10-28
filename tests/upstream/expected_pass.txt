@@ -481,12 +481,15 @@ Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testGetDrawCoords
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testGithub1829
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testGithub4838
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testGithub5298
+Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testGithub7409
+Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testGithubIssue571
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testGridContours
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testIsotopeLabels
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testLegendPosition
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testMolContours
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testMolSize
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testNewDrawingModes
+Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testPNGMetadata
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testPrepareAndDrawMolecule
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testPrepareForDrawing
 Code/GraphMol/MolDraw2D/Wrap/testMolDraw2D.py::TestCase::testProtectedAttributes
@@ -1403,6 +1406,7 @@ rdkit/Chem/ChemUtils/UnitTestAlignDepict.py::TestCase::test_AlignDepict
 rdkit/Chem/ChemUtils/UnitTestSDFToCSV.py::TestCase::test1
 rdkit/Chem/ChemUtils/UnitTestSDFToCSV.py::TestCase::test2
 rdkit/Chem/ChemUtils/UnitTestSDFToCSV.py::TestCase::test_parser
+rdkit/Chem/Draw/UnitTestDraw.py::TestCase::testCairoFile
 rdkit/Chem/Draw/UnitTestDraw.py::TestCase::testDrawMorgan
 rdkit/Chem/Draw/UnitTestDraw.py::TestCase::testDrawRDKit
 rdkit/Chem/Draw/UnitTestDraw.py::TestCase::testDrawReaction

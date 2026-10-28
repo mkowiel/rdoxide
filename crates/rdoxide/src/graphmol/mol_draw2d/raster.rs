@@ -13,6 +13,13 @@ use crate::error::{RDKitError, Result};
 
 use super::drawer::MolDraw2DSVG;
 use super::helpers::MolDrawOptions;
+use crate::graphmol::ROMol;
+use crate::graphmol::file_parsers::mol_file_writer::{MolWriterParams, mol_to_v3k_mol_block};
+use crate::graphmol::file_parsers::png::{
+    MOL_TAG, PKL_TAG, PngMetadataParams, SMILES_TAG, add_metadata_to_png, augment_tag_name,
+};
+use crate::graphmol::pickle::pickle_mol;
+use crate::graphmol::smiles_parse::cx_write::mol_to_cx_smiles;
 
 /// The attributes of a tag, `name='value'` or `name="value"`.
 fn attributes(tag: &str) -> Vec<(String, String)> {
@@ -410,6 +417,57 @@ pub fn svg_to_png(svg: &str) -> Result<Vec<u8>> {
         .map_err(|e| RDKitError::precondition(format!("cannot encode the PNG: {e}")))
 }
 
+/// The molecule tags of the PNG metadata of a drawn molecule (`addMoleculeMetadata` of the Cairo drawer): the pickle,
+/// the V3000 mol block if there are conformers, and the CXSMILES. Later molecules get the index as tag suffix.
+fn metadata_entries(mol: &ROMol, conf_id: i32, idx: usize) -> Result<Vec<(String, Vec<u8>)>> {
+    let params = PngMetadataParams::default();
+    let suffix = if idx > 0 {
+        idx.to_string()
+    } else {
+        String::new()
+    };
+    let mut out = vec![(
+        augment_tag_name(&format!("{PKL_TAG}{suffix}")),
+        pickle_mol(mol, params.property_flags)?,
+    )];
+    if mol.num_conformers() > 0 {
+        let writer = MolWriterParams {
+            include_stereo: true,
+            kekulize: false,
+            ..MolWriterParams::default()
+        };
+        let mb = mol_to_v3k_mol_block(mol, &writer, conf_id)?;
+        out.push((
+            augment_tag_name(&format!("{MOL_TAG}{suffix}")),
+            mb.into_bytes(),
+        ));
+    }
+    let smi = mol_to_cx_smiles(
+        mol,
+        &params.smiles_write_params,
+        params.cx_smiles_flags,
+        params.restore_bond_dirs,
+    )?;
+    out.push((
+        augment_tag_name(&format!("{SMILES_TAG}{suffix}")),
+        smi.into_bytes(),
+    ));
+    Ok(out)
+}
+
+/// The PNG of the SVG of a drawer with the metadata of the molecules it has drawn.
+pub fn drawer_png(drawer: &MolDraw2DSVG) -> Result<Vec<u8>> {
+    let png = svg_to_png(&drawer.get_drawing_text())?;
+    if drawer.metadata_mols.is_empty() {
+        return Ok(png);
+    }
+    let mut metadata = Vec::new();
+    for (idx, (mol, conf_id)) in drawer.metadata_mols.iter().enumerate() {
+        metadata.extend(metadata_entries(mol, *conf_id, idx)?);
+    }
+    add_metadata_to_png(&png, &metadata, true)
+}
+
 /// `MolDraw2DCairo`: draws like [`MolDraw2DSVG`] (all of its drawing methods are available through `Deref`) and returns
 /// the drawing as PNG. The text is always drawn as glyph outlines, as Cairo's FreeType text drawer does.
 #[derive(Debug)]
@@ -449,21 +507,15 @@ impl MolDraw2DCairo {
         panel_height: i32,
         options: MolDrawOptions,
     ) -> Result<Self> {
-        Ok(MolDraw2DCairo {
-            inner: MolDraw2DSVG::with_text(
-                width,
-                height,
-                panel_width,
-                panel_height,
-                options,
-                false,
-            )?,
-        })
+        let mut inner =
+            MolDraw2DSVG::with_text(width, height, panel_width, panel_height, options, false)?;
+        inner.record_metadata = true;
+        Ok(MolDraw2DCairo { inner })
     }
 
     /// `getDrawingText`: the PNG of what has been drawn
     pub fn get_drawing_text(&self) -> Result<Vec<u8>> {
-        svg_to_png(&self.inner.get_drawing_text())
+        drawer_png(&self.inner)
     }
 
     /// `writeDrawingText`

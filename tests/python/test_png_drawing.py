@@ -70,3 +70,12 @@ def test_molecule_image_with_pil():
     colours = img.convert("RGB").getcolors(maxcolors=100000)
     assert max(colours)[1] == (255, 255, 255)
     assert any(c[1][0] > 200 and c[1][1] < 80 for c in colours)  # the red oxygens
+
+
+def test_png_carries_the_molecule():
+    m = Chem.MolFromSmiles("CC(=O)Nc1ccccc1")
+    d = rdMolDraw2D.MolDraw2DCairo(250, 200)
+    d.DrawMolecule(m)
+    d.FinishDrawing()
+    nm = Chem.MolFromPNGString(d.GetDrawingText())
+    assert Chem.MolToSmiles(nm) == Chem.MolToSmiles(m)
