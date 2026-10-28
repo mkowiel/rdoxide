@@ -6,7 +6,7 @@
 
 use super::geometry::transform_points;
 use super::graph::{BondSet, CRand, combine_rings, ring_list};
-use super::perceive::{Neighbourhood, ring_state};
+use super::perceive::{DOUBLE, Neighbourhood, SINGLE, TRIPLE, ring_state};
 use super::reaccs::{Molecule, NONE};
 use super::utilities::{atom_symbol_match, flip_stereo_symbols};
 
@@ -530,6 +530,323 @@ pub fn layout_rings(mp: &mut Molecule) {
     }
 }
 
+/// `GetColoredGraph`: the edges (renumbered) and the coordinates of the atoms with `color`;
+/// `numbers[i]` is the node index of atom `i`
+pub fn get_colored_graph(mp: &Molecule, color: i32) -> (Vec<[u32; 2]>, Vec<[f64; 2]>, Vec<usize>) {
+    let mut edges = Vec::new();
+    for b in &mp.bonds {
+        if b.bond_type & RUBBER_BOND == 0
+            && mp.atoms[(b.atoms[0] - 1) as usize].color == color
+            && mp.atoms[(b.atoms[1] - 1) as usize].color == color
+        {
+            edges.push([b.atoms[0] as u32, b.atoms[1] as u32]);
+        }
+    }
+    let mut coords = Vec::new();
+    let mut numbers = vec![0usize; mp.atoms.len()];
+    for (i, a) in mp.atoms.iter().enumerate() {
+        if a.color == color {
+            coords.push([f64::from(a.x), f64::from(a.y)]);
+            numbers[i] = coords.len() - 1;
+        }
+    }
+    for e in &mut edges {
+        e[0] = numbers[(e[0] - 1) as usize] as u32;
+        e[1] = numbers[(e[1] - 1) as usize] as u32;
+    }
+    (edges, coords, numbers)
+}
+
+/// `ColorStrain`: the repulsion measure between the parts coloured `col1` and `col2`
+pub fn color_strain(mp: &Molecule, col1: i32, col2: i32) -> f64 {
+    let mut result = 0.0f64;
+    for (i1, a1) in mp.atoms.iter().enumerate() {
+        if a1.color != col1 {
+            continue;
+        }
+        for (i2, a2) in mp.atoms.iter().enumerate() {
+            if a2.color == col2 && i1 != i2 {
+                let dx: f32 = (a1.x - a2.x) * (a1.x - a2.x);
+                let dy: f32 = (a1.y - a2.y) * (a1.y - a2.y);
+                result += 1.0 / (0.1 + f64::from(dx) + f64::from(dy));
+            }
+        }
+    }
+    result
+}
+
+/// `ImproveBondByFlip`: flips one side of bond `bi` if the strain improves enough
+pub fn improve_bond_by_flip(mp: &mut Molecule, bi: usize, threshold: f64) -> bool {
+    if mp.bonds[bi].bond_type & DONT_FLIP_BOND != 0 {
+        return false;
+    }
+    let (a0, a1) = (
+        (mp.bonds[bi].atoms[0] - 1) as usize,
+        (mp.bonds[bi].atoms[1] - 1) as usize,
+    );
+    let strain1 = color_strain(mp, mp.atoms[a0].color, mp.atoms[a1].color);
+    let p1 = [f64::from(mp.atoms[a0].x), f64::from(mp.atoms[a0].y)];
+    let p2 = [f64::from(mp.atoms[a1].x), f64::from(mp.atoms[a1].y)];
+    let r12 = [p2[0] - p1[0], p2[1] - p1[1]];
+    let col = mp.atoms[a1].color;
+    for i in 0..mp.atoms.len() {
+        if mp.atoms[i].color == col {
+            mirror_on_bond(mp, i, p1, r12);
+        }
+    }
+    let strain2 = color_strain(mp, mp.atoms[a0].color, mp.atoms[a1].color);
+    if strain1 <= strain2 * (1.0 + threshold) + threshold {
+        let col = mp.atoms[a1].color;
+        for i in 0..mp.atoms.len() {
+            if mp.atoms[i].color == col {
+                mirror_on_bond(mp, i, p1, r12);
+            }
+        }
+        return false;
+    }
+    true
+}
+
+/// `ImproveBondByStretch`: stretches bond `bi` by a third if the two sides collide
+pub fn improve_bond_by_stretch(mp: &mut Molecule, bi: usize) {
+    let (a0, a1) = (
+        (mp.bonds[bi].atoms[0] - 1) as usize,
+        (mp.bonds[bi].atoms[1] - 1) as usize,
+    );
+    let (col1, col2) = (mp.atoms[a0].color, mp.atoms[a1].color);
+    let mut collision = false;
+    for ap1 in &mp.atoms {
+        if ap1.color != col1 {
+            continue;
+        }
+        for ap2 in &mp.atoms {
+            let d: f32 = (ap1.x - ap2.x) * (ap1.x - ap2.x) + (ap1.y - ap2.y) * (ap1.y - ap2.y);
+            if ap2.color == col2 && f64::from(d) < 0.05 * STDBOND * STDBOND {
+                collision = true;
+                break;
+            }
+        }
+    }
+    if !collision {
+        return;
+    }
+    let r12 = [
+        f64::from(mp.atoms[a1].x - mp.atoms[a0].x),
+        f64::from(mp.atoms[a1].y - mp.atoms[a0].y),
+    ];
+    let col = mp.atoms[a1].color;
+    for a in &mut mp.atoms {
+        if a.color == col {
+            a.x = (f64::from(a.x) + 0.3 * r12[0]) as f32;
+            a.y = (f64::from(a.y) + 0.3 * r12[1]) as f32;
+        }
+    }
+}
+
+/// one flip trial of `ImproveMoleculeByBondFlip` around the bond `bi`; `swap_ring_end` temporarily
+/// exchanges the bond's atoms. Returns whether the flip was kept (None: nothing to flip).
+fn flip_trial(
+    mp: &mut Molecule,
+    nbp: &[Neighbourhood],
+    bi: usize,
+    threshold: f64,
+    swap_ring_end: bool,
+) -> Option<bool> {
+    let (ai0, ai1) = (
+        (mp.bonds[bi].atoms[0] - 1) as usize,
+        (mp.bonds[bi].atoms[1] - 1) as usize,
+    );
+    let oldcolor = mp.atoms[ai0].color;
+    mp.atoms[ai0].color = 0;
+    mp.atoms[ai1].color *= -1;
+    let ninvert = invert_fragment_color(mp, nbp, ai1, oldcolor);
+    if ninvert > 0 {
+        mp.atoms[ai0].color = oldcolor;
+        if swap_ring_end {
+            mp.bonds[bi].atoms = [ai1 as i32 + 1, ai0 as i32 + 1];
+        }
+        let improved = improve_bond_by_flip(mp, bi, threshold);
+        for a in &mut mp.atoms {
+            if a.color == -oldcolor {
+                a.color = oldcolor;
+            }
+        }
+        if swap_ring_end {
+            mp.bonds[bi].atoms = [ai0 as i32 + 1, ai1 as i32 + 1];
+        }
+        Some(improved)
+    } else {
+        mp.atoms[ai0].color = oldcolor;
+        mp.atoms[ai1].color *= -1;
+        None
+    }
+}
+
+/// `ImproveMoleculeByBondFlip`: flips around bonds until no improvement is found; returns the
+/// number of improvement steps
+pub fn improve_molecule_by_bond_flip(
+    mp: &mut Molecule,
+    nbp: &[Neighbourhood],
+    ring_size: &[i32],
+    is_ring_atom: &[i32],
+    frag_color: i32,
+    only_single_bonds: bool,
+) -> i32 {
+    let mut ret = 0;
+    for _ in 0..2 {
+        let mut changed = false;
+        for i in 0..mp.bonds.len() {
+            let (ai0, ai1) = (
+                (mp.bonds[i].atoms[0] - 1) as usize,
+                (mp.bonds[i].atoms[1] - 1) as usize,
+            );
+            if mp.atoms[ai0].color & KEEP_POSITION != 0 || mp.atoms[ai1].color & KEEP_POSITION != 0
+            {
+                continue;
+            }
+            if only_single_bonds && mp.bonds[i].bond_type != SINGLE {
+                continue;
+            }
+            if mp.bonds[i].bond_type & RUBBER_BOND == 0
+                && ring_size[i] == 0
+                && nbp[ai0].atoms.len() > 1
+                && nbp[ai1].atoms.len() > 1
+                && (frag_color == 0
+                    || (mp.atoms[ai0].color == frag_color && mp.atoms[ai1].color == frag_color))
+            {
+                if let Some(true) = flip_trial(mp, nbp, i, 0.1, is_ring_atom[ai1] != 0) {
+                    if frag_color == 0 {
+                        changed = true;
+                    }
+                    ret += 1;
+                }
+            }
+        }
+        if mp.bonds.len() > 60 {
+            changed = false;
+        }
+        if !changed {
+            break;
+        }
+    }
+    if mp.atoms.len() > 60 {
+        return ret;
+    }
+    for pass in 0..2 {
+        // pass 0: chain bonds at atoms with more than two neighbours; pass 1: all chain bonds
+        if pass == 1 && mp.atoms.len() > 30 {
+            return ret;
+        }
+        for _ in 0..2 {
+            let mut changed = false;
+            for i in 0..mp.bonds.len() {
+                let (ai0, ai1) = (
+                    (mp.bonds[i].atoms[0] - 1) as usize,
+                    (mp.bonds[i].atoms[1] - 1) as usize,
+                );
+                let cond = mp.bonds[i].bond_type & RUBBER_BOND == 0
+                    && is_ring_atom[ai0] == 0
+                    && is_ring_atom[ai1] == 0
+                    && nbp[ai0].atoms.len() > 1
+                    && nbp[ai1].atoms.len() > 1
+                    && (pass == 1 || nbp[ai1].atoms.len() > 2 || nbp[ai0].atoms.len() > 2)
+                    && (frag_color == 0 || mp.atoms[ai0].color == frag_color/* C tests atom 0 twice here */);
+                if cond {
+                    if only_single_bonds && mp.bonds[i].bond_type != SINGLE {
+                        continue;
+                    }
+                    if let Some(true) = flip_trial(mp, nbp, i, 1.0, false) {
+                        if frag_color == 0 {
+                            changed = true;
+                        }
+                        ret += 1;
+                    }
+                }
+            }
+            if !changed {
+                break;
+            }
+        }
+    }
+    ret
+}
+
+/// `ImproveSPAtoms`: makes sp carbon and nitrogen atoms linear (only atom number `atom` if != 0)
+pub fn improve_sp_atoms(mp: &mut Molecule, nbp: &[Neighbourhood], atom: usize) {
+    let colors: Vec<i32> = mp.atoms.iter().map(|a| a.color).collect();
+    for i in 0..mp.atoms.len() {
+        if nbp[i].atoms.len() != 2 {
+            continue;
+        }
+        let sym = mp.atoms[i].atom_symbol.as_str();
+        if sym != "C" && sym != "N" {
+            continue;
+        }
+        let (b0, b1) = (
+            mp.bonds[nbp[i].bonds[0]].bond_type,
+            mp.bonds[nbp[i].bonds[1]].bond_type,
+        );
+        if !((b0 == SINGLE && b1 == TRIPLE)
+            || (b1 == SINGLE && b0 == TRIPLE)
+            || (b0 == DOUBLE && b1 == DOUBLE))
+        {
+            continue;
+        }
+        if !(atom == 0 || atom == i + 1) {
+            continue;
+        }
+        for a in &mut mp.atoms {
+            a.color = NONE;
+        }
+        mp.atoms[i].color = 1;
+        mp.atoms[nbp[i].atoms[0]].color = 2;
+        mp.atoms[nbp[i].atoms[1]].color = 3;
+        loop {
+            let mut changed = false;
+            for j in 0..mp.bonds.len() {
+                let (x0, x1) = (
+                    (mp.bonds[j].atoms[0] - 1) as usize,
+                    (mp.bonds[j].atoms[1] - 1) as usize,
+                );
+                if mp.atoms[x0].color > 0 && mp.atoms[x1].color == 0 {
+                    changed = true;
+                    mp.atoms[x1].color = mp.atoms[x0].color;
+                } else if mp.atoms[x1].color > 0 && mp.atoms[x0].color == 0 {
+                    changed = true;
+                    mp.atoms[x0].color = mp.atoms[x1].color;
+                }
+            }
+            if !changed {
+                break;
+            }
+        }
+        if mp.atoms[nbp[i].atoms[0]].color != mp.atoms[nbp[i].atoms[1]].color {
+            let ap = &mp.atoms[i];
+            let p1 = [f64::from(ap.x), f64::from(ap.y)];
+            let n0 = &mp.atoms[nbp[i].atoms[0]];
+            let n1 = &mp.atoms[nbp[i].atoms[1]];
+            let p2 = [f64::from(n0.x), f64::from(n0.y)];
+            let p2p = [2.0 * p1[0] - f64::from(n1.x), 2.0 * p1[1] - f64::from(n1.y)];
+            let (_, mut coords, numbers) = get_colored_graph(mp, 2);
+            transform_points(&mut coords, p1, p2, p1, p2p);
+            for j in 0..mp.atoms.len() {
+                if mp.atoms[j].color == 2 {
+                    mp.atoms[j].x = coords[numbers[j]][0] as f32;
+                    mp.atoms[j].y = coords[numbers[j]][1] as f32;
+                }
+            }
+        }
+    }
+    for (a, c) in mp.atoms.iter_mut().zip(colors) {
+        a.color = c;
+    }
+}
+
+/// `CountColor`: the number of atoms with `color`
+pub fn count_color(mp: &Molecule, color: i32) -> usize {
+    mp.atoms.iter().filter(|a| a.color == color).count()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -620,6 +937,84 @@ mod tests {
                 let last = c.atoms.len() - 1;
                 out += &format!("clear={}\n", flood_clear_color(&mut c, &nbp, last, 5));
                 out += &dump("cleared", &c);
+            }
+            if out != want {
+                bad.push(format!("{input}\nwant:\n{want}\ngot:\n{out}"));
+            }
+        }
+        assert!(bad.is_empty(), "{} differ; first:\n{}", bad.len(), bad[0]);
+    }
+
+    fn graph_dump(mp: &Molecule) -> String {
+        let col = mp.atoms[0].color;
+        let (edges, coords, _) = get_colored_graph(mp, col);
+        let mut out = format!("graph {} {}\n", edges.len(), coords.len());
+        for e in &edges {
+            out += &format!("e {} {}\n", e[0], e[1]);
+        }
+        for p in &coords {
+            out += &format!("p {} {}\n", fmt_gp(p[0], 17), fmt_gp(p[1], 17));
+        }
+        out
+    }
+
+    /// the second part of the layout must leave the same coordinates as the C code
+    #[test]
+    fn layout_part2_matches_c() {
+        let text = include_str!("../../../../../tests/data/avalon_layout2.jsonl");
+        let mut bad = Vec::new();
+        for line in text.lines() {
+            let v: serde_json::Value = serde_json::from_str(line).expect("json");
+            let input = v["input"].as_str().unwrap();
+            let want = v["output"].as_str().unwrap();
+            let mp = mol_str_to_mol(input).expect("molecule");
+            let mut out = String::new();
+
+            let mut base = seeded(7, &mp);
+            recolor_molecule(&mut base);
+            layout_rings(&mut base);
+            out += &dump("base", &base);
+            for i in 0..base.atoms.len().min(3) {
+                out += &format!("count{i}={}\n", count_color(&base, base.atoms[i].color));
+            }
+            let nbp = setup_neighbourhood(&base).unwrap();
+            let (is_ring_atom, ring_size) = ring_state(&base);
+            for k in 0..4 {
+                let mut c = base.clone();
+                let frag = if k & 1 != 0 { base.atoms[0].color } else { 0 };
+                let ret = improve_molecule_by_bond_flip(
+                    &mut c,
+                    &nbp,
+                    &ring_size,
+                    &is_ring_atom,
+                    frag,
+                    k & 2 != 0,
+                );
+                out += &format!("improve{k}={ret}\n");
+                out += &dump("improved", &c);
+            }
+            let mut c = base.clone();
+            improve_sp_atoms(&mut c, &nbp, 0);
+            out += &dump("sp", &c);
+            for i in 0..base.bonds.len().min(8) {
+                let mut c = base.clone();
+                let a0 = (base.bonds[i].atoms[0] - 1) as usize;
+                let a1 = (base.bonds[i].atoms[1] - 1) as usize;
+                out += &format!(
+                    "strain{i}={}\n",
+                    fmt_gp(color_strain(&c, c.atoms[a0].color, c.atoms[a1].color), 17)
+                );
+                out += &format!(
+                    "flip{i}={}\n",
+                    i32::from(improve_bond_by_flip(&mut c, i, 0.1))
+                );
+                out += &dump("flipped", &c);
+                let mut c = base.clone();
+                improve_bond_by_stretch(&mut c, i);
+                out += &dump("stretched", &c);
+            }
+            if !base.atoms.is_empty() {
+                out += &graph_dump(&base);
             }
             if out != want {
                 bad.push(format!("{input}\nwant:\n{want}\ngot:\n{out}"));
