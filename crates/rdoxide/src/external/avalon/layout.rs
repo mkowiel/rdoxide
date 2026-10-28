@@ -7,8 +7,8 @@
 use super::geometry::{
     H_GEOMETRY, NO_RAY_CROSSING, USE_INWARDS, next_substituent_point, transform_points,
 };
-use super::graph::{BondSet, CRand, combine_rings, ring_list};
-use super::perceive::{DOUBLE, Neighbourhood, SINGLE, TRIPLE, ring_state};
+use super::graph::{BondSet, CRand, combine_rings_rng, ring_list};
+use super::perceive::{DOUBLE, Neighbourhood, SINGLE, TRIPLE, ring_state, setup_neighbourhood};
 use super::reaccs::{CIS_TRANS_EITHER, CIS_TRANS_SWAPPED, Molecule, NONE};
 use super::utilities::{DOWN, UP, atom_symbol_match, flip_stereo_symbols, reset_colors};
 
@@ -185,7 +185,7 @@ pub fn invert_fragment_color(
 }
 
 /// `MoleculeRings`: the combined basis rings, ignoring rubber bonds
-fn molecule_rings(mp: &Molecule) -> Vec<BondSet> {
+fn molecule_rings(mp: &Molecule, rng: &mut CRand) -> Vec<BondSet> {
     if mp.bonds.is_empty() {
         return Vec::new();
     }
@@ -205,7 +205,7 @@ fn molecule_rings(mp: &Molecule) -> Vec<BondSet> {
         })
         .collect();
     let mut rings = ring_list(&bonds);
-    combine_rings(&mut rings);
+    combine_rings_rng(&mut rings, rng);
     rings
 }
 
@@ -517,8 +517,13 @@ pub fn layout_ring_sort(rings: &mut [BondSet]) {
 /// `LayoutRings`: coordinates for the atoms of ring systems; atoms placed relative to each
 /// other end up with the same colour
 pub fn layout_rings(mp: &mut Molecule) {
+    layout_rings_rng(mp, &mut CRand::new(1));
+}
+
+/// `LayoutRings` that leaves the C `rand()` state (reseeded by the ring perception) in `rng`
+pub fn layout_rings_rng(mp: &mut Molecule, rng: &mut CRand) {
     hide_metal_complex_problems(mp);
-    let mut rings = molecule_rings(mp);
+    let mut rings = molecule_rings(mp, rng);
     layout_ring_sort(&mut rings);
     let mut i = 0;
     while i < rings.len() {
@@ -2366,8 +2371,10 @@ pub fn improve_collisions(
         }
         if !moved {
             // a hard case: nudge the atom randomly by up to a tenth of a bond
-            let dx = STDBOND * f64::from(rng.next_value() % 100 - 50) / 500.0;
-            let dy = STDBOND * f64::from(rng.next_value() % 100 - 50) / 500.0;
+            let r1 = rng.next_value();
+            let r2 = rng.next_value();
+            let dx = STDBOND * f64::from(r1 % 100 - 50) / 500.0;
+            let dy = STDBOND * f64::from(r2 % 100 - 50) / 500.0;
             let a = &mut mp.atoms[apcol];
             a.x = (f64::from(a.x) + dx) as f32;
             a.y = (f64::from(a.y) + dy) as f32;
@@ -3642,6 +3649,332 @@ pub fn fragment_height(mp: &Molecule, color: i32) -> f64 {
     (ymax - ymin) + 1.5 * FRAME_HEIGHT
 }
 
+fn shift_color_y(mp: &mut Molecule, color: i32, dy: f64) {
+    for ap in &mut mp.atoms {
+        if ap.color == color {
+            ap.y = (f64::from(ap.y) - dy) as f32;
+        }
+    }
+}
+
+/// `AlignShortcutsAndFragments`: puts shortcut strings horizontally in rows and places the connected fragments between them
+pub fn align_shortcuts_and_fragments(
+    mp: &mut Molecule,
+    shortcut_class: &[i32],
+    nbp: &[Neighbourhood],
+) {
+    let mut farray = collect_fragment_info(mp, shortcut_class, nbp);
+    let nfrag = farray.len();
+    let mut first_color = -1;
+    for chain in &mut farray {
+        for f in chain {
+            f.used = false;
+        }
+    }
+    // shortcut fragments go into separate rows
+    let mut yoffset = 0.0f64;
+    for ifrag in 0..nfrag {
+        if ifrag != 0 {
+            yoffset += FRAME_HEIGHT;
+        }
+        if farray[ifrag][0].fragment_type != FT_SHORTCUTS {
+            continue;
+        }
+        let fcolor = farray[ifrag][0].color;
+        if first_color == -1 {
+            first_color = fcolor;
+        }
+        farray[ifrag][0].used = true;
+        let mut placed = false;
+        for i in 0..mp.atoms.len() {
+            if mp.atoms[i].color != fcolor {
+                continue;
+            }
+            if shortcut_class[i] & SHORTCUT_START != 0 {
+                let col = mp.atoms[i].color;
+                let Some(&lig) = nbp[i].atoms.iter().find(|&&a| {
+                    col == mp.atoms[a].color
+                        && shortcut_class[a] & (SHORTCUT_INNER | SHORTCUT_END) != 0
+                }) else {
+                    continue;
+                };
+                let (_, mut coords, numbers) = get_colored_graph(mp, col);
+                let p1 = [f64::from(mp.atoms[i].x), f64::from(mp.atoms[i].y)];
+                let p2 = [f64::from(mp.atoms[lig].x), f64::from(mp.atoms[lig].y)];
+                let p1p = [0.0, -yoffset];
+                let p2p = [1.54, -yoffset];
+                farray[ifrag][0].ycenter = -yoffset;
+                transform_points(&mut coords, p1, p2, p1p, p2p);
+                for j in 0..mp.atoms.len() {
+                    if mp.atoms[j].color == col {
+                        mp.atoms[j].x = coords[numbers[j]][0] as f32;
+                        mp.atoms[j].y = coords[numbers[j]][1] as f32;
+                    }
+                }
+                placed = true;
+                break;
+            }
+        }
+        if !placed {
+            break;
+        }
+    }
+
+    // move adjacent shortcut rows apart to fit the fragments between them
+    for ifrag in 0..nfrag.saturating_sub(1) {
+        if farray[ifrag][0].fragment_type != FT_SHORTCUTS {
+            continue;
+        }
+        let gap = farray[ifrag][0].ycenter - farray[ifrag + 1][0].ycenter;
+        let mut deltah = gap;
+        for k in 1..farray[ifrag].len() {
+            let (fcolor, nsn) = (farray[ifrag][k].color, farray[ifrag][k].nsneighbours);
+            if nsn == 1 {
+                improve_fragment_by_all_bond_flips(
+                    mp,
+                    nbp,
+                    fcolor,
+                    CENTER_DISTANCE,
+                    farray[ifrag][0].color,
+                    -1,
+                );
+                continue;
+            }
+            improve_fragment_by_all_bond_flips(
+                mp,
+                nbp,
+                fcolor,
+                TOP_BOTTOM_SEPARATION,
+                farray[ifrag][0].color,
+                farray[ifrag + 1][0].color,
+            );
+            let new_deltah = fragment_height(mp, fcolor);
+            if new_deltah > deltah {
+                deltah = new_deltah;
+            }
+        }
+        if deltah > gap {
+            deltah -= gap;
+            for jfrag in ifrag + 1..nfrag {
+                farray[jfrag][0].ycenter -= deltah;
+                shift_color_y(mp, farray[jfrag][0].color, deltah);
+            }
+        }
+    }
+
+    // make space before the rows
+    for ifrag in 1..nfrag {
+        if farray[ifrag][0].fragment_type != FT_SHORTCUTS {
+            continue;
+        }
+        let gap = farray[ifrag - 1][0].ycenter - farray[ifrag][0].ycenter;
+        let mut deltah = gap;
+        for k in 1..farray[ifrag].len() {
+            if farray[ifrag][k].nsneighbours > 1 {
+                continue;
+            }
+            let new_deltah = fragment_height(mp, farray[ifrag][k].color);
+            if new_deltah > deltah {
+                deltah = new_deltah;
+            }
+        }
+        if deltah > gap {
+            deltah -= gap;
+            for jfrag in ifrag..nfrag {
+                farray[jfrag][0].ycenter -= deltah;
+                shift_color_y(mp, farray[jfrag][0].color, deltah);
+            }
+        }
+    }
+
+    // fragments that connect two neighbouring rows
+    for ifrag in 0..nfrag {
+        if farray[ifrag][0].fragment_type != FT_SHORTCUTS {
+            continue;
+        }
+        for k in 1..farray[ifrag].len() {
+            let f = farray[ifrag][k].clone();
+            if f.nsneighbours == 1 {
+                // placed in the next round
+            } else if f.nsneighbours >= 2
+                && ifrag + 1 < nfrag
+                && f.neighbour_cols[0] == farray[ifrag][0].color
+            {
+                let deltah = farray[ifrag][0].ycenter - farray[ifrag + 1][0].ycenter;
+                align_fragment(
+                    mp,
+                    nbp,
+                    f.color,
+                    farray[ifrag][0].ycenter,
+                    farray[ifrag + 1][0].ycenter,
+                    f.neighbour_cols[0],
+                    f.neighbour_cols[1],
+                    deltah,
+                    f.nsneighbours,
+                );
+                let mut new_deltah = fragment_rendered_height(mp, f.color);
+                if new_deltah > deltah {
+                    new_deltah -= deltah;
+                    shift_color_y(mp, f.color, new_deltah / 2.0);
+                    for jfrag in ifrag + 1..nfrag {
+                        farray[jfrag][0].ycenter -= new_deltah;
+                        shift_color_y(mp, farray[jfrag][0].color, new_deltah);
+                    }
+                }
+                farray[ifrag][k].used = true;
+            }
+        }
+    }
+
+    // fragments with a single attachment are placed above their row
+    for ifrag in 0..nfrag {
+        if farray[ifrag][0].fragment_type != FT_SHORTCUTS {
+            continue;
+        }
+        for k in 1..farray[ifrag].len() {
+            let f = farray[ifrag][k].clone();
+            if f.nsneighbours != 1 {
+                continue;
+            }
+            let deltah = if ifrag > 0 {
+                farray[ifrag - 1][0].ycenter - farray[ifrag][0].ycenter
+            } else {
+                FRAME_HEIGHT
+            };
+            let top_y = if ifrag > 0 {
+                farray[ifrag - 1][0].ycenter
+            } else {
+                fragment_height(mp, f.color) - FRAME_HEIGHT / 2.0
+            };
+            align_fragment(
+                mp,
+                nbp,
+                f.color,
+                top_y,
+                farray[ifrag][0].ycenter,
+                0,
+                f.neighbour_cols[0],
+                deltah,
+                f.nsneighbours,
+            );
+            let mut new_deltah = fragment_rendered_height(mp, f.color);
+            if ifrag > 0 && new_deltah > deltah {
+                new_deltah -= deltah;
+                for kk in 1..farray[ifrag].len() {
+                    shift_color_y(mp, farray[ifrag][kk].color, new_deltah);
+                }
+                for jfrag in ifrag..nfrag {
+                    farray[jfrag][0].ycenter -= new_deltah;
+                    shift_color_y(mp, farray[jfrag][0].color, new_deltah);
+                }
+            }
+            farray[ifrag][k].used = true;
+        }
+    }
+
+    // everything laid out gets the color of the first row and stays in place
+    for chain in &farray {
+        for f in chain {
+            if f.used {
+                for ap in &mut mp.atoms {
+                    if f.color == ap.color {
+                        ap.color = first_color;
+                    }
+                }
+            }
+        }
+    }
+    for ap in &mut mp.atoms {
+        if ap.color == first_color {
+            ap.color |= KEEP_POSITION;
+        }
+    }
+}
+
+/// `LayoutMolecule`: the complete layout of `mp`; fragments pre-laid out by the caller carry a common color
+pub fn layout_molecule(mp: &Molecule) -> Molecule {
+    let mut result = mp.clone();
+    let mut rng = CRand::new(1);
+    random_coordinates(&mut result, &mut rng);
+    scale_by_fixed_fragments(&mut result);
+
+    let mut nbp = setup_neighbourhood(&result).expect("neighbourhood");
+    for nb in &mut nbp {
+        let mut pairs: Vec<(usize, usize)> = nb
+            .atoms
+            .iter()
+            .copied()
+            .zip(nb.bonds.iter().copied())
+            .collect();
+        pairs.sort_by_key(|p| p.0);
+        nb.atoms = pairs.iter().map(|p| p.0).collect();
+        nb.bonds = pairs.iter().map(|p| p.1).collect();
+    }
+    for nb in &nbp {
+        if nb.atoms.len() == 1 {
+            let b = &mut result.bonds[nb.bonds[0]];
+            if ALL_BOND_TYPES & b.bond_type == DOUBLE {
+                b.stereo_symbol = NONE;
+            }
+        }
+    }
+
+    let mut is_ring_atom = vec![0i32; result.atoms.len()];
+    let mut ring_count = vec![0i32; result.bonds.len()];
+    let mut ring_size = vec![0i32; result.bonds.len()];
+    for ring in molecule_rings(&result, &mut rng) {
+        for i in 0..result.bonds.len() {
+            if ring.bond_set.is_member(i) {
+                let (a0, a1) = (
+                    result.bonds[i].atoms[0] as usize - 1,
+                    result.bonds[i].atoms[1] as usize - 1,
+                );
+                is_ring_atom[a0] = 1;
+                is_ring_atom[a1] = 1;
+                if ring_size[i] == 0 || ring_size[i] > ring.cardinality as i32 {
+                    ring_size[i] = ring.cardinality as i32;
+                }
+                result.bonds[i].rsize_flags |= 9.max(ring.cardinality) as u32;
+                ring_count[i] += 1;
+            }
+        }
+    }
+
+    let mut shortcut_class = vec![0i32; result.atoms.len()];
+    let process_shortcuts =
+        perceive_shortcut_classes(&result, &is_ring_atom, &mut shortcut_class, &nbp, 30);
+    if process_shortcuts {
+        layout_shortcut_chains(&mut result, &shortcut_class, &nbp);
+    }
+    layout_large_lactams(&mut result, &is_ring_atom, &ring_size, &nbp);
+    layout_rings_rng(&mut result, &mut rng);
+    flip_ring_carbonyls(&mut result, &is_ring_atom, &ring_size, &nbp);
+    link_ring_fragments(&mut result, &is_ring_atom);
+    sprout_ring_substituents(&mut result, &is_ring_atom, &ring_size, &nbp);
+    layout_chain_atoms(&mut result, &is_ring_atom, &nbp);
+    fix_linear_bridge_heads(&mut result, &ring_count, &nbp);
+    link_remaining_fragments(&mut result);
+    fix_inward_hydrogens(&mut result, &ring_count, &nbp);
+    improve_molecule_by_bond_flip(&mut result, &nbp, &ring_size, &is_ring_atom, 0, false);
+    clear_flip_flags(&mut result);
+    improve_collisions(&mut result, &nbp, &is_ring_atom, &ring_count, &mut rng);
+    layout_rubber_fragments(&mut result);
+    if process_shortcuts {
+        align_shortcuts_and_fragments(&mut result, &shortcut_class, &nbp);
+    }
+    merge_connected_fragment_colors(&mut result);
+    layout_fragments(&mut result, &ring_size, &ring_count);
+    layout_bond_stereo(&mut result, &nbp, &ring_size);
+    improve_molecule_by_bond_flip(&mut result, &nbp, &ring_size, &is_ring_atom, 0, true);
+    clear_flip_flags(&mut result);
+    layout_atom_stereo(&mut result, &nbp, &is_ring_atom, &ring_size);
+    clear_db_stereo_in_small_rings(&mut result, &ring_size);
+    for b in &mut result.bonds {
+        b.bond_type &= ALL_BOND_TYPES;
+    }
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -4333,6 +4666,36 @@ mod tests {
                     }
                 }
             }
+            if out != want {
+                bad.push(format!("{}\nwant:\n{want}\ngot:\n{out}", v["name"]));
+            }
+        }
+        assert!(bad.is_empty(), "{} differ; first:\n{}", bad.len(), bad[0]);
+    }
+
+    /// the complete `LayoutMolecule` must agree with the C code
+    #[test]
+    fn layout_molecule_matches_c() {
+        use crate::external::avalon::smi2mol::{TRUE_DB_STEREO, smi_to_mol};
+        let text = include_str!("../../../../../tests/data/avalon_layout10.jsonl");
+        let mut bad = Vec::new();
+        for line in text.lines() {
+            let v: serde_json::Value = serde_json::from_str(line).expect("json");
+            let input = v["input"].as_str().unwrap();
+            let want = v["output"].as_str().unwrap();
+            let mol = if let Some(smi) = input.strip_prefix("SMILES:") {
+                smi_to_mol(smi, TRUE_DB_STEREO).unwrap()
+            } else {
+                mol_str_to_mol(input)
+            };
+            let Some(mut mp) = mol else {
+                assert_eq!(want, "NULL\n");
+                continue;
+            };
+            recolor_molecule(&mut mp);
+            let mut out = dump3("input", &mp);
+            let r = layout_molecule(&mp);
+            out += &dump3("layout", &r);
             if out != want {
                 bad.push(format!("{}\nwant:\n{want}\ngot:\n{out}", v["name"]));
             }
