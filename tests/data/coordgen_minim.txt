@@ -1,0 +1,2058 @@
+MOL 2 1
+A 6 0 c2190c37 3f74d3e4
+A 6 0 42312644 bf0cb283
+B 0 1 1
+END
+interactions 1 clash 0 stretch 1 bend 0 energy 3cb9dbd1
+a 0 c1b28a61 3f2b1ae2
+a 1 41e2c7d3 be844ab2
+$$
+MOL 3 3
+A 6 0 422db4f9 3fb2f6d1
+A 6 0 c1d5918d 4216c31c
+A 6 0 c19c9481 c2033fde
+B 0 1 1
+B 1 2 1
+B 2 0 1
+END
+interactions 6 clash 0 stretch 3 bend 3 energy 3f9bde1f
+a 0 41ecf2fb 40c2aa74
+a 1 c16ca61a 41ea051d
+a 2 c1494621 c1a53b16
+$$
+MOL 6 6
+A 6 0 4289030f c049512e
+A 6 0 41f79b18 428bcffc
+A 6 0 c2099eb4 42667ceb
+A 6 0 c28691df 40edf4bb
+A 6 0 c20c2622 c27c695f
+A 6 0 42001462 c2916c7d
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 5 0 1
+END
+interactions 24 clash 12 stretch 6 bend 6 energy 40c0b6d4
+a 0 42530846 bfe3fbdc
+a 1 41dfd7e6 4227ec43
+a 2 c1b1c9b6 422a093b
+a 3 c23ea506 bf5f64d7
+a 4 c1b819ca c232d461
+a 5 41d98a91 c234599e
+$$
+MOL 6 6
+A 6 0 4296e880 c0e18284
+A 6 0 42022c5f 42734abf
+A 6 0 c2341320 4280bfed
+A 6 0 c297e72b 40af529c
+A 6 0 c214c6ac c27ad436
+A 6 0 4215fc49 c279692d
+B 0 1 1
+B 1 2 2
+B 2 3 1
+B 3 4 2
+B 4 5 1
+B 5 0 2
+END
+interactions 24 clash 12 stretch 6 bend 6 energy 40044551
+a 0 42454f20 3f9ce9ab
+a 1 41c58f1c 42332a93
+a 2 c1cacb7f 42355918
+a 3 c24b8a63 400511de
+a 4 c1d1ea3f c225be94
+a 5 41be233c c22811fc
+$$
+MOL 10 11
+A 6 0 43013899 c2243294
+A 6 0 4309ddc6 4235b969
+A 6 0 428cca6c 429ca660
+A 6 0 c03d27f8 4204b2d9
+A 6 0 c288a78f 42883f45
+A 6 0 c2fb4952 420fa027
+A 6 0 c2f8b789 c21d435d
+A 6 0 c2667e2f c28ae2d7
+A 6 0 c0ffb893 c22893fd
+A 6 0 428f0853 c296f5dd
+B 0 1 2
+B 1 2 1
+B 2 3 2
+B 3 4 1
+B 4 5 2
+B 5 6 1
+B 6 7 2
+B 7 8 1
+B 8 9 2
+B 9 0 1
+B 8 3 1
+END
+interactions 85 clash 60 stretch 11 bend 14 energy 41699d60
+a 0 42bbea33 c1abf12c
+a 1 42ba510a 41e554c1
+a 2 4244d0ea 4254f56f
+a 3 40bf2a23 41dbc222
+a 4 c218106c 424fd932
+a 5 c2a299dc 41d2bb12
+a 6 c2a111a0 c1be8409
+a 7 c2127e75 c2415eeb
+a 8 40d2c63a c1b47311
+a 9 424a8ceb c23c4e39
+$$
+MOL 7 8
+A 6 0 42aaa018 c21c9099
+A 6 0 428d9753 421e48fd
+A 6 0 412c0fdd 4263f882
+A 6 0 c28f4643 420b4915
+A 6 0 c2666cdf c2057c44
+A 6 0 3e3e04f9 c28177d8
+A 6 0 c230ad85 c0e155a7
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 5 6 1
+B 5 0 1
+B 6 2 1
+END
+interactions 37 clash 18 stretch 8 bend 11 energy 47e90be6
+a 0 42537451 c1cad6a3
+a 1 424c3674 41b0cd1b
+a 2 3ff5a090 41e8ca2c
+a 3 c23d8629 41e75cfe
+a 4 c23306a5 c21ea27a
+a 5 408d6021 c21047ed
+a 6 c1244213 c07fb5eb
+$$
+MOL 10 11
+A 6 0 430da6d9 c0a5075f
+A 6 0 42c8b23e 428038ae
+A 6 0 419b9a54 4289530d
+A 6 0 c1980a7d 40132a0f
+A 6 0 41921bb7 c284708c
+A 6 0 42bd9c4b c2894537
+A 6 0 c2469937 42830fcd
+A 6 0 c303a5bd 422ea1a1
+A 6 0 c3052472 c21cc434
+A 6 0 c24e0ecf c269a0ab
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 3 6 1
+B 6 7 1
+B 7 8 1
+B 8 9 1
+B 5 0 1
+B 9 3 1
+END
+interactions 82 clash 58 stretch 11 bend 13 energy 4162d67e
+a 0 42b4d524 c02d0803
+a 1 4284ddbe 4225ebe8
+a 2 418082e2 422a8e87
+a 3 c124d536 be2805f1
+a 4 415e0280 c230f7fe
+a 5 428079fe c2367d98
+a 6 c21b6248 42239eb7
+a 7 c2ad6f15 41d27e1a
+a 8 c2af5ec9 c1bd4a06
+a 9 c221b509 c2205c89
+$$
+MOL 13 15
+A 6 0 4331d3d5 bdb058de
+A 6 0 431c7530 426e2fde
+A 6 0 42b8187e 42988abd
+A 6 0 4208f6fc 418391d0
+A 6 0 425878fc c23aef45
+A 6 0 4301ecf1 c2781efb
+A 7 0 c0036004 c2b9c7ac
+A 6 0 c255520b c2414574
+A 6 0 c304d81d c2672542
+A 6 0 c33d4c01 c1572e28
+A 6 0 c31a82d7 4288ff8e
+A 6 0 c2b762ba 429416c8
+A 6 0 c206ad45 41f28be0
+B 0 1 2
+B 1 2 1
+B 2 3 2
+B 3 4 1
+B 4 5 2
+B 4 6 1
+B 6 7 1
+B 7 8 2
+B 8 9 1
+B 9 10 2
+B 10 11 1
+B 11 12 2
+B 5 0 1
+B 12 7 1
+B 12 3 1
+END
+interactions 159 clash 123 stretch 15 bend 21 energy 411c4f67
+a 0 42eafa8c c06eb604
+a 1 42cbfb6d 422f9c21
+a 2 425336b3 42590066
+a 3 419a632e 41895c88
+a 4 420b1c46 c1f454dd
+a 5 42a7fb95 c223fe4f
+a 6 c0b47c7b c27065d5
+a 7 c23a1e33 c1f42ea0
+a 8 c2beb238 c225082e
+a 9 c3012824 c08168dd
+a 10 c2e38afc 422e2998
+a 11 c2819162 4258a9a2
+a 12 c1f9256c 4188afe4
+$$
+MOL 11 11
+A 6 0 43004019 40e67835
+A 6 0 42ec2e1b 42933caf
+A 6 0 42582601 42e579d7
+A 6 0 c1d296de 430b272e
+A 6 0 c2b6b38e 42cfbc0d
+A 6 0 c3039a00 422ab7cb
+A 6 0 c2fc56f1 c223385b
+A 6 0 c2b8b770 c2c22301
+A 6 0 c1cebd38 c3081886
+A 6 0 4260f981 c2e6e053
+A 6 0 42e39b94 c296f4f9
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 5 6 1
+B 6 7 1
+B 7 8 1
+B 8 9 1
+B 9 10 1
+B 10 0 1
+END
+interactions 99 clash 77 stretch 11 bend 11 energy 45000e04
+a 0 42b7aeb9 3fa3e603
+a 1 429b00a1 424f9bb4
+a 2 42197ea4 42ad5f80
+a 3 c152ab42 42bcf253
+a 4 c2726c26 4291830e
+a 5 c2b1b89e 41e4ad2d
+a 6 c2b246ae c1c01916
+a 7 c2756bb1 c2890301
+a 8 c162aa1d c2b58291
+a 9 4215bf04 c2a71586
+a 10 4299e12a c244bec9
+$$
+MOL 16 16
+A 6 0 4346e57c c0979015
+A 6 0 4329da22 428bbb65
+A 6 0 43070ce7 4300e2eb
+A 6 0 4288c207 432f7cc9
+A 6 0 3f93cd90 433a52ec
+A 6 0 c2978777 4337d789
+A 6 0 c3003b31 430a6e16
+A 6 0 c32e8700 4295d1e4
+A 6 0 c345f91d c0ee09ed
+A 6 0 c3394cf3 c285fdb2
+A 6 0 c304b41f c30083c8
+A 6 0 c2a27000 c32f686e
+A 6 0 be918664 c33c87db
+A 6 0 428d529f c32998e0
+A 6 0 43011f92 c3072e7d
+A 6 0 43356104 c2864fc0
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 5 6 1
+B 6 7 1
+B 7 8 1
+B 8 9 1
+B 9 10 1
+B 10 11 1
+B 11 12 1
+B 12 13 1
+B 13 14 1
+B 14 15 1
+B 15 0 1
+END
+interactions 224 clash 192 stretch 16 bend 16 energy 45b032ae
+a 0 430a1953 bed052e0
+a 1 42fea7e2 424ff467
+a 2 42c17c32 42c0b560
+a 3 424db8c1 42fc4a24
+a 4 bfdcf6ad 43093244
+a 5 c25bfff0 42ffb04b
+a 6 c2c8fccb 42c6507a
+a 7 c3031d3c 425ce231
+a 8 c30de89a 403698fe
+a 9 c303324a c2464d46
+a 10 c2c9c3f4 c2bbb25a
+a 11 c25f69a1 c2f6d3ed
+a 12 c038a732 c306325b
+a 13 42497295 c2f98181
+a 14 42c0235b c2c07e08
+a 15 42fe1d7f c2525fc1
+$$
+MOL 14 14
+A 8 0 435af0c1 40509446
+A 6 0 4310d6dc 40d47b38
+A 6 0 42efa7c9 429790e1
+A 6 0 429dc14c 4306e585
+A 6 0 3f819609 432033ec
+A 6 0 c284996e 4313add1
+A 6 0 c303d6f3 42cc0d97
+A 6 0 c3275ed2 421cf7ad
+A 6 0 c32f68f7 c20d1400
+A 6 0 c2fbe448 c2c3aa42
+A 6 0 c288ed86 c3144c90
+A 6 0 40c32755 c31a4252
+A 6 0 428f0669 c2f7170d
+A 7 0 42e713e7 c289a271
+B 0 1 2
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 5 6 1
+B 6 7 1
+B 7 8 1
+B 8 9 1
+B 9 10 1
+B 10 11 1
+B 11 12 1
+B 12 13 1
+B 13 1 1
+END
+interactions 167 clash 138 stretch 14 bend 15 energy 455a826a
+a 0 43213c37 40745e08
+a 1 42da0c06 40815f35
+a 2 42b7816b 4258f224
+a 3 425589ba 42b6bdfb
+a 4 401d59ae 42d81df2
+a 5 c24a6232 42ca79fb
+a 6 c2bdec74 42904538
+a 7 c2f18093 41d443cb
+a 8 c2f2bd0b c1ca08fc
+a 9 c2c0ab9a c28d0ac6
+a 10 c24fcda0 c2c4beca
+a 11 3fa401ea c2ce3891
+a 12 4250ea66 c2a917bd
+a 13 42b5dd70 c239d76e
+$$
+MOL 10 10
+A 6 0 4295f40a c292c245
+A 6 0 42a46400 c08a2064
+A 6 0 42ab58c2 4295e97a
+A 6 0 431f5501 40d74718
+A 6 0 4065f85b c0fa35f1
+A 6 0 c204bbe2 42879aac
+A 6 0 c2db8483 426ea998
+A 6 0 c308022a 4023d46b
+A 6 0 c2d3dbb0 c26abcb2
+A 6 0 c2031314 c27930a9
+B 0 1 1
+B 1 2 1
+B 1 3 1
+B 1 4 1
+B 4 5 2
+B 5 6 1
+B 6 7 2
+B 7 8 1
+B 8 9 2
+B 9 4 1
+END
+interactions 74 clash 52 stretch 10 bend 12 energy 41a5959c
+a 0 420604b3 c252545c
+a 1 421b4614 c02c5cda
+a 2 41a43012 422c5706
+a 3 42ac8dbd 417f4598
+a 4 c17b00ae 3fee2838
+a 5 c21fdfec 42377d68
+a 6 c2b48dcf 423c30e8
+a 7 c2e88f0a 40814c32
+a 8 c2b84da4 c2201d62
+a 9 c227706e c2241031
+$$
+MOL 5 4
+A 6 0 c28b8d37 c21a6c36
+A 16 0 409caa83 40d414cd
+A 8 0 428e128a 420e9a51
+A 8 0 421b51a1 c287c6b7
+A 8 0 c22d48e3 4281ca6f
+B 0 1 1
+B 1 2 2
+B 1 3 2
+B 1 4 1
+END
+interactions 8 clash 0 stretch 4 bend 4 energy 3e4422c8
+a 0 c210f7dc c204dce2
+a 1 bd864eb6 400b5c85
+a 2 4241c893 41722a2a
+a 3 414f48e7 c23a6255
+a 4 c20c7fdd 4217e48e
+$$
+MOL 5 4
+A 8 0 c26e3bc7 c1ff5d22
+A 15 0 40584978 40e6666b
+A 8 0 427585c7 4200d302
+A 8 0 4212d771 c289193e
+A 8 0 c2284c82 427e4d7a
+B 0 1 1
+B 1 2 2
+B 1 3 1
+B 1 4 1
+END
+interactions 8 clash 0 stretch 4 bend 4 energy 3e14a32f
+a 0 c202620c c2045db5
+a 1 404ec674 4001066d
+a 2 424e2b23 416d6bfa
+a 3 41823615 c23c4ba3
+a 4 c200155a 421800ec
+$$
+MOL 14 15
+A 6 0 c3119017 428c619b
+A 6 0 c3601ef2 4275016c
+A 6 0 c36db994 c17e6313
+A 6 0 c34aebcb c29e45c1
+A 6 0 c2e91deb c28106af
+A 6 0 c2bdd471 416eab10
+A 6 0 c1ddbafa 4203a8c3
+A 6 0 4187bb9c c2084e54
+A 6 0 42c30f89 c1ab2277
+A 6 0 4318d96a c294faec
+A 6 0 43576bbb c27c4c33
+A 6 0 4377811f 41648531
+A 6 0 43463203 42943dcc
+A 6 0 42fee23b 42810644
+B 0 1 1
+B 1 2 2
+B 2 3 1
+B 3 4 2
+B 4 5 1
+B 5 6 1
+B 6 7 2
+B 7 8 1
+B 8 9 2
+B 9 10 1
+B 10 11 2
+B 11 12 1
+B 12 13 2
+B 5 0 2
+B 13 8 1
+END
+interactions 177 clash 144 stretch 15 bend 18 energy 43c28955
+a 0 c31a3217 422d0d19
+a 1 c34bf539 420e17d6
+a 2 c35deeee c136759c
+a 3 c33e57e1 c24a0d87
+a 4 c30c9f35 c22a5515
+a 5 c2f4e77f 4086e7c9
+a 6 c211ad25 419d686f
+a 7 420c1e45 c1bc02ff
+a 8 42f1d882 c0f9d0f3
+a 9 4318de92 c23a9a20
+a 10 434a848f c21a7700
+a 11 435c2d38 4106bba9
+a 12 433c657d 423d51bd
+a 13 430acb22 421c5d33
+$$
+MOL 4 3
+A 6 0 c2c00ebb c13a2b10
+A 6 0 c1f2eee8 418b33e8
+A 6 0 41b1212c c1b7e3af
+A 6 0 42ccd095 3fd8642f
+B 0 1 1
+B 1 2 2
+B 2 3 1
+END
+interactions 7 clash 2 stretch 3 bend 2 energy 3f8734c8
+a 0 c282977f c110334a
+a 1 c18eb095 412d6175
+a 2 41c02b5e c19ddc71
+a 3 428ef81b 3de43f5b
+$$
+MOL 4 3
+A 6 0 c29d48de c20bc6c7
+A 6 0 c2095f3f 420335fc
+A 6 0 421d531c 42124d11
+A 6 0 429297af c1de70b7
+B 0 1 1
+B 1 2 2
+B 2 3 1
+END
+interactions 7 clash 2 stretch 3 bend 2 energy 42ec0dee
+a 0 c29d47ae c20bc28f
+a 1 c2095c29 42033333
+a 2 421d51ec 421251ec
+a 3 4292999a c1de7ae1
+$$
+MOL 6 7
+A 6 0 42d9e745 c2306b28
+A 6 0 42dabf44 42243b6d
+A 6 0 41fca0e3 bf3e50e0
+A 6 0 c20df705 40d1e6fb
+A 6 0 c2d0d89b 421a6773
+A 6 0 c2c0c3fb c20301c4
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 2 0 1
+B 5 3 1
+END
+interactions 31 clash 14 stretch 7 bend 10 energy 41fa75b2
+a 0 42a9f413 c1c4d5d5
+a 1 42a7c180 41cbcd9e
+a 2 422448ee bf18efdf
+a 3 c1f5d9cd 3f239fdb
+a 4 c291a7e3 41ddfb3d
+a 5 c296e802 c1b139f4
+$$
+MOL 12 13
+A 6 0 43429bae bf14a6fc
+A 6 0 43186bd1 4270ebbd
+A 6 0 429d1a19 428c1743
+A 6 0 421f103e 405ee2c0
+A 6 0 428cd353 c26a356b
+A 6 0 431db01a c26541b5
+A 6 0 c213a281 4094e20a
+A 6 0 c29bbf54 428f0603
+A 6 0 c3104eb6 427a1cb0
+A 6 0 c3422cf7 bf7211b0
+A 6 0 c31531f7 c272a403
+A 6 0 c29666d5 c290fea3
+B 0 1 2
+B 1 2 1
+B 2 3 2
+B 3 4 1
+B 4 5 2
+B 3 6 1
+B 6 7 2
+B 7 8 1
+B 8 9 2
+B 9 10 1
+B 10 11 2
+B 5 0 1
+B 11 6 1
+END
+interactions 127 clash 98 stretch 13 bend 16 energy 43a3b2bf
+a 0 4326761c 3ff472cc
+a 1 430e0d3e 4237340f
+a 2 42b75189 4239c53a
+a 3 428373da 405834b3
+a 4 42b4bb1f c2214ddb
+a 5 430cb982 c224cd89
+a 6 c277e0fe 3cc45993
+a 7 c2afdaf1 422c04e7
+a 8 c30a565d 42280917
+a 9 c322c7a2 bff25693
+a 10 c308bc2e c233670d
+a 11 c2ac9fa3 c22fda49
+$$
+MOL 3 2
+A 7 0 429fe47a c0df33f0
+A 6 0 4099873c c0a77a23
+A 6 0 c29b47a5 40936867
+B 0 1 3
+B 1 2 1
+END
+interactions 3 clash 0 stretch 2 bend 1 energy 40150d58
+a 0 425f38a3 c0b40679
+a 1 3f9076d3 bfcaaedc
+a 2 c2563149 401d4f24
+$$
+MOL 5 4
+A 6 0 c28d6866 c22c7c1a
+A 7 1 3e875f44 4064ee96
+A 6 0 428cc876 42221eaa
+A 6 0 42328720 c2822426
+A 6 0 c1f2821c 42695029
+B 0 1 1
+B 1 2 1
+B 1 3 1
+B 1 4 1
+END
+interactions 8 clash 0 stretch 4 bend 4 energy 3dfd5741
+a 0 c2155574 c20a62bb
+a 1 bfa2e0f9 3f548977
+a 2 423ebf08 415fa976
+a 3 42081aec c20b8612
+a 4 c16164bc 42448f80
+$$
+MOL 3 2
+A 8 0 428d15d3 3eda6d36
+A 6 0 c056ddc3 406a55df
+A 8 0 c2918e5e 3ebaa2d6
+B 0 1 2
+B 1 2 2
+END
+interactions 3 clash 0 stretch 2 bend 1 energy 3ec36162
+a 0 424b52e0 3f44a98d
+a 1 bf8faf83 3f41ed09
+a 2 c2544dd2 3f3f3098
+$$
+MOL 10 12
+A 6 0 c1b9bff9 c090f509
+A 6 0 4119d393 c28bee58
+A 6 0 42ba07b1 c2648f02
+A 6 0 42e8af89 4112820b
+A 6 0 42ae5320 428503df
+A 6 0 40bf14a0 42634624
+A 6 0 c28af8d0 42648c29
+A 6 0 c2cbcb3a c18c7f92
+A 6 0 c25ae7d2 c290a6b9
+A 6 0 c22a61fc 42109e21
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 5 6 1
+B 6 7 1
+B 7 8 1
+B 7 9 1
+B 5 0 1
+B 8 1 1
+B 9 3 1
+END
+interactions 90 clash 60 stretch 12 bend 18 energy 48ff3fce
+a 0 bfe0ea38 c12c4160
+a 1 41815282 c2557b35
+a 2 425e0c8a c20f6b01
+a 3 42763018 40fc470a
+a 4 423feffc 4253a5e1
+a 5 4115a9e3 422708b7
+a 6 c21150c8 426bf663
+a 7 c24bc2eb 3fb5bb4e
+a 8 c1fd342e c252bed7
+a 9 c043090d 418cdef2
+$$
+MOL 20 24
+A 6 0 43170181 c3020c13
+A 6 0 433e8e48 c28fcb85
+A 6 0 43169e94 bfb0972f
+A 6 0 4342cf52 428f7405
+A 6 0 43124eb3 43017972
+A 6 0 428a101e 4300d7b8
+A 6 0 422a34b5 428eb8ba
+A 6 0 c217807d 42781bff
+A 6 0 c29fdfa1 4303ca46
+A 6 0 c30f3217 42f7f34c
+A 6 0 c3370808 42654413
+A 6 0 c31ae4f0 c08ba4ad
+A 6 0 c33881e9 c28798e1
+A 6 0 c3185080 c2fff9a0
+A 6 0 c2a2a4c7 c2fc6b45
+A 6 0 c22e2451 c281919d
+A 6 0 42060912 c28b9395
+A 6 0 4296f8a5 c302ea57
+A 6 0 42920608 bfb15a42
+A 6 0 c2950f95 c0ae3812
+B 0 1 1
+B 1 2 2
+B 2 3 1
+B 3 4 2
+B 4 5 1
+B 5 6 2
+B 6 7 1
+B 7 8 2
+B 8 9 1
+B 9 10 2
+B 10 11 1
+B 11 12 1
+B 12 13 2
+B 13 14 1
+B 14 15 2
+B 15 16 1
+B 16 17 1
+B 16 18 2
+B 15 19 1
+B 17 0 2
+B 18 2 1
+B 18 6 1
+B 19 7 1
+B 19 11 2
+END
+interactions 420 clash 360 stretch 24 bend 36 energy 41ee730a
+a 0 42d2089b c2b050a7
+a 1 430272d6 c233868c
+a 2 42d304bb bf909278
+a 3 43030690 422908d7
+a 4 42d4105c 42aba543
+a 5 425e99cd 42ac204e
+a 6 41f27000 422a5faa
+a 7 c1a80b4b 422a8605
+a 8 c238c97d 42ac081e
+a 9 c2c134c5 42abdc29
+a 10 c2f3ad3a 422a1b05
+a 11 c2c144cf bf65115d
+a 12 c2f3a20e c231d46a
+a 13 c2c14e06 c2af7112
+a 14 c239bcd7 c2af6efa
+a 15 c1aa8cc2 c230fcf0
+a 16 41ef361e c2317975
+a 17 425b144c c2aff2a1
+a 18 425ca836 bf6f3db0
+a 19 c238a039 bf73416e
+$$
+MOL 12 12
+A 6 0 431144ad 40067770
+A 6 0 429a6e53 3ef2a395
+A 6 0 422c7b04 42857a83
+A 6 0 42a16a9d 42fb40b0
+A 6 0 c2069733 428bd70f
+A 8 0 c2891d44 42fdea63
+A 6 0 c29beb9d 40d874ea
+A 6 0 c31a827b 40ff283c
+A 6 0 c1fa6509 c28d9e34
+A 6 0 c29e5744 c2fc8ea3
+A 6 0 42069b9b c28ecc9f
+A 8 0 42a0a120 c3032860
+B 0 1 1
+B 1 2 2
+B 2 3 1
+B 2 4 1
+B 4 5 2
+B 4 6 1
+B 6 7 1
+B 6 8 2
+B 8 9 1
+B 8 10 1
+B 10 11 2
+B 10 1 1
+END
+interactions 114 clash 84 stretch 12 bend 18 energy 40b5e1cf
+a 0 42c8ee40 c084406c
+a 1 42492d59 c0165310
+a 2 41d58583 42280118
+a 3 4256aeed 42a9c70b
+a 4 c1bc3fbd 422fd5d7
+a 5 c23bc921 42b078bb
+a 6 c248957f 3fb85f5a
+a 7 c2cdcd7a 405c1e39
+a 8 c1d53b12 c22be739
+a 9 c255c3ad c2aba108
+a 10 41bc9a8b c233304a
+a 11 42410c38 c2b5c0f4
+$$
+MOL 5 4
+A 26 0 40947278 c0bf7c80
+A 6 0 c28503d0 c20a2570
+A 6 0 4264f1b5 4202dc1b
+A 6 0 4221ac2a c2697ad1
+A 6 0 c1f00c2e 426b31a2
+B 0 1 1
+B 0 2 1
+B 0 3 1
+B 0 4 1
+END
+interactions 8 clash 0 stretch 4 bend 4 energy 3e21ed15
+a 0 bfaafd29 c0cc3dcc
+a 1 c24798f6 c19faab9
+a 2 4209b2b4 41eb18d1
+a 3 4208dd5d c226f524
+a 4 c16cfe8c 42292af4
+$$
+MOL 8 7
+A 9 0 c2e0d176 40842cd1
+A 6 0 c215d25d 403e2396
+A 9 0 c229e74e 428841f7
+A 9 0 c22f3475 c2a4cd53
+A 6 0 42194e96 3e72e1b7
+A 9 0 42e33323 c0b4f6c4
+A 9 0 4201cf71 c29f7989
+A 9 0 422bc612 42a5b08d
+B 0 1 1
+B 1 2 1
+B 1 3 1
+B 1 4 1
+B 4 5 1
+B 4 6 1
+B 4 7 1
+END
+interactions 33 clash 18 stretch 7 bend 8 energy 41d39841
+a 0 c28de888 c18fc190
+a 1 c1c903fd 40103176
+a 2 c239f180 423db421
+a 3 c1f9edde c23d86fc
+a 4 41f1d705 3e0a887e
+a 5 4295cfa3 c1b85ac4
+a 6 411827f1 c2306bc9
+a 7 41f14e30 424823cb
+$$
+MOL 12 11
+A 8 0 436ae04a bfac0e85
+A 6 0 431884d4 422b6c9d
+A 6 0 42c47edf c0870f43
+A 8 0 42cfdb9d c2a7258f
+A 6 0 41f4a62a 41a7674f
+A 8 0 41c0d9de 42b1b077
+A 6 0 c1d8f5e1 c184499a
+A 8 0 c1dcbac5 c2c2bd30
+A 6 0 c2be0cf6 40de1c75
+A 8 0 c2df27c6 429b5f34
+A 6 0 c31f53a7 c22d8ab8
+A 8 0 c35dc141 be9bf001
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 2 4 1
+B 4 5 1
+B 4 6 1
+B 6 7 1
+B 6 8 1
+B 8 9 1
+B 8 10 1
+B 10 11 1
+END
+interactions 107 clash 82 stretch 11 bend 14 energy 4180e55a
+a 0 432a40f3 4030664a
+a 1 42f400d1 41b1c8df
+a 2 429d71f4 c112897e
+a 3 42aa634c c26c698f
+a 4 41dbe856 414f6c50
+a 5 41babaf6 427b83a9
+a 6 c19858e9 c1903620
+a 7 c173ddd0 c287f01c
+a 8 c28b9469 4083c881
+a 9 c29882f8 42580871
+a 10 c2e133df c1d68a64
+a 11 c32049ca c0dfc9b0
+$$
+MOL 17 20
+A 6 0 436b7790 40dbcfea
+A 6 0 434cb931 428903de
+A 6 0 4301c67e 429dfb9b
+A 6 0 42b5f1b0 41bdfebb
+A 6 0 42d9d745 c22df096
+A 6 0 433f2bb7 c25a0576
+A 6 0 4291c7ad c2df4091
+A 6 0 be8ad0b7 c2be4d88
+A 6 0 c204270b c1e01de6
+A 6 0 4150571a 41d2033a
+A 6 0 c1899832 42b3a724
+A 6 0 c2c387f3 42d22c47
+A 6 0 c313fefb 422ce60d
+A 6 0 c354a35c 4222e9f6
+A 6 0 c36bc455 c1da3488
+A 6 0 c32467a1 c296ca20
+A 6 0 c2d823fd c1b25288
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 4 6 1
+B 6 7 1
+B 7 8 1
+B 8 9 1
+B 9 10 1
+B 10 11 1
+B 11 12 1
+B 12 13 1
+B 13 14 1
+B 14 15 1
+B 15 16 1
+B 5 0 1
+B 16 8 1
+B 9 3 1
+B 16 12 1
+END
+interactions 291 clash 242 stretch 20 bend 29 energy 4225aa6d
+a 0 431b7058 3f8ac82c
+a 1 43076a8d 423c0ea0
+a 2 42aaf352 4252141c
+a 3 425ef02d 414502dc
+a 4 42979a5c c206fc70
+a 5 42fb71ba c21d422c
+a 6 423762cd c294aa00
+a 7 c08dc0b2 c289350e
+a 8 c1c5eac0 c1b3ec4d
+a 9 40a95987 418e8e36
+a 10 c16e5a9c 427f5df9
+a 11 c281d017 428bc9eb
+a 12 c2bde389 41edd013
+a 13 c310f93d 41cade61
+a 14 c31c1b44 c1baabec
+a 15 c2e25816 c244bf7f
+a 16 c296cf8d c183bccb
+$$
+MOL 5 5
+A 7 0 4280a7fb bfe21c80
+A 6 0 41ddb472 427bcf61
+A 6 0 c24193c6 4226c058
+A 6 0 c22fbb53 c2348a1c
+A 6 0 41ac7d75 c2636c17
+B 0 1 1
+B 1 2 2
+B 2 3 1
+B 3 4 2
+B 4 0 1
+END
+interactions 15 clash 5 stretch 5 bend 5 energy 3feed4b7
+a 0 422fd9b1 403082d4
+a 1 4159fba4 422ae138
+a 2 c2062c82 41d1a8fa
+a 3 c20229a2 c1be99cc
+a 4 41761a80 c218f2eb
+$$
+MOL 5 5
+A 6 0 426f9eaa bfc99d30
+A 6 0 41485b0b 425f36b1
+A 6 0 c25669fb 41f899fb
+A 16 0 c25e6687 c1f813e2
+A 6 0 41a42070 c2723464
+B 0 1 1
+B 1 2 2
+B 2 3 1
+B 3 4 1
+B 4 0 2
+END
+interactions 15 clash 5 stretch 5 bend 5 energy 40ce9180
+a 0 4221ef11 c046f56c
+a 1 412d2fcc 4214b5d2
+a 2 c21296e0 41ad5d7e
+a 3 c211c763 c1e414e4
+a 4 41326859 c22e886c
+$$
+MOL 5 5
+A 6 0 428e8bc5 3f8b3851
+A 6 0 41dd17c1 427b89b4
+A 6 0 c23aa5c2 41f5c0ca
+A 8 0 c2483707 c205687a
+A 6 0 4146fcdd c2572cdd
+B 0 1 1
+B 1 2 2
+B 2 3 1
+B 3 4 1
+B 4 0 2
+END
+interactions 15 clash 5 stretch 5 bend 5 energy 3f7b2c15
+a 0 42407141 3f31c11c
+a 1 419edd73 4227dac3
+a 2 c1e0e83f 41df8fd2
+a 3 c1ec7885 c1b0e7b4
+a 4 418c2ff6 c21b80f3
+$$
+MOL 6 6
+A 16 0 428b1e29 bee7545c
+A 16 0 4200d2e8 4281c2af
+A 16 0 c20ee291 42678df5
+A 16 0 c287c052 bfa26603
+A 16 0 c2144998 c27d8bdf
+A 16 0 420d6596 c288c282
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 5 0 1
+END
+interactions 24 clash 12 stretch 6 bend 6 energy 40c21060
+a 0 4252465e bfe7e9b1
+a 1 41d6ea45 4224c5de
+a 2 c1b98949 422259eb
+a 3 c23e2ffb c04c6c8e
+a 4 c1afeb72 c23925e4
+a 5 41e08340 c2360a47
+$$
+MOL 2 1
+A 14 0 421fed59 3f78661a
+A 6 0 c223daab 405dccdb
+B 0 1 1
+END
+interactions 1 clash 0 stretch 1 bend 0 energy 3cbb95a8
+a 0 41c6b0b8 3fb80817
+a 1 c1ce87c2 404024df
+$$
+MOL 10 10
+A 8 0 429e792a c2a58d36
+A 16 0 429cd73a c0ea1986
+A 8 0 429a02c4 429e260c
+A 7 0 431bbd42 40cb8aa4
+A 6 0 413794ba c0e651aa
+A 6 0 c1b17001 4290205f
+A 6 0 c2dfa5da 428ee1a6
+A 6 0 c30fa0b4 beb76e7f
+A 6 0 c2c2dbcf c28a1aeb
+A 6 0 c1ed028f c267d281
+B 0 1 2
+B 1 2 2
+B 1 3 1
+B 1 4 1
+B 4 5 2
+B 5 6 1
+B 6 7 2
+B 7 8 1
+B 8 9 2
+B 9 4 1
+END
+interactions 74 clash 52 stretch 10 bend 12 energy 419547dd
+a 0 420ba334 c2454acf
+a 1 421dcaa1 3f249fda
+a 2 41a4aef4 423896dd
+a 3 42ad671e 419fdec5
+a 4 c1785612 40900c63
+a 5 c2208af6 424119d7
+a 6 c2b4beec 4242b7ed
+a 7 c2e7ee86 40afdadd
+a 8 c2b661e9 c218ab98
+a 9 c223eba7 c21af649
+$$
+MOL 3 2
+A 6 0 c2758d6a c1501a31
+A 6 0 40f52800 41f0897f
+A 8 0 42853842 c19544a0
+B 0 1 1
+B 1 2 1
+END
+interactions 3 clash 0 stretch 2 bend 1 energy 401cdd0b
+a 0 c22c2f4f c0dea087
+a 1 4084537e 41824930
+a 2 4244984c c12df0ab
+$$
+MOL 6 6
+A 6 0 4299f9d7 bf357fc8
+A 6 0 420308b7 426723a1
+A 6 0 c214339d 426bc3b5
+A 6 0 c297d40f 402bebb0
+A 6 0 c218d836 c2898403
+A 6 0 421b435e c2847a92
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 5 0 1
+END
+interactions 24 clash 12 stretch 6 bend 6 energy 41021934
+a 0 42499883 c0810232
+a 1 41c8e4a5 421d6935
+a 2 c1c9a751 421d884e
+a 3 c248e5c1 c084a6e6
+a 4 c1c8b626 c23e787e
+a 5 41c9d562 c23de3b6
+$$
+MOL 7 8
+A 6 0 42a42619 c21407ed
+A 6 0 42ab2d9d 4232f7f9
+A 6 0 4120bd75 4261f6a1
+A 6 0 c28e6b56 422f21fe
+A 6 0 c271ee2e c20e0063
+A 6 0 40816db4 c280aa07
+A 6 0 c20b4d63 3f84e544
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 5 6 1
+B 5 0 1
+B 6 2 1
+END
+interactions 37 clash 18 stretch 8 bend 11 energy 47e90652
+a 0 4261ba9a c1bc568e
+a 1 4263ff18 41bf6b5c
+a 2 4104a94b 420582ec
+a 3 c223d037 420ebf1d
+a 4 c2272081 c203d141
+a 5 40eff94c c1fea93e
+a 6 c0b1e4a6 3f6e2ca4
+$$
+MOL 12 13
+A 6 0 433cf780 40084b96
+A 6 0 431a0db8 426ff4b0
+A 6 0 428df77d 42914140
+A 6 0 42309b31 40c1eef8
+A 6 0 428743a6 c28ff569
+A 6 0 431255c5 c2844c32
+A 6 0 c20e1b0c c0cb891e
+A 6 0 c294aad1 42687279
+A 6 0 c31c9def 42878b76
+A 6 0 c33ab0a0 4006407a
+A 6 0 c3180771 c282970c
+A 6 0 c29f427f c286e7c8
+B 0 1 2
+B 1 2 1
+B 2 3 2
+B 3 4 1
+B 4 5 2
+B 3 6 1
+B 6 7 2
+B 7 8 1
+B 8 9 2
+B 9 10 1
+B 10 11 2
+B 5 0 1
+B 11 6 1
+END
+interactions 127 clash 98 stretch 13 bend 16 energy 4380b5a3
+a 0 431d1bf0 bf73304e
+a 1 43047339 422b60c2
+a 2 42a42618 422e59a4
+a 3 42617e3d 3ecf58e0
+a 4 42a1d76b c22dcb10
+a 5 43034be8 c230405a
+a 6 c2797f9f 3fd984f3
+a 7 c2ae6d4a 4235d3e6
+a 8 c309ace1 42389c4a
+a 9 c3234828 40372304
+a 10 c30aa490 c2240a89
+a 11 c2b05b28 c225e792
+$$
+MOL 10 11
+A 6 0 4305d230 c2005522
+A 6 0 42f62fcc 41fb553b
+A 6 0 428bcc34 4299f59e
+A 6 0 408999bc 4203a47d
+A 6 0 c2845304 428e4221
+A 6 0 c2f9e43d 420d9ce0
+A 6 0 c2fee3fc c1ed6288
+A 6 0 c2877dc6 c29471c2
+A 6 0 407c02e3 c1f62268
+A 6 0 427f2d69 c29a2f05
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 5 6 1
+B 6 7 1
+B 7 8 1
+B 8 9 1
+B 9 0 1
+B 8 3 1
+END
+interactions 85 clash 60 stretch 11 bend 14 energy 4183117b
+a 0 42b4d855 c1d3293b
+a 1 42b57a52 41be118d
+a 2 423ccd29 4243a43c
+a 3 405b1f74 41bfdf2b
+a 4 c2203cd1 4245785b
+a 5 c2a77cb2 41c35869
+a 6 c2a80b28 c1cdf07f
+a 7 c221d63b c24bc952
+a 8 40540d17 c1d05388
+a 9 423b02ad c24d9080
+$$
+MOL 6 5
+A 6 0 c32991dc c08f7413
+A 6 0 c2ce3081 4187fc5f
+A 6 0 c2016eba c18a8f9a
+A 6 0 4211673e 415dc192
+A 6 0 42c9848f c1f39ef6
+A 6 0 431e88c2 415144fd
+B 0 1 1
+B 1 2 2
+B 2 3 1
+B 3 4 2
+B 4 5 1
+END
+interactions 21 clash 12 stretch 5 bend 4 energy 4094a225
+a 0 c2ef47f3 c0c1dcac
+a 1 c2917d6f 417d7e1b
+a 2 c1e326b8 c1503117
+a 3 419eb0f0 4120d1d7
+a 4 4280afe1 c19329aa
+a 5 42ddd978 408418cc
+$$
+MOL 9 9
+A 6 0 42cde667 c048e748
+A 6 0 42af2ea6 42932949
+A 6 0 41790de5 42cc86fb
+A 6 0 c26462d2 42c5234c
+A 6 0 c2d25610 41fb0661
+A 6 0 c2c75d30 c2119101
+A 6 0 c2407f69 c2afd427
+A 6 0 41cd39dd c2d9f029
+A 6 0 42b1ae0e c2933390
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 5 6 1
+B 6 7 1
+B 7 8 1
+B 8 0 1
+END
+interactions 63 clash 45 stretch 9 bend 9 energy 44615680
+a 0 429c6ac6 401b6130
+a 1 426d97ee 424a5131
+a 2 41630906 4297b870
+a 3 c2111e0a 4284ddb5
+a 4 c288b9a1 41d59e7d
+a 5 c286194d c1c59de6
+a 6 c2040366 c27ef514
+a 7 418ef741 c290627a
+a 8 42773716 c238473f
+$$
+MOL 7 8
+A 6 0 42956aee c21c6d17
+A 6 0 42a929c7 422f4337
+A 6 0 40115139 4269da80
+A 6 0 c21fbfa8 c00bf7ff
+A 6 0 40941417 c279e665
+A 6 0 c28bd308 c211eaa0
+A 6 0 c2711ce4 4218988f
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 5 6 1
+B 4 0 1
+B 6 2 1
+END
+interactions 37 clash 18 stretch 8 bend 11 energy 47e9ad09
+a 0 425aafc3 c1bcff72
+a 1 425c5c77 41c06c81
+a 2 40ce489c 4204c479
+a 3 c0ef6ffc 3f3f9c28
+a 4 40bb2031 c1ff605d
+a 5 c22e2825 c20484bc
+a 6 c22bb03e 420d2641
+$$
+MOL 3 3
+A 6 0 4242bbb1 3f809262
+A 6 0 c1d699ed 42269298
+A 6 0 c178e674 c223fca4
+B 0 1 1
+B 1 2 1
+B 2 0 1
+END
+interactions 6 clash 0 stretch 3 bend 3 energy 3f3daeff
+a 0 41f1fd84 40a985f9
+a 1 c169d5d2 41d9b4d3
+a 2 c13379b3 c1b5a52a
+$$
+MOL 4 4
+A 6 0 42358e05 3e802228
+A 6 0 3f34d860 4258731b
+A 6 0 c236480a 401ad541
+A 6 0 409bcfb3 c270084d
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 0 1
+END
+interactions 8 clash 0 stretch 4 bend 4 energy 3ffe62e7
+a 0 42165020 bfdf5b8f
+a 1 3f8538c2 4201affc
+a 2 c204250a c08661b9
+a 3 406014f9 c2197710
+$$
+MOL 7 7
+A 29 0 41f3292d 40937cfa
+A 7 0 429d740c 422df75b
+A 7 0 42b25989 c22f32d6
+A 8 0 c1a8a944 427b4a0f
+A 6 0 c2b6ee19 4225bb0c
+A 6 0 c2a6c41c c2264a8b
+A 8 0 c1974903 c261b8f6
+B 0 1 1
+B 0 2 1
+B 0 3 1
+B 3 4 1
+B 4 5 1
+B 5 6 1
+B 6 0 1
+END
+interactions 30 clash 15 stretch 7 bend 8 energy 40a29e87
+a 0 40c5347c 40a49d45
+a 1 4226ea2d 4222ac25
+a 2 4245c5a4 c1e97057
+a 3 c1c5fa8c 4231f3c3
+a 4 c28f61d1 41d876f9
+a 5 c28b617b c1b7611f
+a 6 c1ac5e1e c2121061
+$$
+MOL 8 9
+A 6 0 42b5c179 c24330ce
+A 6 0 430de04b c0261432
+A 6 0 42c40cfb 425f2a32
+A 6 0 42159828 3f18f1aa
+A 6 0 c207dc33 405522d2
+A 6 0 c2a7c969 424e6929
+A 6 0 c30a58a8 402abcf4
+A 6 0 c2a9c0ff c2408dd1
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 5 6 1
+B 6 7 1
+B 3 0 1
+B 7 4 1
+END
+interactions 51 clash 30 stretch 9 bend 12 energy 41d80cde
+a 0 4291bcb0 c2013c70
+a 1 42d98050 402b9e70
+a 2 4293b881 4219eb5a
+a 3 4217a682 406b2cbf
+a 4 c2069426 406314c5
+a 5 c28b1fb7 421a478b
+a 6 c2d0f4ca 40271680
+a 7 c289413c c200e07c
+$$
+MOL 5 6
+A 6 0 428c9617 c1fa40d1
+A 6 0 42908d90 421efa3d
+A 6 0 3ec36df9 405720e4
+A 6 0 c27076a1 4210fbac
+A 6 0 c28472ff c22ca4d5
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 2 0 1
+B 4 2 1
+END
+interactions 18 clash 4 stretch 6 bend 8 energy 40229774
+a 0 4236244f c1cdc220
+a 1 4236019e 41c2a86c
+a 2 4010c2f3 bf347814
+a 3 c2249673 41c179c8
+a 4 c2248808 c1cd9913
+$$
+MOL 6 5
+A 6 0 429db82d 42919dbb
+A 6 0 420e088f c0aa2911
+A 7 0 428c8a28 c2844e39
+A 6 0 c2234f79 40f0846b
+A 8 0 c2a41afa 42778c4e
+A 8 0 c2a25374 c27a563e
+B 0 1 1
+B 1 2 1
+B 1 3 1
+B 3 4 2
+B 3 5 1
+END
+interactions 19 clash 8 stretch 5 bend 6 energy 3ffbccdb
+a 0 4253f0c4 423cd733
+a 1 41d13b43 40548c6d
+a 2 424cd6b7 c2226539
+a 3 c1d8d99a 40664e86
+a 4 c252d0e5 423ce7fb
+a 5 c2553893 c2211487
+$$
+MOL 4 3
+A 6 0 c2bd21a2 c13f43cb
+A 6 0 c213e2bc 41af0d5a
+A 6 0 41fa830f c17fe1e3
+A 6 0 42b72013 3f10549a
+B 0 1 1
+B 1 2 2
+B 2 3 1
+END
+interactions 7 clash 2 stretch 3 bend 2 energy 3f852cc1
+a 0 c28c417d c0eb473d
+a 1 c1b64ab7 414bc58d
+a 2 41999607 c18d120e
+a 3 42852434 401a2c82
+$$
+MOL 6 5
+A 9 0 c3091a89 c2062f33
+A 6 0 c2c2331f 42199804
+A 6 0 c1830133 41e4514b
+A 6 0 414da19b c211d661
+A 6 0 42af40d2 c1f66b81
+A 17 0 43010b42 41ee5d8c
+B 0 1 1
+B 1 2 2
+B 2 3 1
+B 3 4 2
+B 4 5 1
+END
+interactions 21 clash 12 stretch 5 bend 4 energy 4372d194
+a 0 c309199a c2063333
+a 1 c2c23333 4219999a
+a 2 c1830a3d 41e451ec
+a 3 414d999a c211d70a
+a 4 42af428f c1f66666
+a 5 43010a3d 41ee6666
+$$
+MOL 8 8
+A 6 0 431b12f5 bea80239
+A 6 0 428e55b9 40c65bc9
+A 6 0 4230831f 4279b34e
+A 6 0 c212f83a 42908747
+A 6 0 c2968e6e c08ed867
+A 6 0 c31d3467 40e5215d
+A 6 0 c202b593 c28595a6
+A 6 0 4217c3f9 c28165cb
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 4 6 1
+B 6 7 1
+B 7 1 1
+END
+interactions 46 clash 28 stretch 8 bend 10 energy 4143ebcb
+a 0 42cf7e98 3ff1f636
+a 1 42467921 401f463f
+a 2 41c6e296 4239942c
+a 3 c1cce9a5 423b480a
+a 4 c24d3704 4062f958
+a 5 c2d4e07d 4079fa62
+a 6 c1d316b2 c2210dd4
+a 7 41c09ff3 c2237a5d
+$$
+MOL 9 8
+A 6 0 c3221f70 42822738
+A 6 0 c2c4e44a 409e1098
+A 6 0 c2f356e5 c2825f5a
+A 6 0 c2026227 421eb5a3
+A 6 0 41f35d84 c1378023
+A 7 0 410a5cec c2b91556
+A 6 0 42bd2a68 410c6b06
+A 8 0 4320e40a c20cd8af
+A 8 0 42e10142 42bccd96
+B 0 1 1
+B 1 2 1
+B 1 3 1
+B 3 4 1
+B 4 5 1
+B 4 6 1
+B 6 7 1
+B 6 8 2
+END
+interactions 54 clash 36 stretch 8 bend 10 energy 413b74df
+a 0 c2e3360a 422ef166
+a 1 c296413c 4119c6ed
+a 2 c2ad95e6 c21dd515
+a 3 c1b94134 41d498ec
+a 4 419f6fc0 c0d61543
+a 5 41505ff1 c2616993
+a 6 428d5511 41433c49
+a 7 42dcad44 c1a1ae5b
+a 8 42a0531e 4276db7e
+$$
+MOL 9 9
+A 6 0 c224f183 c2c18dbf
+A 6 0 41ff489c c2ba0210
+A 6 0 42adf34a c22fe9ca
+A 6 0 42e30820 41ef24dc
+A 6 0 427f2ede 42ac053c
+A 6 0 405db82d 426660ec
+A 6 0 c28d9733 42b26156
+A 6 0 c2c960ca 41d10179
+A 6 0 c2b278bb c2510dd1
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 5 6 2
+B 6 7 1
+B 7 8 1
+B 8 0 1
+END
+interactions 64 clash 45 stretch 9 bend 9 energy 43b02f9d
+a 0 c1f40dd5 c2647514
+a 1 41ceb0ad c263ccb0
+a 2 42894421 c1b29a50
+a 3 4291da7f 41e4922c
+a 4 4210ec3f 425f4371
+a 5 c038a126 42068905
+a 6 c2285fdd 425eaaf3
+a 7 c29cfa63 41e19413
+a 8 c29359b7 c1b5dd2b
+$$
+MOL 12 12
+A 6 0 4315849d bfaa0b5f
+A 6 0 43042545 4283cc93
+A 6 0 429b54d1 42f19fbc
+A 6 0 3f31a629 43114cb5
+A 6 0 c29bd8e4 4302ca23
+A 6 0 c3007eb3 428ad530
+A 6 0 c317ac27 c046f639
+A 6 0 c2fc00ef c28a0114
+A 6 0 c29560d0 c2f4f7c7
+A 6 0 c0c9dadf c31294c2
+A 6 0 428faa47 c2ec038a
+A 6 0 4302c0d9 c28bf681
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 5 6 1
+B 6 7 1
+B 7 8 1
+B 8 9 2
+B 9 10 1
+B 10 11 1
+B 11 0 1
+END
+interactions 121 clash 96 stretch 12 bend 12 energy 44b5ea20
+a 0 42adc30c c1cabe71
+a 1 428e3ea2 41cc7b70
+a 2 42016b16 427a9ec0
+a 3 c19a5bc5 429acd3b
+a 4 c28eb439 4282df6c
+a 5 c2d7abc8 41e0c1e6
+a 6 c2dfad9c c1aa92d8
+a 7 c29f7b79 c25cf816
+a 8 c2049a46 c249fc36
+a 9 c15a202c c2ba1217
+a 10 41ff83c7 c2cf6587
+a 11 42918b36 c29705ac
+$$
+MOL 6 6
+A 6 0 c320b63e c012c714
+A 6 0 c29b547f 4186eb2a
+A 6 0 c1cc3e9b c1f94d56
+A 6 0 4215fb54 bf9de59b
+A 6 0 42f6235b c1f9a8f3
+A 6 0 42c57c11 42280fd1
+B 0 1 1
+B 1 2 2
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 5 3 1
+END
+interactions 26 clash 13 stretch 6 bend 7 energy 41408155
+a 0 c2b1277f 408f155d
+a 1 c21c241d 4199fd05
+a 2 bfd1ccdf c1842e7b
+a 3 424bb2d2 c0c98b74
+a 4 42c330ca c1c42f37
+a 5 42b40e6a 41c6cd8a
+$$
+MOL 20 21
+A 7 0 c311d381 c317769c
+A 6 0 c3413363 c2bf21aa
+A 6 0 c384fcc6 c2c95b9d
+A 6 0 c325b891 c1e1fa72
+A 8 0 c34c4044 4203d69b
+A 7 0 c2a0d9e2 c140f3b3
+A 6 0 c25f452c 425709eb
+A 6 0 c2c8989f 42da215a
+A 8 0 c2a6411c 43329ddf
+A 8 0 c330f68d 42d9142e
+A 6 0 411c1f61 42828b0d
+A 6 0 4284cd0b 4112eefa
+A 6 0 4206e595 c2898224
+A 7 0 42c1e261 c2e0c29f
+A 6 0 432012e7 c2862554
+A 6 0 4372251c c294f742
+A 6 0 438ded21 c158ace5
+A 6 0 43832b62 426ef17c
+A 6 0 433664bf 4281f5bf
+A 6 0 43068f6e 402076de
+B 0 1 1
+B 1 2 1
+B 1 3 1
+B 3 4 2
+B 3 5 1
+B 5 6 1
+B 6 7 1
+B 7 8 2
+B 7 9 1
+B 6 10 1
+B 10 11 1
+B 11 12 2
+B 12 13 1
+B 13 14 1
+B 14 15 2
+B 15 16 1
+B 16 17 2
+B 17 18 1
+B 18 19 2
+B 19 11 1
+B 19 14 1
+END
+interactions 370 clash 320 stretch 21 bend 29 energy 43002a1f
+a 0 c2e83710 c2d63207
+a 1 c30872d7 c276c4b5
+a 2 c33c0ab8 c2678385
+a 3 c2d3d50c c186ff0c
+a 4 c3030c65 41d91861
+a 5 c23c2a93 c188189f
+a 6 c18fe7cb 4201670a
+a 7 c24872a7 4295d1e7
+a 8 c1ffe927 42f29ef4
+a 9 c2ca2177 4288a496
+a 10 423d3e9e 4221c70e
+a 11 42b691c0 bffcd99c
+a 12 429b9269 c248b17a
+a 13 42ef819f c29bb455
+a 14 431f0d3f c23b3faf
+a 15 4350b9de c25d3e44
+a 16 4370ffef c1868bbc
+a 17 435f892b 41f1bdf1
+a 18 432de8a1 421b27d5
+a 19 430dbfc9 3e366f48
+$$
+MOL 10 9
+A 8 0 c31f9b6c 423412a6
+A 6 0 c2b6cbb1 3d149e28
+A 8 0 c2d694a9 c29a2c99
+A 6 0 c214a1d3 41a40b56
+A 8 0 c1a9df1b 42c7b1bf
+A 6 0 41b93dba c1c95705
+A 8 0 4196e04c c2b9a331
+A 6 0 42d09fc8 40cc34d3
+A 8 0 42d0c665 42a62d8e
+A 8 0 43247766 c2243137
+B 0 1 1
+B 1 2 2
+B 1 3 1
+B 3 4 1
+B 3 5 1
+B 5 6 1
+B 5 7 1
+B 7 8 2
+B 7 9 1
+END
+interactions 69 clash 48 stretch 9 bend 12 energy 4139cb7e
+a 0 c2deffbc 41f2cc2c
+a 1 c28e1406 bfbb5c05
+a 2 c29f6300 c24c20ff
+a 3 c1a2fbfa 41942022
+a 4 c16c2649 4288c3d3
+a 5 41c2f603 c15cf49d
+a 6 4195877e c27ecd22
+a 7 42965e1e 40cbc62d
+a 8 42a72102 425ff55d
+a 9 42e7fb43 c1ca533d
+$$
+MOL 7 8
+A 6 0 4296892c c215f931
+A 6 0 428fca3e 4223a8b1
+A 6 0 416160e0 4273bb3e
+A 6 0 c2765769 422b7935
+A 6 0 c28bc0a9 c1f30dd4
+A 6 0 41054e01 c2830510
+A 6 0 c231d149 c082c3df
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 5 6 1
+B 5 0 1
+B 6 2 1
+END
+interactions 37 clash 18 stretch 8 bend 11 energy 47e9ac93
+a 0 4236cb18 c1d62490
+a 1 423d1a36 41a7baa8
+a 2 bf912465 41fa39bf
+a 3 c249a890 420a4b4f
+a 4 c252b82a c20794fa
+a 5 c0529fbf c20774c0
+a 6 c17df1c9 bf57b565
+$$
+MOL 11 11
+A 8 0 c332e63f c280beb1
+A 6 0 c3218d61 4133fe1e
+A 6 0 c2b03924 41aa63a6
+A 6 0 c22120a9 c1c78075
+A 6 0 420353bd c108b657
+A 6 0 42b5f676 c288e2c2
+A 6 0 43242e3a c25eb767
+A 6 0 433f117a 41df018b
+A 6 0 4309f985 42980fcc
+A 6 0 4257b6ce 427861f0
+A 8 0 c355d390 4282489b
+B 0 1 2
+B 1 2 1
+B 2 3 2
+B 3 4 1
+B 4 5 2
+B 5 6 1
+B 6 7 2
+B 7 8 1
+B 8 9 2
+B 1 10 1
+B 9 4 1
+END
+interactions 97 clash 73 stretch 11 bend 13 energy 423a8d15
+a 0 c2defc73 c22f2568
+a 1 c2c2dc78 409cc95f
+a 2 c224c536 41a33176
+a 3 406ba6b5 c186cb4a
+a 4 427cb18d c069e2ee
+a 5 42c0dc48 c224df80
+a 6 4311a2eb c1fb4de7
+a 7 43218ba5 4181022e
+a 8 43006f74 4257304b
+a 9 429e89eb 422f370e
+a 10 c3081e2d 4223a9ce
+$$
+MOL 6 5
+A 6 0 c29e4add 4284422e
+A 6 0 c200d4ea c0a0fc73
+A 9 0 c29477f5 c28f768f
+A 6 0 41f01943 c0a3ce27
+A 17 0 42a5958e c267aee4
+A 35 0 429b1164 42777f48
+B 0 1 1
+B 1 2 1
+B 1 3 2
+B 3 4 1
+B 3 5 1
+END
+interactions 19 clash 8 stretch 5 bend 6 energy 3ff2456a
+a 0 c25e329e 4226289d
+a 1 c1e168e9 bfcffadc
+a 2 c252d887 c238fce8
+a 3 41c936e6 bd216e84
+a 4 4251bce6 c22c3767
+a 5 4246c4a2 4231a580
+$$
+MOL 12 12
+A 8 0 c334fa0f c16e662d
+A 6 0 c2fe787c c280a487
+A 6 0 c24a0d28 c23a14df
+A 8 0 bfe7389c c2acc3d6
+A 6 0 42868352 c272b761
+A 8 0 430474b7 c2de578f
+A 6 0 42a9c166 41374bfb
+A 8 0 431b9e1c 421e3e49
+A 6 0 41e3a140 425bba9b
+A 8 0 42220f6d 4302bdb3
+A 6 0 c211ba4c 4213ac35
+A 8 0 c2cd4676 42a1fa0d
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 4 6 1
+B 6 7 1
+B 6 8 1
+B 8 9 1
+B 8 10 1
+B 10 11 1
+B 10 2 1
+END
+interactions 115 clash 86 stretch 12 bend 17 energy 41229d50
+a 0 c2fc579b c1ad85ba
+a 1 c2a65882 c24a34d6
+a 2 c2028c8f c1f4cf22
+a 3 40aa4c5d c27cbe36
+a 4 4252875e c23a0d60
+a 5 42b59fac c29e98b8
+a 6 42770dbf 40294e65
+a 7 42da56c4 419a86d1
+a 8 41bed918 420cf8ed
+a 9 42042d4a 42a8dcea
+a 10 c1bbc265 4194c250
+a 11 c27615bb 424d487a
+$$
+MOL 6 5
+A 6 0 c2deedf4 424b60f8
+A 6 0 c2495981 40b07221
+A 35 0 c282a6d4 c281af33
+A 6 0 41a476e9 420c5264
+A 6 0 42915720 c18fe3e0
+A 6 0 4310cb20 418bbdb1
+B 0 1 1
+B 1 2 1
+B 1 3 1
+B 3 4 2
+B 4 5 1
+END
+interactions 20 clash 10 stretch 5 bend 5 energy 4087c508
+a 0 c2963931 421bd96a
+a 1 c20d6391 40d959ae
+a 2 c2317b4a c22b0afc
+a 3 416b19ea 41ccc538
+a 4 4263ccf9 c0c0eb32
+a 5 42d29a67 4152a432
+$$
+MOL 9 9
+A 6 0 4301950a c2811a91
+A 16 0 42b52a1e 40cefe4f
+A 8 0 42fc986e 42674ea4
+A 6 0 41a2353b 40ccdedc
+A 6 0 c188f845 42850646
+A 6 0 c2b79b39 42774fd1
+A 6 0 c303d69d c0dc4333
+A 6 0 c2cbaf38 c28399e4
+A 6 0 c1a65457 c2853569
+B 0 1 1
+B 1 2 2
+B 1 3 1
+B 3 4 2
+B 4 5 1
+B 5 6 2
+B 6 7 1
+B 7 8 2
+B 8 3 1
+END
+interactions 61 clash 41 stretch 9 bend 11 energy 416287d4
+a 0 42a05e7d c2393ff6
+a 1 424f08eb c02714c2
+a 2 429a67dc 42272efd
+a 3 c0b409a1 c03e69bb
+a 4 c1efd3a7 42236119
+a 5 c2a0623a 422627bf
+a 6 c2d4184f bfb68bd4
+a 7 c2a31b83 c234afdc
+a 8 c1faaf86 c2382085
+$$
+MOL 5 4
+A 6 0 42d2a9b3 42285bc4
+A 6 0 4296d6ca c1f13c36
+A 6 0 c046599a c1dd37fd
+A 6 0 c29e73be c2038afc
+A 6 0 c2d3d6ad 4239bd25
+B 0 1 1
+B 1 2 2
+B 2 3 2
+B 3 4 1
+END
+interactions 13 clash 6 stretch 4 bend 3 energy 4201499a
+a 0 42b47bed 41c668f2
+a 1 425ecdbb c18dbcdb
+a 2 c050cb66 c172bf41
+a 3 c2795847 c1865360
+a 4 c2bd9221 41d349b0
+$$
+MOL 13 13
+A 6 0 43039c35 c2abd2a4
+A 6 0 431a4bf8 c1861e91
+A 6 0 430e1001 42630016
+A 6 0 42d1f4c4 42f1f70f
+A 6 0 41f89db7 431a0f53
+A 6 0 c22e13ba 4315fbcc
+A 6 0 c2c16320 42d51303
+A 6 0 c3169c75 42465e9e
+A 6 0 c31e5bab c1e52cda
+A 6 0 c2f5461c c2ad74cd
+A 6 0 c294edda c30fce35
+A 6 0 3faf1f4e c302d399
+A 6 0 4282a332 c307221e
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 5 6 1
+B 6 7 1
+B 7 8 1
+B 8 9 1
+B 9 10 1
+B 10 11 1
+B 11 12 2
+B 12 0 1
+END
+interactions 144 clash 117 stretch 13 bend 13 energy 44f826ab
+a 0 42a6efd3 c28dbe7b
+a 1 42da8fa3 c1e3f793
+a 2 42cf1af6 41b752c2
+a 3 428e407e 428106cf
+a 4 41b5dba7 42ac991a
+a 5 c1f3b0ed 42a93af3
+a 6 c29b71be 426fb25f
+a 7 c2d89ed5 41846c0a
+a 8 c2dfe311 c20cd63e
+a 9 c2a8acc5 c2987e09
+a 10 c2184f3a c2a9995d
+a 11 bf99b2eb c25c667c
+a 12 42162806 c2a45932
+$$
+MOL 8 7
+A 8 0 c31efc1a 42444b7b
+A 6 0 c2b88b9f 40f45deb
+A 8 0 c2e3a779 c29cb056
+A 6 0 c1fcf95e 41fa7ec4
+A 6 0 420ac8cd c1eb5f1c
+A 6 0 42d13ea5 c01558a7
+A 8 0 42e1e5fb 4288cc23
+A 8 0 4321fc5f c224b0b4
+B 0 1 1
+B 1 2 2
+B 1 3 1
+B 3 4 2
+B 4 5 1
+B 5 6 2
+B 5 7 1
+END
+interactions 41 clash 26 stretch 7 bend 8 energy 412b995f
+a 0 c2e01599 41fe421e
+a 1 c2928d19 bfe8ddf5
+a 2 c2a8a5a8 c24c46ec
+a 3 c1ada5df 417b086a
+a 4 41a8e11a c1897239
+a 5 4290b7b0 3f998abc
+a 6 42a46bab 424a944e
+a 7 42dfeb74 c1fc1058
+$$
+MOL 4 3
+A 6 0 c2cf7f3a c0969d09
+A 6 0 c20b9e85 41e4fe1d
+A 6 0 41b626d8 c1e6c001
+A 6 0 42cd2fab 40754c51
+B 0 1 1
+B 1 2 2
+B 2 3 1
+END
+interactions 7 clash 2 stretch 3 bend 2 energy 3f895b59
+a 0 c28aa0a6 bf95116f
+a 1 c1a75fa2 4182954a
+a 2 419b25e9 c1823547
+a 3 428793d6 3f9a849d
+$$
+MOL 4 3
+A 6 0 c28930b1 c1d48024
+A 6 0 c2085bd7 41d5127e
+A 6 0 42228a75 421dec65
+A 6 0 42943eb7 c21cd936
+B 0 1 1
+B 1 2 2
+B 2 3 1
+END
+interactions 7 clash 2 stretch 3 bend 2 energy 4357ba70
+a 0 c2893333 c1d47ae1
+a 1 c2085c29 41d50a3d
+a 2 42228f5c 421deb85
+a 3 42943d71 c21cd70a
+$$
+MOL 11 11
+A 6 0 4300ad3f c0457705
+A 6 0 42e6afeb 428635f9
+A 6 0 4248c29d 42e9aff4
+A 6 0 c182798a 430865e2
+A 6 0 c2b268f0 42ce5f50
+A 6 0 c2f31fdc 421bc0ee
+A 6 0 c3040ca2 c222bd7f
+A 6 0 c2a0aca9 c2c3d7cc
+A 6 0 c1b41b8d c30182e2
+A 6 0 4242ef23 c2e2b238
+A 6 0 42de0a80 c28f04b7
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 5 6 1
+B 6 7 1
+B 7 8 1
+B 8 9 1
+B 9 10 1
+B 10 0 1
+END
+interactions 99 clash 77 stretch 11 bend 11 energy 450008e0
+a 0 42b55ac2 3f80cf6d
+a 1 42992fac 424cf1f2
+a 2 421597a8 42ab9dac
+a 3 c1670042 42bb673f
+a 4 c279eac3 4290d434
+a 5 c2b6f03a 41e55342
+a 6 c2b83808 c1bd05b5
+a 7 c28060ca c2878234
+a 8 c1858f0a c2b36612
+a 9 420cf2d1 c2a5449a
+a 10 429676fd c2437702
+$$
+MOL 16 16
+A 6 0 4340b62f c0e8c8f8
+A 6 0 43332e9d 428c391b
+A 6 0 4303eefe 430cc549
+A 6 0 4285e837 432e263b
+A 6 0 4082e8ab 433c272d
+A 6 0 c29a2fc1 43325b47
+A 6 0 c30ceff6 430e4589
+A 6 0 c329c879 42843180
+A 6 0 c340d521 40804d87
+A 6 0 c3336e78 c28561a1
+A 6 0 c307ebb4 c30d0a71
+A 6 0 c291535c c32f4476
+A 6 0 c00fbf0d c33dafbb
+A 6 0 429c2c74 c33151b2
+A 6 0 4308025a c302648c
+A 6 0 433488f9 c292760b
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 5 6 1
+B 6 7 1
+B 7 8 1
+B 8 9 1
+B 9 10 1
+B 10 11 1
+B 11 12 1
+B 12 13 1
+B 13 14 1
+B 14 15 1
+B 15 0 1
+END
+interactions 224 clash 192 stretch 16 bend 16 energy 45b0308b
+a 0 43094b7f 3ee98204
+a 1 42fc83f2 42547fd7
+a 2 42bfa52c 42c3729d
+a 3 424ac1ee 42ff4dcb
+a 4 c019a777 430a7a01
+a 5 c25e1e6e 43006bb9
+a 6 c2c92650 42c584ee
+a 7 c30279a7 4257ae52
+a 8 c30c8f03 3f64dd07
+a 9 c301646d c250228a
+a 10 c2c5bb9b c2c186be
+a 11 c256c85d c2fd35f4
+a 12 bf278d40 c30923ba
+a 13 42515109 c2fd8aaf
+a 14 42c2759b c2c1fdd7
+a 15 42fe379c c2512f50
+$$
+MOL 15 15
+A 6 0 c1f23442 c3338fcf
+A 6 0 4227e5db c333b3a3
+A 6 0 42d77d87 c31412e2
+A 6 0 431b3f65 c2a77849
+A 6 0 4337f647 c141db5c
+A 6 0 43274ff6 4266903f
+A 6 0 430193bd 42f818bf
+A 6 0 4292b05d 431f6a87
+A 6 0 3fc64de1 431ab163
+A 6 0 c29065cc 432cd11e
+A 6 0 c30b2820 42ea6447
+A 6 0 c33340b2 426702b7
+A 6 0 c3346c3d c18da8be
+A 6 0 c31ffe5b c2a6a779
+A 6 0 c2e1b5ee c3095287
+B 0 1 2
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 5 6 1
+B 6 7 1
+B 7 8 1
+B 8 9 2
+B 9 10 1
+B 10 11 1
+B 11 12 1
+B 12 13 1
+B 13 14 1
+B 14 0 1
+END
+interactions 197 clash 165 stretch 15 bend 15 energy 44dd3d14
+a 0 c14293c8 c2e85df3
+a 1 41b347cb c2a3bd3b
+a 2 42874527 c2c9655e
+a 3 42e3ad99 c29c8a3a
+a 4 4308f20a c1e41ee3
+a 5 4301feff 41da1c8f
+a 6 42bf67a3 428c39ba
+a 7 42368180 42a42fb0
+a 8 408da3af 425d68f9
+a 9 c20b2130 42a9af84
+a 10 c2a768f8 4295a1cc
+a 11 c2e98c57 42023ea3
+a 12 c2f749c1 c1bafd48
+a 13 c2d12fa6 c299da80
+a 14 c27d0f5c c2e261a7
+$$
