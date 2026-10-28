@@ -82,3 +82,11 @@ into `sketcherMinimizerMolecule`, runs `runGenerateCoordinates` and copies the c
   wedges and first neighbours (`tests/data/coordgen_cip.txt`, `tools/coordgen_drv/cip.cpp`,
   `tools/make_coordgen_cip_corpus.py`). The macrocycle double bond check in the template `compare` now uses it (template
   corpus regenerated without the macrocycle filter).
+* CG4a `external::coordgen::fragment_builder`: `CoordgenFragmentBuilder` for fragments without macrocycles: fused ring
+  information, side/central ring split, template lookup, ring placement (single, one-atom/bond fusion, two-or-more atom
+  fusion with mirror choice), non-ring atoms by breadth first search with ZE inversion avoidance, DOF creation
+  (`Fragment` constructor DOFs, scale-atoms, invert-bond), `avoidInternalClashes`, `storeCoordinateInformation`,
+  `rotateMainFragment`. 108 molecules (7 skipped: macrocycles / non-planar systems) give identical coordinates, ring flags,
+  DOF lists and fragment-local coordinates (`tests/data/coordgen_fbuild.txt`, `tools/coordgen_drv/fbuild.cpp`,
+  `tools/make_coordgen_fbuild_corpus.py`). `unimplemented!`: the macrocycle builder and `checkForClashes`. Known gaps in
+  the corpus: only one templated fragment, and the gap-scaling of ring-atom neighbours (`gap > PI`) is not exercised.

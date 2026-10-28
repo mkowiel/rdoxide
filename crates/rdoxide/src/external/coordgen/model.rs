@@ -250,6 +250,7 @@ pub struct Model {
     pub rings: Vec<Ring>,
     pub molecules: Vec<Molecule>,
     pub fragments: Vec<super::fragment::Fragment>,
+    pub dofs: Vec<super::fragment::Dof>,
 }
 
 impl Model {
