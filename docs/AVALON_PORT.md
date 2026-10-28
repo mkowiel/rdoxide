@@ -179,3 +179,11 @@ The flip-and-undo trials reproduce C's float round-off since the undo is a secon
 Ported `IsShortcutLikeAtom`, `PerceiveShortcutClasses` (without the stderr diagnostics) and `LayoutShortcutChains`.
 69 molfiles with `R` + atext atoms and three `max_line_size` values (0, 8, 14) in `tests/data/avalon_layout8.jsonl`
 (driver `lay8.c`, records separated by `$$$$`); line splitting changes the classes in 5 of them.
+
+### L9 — layout.c fragment info and alignment
+
+Ported `CollectFragmentInfo` (fragments as chains: a shortcut fragment followed by the atom fragments linked to it),
+`ColorScore`, `CollectAttachments`, `TfmPoint`, `ScoreTransformation`, `FindBestTransformation`, `AlignFragment`,
+`FragmentRenderedHeight` and `FragmentHeight`. Checked on 69 molfiles in `tests/data/avalon_layout9.jsonl`
+(driver `lay9.c`). C quirks kept: the x collision term multiplies by `ap->x - ap->x` (zero), the y term does not;
+float differences are squared in single precision.
