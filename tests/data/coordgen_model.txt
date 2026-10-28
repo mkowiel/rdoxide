@@ -1,0 +1,2564 @@
+MOL 1 0
+A 6 0 00000000 00000000
+END
+a 0 hs 4 nb bd rg chiral 0 stereoActive 0 cw sav 80000000 80000000
+m charge 0 bbox 00000000 00000000 00000000 00000000 center 00000000 00000000
+$$
+MOL 2 1
+A 6 0 c2160000 27480000
+A 6 0 42160000 a7480000
+B 0 1 1
+END
+a 0 hs 3 nb 1 bd 0 rg chiral 0 stereoActive 0 cw 1 sub 0 sav c2960000 80000000
+a 1 hs 3 nb 0 bd 0 rg chiral 0 stereoActive 0 cw 0 sub 1 sav 42960000 80000000
+b 0 small 0 macro 0 term 1 inter 0 stereo 0 rings
+m charge 0 bbox c2160000 00000000 42160000 00000000 center 00000000 00000000
+$$
+MOL 3 3
+A 6 0 422d3480 a7c80000
+A 6 0 c1ad3480 42160000
+A 6 0 c1ad3480 c2160000
+B 0 1 1
+B 1 2 1
+B 2 0 1
+END
+a 0 hs 2 nb 1 2 bd 0 2 rg 0 chiral 0 stereoActive 0 cw 1 2 sub 0 2 sav 4281e666 80000000
+a 1 hs 2 nb 0 2 bd 0 1 rg 0 chiral 0 stereoActive 0 cw 0 2 sub 1 2 sav c201e666 42610000
+a 2 hs 2 nb 1 0 bd 1 2 rg 0 chiral 0 stereoActive 0 cw 1 0 sub 2 0 sav c201e666 c2610000
+b 0 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 1 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 2 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+r 0 size 3 benz 0 arom 0 mac 0 atoms 0 1 2 bonds 2 1 0 center 00000000 00000000
+m charge 0 bbox c1ad3333 c2160000 422d3333 42160000 center 00000000 00000000
+$$
+MOL 6 6
+A 6 0 42960000 27855555
+A 6 0 42160000 4281e760
+A 6 0 c2160000 4281e760
+A 6 0 c2960000 28682051
+A 6 0 c2160000 c281e760
+A 6 0 42160000 c281e760
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 5 0 1
+END
+a 0 hs 2 nb 1 5 bd 0 5 rg 0 chiral 0 stereoActive 0 cw 1 5 sub 0 5 4 3 2 sav 42160000 80000000
+a 1 hs 2 nb 0 2 bd 0 1 rg 0 chiral 0 stereoActive 0 cw 0 2 sub 1 2 3 4 5 sav 41960000 4201e666
+a 2 hs 2 nb 1 3 bd 1 2 rg 0 chiral 0 stereoActive 0 cw 1 3 sub 2 3 4 5 0 sav c1960000 4201e666
+a 3 hs 2 nb 2 4 bd 2 3 rg 0 chiral 0 stereoActive 0 cw 2 4 sub 3 4 5 0 1 sav c2160000 80000000
+a 4 hs 2 nb 3 5 bd 3 4 rg 0 chiral 0 stereoActive 0 cw 3 5 sub 4 5 0 1 2 sav c1960000 c201e666
+a 5 hs 2 nb 4 0 bd 4 5 rg 0 chiral 0 stereoActive 0 cw 4 0 sub 5 0 1 2 3 sav 41960000 c201e666
+b 0 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 1 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 2 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 3 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 4 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 5 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+r 0 size 6 benz 0 arom 0 mac 0 atoms 0 1 2 3 4 5 bonds 5 4 3 2 1 0 center 00000000 00000000
+m charge 0 bbox c2960000 c281e666 42960000 4281e666 center 00000000 00000000
+$$
+MOL 6 6
+A 6 0 42960000 27855555
+A 6 0 42160000 4281e760
+A 6 0 c2160000 4281e760
+A 6 0 c2960000 28682051
+A 6 0 c2160000 c281e760
+A 6 0 42160000 c281e760
+B 0 1 1
+B 1 2 2
+B 2 3 1
+B 3 4 2
+B 4 5 1
+B 5 0 2
+END
+a 0 hs 1 nb 1 5 bd 0 5 rg 0 chiral 0 stereoActive 0 cw 1 5 sub 0 5 4 3 2 sav 42160000 80000000
+a 1 hs 1 nb 0 2 bd 0 1 rg 0 chiral 0 stereoActive 0 cw 0 2 sub 1 2 3 4 5 sav 41960000 4201e666
+a 2 hs 1 nb 1 3 bd 1 2 rg 0 chiral 0 stereoActive 0 cw 1 3 sub 2 3 4 5 0 sav c1960000 4201e666
+a 3 hs 1 nb 2 4 bd 2 3 rg 0 chiral 0 stereoActive 0 cw 2 4 sub 3 4 5 0 1 sav c2160000 80000000
+a 4 hs 1 nb 3 5 bd 3 4 rg 0 chiral 0 stereoActive 0 cw 3 5 sub 4 5 0 1 2 sav c1960000 c201e666
+a 5 hs 1 nb 4 0 bd 4 5 rg 0 chiral 0 stereoActive 0 cw 4 0 sub 5 0 1 2 3 sav 41960000 c201e666
+b 0 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 1 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 2 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 3 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 4 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 5 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+r 0 size 6 benz 1 arom 1 mac 0 atoms 0 1 2 3 4 5 bonds 5 4 3 2 1 0 center 00000000 00000000
+m charge 0 bbox c2960000 c281e666 42960000 4281e666 center 00000000 00000000
+$$
+MOL 10 11
+A 6 0 4301e760 c2160000
+A 6 0 4301e760 42160000
+A 6 0 4281e760 42960000
+A 6 0 274f2dff 42160000
+A 6 0 c281e760 42960000
+A 6 0 c301e760 42160000
+A 6 0 c301e760 c2160000
+A 6 0 c281e760 c2960000
+A 6 0 a904cdf0 c2160000
+A 6 0 4281e760 c2960000
+B 0 1 2
+B 1 2 1
+B 2 3 2
+B 3 4 1
+B 4 5 2
+B 5 6 1
+B 6 7 2
+B 7 8 1
+B 8 9 2
+B 9 0 1
+B 8 3 1
+END
+a 0 hs 1 nb 1 9 bd 0 9 rg 0 chiral 0 stereoActive 0 cw 1 9 sub 0 9 8 7 3 6 2 4 5 sav 4201e666 c1960000
+a 1 hs 1 nb 0 2 bd 0 1 rg 0 chiral 0 stereoActive 0 cw 0 2 sub 1 2 3 4 8 5 7 9 6 sav 4201e666 41960000
+a 2 hs 1 nb 1 3 bd 1 2 rg 0 chiral 0 stereoActive 0 cw 1 3 sub 2 3 4 8 5 7 9 6 0 sav 80000000 42160000
+a 3 hs 0 nb 2 4 8 bd 2 3 10 rg 0 1 chiral 0 stereoActive 0 cw 2 4 8 sub 3 4 8 5 7 9 6 0 1 sav 80000000 80000000
+a 4 hs 1 nb 3 5 bd 3 4 rg 1 chiral 0 stereoActive 0 cw 3 5 sub 4 5 6 7 8 9 0 1 2 sav 80000000 42160000
+a 5 hs 1 nb 4 6 bd 4 5 rg 1 chiral 0 stereoActive 0 cw 4 6 sub 5 6 7 8 9 3 0 2 1 sav c201e666 41960000
+a 6 hs 1 nb 5 7 bd 5 6 rg 1 chiral 0 stereoActive 0 cw 5 7 sub 6 7 8 9 3 0 2 4 1 sav c201e666 c1960000
+a 7 hs 1 nb 6 8 bd 6 7 rg 1 chiral 0 stereoActive 0 cw 6 8 sub 7 8 9 3 0 2 4 1 5 sav 80000000 c2160000
+a 8 hs 0 nb 7 9 3 bd 7 8 10 rg 1 0 chiral 0 stereoActive 0 cw 7 9 3 sub 8 9 3 0 2 4 1 5 6 sav 80000000 80000000
+a 9 hs 1 nb 8 0 bd 8 9 rg 0 chiral 0 stereoActive 0 cw 8 0 sub 9 0 1 2 3 4 5 6 7 sav 80000000 c2160000
+b 0 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 1 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 2 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 3 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 4 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 5 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 6 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 7 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 8 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 9 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 10 small 1 macro 0 term 0 inter 0 stereo 0 rings 0 1
+r 0 size 6 benz 1 arom 1 mac 0 atoms 0 1 2 3 8 9 bonds 9 8 10 2 1 0 center 4281e667 00000000
+r 1 size 6 benz 1 arom 0 mac 0 atoms 3 4 5 6 7 8 bonds 10 7 6 5 4 3 center c281e667 00000000
+m charge 0 bbox c301e666 c2960000 4301e666 42960000 center 00000000 00000000
+$$
+MOL 7 8
+A 6 0 429b40fe c2160000
+A 6 0 429b40fe 42160000
+A 6 0 40c986c0 4272b481
+A 6 0 c2821026 42160000
+A 6 0 c2821026 c2160000
+A 6 0 40c986c0 c272b481
+A 6 0 c2172510 26a41929
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 5 6 1
+B 5 0 1
+B 6 2 1
+END
+a 0 hs 2 nb 1 5 bd 0 6 rg 0 chiral 0 stereoActive 0 cw 1 5 sub 0 5 4 6 3 2 sav 420ea8f5 c1cf47ae
+a 1 hs 2 nb 0 2 bd 0 1 rg 0 chiral 0 stereoActive 0 cw 0 2 sub 1 2 3 6 4 5 sav 420ea8f5 41cf47ae
+a 2 hs 1 nb 1 3 6 bd 1 2 7 rg 0 1 chiral 1 stereoActive 0 cw 1 3 6 sub 2 3 6 4 5 0 sav 416b258f 420eb852
+a 3 hs 2 nb 2 4 bd 2 3 rg 1 chiral 0 stereoActive 0 cw 2 4 sub 3 4 5 6 0 1 sav c20ea8f6 41cf47ae
+a 4 hs 2 nb 3 5 bd 3 4 rg 1 chiral 0 stereoActive 0 cw 3 5 sub 4 5 6 0 2 1 sav c20ea8f6 c1cf47ae
+a 5 hs 1 nb 4 6 0 bd 4 5 6 rg 1 0 chiral 1 stereoActive 0 cw 4 0 6 sub 5 6 0 2 1 3 sav 416b258d c20eb852
+a 6 hs 2 nb 5 2 bd 5 7 rg 0 1 chiral 0 stereoActive 0 cw 5 2 sub 6 2 1 3 0 4 sav c2305c29 80000000
+b 0 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 1 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 2 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 3 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 4 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 5 small 1 macro 0 term 0 inter 0 stereo 0 rings 0 1
+b 6 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 7 small 1 macro 0 term 0 inter 0 stereo 0 rings 0 1
+r 0 size 5 benz 0 arom 0 mac 0 atoms 0 1 2 5 6 bonds 6 5 7 1 0 center 41d01cad 00000000
+r 1 size 5 benz 0 arom 0 mac 0 atoms 2 3 4 5 6 bonds 7 5 4 3 2 center c1f86666 00000000
+m charge 0 bbox c2820f5c c272b852 429b428f 4272b852 center 3abb36db 00000000
+$$
+MOL 10 11
+A 6 0 4308e63f a7700000
+A 6 0 42c6cc7f 4281e760
+A 6 0 41c331fb 4281e760
+A 6 0 c1519c09 27d2eb4c
+A 6 0 41c331fb c281e760
+A 6 0 42c6cc7f c281e760
+A 6 0 c264bceb 4272b481
+A 6 0 c3008384 42160000
+A 6 0 c3008384 c2160000
+A 6 0 c264bceb c272b481
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 3 6 1
+B 6 7 1
+B 7 8 1
+B 8 9 1
+B 5 0 1
+B 9 3 1
+END
+a 0 hs 2 nb 1 5 bd 0 9 rg 0 chiral 0 stereoActive 0 cw 1 5 sub 0 5 4 3 2 6 9 7 8 sav 4215fffe 80000000
+a 1 hs 2 nb 0 2 bd 0 1 rg 0 chiral 0 stereoActive 0 cw 0 2 sub 1 2 3 4 6 9 5 7 8 sav 41960002 4201e666
+a 2 hs 2 nb 1 3 bd 1 2 rg 0 chiral 0 stereoActive 0 cw 1 3 sub 2 3 4 6 9 5 7 8 0 sav c1960000 4201e666
+a 3 hs 0 nb 2 4 6 9 bd 2 3 5 10 rg 0 1 chiral 1 stereoActive 0 cw 2 6 9 4 sub 3 4 6 9 5 7 8 0 1 sav 40528f60 80000000
+a 4 hs 2 nb 3 5 bd 3 4 rg 0 chiral 0 stereoActive 0 cw 3 5 sub 4 5 0 1 2 sav c1960000 c201e666
+a 5 hs 2 nb 4 0 bd 4 9 rg 0 chiral 0 stereoActive 0 cw 4 0 sub 5 0 1 2 3 6 9 7 8 sav 41960002 c201e666
+a 6 hs 2 nb 3 7 bd 5 6 rg 1 chiral 0 stereoActive 0 cw 3 7 sub 6 7 8 9 sav 4159fffc 4227b852
+a 7 hs 2 nb 6 8 bd 6 7 rg 1 chiral 0 stereoActive 0 cw 6 8 sub 7 8 9 3 2 4 1 5 0 sav c20ea8f5 41cf47ae
+a 8 hs 2 nb 7 9 bd 7 8 rg 1 chiral 0 stereoActive 0 cw 7 9 sub 8 9 3 2 4 6 1 5 0 sav c20ea8f5 c1cf47ae
+a 9 hs 2 nb 8 3 bd 8 10 rg 1 chiral 0 stereoActive 0 cw 8 3 sub 9 3 2 4 6 1 5 7 0 sav 4159fffc c227b852
+b 0 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 1 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 2 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 3 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 4 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 5 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 6 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 7 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 8 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 9 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 10 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+r 0 size 6 benz 0 arom 0 mac 0 atoms 0 1 2 3 4 5 bonds 9 4 3 2 1 0 center 42779998 00000000
+r 1 size 5 benz 0 arom 0 mac 0 atoms 3 6 7 8 9 bonds 10 8 7 6 5 center c299cac0 00000000
+m charge 0 bbox c300828f c281e666 4308e666 4281e666 center 3b02f333 00000000
+$$
+MOL 13 15
+A 6 0 433838de c0fd4724
+A 6 0 43210bbe 427da83f
+A 6 0 42af5e9e 429e03ef
+A 6 0 42160000 41ba2cb0
+A 6 0 4272b481 c2403acc
+A 6 0 4306098f c27e9a6a
+A 7 0 29c1c9ad c2b8485a
+A 6 0 c272b481 c2403acc
+A 6 0 c306098f c27e9a6a
+A 6 0 c33838de c0fd4724
+A 6 0 c3210bbe 427da83f
+A 6 0 c2af5e9e 429e03ef
+A 6 0 c2160000 41ba2cb0
+B 0 1 2
+B 1 2 1
+B 2 3 2
+B 3 4 1
+B 4 5 2
+B 4 6 1
+B 6 7 1
+B 7 8 2
+B 8 9 1
+B 9 10 2
+B 10 11 1
+B 11 12 2
+B 5 0 1
+B 12 7 1
+B 12 3 1
+END
+a 0 hs 1 nb 1 5 bd 0 12 rg 0 chiral 0 stereoActive 0 cw 1 5 sub 0 5 4 3 6 2 12 7 11 8 10 9 sav 4212b334 c0f947ac
+a 1 hs 1 nb 0 2 bd 0 1 rg 0 chiral 0 stereoActive 0 cw 0 2 sub 1 2 3 4 12 5 6 11 7 10 8 9 sav 41c8ccce 41dee147
+a 2 hs 1 nb 1 3 bd 1 2 rg 0 chiral 0 stereoActive 0 cw 1 3 sub 2 3 4 12 5 6 11 7 0 10 8 9 sav c1398520 420eae15
+a 3 hs 0 nb 2 4 12 bd 2 3 14 rg 0 1 chiral 0 stereoActive 0 cw 2 12 4 sub 3 4 12 5 6 11 7 0 10 8 1 9 sav 3f0bf255 40a64b18
+a 4 hs 0 nb 3 5 6 bd 3 4 5 rg 0 1 chiral 0 stereoActive 0 cw 3 6 5 sub 4 5 6 0 7 1 8 12 2 9 11 10 sav 4060000b c078bf2b
+a 5 hs 1 nb 4 0 bd 4 12 rg 0 chiral 0 stereoActive 0 cw 4 0 sub 5 0 1 2 3 12 11 7 10 6 8 9 sav 4139709c c20ea8f6
+a 6 hs 1 nb 4 7 bd 5 6 rg 1 chiral 0 stereoActive 0 cw 4 7 sub 6 7 8 12 9 11 3 10 2 1 0 5 sav 80000000 c23051eb
+a 7 hs 0 nb 6 8 12 bd 6 7 13 rg 1 2 chiral 0 stereoActive 0 cw 6 12 8 sub 7 8 12 9 11 3 10 2 4 1 5 0 sav c060000b c078bf2b
+a 8 hs 1 nb 7 9 bd 7 8 rg 2 chiral 0 stereoActive 0 cw 7 9 sub 8 9 10 11 12 3 2 4 1 5 6 0 sav c139709c c20ea8f6
+a 9 hs 1 nb 8 10 bd 8 9 rg 2 chiral 0 stereoActive 0 cw 8 10 sub 9 10 11 12 7 3 6 2 4 1 5 0 sav c212b334 c0f947ac
+a 10 hs 1 nb 9 11 bd 9 10 rg 2 chiral 0 stereoActive 0 cw 9 11 sub 10 11 12 7 3 6 8 2 4 1 5 0 sav c1c8ccce 41dee147
+a 11 hs 1 nb 10 12 bd 10 11 rg 2 chiral 0 stereoActive 0 cw 10 12 sub 11 12 7 3 6 8 2 4 9 1 5 0 sav 41398520 420eae15
+a 12 hs 0 nb 11 7 3 bd 11 13 14 rg 2 1 chiral 0 stereoActive 0 cw 11 7 3 sub 12 7 3 6 8 2 4 9 1 5 10 0 sav bf0bf255 40a64b18
+b 0 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 1 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 2 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 3 small 1 macro 0 term 0 inter 0 stereo 0 rings 0 1
+b 4 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 5 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 6 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 7 small 1 macro 0 term 0 inter 0 stereo 0 rings 2
+b 8 small 1 macro 0 term 0 inter 0 stereo 0 rings 2
+b 9 small 1 macro 0 term 0 inter 0 stereo 0 rings 2
+b 10 small 1 macro 0 term 0 inter 0 stereo 0 rings 2
+b 11 small 1 macro 0 term 0 inter 0 stereo 0 rings 2
+b 12 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 13 small 1 macro 0 term 0 inter 0 stereo 0 rings 1 2
+b 14 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+r 0 size 6 benz 1 arom 1 mac 0 atoms 0 1 2 3 4 5 bonds 12 4 3 2 1 0 center 42ddb92c 40f5b4ed
+r 1 size 5 benz 0 arom 0 mac 0 atoms 3 4 6 7 12 bonds 14 13 6 5 3 center 00000000 c1e2c083
+r 2 size 6 benz 1 arom 1 mac 0 atoms 7 8 9 10 11 12 bonds 13 11 10 9 8 7 center c2ddb92c 40f5b4e5
+m charge 0 bbox c3383852 c2b847ae 43383852 429e051f center 351d89d9 349d89d9
+$$
+MOL 11 11
+A 6 0 43051ade 275a2e8c
+A 6 0 42dff335 428fec88
+A 6 0 425d2cd9 42f2272f
+A 6 0 c1978ae0 4303c009
+A 6 0 c2ae5496 42c93023
+A 6 0 c2ff6d32 42160000
+A 6 0 c2ff6d32 c2160000
+A 6 0 c2ae5496 c2c93023
+A 6 0 c1978ae0 c303c009
+A 6 0 425d2cd9 c2f2272f
+A 6 0 42dff335 c28fec88
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 5 6 1
+B 6 7 1
+B 7 8 1
+B 8 9 1
+B 9 10 1
+B 10 0 1
+END
+a 0 hs 2 nb 1 10 bd 0 10 rg 0 chiral 0 stereoActive 0 cw 1 10 sub 0 10 9 8 7 6 5 4 3 2 sav 41a8f5c4 80000000
+a 1 hs 2 nb 0 2 bd 0 1 rg 0 chiral 0 stereoActive 0 cw 0 2 sub 1 2 3 4 5 6 7 8 9 10 sav 418e47ae 4136b850
+a 2 hs 2 nb 1 3 bd 1 2 rg 0 chiral 0 stereoActive 0 cw 1 3 sub 2 3 4 5 6 7 8 9 10 0 sav 410c51ec 4199ccce
+a 3 hs 2 nb 2 4 bd 2 3 rg 0 chiral 0 stereoActive 0 cw 2 4 sub 3 4 5 6 7 8 9 10 0 1 sav c0400010 41a751ec
+a 4 hs 2 nb 3 5 bd 3 4 rg 0 chiral 0 stereoActive 0 cw 3 5 sub 4 5 6 7 8 9 10 0 1 2 sav c15d851c 417f70a0
+a 5 hs 2 nb 4 6 bd 4 5 rg 0 chiral 0 stereoActive 0 cw 4 6 sub 5 6 7 8 9 10 0 1 2 3 sav c1a228f6 40be8f60
+a 6 hs 2 nb 5 7 bd 5 6 rg 0 chiral 0 stereoActive 0 cw 5 7 sub 6 7 8 9 10 0 1 2 3 4 sav c1a228f6 c0be8f60
+a 7 hs 2 nb 6 8 bd 6 7 rg 0 chiral 0 stereoActive 0 cw 6 8 sub 7 8 9 10 0 1 2 3 4 5 sav c15d851c c17f70a0
+a 8 hs 2 nb 7 9 bd 7 8 rg 0 chiral 0 stereoActive 0 cw 7 9 sub 8 9 10 0 1 2 3 4 5 6 sav c0400010 c1a751ec
+a 9 hs 2 nb 8 10 bd 8 9 rg 0 chiral 0 stereoActive 0 cw 8 10 sub 9 10 0 1 2 3 4 5 6 7 sav 410c51ec c199ccce
+a 10 hs 2 nb 9 0 bd 9 10 rg 0 chiral 0 stereoActive 0 cw 9 0 sub 10 0 1 2 3 4 5 6 7 8 sav 418e47ae c136b850
+b 0 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 1 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 2 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 3 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 4 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 5 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 6 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 7 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 8 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 9 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 10 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+r 0 size 11 benz 0 arom 0 mac 1 atoms 0 1 2 3 4 5 6 7 8 9 10 bonds 10 9 8 7 6 5 4 3 2 1 0 center 363a2e8c 353a2e8c
+m charge 0 bbox c2ff6b85 c303c000 4305199a 4303c000 center 363a2e8c 353a2e8c
+$$
+MOL 16 16
+A 6 0 434037fa 28610000
+A 6 0 4331963e 42931e28
+A 6 0 4307eb4b 4307eb4b
+A 6 0 42931e28 4331963e
+A 6 0 289c03c5 434037fa
+A 6 0 c2931e28 4331963e
+A 6 0 c307eb4b 4307eb4b
+A 6 0 c331963e 42931e28
+A 6 0 c34037fa 292243c5
+A 6 0 c331963e c2931e28
+A 6 0 c307eb4b c307eb4b
+A 6 0 c2931e28 c331963e
+A 6 0 a90605a7 c34037fa
+A 6 0 42931e28 c331963e
+A 6 0 4307eb4b c307eb4b
+A 6 0 4331963e c2931e28
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 5 6 1
+B 6 7 1
+B 7 8 1
+B 8 9 1
+B 9 10 1
+B 10 11 1
+B 11 12 1
+B 12 13 1
+B 13 14 1
+B 14 15 1
+B 15 0 1
+END
+a 0 hs 2 nb 1 15 bd 0 15 rg 0 chiral 0 stereoActive 0 cw 1 15 sub 0 15 14 13 12 11 10 9 8 7 6 5 4 3 2 sav 416a1480 80000000
+a 1 hs 2 nb 0 2 bd 0 1 rg 0 chiral 0 stereoActive 0 cw 0 2 sub 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 sav 415851e8 40b33330
+a 2 hs 2 nb 1 3 bd 1 2 rg 0 chiral 0 stereoActive 0 cw 1 3 sub 2 3 4 5 6 7 8 9 10 11 12 13 14 15 0 sav 41258520 41258520
+a 3 hs 2 nb 2 4 bd 2 3 rg 0 chiral 0 stereoActive 0 cw 2 4 sub 3 4 5 6 7 8 9 10 11 12 13 14 15 0 1 sav 40b33330 415851e8
+a 4 hs 2 nb 3 5 bd 3 4 rg 0 chiral 0 stereoActive 0 cw 3 5 sub 4 5 6 7 8 9 10 11 12 13 14 15 0 1 2 sav 80000000 416a1480
+a 5 hs 2 nb 4 6 bd 4 5 rg 0 chiral 0 stereoActive 0 cw 4 6 sub 5 6 7 8 9 10 11 12 13 14 15 0 1 2 3 sav c0b33330 415851e8
+a 6 hs 2 nb 5 7 bd 5 6 rg 0 chiral 0 stereoActive 0 cw 5 7 sub 6 7 8 9 10 11 12 13 14 15 0 1 2 3 4 sav c1258520 41258520
+a 7 hs 2 nb 6 8 bd 6 7 rg 0 chiral 0 stereoActive 0 cw 6 8 sub 7 8 9 10 11 12 13 14 15 0 1 2 3 4 5 sav c15851e8 40b33330
+a 8 hs 2 nb 7 9 bd 7 8 rg 0 chiral 0 stereoActive 0 cw 7 9 sub 8 9 10 11 12 13 14 15 0 1 2 3 4 5 6 sav c16a1480 80000000
+a 9 hs 2 nb 8 10 bd 8 9 rg 0 chiral 0 stereoActive 0 cw 8 10 sub 9 10 11 12 13 14 15 0 1 2 3 4 5 6 7 sav c15851e8 c0b33330
+a 10 hs 2 nb 9 11 bd 9 10 rg 0 chiral 0 stereoActive 0 cw 9 11 sub 10 11 12 13 14 15 0 1 2 3 4 5 6 7 8 sav c1258520 c1258520
+a 11 hs 2 nb 10 12 bd 10 11 rg 0 chiral 0 stereoActive 0 cw 10 12 sub 11 12 13 14 15 0 1 2 3 4 5 6 7 8 9 sav c0b33330 c15851e8
+a 12 hs 2 nb 11 13 bd 11 12 rg 0 chiral 0 stereoActive 0 cw 11 13 sub 12 13 14 15 0 1 2 3 4 5 6 7 8 9 10 sav 80000000 c16a1480
+a 13 hs 2 nb 12 14 bd 12 13 rg 0 chiral 0 stereoActive 0 cw 12 14 sub 13 14 15 0 1 2 3 4 5 6 7 8 9 10 11 sav 40b33330 c15851e8
+a 14 hs 2 nb 13 15 bd 13 14 rg 0 chiral 0 stereoActive 0 cw 13 15 sub 14 15 0 1 2 3 4 5 6 7 8 9 10 11 12 sav 41258520 c1258520
+a 15 hs 2 nb 14 0 bd 14 15 rg 0 chiral 0 stereoActive 0 cw 14 0 sub 15 0 1 2 3 4 5 6 7 8 9 10 11 12 13 sav 415851e8 c0b33330
+b 0 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 1 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 2 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 3 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 4 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 5 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 6 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 7 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 8 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 9 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 10 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 11 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 12 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 13 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 14 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 15 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+r 0 size 16 benz 0 arom 0 mac 1 atoms 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 bonds 15 14 13 12 11 10 9 8 7 6 5 4 3 2 1 0 center b5800000 36400000
+m charge 0 bbox c3403852 c3403852 43403852 43403852 center b5800000 36400000
+$$
+MOL 14 14
+A 8 0 435725a4 00000000
+A 6 0 430c25a4 00000000
+A 6 0 42f4658f 4291a42a
+A 6 0 4290eda6 4300f57d
+A 6 0 4015a0d3 431b8de7
+A 6 0 c2903aff 43128399
+A 6 0 c305d6ca 42cfd183
+A 6 0 c328b179 42160000
+A 6 0 c328b179 c2160000
+A 6 0 c305d6ca c2cfd183
+A 6 0 c2903aff c3128399
+A 6 0 4015a0d3 c31b8de7
+A 6 0 4290eda6 c300f57d
+A 7 0 42f4658f c291a42a
+B 0 1 2
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 5 6 1
+B 6 7 1
+B 7 8 1
+B 8 9 1
+B 9 10 1
+B 10 11 1
+B 11 12 1
+B 12 13 1
+B 13 1 1
+END
+a 0 hs 0 nb 1 bd 0 rg chiral 0 stereoActive 1 cw 1 sub 0 sav 42960000 80000000
+a 1 hs 0 nb 0 2 13 bd 0 1 13 rg 0 chiral 0 stereoActive 1 cw 0 2 13 sub 1 2 13 3 12 4 11 5 10 6 9 7 8 sav 40f3e939 80000000
+a 2 hs 2 nb 1 3 bd 1 2 rg 0 chiral 0 stereoActive 0 cw 1 3 sub 2 3 4 5 6 7 8 9 10 11 12 13 sav 417e51ec 410570a0
+a 3 hs 2 nb 2 4 bd 2 3 rg 0 chiral 0 stereoActive 0 cw 2 4 sub 3 4 5 6 7 8 9 10 11 12 13 1 0 sav 41230a40 416c666c
+a 4 hs 2 nb 3 5 bd 3 4 rg 0 chiral 0 stereoActive 0 cw 3 5 sub 4 5 6 7 8 9 10 11 12 13 1 0 2 sav 400ae140 418e8520
+a 5 hs 2 nb 4 6 bd 4 5 rg 0 chiral 0 stereoActive 0 cw 4 6 sub 5 6 7 8 9 10 11 12 13 1 0 2 3 sav c0cbd710 41863d6c
+a 6 hs 2 nb 5 7 bd 5 6 rg 0 chiral 0 stereoActive 0 cw 5 7 sub 6 7 8 9 10 11 12 13 1 0 2 3 4 sav c156f5bc 413e7ae8
+a 7 hs 2 nb 6 8 bd 6 7 rg 0 chiral 0 stereoActive 0 cw 6 8 sub 7 8 9 10 11 12 13 1 0 2 3 4 5 sav c18b6668 408970a0
+a 8 hs 2 nb 7 9 bd 7 8 rg 0 chiral 0 stereoActive 0 cw 7 9 sub 8 9 10 11 12 13 1 0 2 3 4 5 6 sav c18b6668 c08970a0
+a 9 hs 2 nb 8 10 bd 8 9 rg 0 chiral 0 stereoActive 0 cw 8 10 sub 9 10 11 12 13 1 0 2 3 4 5 6 7 sav c156f5bc c13e7ae8
+a 10 hs 2 nb 9 11 bd 9 10 rg 0 chiral 0 stereoActive 0 cw 9 11 sub 10 11 12 13 1 0 2 3 4 5 6 7 8 sav c0cbd710 c1863d6c
+a 11 hs 2 nb 10 12 bd 10 11 rg 0 chiral 0 stereoActive 0 cw 10 12 sub 11 12 13 1 0 2 3 4 5 6 7 8 9 sav 400ae140 c18e8520
+a 12 hs 2 nb 11 13 bd 11 12 rg 0 chiral 0 stereoActive 0 cw 11 13 sub 12 13 1 0 2 3 4 5 6 7 8 9 10 sav 41230a40 c16c666c
+a 13 hs 1 nb 12 1 bd 12 13 rg 0 chiral 0 stereoActive 0 cw 12 1 sub 13 1 0 2 3 4 5 6 7 8 9 10 11 sav 417e51ec c10570a0
+b 0 small 0 macro 0 term 1 inter 0 stereo 1 rings
+b 1 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 2 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 3 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 4 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 5 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 6 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 7 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 8 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 9 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 10 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 11 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 12 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 13 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+r 0 size 13 benz 0 arom 0 mac 1 atoms 1 2 3 4 5 6 7 8 9 10 11 12 13 bonds 13 12 11 10 9 8 7 6 5 4 3 2 1 center c1846668 351d89d9
+m charge 0 bbox c328b0a4 c31b8ccd 43572666 431b8ccd center 36800000 35124925
+$$
+MOL 10 10
+A 6 0 42a50000 c2960000
+A 6 0 42a50000 28200000
+A 6 0 42a50000 42960000
+A 6 0 431d8000 a7200000
+A 6 0 40f00000 a7200000
+A 6 0 c1f00000 4281e760
+A 6 0 c2d20000 4281e760
+A 6 0 c30e8000 27faeb4c
+A 6 0 c2d20000 c281e760
+A 6 0 c1f00000 c281e760
+B 0 1 1
+B 1 2 1
+B 1 3 1
+B 1 4 1
+B 4 5 2
+B 5 6 1
+B 6 7 2
+B 7 8 1
+B 8 9 2
+B 9 4 1
+END
+a 0 hs 3 nb 1 bd 0 rg chiral 0 stereoActive 0 cw 1 sub 0 sav 80000000 c2960000
+a 1 hs 0 nb 0 2 3 4 bd 0 1 2 3 rg chiral 1 stereoActive 0 cw 0 3 2 4 sub 1 2 3 4 5 9 6 8 7 sav 80000000 80000000
+a 2 hs 3 nb 1 bd 1 rg chiral 0 stereoActive 0 cw 1 sub 2 sav 80000000 42960000
+a 3 hs 3 nb 1 bd 2 rg chiral 0 stereoActive 0 cw 1 sub 3 sav 42960000 80000000
+a 4 hs 0 nb 1 5 9 bd 3 4 9 rg 0 chiral 0 stereoActive 0 cw 1 5 9 sub 4 5 9 6 8 7 sav 41c80000 80000000
+a 5 hs 1 nb 4 6 bd 4 5 rg 0 chiral 0 stereoActive 0 cw 4 6 sub 5 6 7 8 9 sav 41960000 4201e666
+a 6 hs 1 nb 5 7 bd 5 6 rg 0 chiral 0 stereoActive 0 cw 5 7 sub 6 7 8 9 4 1 0 2 3 sav c1960000 4201e666
+a 7 hs 1 nb 6 8 bd 6 7 rg 0 chiral 0 stereoActive 0 cw 6 8 sub 7 8 9 4 1 5 0 2 3 sav c2160000 80000000
+a 8 hs 1 nb 7 9 bd 7 8 rg 0 chiral 0 stereoActive 0 cw 7 9 sub 8 9 4 1 5 0 2 3 6 sav c1960000 c201e666
+a 9 hs 1 nb 8 4 bd 8 9 rg 0 chiral 0 stereoActive 0 cw 8 4 sub 9 4 1 5 0 2 3 6 7 sav 41960000 c201e666
+b 0 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 1 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 2 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 3 small 0 macro 0 term 0 inter 1 stereo 0 rings
+b 4 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 5 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 6 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 7 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 8 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 9 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+r 0 size 6 benz 1 arom 1 mac 0 atoms 4 5 6 7 8 9 bonds 9 8 7 6 5 4 center c2870000 00000000
+m charge 0 bbox c30e8000 c2960000 431d8000 42960000 center 00000000 00000000
+flip 3 42a50000 42960000 42a50000 00000000 42a50000 c2960000 431d8000 00000000 40f00000 00000000 c1f00000 4281e666 c2d20000 4281e666 c30e8000 00000000 c2d20000 c281e666 c1f00000 c281e666 wedge 1 1 1 0 0 0 0 0 0 0
+$$
+MOL 2 0
+A 7 1 00000000 00000000
+A 17 -1 42480000 00000000
+END
+a 0 hs 4 nb bd rg chiral 0 stereoActive 0 cw sav 80000000 80000000
+a 1 hs 0 nb bd rg chiral 0 stereoActive 0 cw sav 80000000 80000000
+m charge 0 bbox 00000000 00000000 42480000 00000000 center 41c80000 00000000
+$$
+MOL 5 4
+A 6 0 c281e760 c2160000
+A 16 0 00000000 a7c80000
+A 8 0 42160000 c281e760
+A 8 0 c2160000 4281e760
+A 8 0 4281e760 42160000
+B 0 1 1
+B 1 2 2
+B 1 3 2
+B 1 4 1
+END
+a 0 hs 3 nb 1 bd 0 rg chiral 0 stereoActive 0 cw 1 sub 0 sav c281e666 c2160000
+a 1 hs 0 nb 0 2 3 4 bd 0 1 2 3 rg chiral 1 stereoActive 1 cw 0 2 4 3 sub 1 2 3 4 sav 80000000 80000000
+a 2 hs 0 nb 1 bd 1 rg chiral 0 stereoActive 1 cw 1 sub 2 sav 42160000 c281e666
+a 3 hs 0 nb 1 bd 2 rg chiral 0 stereoActive 1 cw 1 sub 3 sav c2160000 4281e666
+a 4 hs 1 nb 1 bd 3 rg chiral 0 stereoActive 0 cw 1 sub 4 sav 4281e666 42160000
+b 0 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 1 small 0 macro 0 term 1 inter 0 stereo 1 rings
+b 2 small 0 macro 0 term 1 inter 0 stereo 1 rings
+b 3 small 0 macro 0 term 1 inter 0 stereo 0 rings
+m charge 0 bbox c281e666 c281e666 4281e666 4281e666 center 00000000 00000000
+$$
+MOL 5 4
+A 8 0 c281e760 c2160000
+A 15 0 00000000 a8480000
+A 8 0 4281e760 42160000
+A 8 0 c2160000 4281e760
+A 8 0 42160000 c281e760
+B 0 1 1
+B 1 2 2
+B 1 3 1
+B 1 4 1
+END
+a 0 hs 1 nb 1 bd 0 rg chiral 0 stereoActive 0 cw 1 sub 0 sav c281e666 c2160000
+a 1 hs 0 nb 0 2 3 4 bd 0 1 2 3 rg chiral 1 stereoActive 1 cw 0 4 2 3 sub 1 2 3 4 sav 80000000 80000000
+a 2 hs 0 nb 1 bd 1 rg chiral 0 stereoActive 1 cw 1 sub 2 sav 4281e666 42160000
+a 3 hs 1 nb 1 bd 2 rg chiral 0 stereoActive 0 cw 1 sub 3 sav c2160000 4281e666
+a 4 hs 1 nb 1 bd 3 rg chiral 0 stereoActive 0 cw 1 sub 4 sav 42160000 c281e666
+b 0 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 1 small 0 macro 0 term 1 inter 0 stereo 1 rings
+b 2 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 3 small 0 macro 0 term 1 inter 0 stereo 0 rings
+m charge 0 bbox c281e666 c281e666 4281e666 4281e666 center 00000000 00000000
+$$
+MOL 14 15
+A 6 0 c3139318 428c93c7
+A 6 0 c35d2ab5 425f4d4e
+A 6 0 c3757000 c17238a1
+A 6 0 c3441dae c28f47af
+A 6 0 c2f50c22 c264b51c
+A 6 0 c2c4818c 415c9967
+A 6 0 c1c54948 41e20135
+A 6 0 41c54948 c1e20135
+A 6 0 42c4818c c15c9967
+A 6 0 43139318 c28c93c7
+A 6 0 435d2ab5 c25f4d4e
+A 6 0 43757000 417238a1
+A 6 0 43441dae 428f47af
+A 6 0 42f50c22 4264b51c
+B 0 1 1
+B 1 2 2
+B 2 3 1
+B 3 4 2
+B 4 5 1
+B 5 6 1
+B 6 7 2
+B 7 8 1
+B 8 9 2
+B 9 10 1
+B 10 11 2
+B 11 12 1
+B 12 13 2
+B 5 0 2
+B 13 8 1
+END
+a 0 hs 1 nb 1 5 bd 0 13 rg 0 chiral 0 stereoActive 0 cw 1 5 sub 0 5 4 6 3 7 2 8 9 13 10 12 11 sav 41423d68 420deb85
+a 1 hs 1 nb 0 2 bd 0 1 rg 0 chiral 0 stereoActive 0 cw 0 2 sub 1 2 3 4 5 6 7 8 9 13 10 12 11 sav c1c551e8 41e20a3e
+a 2 hs 1 nb 1 3 bd 1 2 rg 0 chiral 0 stereoActive 0 cw 1 3 sub 2 3 4 5 6 0 7 8 9 13 10 12 11 sav c2132e16 c0e78520
+a 3 hs 1 nb 2 4 bd 2 3 rg 0 chiral 0 stereoActive 0 cw 2 4 sub 3 4 5 6 0 7 1 8 9 13 10 12 11 sav c1423d6c c20deb85
+a 4 hs 1 nb 3 5 bd 3 4 rg 0 chiral 0 stereoActive 0 cw 3 5 sub 4 5 6 0 7 1 8 2 9 13 10 12 11 sav 41c551ec c1e20a3e
+a 5 hs 0 nb 4 6 0 bd 4 5 13 rg 0 chiral 0 stereoActive 0 cw 4 6 0 sub 5 6 0 7 1 8 2 9 13 3 10 12 11 sav 41c43d72 409a61dc
+a 6 hs 1 nb 5 7 bd 5 6 rg chiral 0 stereoActive 1 cw 5 7 sub 6 7 8 9 13 10 12 11 sav 414228f4 420deb85
+a 7 hs 1 nb 6 8 bd 6 7 rg chiral 0 stereoActive 1 cw 6 8 sub 7 8 9 13 10 12 11 sav c14228f4 c20deb85
+a 8 hs 0 nb 7 9 13 bd 7 8 14 rg 1 chiral 0 stereoActive 0 cw 7 9 13 sub 8 9 13 10 12 11 sav c1c43d72 c09a61d9
+a 9 hs 1 nb 8 10 bd 8 9 rg 1 chiral 0 stereoActive 0 cw 8 10 sub 9 10 11 12 13 sav c1423d68 c20deb85
+a 10 hs 1 nb 9 11 bd 9 10 rg 1 chiral 0 stereoActive 0 cw 9 11 sub 10 11 12 13 8 7 6 5 4 0 3 1 2 sav 41c551e8 c1e20a3e
+a 11 hs 1 nb 10 12 bd 10 11 rg 1 chiral 0 stereoActive 0 cw 10 12 sub 11 12 13 8 7 9 6 5 4 0 3 1 2 sav 42132e16 40e78520
+a 12 hs 1 nb 11 13 bd 11 12 rg 1 chiral 0 stereoActive 0 cw 11 13 sub 12 13 8 7 9 6 10 5 4 0 3 1 2 sav 41423d6c 420deb85
+a 13 hs 1 nb 12 8 bd 12 14 rg 1 chiral 0 stereoActive 0 cw 12 8 sub 13 8 7 9 6 10 5 11 4 0 3 1 2 sav c1c551ec 41e20a3e
+b 0 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 1 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 2 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 3 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 4 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 5 small 0 macro 0 term 0 inter 1 stereo 0 rings
+b 6 small 0 macro 0 term 0 inter 0 stereo 1 rings
+b 7 small 0 macro 0 term 0 inter 1 stereo 0 rings
+b 8 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 9 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 10 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 11 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 12 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 13 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 14 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+r 0 size 6 benz 1 arom 1 mac 0 atoms 0 1 2 3 4 5 bonds 13 4 3 2 1 0 center c32bd853 bf2cccc3
+r 1 size 6 benz 1 arom 1 mac 0 atoms 8 9 10 11 12 13 bonds 14 12 11 10 9 8 center 432bd851 3f2cccc0
+m charge 0 bbox c37570a4 c28f47ae 437570a4 428f47ae center b6c92492 35124925
+flip 5 c2f50a3d c264ae14 c3441eb8 c28f428f c37570a4 c171eb85 c35d2b85 425f5c29 c31391ec 428c999a c2c48000 415ca3d7 c1c547ae 41e20000 41c547ae c1e20000 42c48000 c15ca3d7 431391ec c28c947b 435d2b85 c25f51ec 437570a4 41723d71 43441eb8 428f47ae 42f50a3d 4264b852 wedge 1 1 1 1 1 0 0 0 0 0 0 0 0 1 0
+flip 6 c246d70a 431bb5c3 c1cb851f 4362ae14 4240a3d7 43712666 42c2f5c3 4338a666 42926b85 42e3570a bec7ae14 42c66b85 c1c547ae 41e20000 41c547ae c1e20000 42c48000 c15ca3d7 431391ec c28c947b 435d2b85 c25f51ec 437570a4 41723d71 43441eb8 428f47ae 42f50a3d 4264b852 wedge 1 1 1 1 1 1 0 0 0 0 0 0 0 1 0
+flip 7 c31391ec 428c947b c35d2b85 425f51ec c37570a4 c1723d71 c3441eb8 c28f47ae c2f50a3d c264b852 c2c48000 415ca3d7 c1c547ae 41e20000 41c547ae c1e20000 42c48000 c15ca3d7 42f50a3d 4264ae14 43441eb8 428f428f 437570a4 4171eb85 435d2b85 c25f5c29 431391ec c28c999a wedge 0 0 0 0 0 0 0 0 1 1 1 1 1 0 1
+$$
+MOL 4 3
+A 6 0 c2c5f618 c0da6635
+A 6 0 c1efc05f 41b454b8
+A 6 0 41efc05f c1b454b8
+A 6 0 42c5f618 40da6635
+B 0 1 1
+B 1 2 2
+B 2 3 1
+END
+a 0 hs 3 nb 1 bd 0 rg chiral 0 stereoActive 0 cw 1 sub 0 sav c28a051f c1eae148
+a 1 hs 1 nb 0 2 bd 0 1 rg chiral 0 stereoActive 1 cw 0 2 sub 1 2 3 sav 40911ebc 4214e148
+a 2 hs 1 nb 1 3 bd 1 2 rg chiral 0 stereoActive 1 cw 1 3 sub 2 3 sav c0911ebc c214e148
+a 3 hs 3 nb 2 bd 2 rg chiral 0 stereoActive 0 cw 2 sub 3 sav 428a051f 41eae148
+b 0 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 1 small 0 macro 0 term 0 inter 0 stereo 1 rings
+b 2 small 0 macro 0 term 1 inter 0 stereo 0 rings
+m charge 0 bbox c2c5f5c3 c1b451ec 42c5f5c3 41b451ec center 36000000 34000000
+flip 1 c1a747ae 42c1fae1 c1efc28f 41b451ec 41efc28f c1b451ec 42c5f5c3 40da3d71 wedge 1 0 0
+$$
+MOL 4 3
+A 6 0 c2960000 c201e760
+A 6 0 c2160000 4201e760
+A 6 0 42160000 4201e760
+A 6 0 42960000 c201e760
+B 0 1 1
+B 1 2 2
+B 2 3 1
+END
+a 0 hs 3 nb 1 bd 0 rg chiral 0 stereoActive 0 cw 1 sub 0 sav c2160000 c281eb85
+a 1 hs 1 nb 0 2 bd 0 1 rg chiral 0 stereoActive 1 cw 0 2 sub 1 2 3 sav c1960000 4201eb85
+a 2 hs 1 nb 1 3 bd 1 2 rg chiral 0 stereoActive 1 cw 1 3 sub 2 3 sav 41960000 4201eb85
+a 3 hs 3 nb 2 bd 2 rg chiral 0 stereoActive 0 cw 2 sub 3 sav 42160000 c281eb85
+b 0 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 1 small 0 macro 0 term 0 inter 0 stereo 1 rings
+b 2 small 0 macro 0 term 1 inter 0 stereo 0 rings
+m charge 0 bbox c2960000 c201eb85 42960000 4201eb85 center 00000000 00000000
+flip 1 c2960000 42c2e148 c2160000 4201eb85 42160000 4201eb85 42960000 c201eb85 wedge 1 0 0
+$$
+MOL 6 7
+A 6 0 42cce760 c2160000
+A 6 0 42cce760 42160000
+A 6 0 42160000 27a6aaab
+A 6 0 c2160000 a8855555
+A 6 0 c2cce760 42160000
+A 6 0 c2cce760 c2160000
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 2 0 1
+B 5 3 1
+END
+a 0 hs 2 nb 1 2 bd 0 5 rg 0 chiral 0 stereoActive 0 cw 1 2 sub 0 2 3 4 5 sav 4201e666 c2610000
+a 1 hs 2 nb 0 2 bd 0 1 rg 0 chiral 0 stereoActive 0 cw 0 2 sub 1 2 3 4 5 sav 4201e666 42610000
+a 2 hs 1 nb 1 3 0 bd 1 2 5 rg 0 chiral 1 stereoActive 0 cw 1 3 0 sub 2 3 0 4 5 sav c2459999 80000000
+a 3 hs 1 nb 2 4 5 bd 2 3 6 rg 1 chiral 1 stereoActive 0 cw 2 4 5 sub 3 4 5 sav 42459999 80000000
+a 4 hs 2 nb 3 5 bd 3 4 rg 1 chiral 0 stereoActive 0 cw 3 5 sub 4 5 sav c201e666 42610000
+a 5 hs 2 nb 4 3 bd 4 6 rg 1 chiral 0 stereoActive 0 cw 4 3 sub 5 3 2 1 0 sav c201e666 c2610000
+b 0 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 1 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 2 small 0 macro 0 term 0 inter 1 stereo 0 rings
+b 3 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 4 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 5 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 6 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+r 0 size 3 benz 0 arom 0 mac 0 atoms 0 1 2 bonds 5 1 0 center 42a19999 00000000
+r 1 size 3 benz 0 arom 0 mac 0 atoms 3 4 5 bonds 6 4 3 center c2a19999 00000000
+m charge 0 bbox c2cce666 c2160000 42cce666 42160000 center 00000000 00000000
+flip 2 42cce666 42160000 42cce666 c2160000 42160000 00000000 c2160000 00000000 c2cce666 42160000 c2cce666 c2160000 wedge 1 1 0 0 0 1 0
+$$
+MOL 12 13
+A 6 0 433b8000 365cf88b
+A 6 0 43160000 4281e760
+A 6 0 42960000 4281e760
+A 6 0 42160000 b5c27451
+A 6 0 42960000 c281e760
+A 6 0 43160000 c281e760
+A 6 0 c2160000 b5c27451
+A 6 0 c2960000 4281e760
+A 6 0 c3160000 4281e760
+A 6 0 c33b8000 b5c27451
+A 6 0 c3160000 c281e760
+A 6 0 c2960000 c281e760
+B 0 1 2
+B 1 2 1
+B 2 3 2
+B 3 4 1
+B 4 5 2
+B 3 6 1
+B 6 7 2
+B 7 8 1
+B 8 9 2
+B 9 10 1
+B 10 11 2
+B 5 0 1
+B 11 6 1
+END
+a 0 hs 1 nb 1 5 bd 0 11 rg 0 chiral 0 stereoActive 0 cw 1 5 sub 0 5 4 3 2 6 7 11 8 10 9 sav 42160000 80000000
+a 1 hs 1 nb 0 2 bd 0 1 rg 0 chiral 0 stereoActive 0 cw 0 2 sub 1 2 3 4 6 5 7 11 8 10 9 sav 41960000 4201e666
+a 2 hs 1 nb 1 3 bd 1 2 rg 0 chiral 0 stereoActive 0 cw 1 3 sub 2 3 4 6 5 7 11 0 8 10 9 sav c1960000 4201e666
+a 3 hs 0 nb 2 4 6 bd 2 3 5 rg 0 chiral 0 stereoActive 0 cw 2 6 4 sub 3 4 6 5 7 11 0 8 10 1 9 sav c1c80000 80000000
+a 4 hs 1 nb 3 5 bd 3 4 rg 0 chiral 0 stereoActive 0 cw 3 5 sub 4 5 0 1 2 sav c1960000 c201e666
+a 5 hs 1 nb 4 0 bd 4 11 rg 0 chiral 0 stereoActive 0 cw 4 0 sub 5 0 1 2 3 6 7 11 8 10 9 sav 41960000 c201e666
+a 6 hs 0 nb 3 7 11 bd 5 6 12 rg 1 chiral 0 stereoActive 0 cw 3 7 11 sub 6 7 11 8 10 9 sav 41c80000 80000000
+a 7 hs 1 nb 6 8 bd 6 7 rg 1 chiral 0 stereoActive 0 cw 6 8 sub 7 8 9 10 11 sav 41960000 4201e666
+a 8 hs 1 nb 7 9 bd 7 8 rg 1 chiral 0 stereoActive 0 cw 7 9 sub 8 9 10 11 6 3 2 4 1 5 0 sav c1960000 4201e666
+a 9 hs 1 nb 8 10 bd 8 9 rg 1 chiral 0 stereoActive 0 cw 8 10 sub 9 10 11 6 3 7 2 4 1 5 0 sav c2160000 80000000
+a 10 hs 1 nb 9 11 bd 9 10 rg 1 chiral 0 stereoActive 0 cw 9 11 sub 10 11 6 3 7 2 4 8 1 5 0 sav c1960000 c201e666
+a 11 hs 1 nb 10 6 bd 10 12 rg 1 chiral 0 stereoActive 0 cw 10 6 sub 11 6 3 7 2 4 8 1 5 9 0 sav 41960000 c201e666
+b 0 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 1 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 2 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 3 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 4 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 5 small 0 macro 0 term 0 inter 1 stereo 0 rings
+b 6 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 7 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 8 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 9 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 10 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 11 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 12 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+r 0 size 6 benz 1 arom 1 mac 0 atoms 0 1 2 3 4 5 bonds 11 4 3 2 1 0 center 42e10000 00000000
+r 1 size 6 benz 1 arom 1 mac 0 atoms 6 7 8 9 10 11 bonds 12 10 9 8 7 6 center c2e10000 00000000
+m charge 0 bbox c33b8000 c281e666 433b8000 4281e666 center 00000000 00000000
+flip 5 433b8000 00000000 43160000 c281e666 42960000 c281e666 42160000 00000000 42960000 4281e666 43160000 4281e666 c2160000 00000000 c2960000 4281e666 c3160000 4281e666 c33b8000 00000000 c3160000 c281e666 c2960000 c281e666 wedge 1 1 1 1 1 0 0 0 0 0 0 1 0
+$$
+MOL 3 2
+A 7 0 42960000 26ef3b01
+A 6 0 27480000 27ad3480
+A 6 0 c2960000 282a18a0
+B 0 1 3
+B 1 2 1
+END
+a 0 hs 0 nb 1 bd 0 rg chiral 0 stereoActive 0 cw 1 sub 0 sav 42960000 80000000
+a 1 hs 0 nb 0 2 bd 0 1 rg chiral 0 stereoActive 0 cw 0 2 sub 1 2 sav 80000000 80000000
+a 2 hs 3 nb 1 bd 1 rg chiral 0 stereoActive 0 cw 1 sub 2 sav c2960000 80000000
+b 0 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 1 small 0 macro 0 term 1 inter 0 stereo 0 rings
+m charge 0 bbox c2960000 00000000 42960000 00000000 center 00000000 00000000
+$$
+MOL 5 4
+A 6 0 c281e760 c2160000
+A 7 1 00000000 a7c80000
+A 6 0 4281e760 42160000
+A 6 0 42160000 c281e760
+A 6 0 c2160000 4281e760
+B 0 1 1
+B 1 2 1
+B 1 3 1
+B 1 4 1
+END
+a 0 hs 3 nb 1 bd 0 rg chiral 0 stereoActive 0 cw 1 sub 0 sav c281e666 c2160000
+a 1 hs 0 nb 0 2 3 4 bd 0 1 2 3 rg chiral 1 stereoActive 0 cw 0 3 2 4 sub 1 2 3 4 sav 80000000 80000000
+a 2 hs 3 nb 1 bd 1 rg chiral 0 stereoActive 0 cw 1 sub 2 sav 4281e666 42160000
+a 3 hs 3 nb 1 bd 2 rg chiral 0 stereoActive 0 cw 1 sub 3 sav 42160000 c281e666
+a 4 hs 3 nb 1 bd 3 rg chiral 0 stereoActive 0 cw 1 sub 4 sav c2160000 4281e666
+b 0 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 1 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 2 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 3 small 0 macro 0 term 1 inter 0 stereo 0 rings
+m charge 1 bbox c281e666 c281e666 4281e666 4281e666 center 00000000 00000000
+$$
+MOL 3 2
+A 8 0 42960000 26dc9cdd
+A 6 0 0cf35996 a75c9cdd
+A 8 0 c2960000 26dc9cdd
+B 0 1 2
+B 1 2 2
+END
+a 0 hs 0 nb 1 bd 0 rg chiral 0 stereoActive 1 cw 1 sub 0 sav 42960000 80000000
+a 1 hs 0 nb 0 2 bd 0 1 rg chiral 0 stereoActive 1 cw 0 2 sub 1 2 sav 80000000 80000000
+a 2 hs 0 nb 1 bd 1 rg chiral 0 stereoActive 1 cw 1 sub 2 sav c2960000 80000000
+b 0 small 0 macro 0 term 1 inter 0 stereo 1 rings
+b 1 small 0 macro 0 term 1 inter 0 stereo 1 rings
+m charge 0 bbox c2960000 00000000 42960000 00000000 center 00000000 00000000
+$$
+MOL 10 12
+A 6 0 c1e5bbd3 c0afa991
+A 6 0 414a082a c2882146
+A 6 0 42aefb51 c27e3136
+A 6 0 42f205a3 4062d79a
+A 6 0 429f55a9 42843d6a
+A 6 0 4099b5cd 4276697e
+A 6 0 c28c1eef 42645828
+A 6 0 c2cf2941 c1201a20
+A 6 0 c278f28d c29129f1
+A 6 0 c2240527 41fab2d8
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 5 6 1
+B 6 7 1
+B 7 8 1
+B 7 9 1
+B 5 0 1
+B 8 1 1
+B 9 3 1
+END
+a 0 hs 2 nb 1 5 bd 0 9 rg 0 2 chiral 0 stereoActive 0 cw 1 5 sub 0 5 4 6 3 7 2 9 8 sav c215bd70 c010a3d0
+a 1 hs 1 nb 0 2 8 bd 0 1 10 rg 0 2 3 chiral 1 stereoActive 0 cw 0 8 2 sub 1 2 8 3 7 4 9 6 5 sav 415c9630 c1a6d3a0
+a 2 hs 2 nb 1 3 bd 1 2 rg 0 3 chiral 0 stereoActive 0 cw 1 3 sub 2 3 4 9 5 7 6 0 8 sav 41a55c28 c1fa51eb
+a 3 hs 1 nb 2 4 9 bd 2 3 11 rg 0 3 1 chiral 1 stereoActive 0 cw 2 4 9 sub 3 4 9 5 7 6 0 8 1 sav 429deb85 c0f86d3d
+a 4 hs 2 nb 3 5 bd 3 4 rg 0 1 chiral 0 stereoActive 0 cw 3 5 sub 4 5 6 0 7 1 8 9 2 sav 41861eb6 42063334
+a 5 hs 1 nb 4 6 0 bd 4 5 9 rg 0 1 2 chiral 1 stereoActive 0 cw 4 6 0 sub 5 6 0 7 1 8 9 2 3 sav 4132b854 41b2e145
+a 6 hs 2 nb 5 7 bd 5 6 rg 1 2 chiral 0 stereoActive 0 cw 5 7 sub 6 7 8 9 1 3 0 2 4 sav c1a55c28 41fa5c29
+a 7 hs 1 nb 6 8 9 bd 6 7 8 rg 1 2 3 chiral 1 stereoActive 0 cw 6 8 9 sub 7 8 9 1 3 0 2 4 5 sav c2373d71 c174b17d
+a 8 hs 2 nb 7 1 bd 7 10 rg 2 3 chiral 0 stereoActive 0 cw 7 1 sub 8 1 0 2 5 3 4 6 9 sav c1861eb9 c2062e15
+a 9 hs 2 nb 7 3 bd 8 11 rg 1 3 chiral 0 stereoActive 0 cw 7 3 sub 9 3 2 4 1 5 0 8 6 sav c246e666 420a4ccc
+b 0 small 1 macro 0 term 0 inter 0 stereo 0 rings 0 2
+b 1 small 1 macro 0 term 0 inter 0 stereo 0 rings 0 3
+b 2 small 1 macro 0 term 0 inter 0 stereo 0 rings 0 3
+b 3 small 1 macro 0 term 0 inter 0 stereo 0 rings 0 1
+b 4 small 1 macro 0 term 0 inter 0 stereo 0 rings 0 1
+b 5 small 1 macro 0 term 0 inter 0 stereo 0 rings 1 2
+b 6 small 1 macro 0 term 0 inter 0 stereo 0 rings 1 2
+b 7 small 1 macro 0 term 0 inter 0 stereo 0 rings 2 3
+b 8 small 1 macro 0 term 0 inter 0 stereo 0 rings 1 3
+b 9 small 1 macro 0 term 0 inter 0 stereo 0 rings 0 2
+b 10 small 1 macro 0 term 0 inter 0 stereo 0 rings 2 3
+b 11 small 1 macro 0 term 0 inter 0 stereo 0 rings 1 3
+r 0 size 6 benz 0 arom 0 mac 0 atoms 0 1 2 3 4 5 bonds 9 4 3 2 1 0 center 42389630 bf792c55
+r 1 size 6 benz 0 arom 0 mac 0 atoms 3 4 5 6 7 9 bonds 11 8 6 5 4 3 center bfc3a070 420bc963
+r 2 size 6 benz 0 arom 0 mac 0 atoms 0 1 5 6 7 8 bonds 9 0 10 7 6 5 center c224c7ae c0c7bbbb
+r 3 size 6 benz 0 arom 0 mac 0 atoms 1 2 3 7 8 9 bonds 7 10 1 2 11 8 center 4018888b c1ef17e5
+m charge 0 bbox c2cf28f6 c29128f6 42f2051f 42843d71 center ba830000 34cccccd
+$$
+MOL 20 24
+A 6 0 43160000 c301e760
+A 6 0 433b8000 c281e760
+A 6 0 43160000 3564732d
+A 6 0 433b8000 4281e760
+A 6 0 43160000 4301e760
+A 6 0 42960000 4301e760
+A 6 0 42160000 4281e760
+A 6 0 c2160000 4281e760
+A 6 0 c2960000 4301e760
+A 6 0 c3160000 4301e760
+A 6 0 c33b8000 4281e760
+A 6 0 c3160000 b5a7420a
+A 6 0 c33b8000 c281e760
+A 6 0 c3160000 c301e760
+A 6 0 c2960000 c301e760
+A 6 0 c2160000 c281e760
+A 6 0 42160000 c281e760
+A 6 0 42960000 c301e760
+A 6 0 42960000 355c4a7d
+A 6 0 c2960000 b4e4732b
+B 0 1 1
+B 1 2 2
+B 2 3 1
+B 3 4 2
+B 4 5 1
+B 5 6 2
+B 6 7 1
+B 7 8 2
+B 8 9 1
+B 9 10 2
+B 10 11 1
+B 11 12 1
+B 12 13 2
+B 13 14 1
+B 14 15 2
+B 15 16 1
+B 16 17 1
+B 16 18 2
+B 15 19 1
+B 17 0 2
+B 18 2 1
+B 18 6 1
+B 19 7 1
+B 19 11 2
+END
+a 0 hs 1 nb 1 17 bd 0 19 rg 0 chiral 0 stereoActive 0 cw 1 17 sub 0 17 16 15 18 14 19 2 6 13 7 11 3 5 12 8 10 4 9 sav 41960000 c201e666
+a 1 hs 1 nb 0 2 bd 0 1 rg 0 chiral 0 stereoActive 0 cw 0 2 sub 1 2 3 18 4 16 6 5 15 17 7 14 19 8 13 11 9 12 10 sav 42160000 80000000
+a 2 hs 0 nb 1 3 18 bd 1 2 20 rg 0 1 chiral 0 stereoActive 0 cw 1 3 18 sub 2 3 18 4 16 6 5 15 17 7 14 19 0 8 13 11 9 12 10 sav 80000000 80000000
+a 3 hs 1 nb 2 4 bd 2 3 rg 1 chiral 0 stereoActive 0 cw 2 4 sub 3 4 5 6 7 18 8 19 16 9 15 11 17 10 14 12 0 13 1 sav 42160000 80000000
+a 4 hs 1 nb 3 5 bd 3 4 rg 1 chiral 0 stereoActive 0 cw 3 5 sub 4 5 6 7 18 8 19 16 2 9 15 11 17 1 10 14 12 0 13 sav 41960000 4201e666
+a 5 hs 1 nb 4 6 bd 4 5 rg 1 chiral 0 stereoActive 0 cw 4 6 sub 5 6 7 18 8 19 16 2 9 15 11 17 1 3 10 14 12 0 13 sav c1960000 4201e666
+a 6 hs 0 nb 5 7 18 bd 5 6 21 rg 1 2 chiral 0 stereoActive 0 cw 5 7 18 sub 6 7 18 8 19 16 2 9 15 11 17 1 3 10 14 12 0 4 13 sav 80000000 80000000
+a 7 hs 0 nb 6 8 19 bd 6 7 22 rg 2 3 chiral 0 stereoActive 0 cw 6 8 19 sub 7 8 19 9 15 11 10 14 16 12 13 17 18 0 2 1 3 4 5 sav 80000000 80000000
+a 8 hs 1 nb 7 9 bd 7 8 rg 3 chiral 0 stereoActive 0 cw 7 9 sub 8 9 10 11 12 19 13 15 14 16 17 18 0 2 6 1 3 5 4 sav 41960000 4201e666
+a 9 hs 1 nb 8 10 bd 8 9 rg 3 chiral 0 stereoActive 0 cw 8 10 sub 9 10 11 12 19 13 15 7 14 16 6 17 18 5 0 2 4 1 3 sav c1960000 4201e666
+a 10 hs 1 nb 9 11 bd 9 10 rg 3 chiral 0 stereoActive 0 cw 9 11 sub 10 11 12 19 13 15 7 14 16 6 8 17 18 5 0 2 4 1 3 sav c2160000 80000000
+a 11 hs 0 nb 10 12 19 bd 10 11 23 rg 3 4 chiral 0 stereoActive 0 cw 10 12 19 sub 11 12 19 13 15 7 14 16 6 8 17 18 5 9 0 2 4 1 3 sav 80000000 80000000
+a 12 hs 1 nb 11 13 bd 11 12 rg 4 chiral 0 stereoActive 0 cw 11 13 sub 12 13 14 15 16 19 17 18 7 0 2 6 8 1 3 5 9 4 10 sav c2160000 80000000
+a 13 hs 1 nb 12 14 bd 12 13 rg 4 chiral 0 stereoActive 0 cw 12 14 sub 13 14 15 16 19 17 18 7 11 0 2 6 8 10 1 3 5 9 4 sav c1960000 c201e666
+a 14 hs 1 nb 13 15 bd 13 14 rg 4 chiral 0 stereoActive 0 cw 13 15 sub 14 15 16 19 17 18 7 11 0 2 6 8 10 12 1 3 5 9 4 sav 41960000 c201e666
+a 15 hs 0 nb 14 16 19 bd 14 15 18 rg 4 2 chiral 0 stereoActive 0 cw 14 16 19 sub 15 16 19 17 18 7 11 0 2 6 8 10 12 1 3 5 9 13 4 sav 80000000 80000000
+a 16 hs 0 nb 15 17 18 bd 15 16 17 rg 2 0 chiral 0 stereoActive 0 cw 15 17 18 sub 16 17 18 0 2 6 1 3 5 7 4 8 19 9 11 10 12 13 14 sav 80000000 80000000
+a 17 hs 1 nb 16 0 bd 16 19 rg 0 chiral 0 stereoActive 0 cw 16 0 sub 17 0 1 2 3 18 4 6 5 7 8 19 9 15 11 10 14 12 13 sav c1960000 c201e666
+a 18 hs 0 nb 16 2 6 bd 17 20 21 rg 0 2 1 chiral 0 stereoActive 0 cw 16 2 6 sub 18 2 6 1 3 5 7 0 4 8 19 17 9 15 11 10 14 12 13 sav 80000000 80000000
+a 19 hs 0 nb 15 7 11 bd 18 22 23 rg 2 4 3 chiral 0 stereoActive 0 cw 15 7 11 sub 19 7 11 6 8 10 12 5 18 9 13 4 16 2 14 3 17 1 0 sav 80000000 80000000
+b 0 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 1 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 2 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 3 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 4 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 5 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 6 small 1 macro 0 term 0 inter 0 stereo 0 rings 2
+b 7 small 1 macro 0 term 0 inter 0 stereo 0 rings 3
+b 8 small 1 macro 0 term 0 inter 0 stereo 0 rings 3
+b 9 small 1 macro 0 term 0 inter 0 stereo 0 rings 3
+b 10 small 1 macro 0 term 0 inter 0 stereo 0 rings 3
+b 11 small 1 macro 0 term 0 inter 0 stereo 0 rings 4
+b 12 small 1 macro 0 term 0 inter 0 stereo 0 rings 4
+b 13 small 1 macro 0 term 0 inter 0 stereo 0 rings 4
+b 14 small 1 macro 0 term 0 inter 0 stereo 0 rings 4
+b 15 small 1 macro 0 term 0 inter 0 stereo 0 rings 2
+b 16 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 17 small 1 macro 0 term 0 inter 0 stereo 0 rings 0 2
+b 18 small 1 macro 0 term 0 inter 0 stereo 0 rings 2 4
+b 19 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 20 small 1 macro 0 term 0 inter 0 stereo 0 rings 0 1
+b 21 small 1 macro 0 term 0 inter 0 stereo 0 rings 1 2
+b 22 small 1 macro 0 term 0 inter 0 stereo 0 rings 2 3
+b 23 small 1 macro 0 term 0 inter 0 stereo 0 rings 3 4
+r 0 size 6 benz 1 arom 1 mac 0 atoms 0 1 2 16 17 18 bonds 19 16 17 20 1 0 center 42e10000 c281e666
+r 1 size 6 benz 1 arom 0 mac 0 atoms 2 3 4 5 6 18 bonds 20 21 5 4 3 2 center 42e10000 4281e667
+r 2 size 6 benz 1 arom 0 mac 0 atoms 6 7 15 16 18 19 bonds 21 17 15 18 22 6 center 00000000 00000000
+r 3 size 6 benz 1 arom 1 mac 0 atoms 7 8 9 10 11 19 bonds 22 23 10 9 8 7 center c2e10000 4281e667
+r 4 size 6 benz 1 arom 1 mac 0 atoms 11 12 13 14 15 19 bonds 23 18 14 13 12 11 center c2e10000 c281e667
+m charge 0 bbox c33b8000 c301e666 433b8000 4301e666 center 00000000 00000000
+$$
+MOL 12 12
+A 6 0 43160000 28a6aaab
+A 6 0 42960000 28055555
+A 6 0 42160000 4281e760
+A 6 0 42960000 4301e760
+A 6 0 c2160000 4281e760
+A 8 0 c2960000 4301e760
+A 6 0 c2960000 2895657e
+A 6 0 c3160000 29055555
+A 6 0 c2160000 c281e760
+A 6 0 c2960000 c301e760
+A 6 0 42160000 c281e760
+A 8 0 42960000 c301e760
+B 0 1 1
+B 1 2 2
+B 2 3 1
+B 2 4 1
+B 4 5 2
+B 4 6 1
+B 6 7 1
+B 6 8 2
+B 8 9 1
+B 8 10 1
+B 10 11 2
+B 10 1 1
+END
+a 0 hs 3 nb 1 bd 0 rg chiral 0 stereoActive 0 cw 1 sub 0 sav 42960000 80000000
+a 1 hs 0 nb 0 2 10 bd 0 1 11 rg 0 chiral 0 stereoActive 0 cw 0 2 10 sub 1 2 10 3 4 8 11 5 6 9 7 sav 41c80000 80000000
+a 2 hs 0 nb 1 3 4 bd 1 2 3 rg 0 chiral 0 stereoActive 0 cw 1 3 4 sub 2 3 4 5 6 7 8 9 10 11 sav 41480000 41ad3333
+a 3 hs 3 nb 2 bd 2 rg chiral 0 stereoActive 0 cw 2 sub 3 sav 42160000 4281e666
+a 4 hs 0 nb 2 5 6 bd 3 4 5 rg 0 chiral 0 stereoActive 1 cw 2 5 6 sub 4 5 6 7 8 9 10 11 1 0 sav c1480000 41ad3333
+a 5 hs 0 nb 4 bd 4 rg chiral 0 stereoActive 1 cw 4 sub 5 sav c2160000 4281e666
+a 6 hs 0 nb 4 7 8 bd 5 6 7 rg 0 chiral 0 stereoActive 0 cw 4 7 8 sub 6 7 8 9 10 11 1 0 2 3 sav c1c80000 80000000
+a 7 hs 3 nb 6 bd 6 rg chiral 0 stereoActive 0 cw 6 sub 7 sav c2960000 80000000
+a 8 hs 0 nb 6 9 10 bd 7 8 9 rg 0 chiral 0 stereoActive 0 cw 6 9 10 sub 8 9 10 11 1 0 2 3 4 5 sav c1480000 c1ad3333
+a 9 hs 3 nb 8 bd 8 rg chiral 0 stereoActive 0 cw 8 sub 9 sav c2160000 c281e666
+a 10 hs 0 nb 8 11 1 bd 9 10 11 rg 0 chiral 0 stereoActive 1 cw 8 11 1 sub 10 11 1 0 2 3 4 5 6 7 sav 41480000 c1ad3333
+a 11 hs 0 nb 10 bd 10 rg chiral 0 stereoActive 1 cw 10 sub 11 sav 42160000 c281e666
+b 0 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 1 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 2 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 3 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 4 small 0 macro 0 term 1 inter 0 stereo 1 rings
+b 5 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 6 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 7 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 8 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 9 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 10 small 0 macro 0 term 1 inter 0 stereo 1 rings
+b 11 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+r 0 size 6 benz 1 arom 0 mac 0 atoms 1 2 4 6 8 10 bonds 11 9 7 5 3 1 center 00000000 00000000
+m charge 0 bbox c3160000 c301e666 43160000 4301e666 center 00000000 35aaaaab
+$$
+MOL 5 4
+A 26 0 00000000 a7c80000
+A 6 0 c281e760 c2160000
+A 6 0 4281e760 42160000
+A 6 0 42160000 c281e760
+A 6 0 c2160000 4281e760
+B 0 1 1
+B 0 2 1
+B 0 3 1
+B 0 4 1
+END
+a 0 hs 0 nb 1 2 3 4 bd 0 1 2 3 rg chiral 1 stereoActive 0 cw 1 3 2 4 sub 0 2 3 4 sav 80000000 80000000
+a 1 hs 3 nb 0 bd 0 rg chiral 0 stereoActive 0 cw 0 sub 1 sav c281e666 c2160000
+a 2 hs 3 nb 0 bd 1 rg chiral 0 stereoActive 0 cw 0 sub 2 sav 4281e666 42160000
+a 3 hs 3 nb 0 bd 2 rg chiral 0 stereoActive 0 cw 0 sub 3 sav 42160000 c281e666
+a 4 hs 3 nb 0 bd 3 rg chiral 0 stereoActive 0 cw 0 sub 4 sav c2160000 4281e666
+b 0 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 1 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 2 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 3 small 0 macro 0 term 1 inter 0 stereo 0 rings
+m charge 0 bbox c281e666 c281e666 4281e666 4281e666 center 00000000 00000000
+$$
+MOL 8 7
+A 9 0 c2e10000 280c75a6
+A 6 0 c2160000 a6c80000
+A 9 0 c2160000 42960000
+A 9 0 c2160000 c2960000
+A 6 0 42160000 a6c80000
+A 9 0 42e10000 a6c80000
+A 9 0 42160000 c2960000
+A 9 0 42160000 42960000
+B 0 1 1
+B 1 2 1
+B 1 3 1
+B 1 4 1
+B 4 5 1
+B 4 6 1
+B 4 7 1
+END
+a 0 hs 0 nb 1 bd 0 rg chiral 0 stereoActive 0 cw 1 sub 0 sav c2960000 80000000
+a 1 hs 0 nb 0 2 3 4 bd 0 1 2 3 rg chiral 1 stereoActive 0 cw 0 3 4 2 sub 1 2 3 4 5 6 7 sav 80000000 80000000
+a 2 hs 0 nb 1 bd 1 rg chiral 0 stereoActive 0 cw 1 sub 2 sav 80000000 42960000
+a 3 hs 0 nb 1 bd 2 rg chiral 0 stereoActive 0 cw 1 sub 3 sav 80000000 c2960000
+a 4 hs 0 nb 1 5 6 7 bd 3 4 5 6 rg chiral 1 stereoActive 0 cw 1 6 5 7 sub 4 5 6 7 sav 80000000 80000000
+a 5 hs 0 nb 4 bd 4 rg chiral 0 stereoActive 0 cw 4 sub 5 sav 42960000 80000000
+a 6 hs 0 nb 4 bd 5 rg chiral 0 stereoActive 0 cw 4 sub 6 sav 80000000 c2960000
+a 7 hs 0 nb 4 bd 6 rg chiral 0 stereoActive 0 cw 4 sub 7 sav 80000000 42960000
+b 0 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 1 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 2 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 3 small 0 macro 0 term 0 inter 1 stereo 0 rings
+b 4 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 5 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 6 small 0 macro 0 term 1 inter 0 stereo 0 rings
+m charge 0 bbox c2e10000 c2960000 42e10000 42960000 center 00000000 00000000
+flip 3 c2e10000 00000000 c2160000 00000000 c2160000 c2960000 c2160000 42960000 42160000 00000000 42e10000 00000000 42160000 c2960000 42160000 42960000 wedge 1 1 1 0 0 0 0
+$$
+MOL 12 11
+A 8 0 43640bbd 40a4383b
+A 6 0 431f871a 420e8752
+A 6 0 42c5b596 c1074c5a
+A 8 0 42d5663f c2a616e5
+A 6 0 41f2b13c 41b05a68
+A 8 0 41b3ee99 42c143f4
+A 6 0 c1f2b13c c1b05a68
+A 8 0 c1b3ee99 c2c143f4
+A 6 0 c2c5b596 41074c5a
+A 8 0 c2d5663f 42a616e5
+A 6 0 c31f871a c20e8752
+A 8 0 c3640bbd c0a4383b
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 2 4 1
+B 4 5 1
+B 4 6 1
+B 6 7 1
+B 6 8 1
+B 8 9 1
+B 8 10 1
+B 10 11 1
+END
+a 0 hs 1 nb 1 bd 0 rg chiral 0 stereoActive 0 cw 1 sub 0 sav 42890a3e c1f40000
+a 1 hs 2 nb 0 2 bd 0 1 rg chiral 0 stereoActive 0 cw 0 2 sub 1 2 3 4 5 6 7 8 9 10 11 sav c07ae150 42152e14
+a 2 hs 1 nb 1 3 4 bd 1 2 3 rg chiral 1 stereoActive 0 cw 1 4 3 sub 2 3 4 5 6 7 8 9 10 11 sav bbda8000 bb5a6aab
+a 3 hs 1 nb 2 bd 2 rg chiral 0 stereoActive 0 cw 2 sub 3 sav 40fb3330 c29528f6
+a 4 hs 1 nb 2 5 6 bd 3 4 5 rg chiral 1 stereoActive 0 cw 2 5 6 sub 4 5 6 7 8 9 10 11 sav 3bda8000 bb5a5555
+a 5 hs 1 nb 4 bd 4 rg chiral 0 stereoActive 0 cw 4 sub 5 sav c0fb3334 42952e14
+a 6 hs 1 nb 4 7 8 bd 5 6 7 rg chiral 1 stereoActive 0 cw 4 8 7 sub 6 7 8 9 10 11 sav bbda8000 3b5a5555
+a 7 hs 1 nb 6 bd 6 rg chiral 0 stereoActive 0 cw 6 sub 7 sav 40fb3334 c2952e14
+a 8 hs 1 nb 6 9 10 bd 7 8 9 rg chiral 1 stereoActive 0 cw 6 9 10 sub 8 9 10 11 sav 3bda8000 3b5a6aab
+a 9 hs 1 nb 8 bd 8 rg chiral 0 stereoActive 0 cw 8 sub 9 sav c0fb3330 429528f6
+a 10 hs 2 nb 8 11 bd 9 10 rg chiral 0 stereoActive 0 cw 8 11 sub 10 11 sav 407ae150 c2152e14
+a 11 hs 1 nb 10 bd 10 rg chiral 0 stereoActive 0 cw 10 sub 11 sav c2890a3e 41f40000
+b 0 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 1 small 0 macro 0 term 0 inter 1 stereo 0 rings
+b 2 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 3 small 0 macro 0 term 0 inter 1 stereo 0 rings
+b 4 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 5 small 0 macro 0 term 0 inter 1 stereo 0 rings
+b 6 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 7 small 0 macro 0 term 0 inter 1 stereo 0 rings
+b 8 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 9 small 0 macro 0 term 0 inter 1 stereo 0 rings
+b 10 small 0 macro 0 term 1 inter 0 stereo 0 rings
+m charge 0 bbox c3640ccd c2c1428f 43640ccd 42c1428f center 35aaaaab 33aaaaab
+flip 1 4317b0a4 42dc70a4 431f87ae 420e851f 42c5b333 c1075c29 42d56666 c2a6147b 41f2b852 41b051ec 41b3eb85 42c1428f c1f2b852 c1b051ec c1b3eb85 c2c1428f c2c5b333 41075c29 c2d56666 42a6147b c31f87ae c20e851f c3640ccd c0a428f6 wedge 1 0 0 0 0 0 0 0 0 0 0
+flip 3 432f35c3 c2e31eb8 42d56148 c2a61eb8 42c5b333 c1075c29 431f851f 420e70a4 41f2b852 41b051ec 41b3eb85 42c1428f c1f2b852 c1b051ec c1b3eb85 c2c1428f c2c5b333 41075c29 c2d56666 42a6147b c31f87ae c20e851f c3640ccd c0a428f6 wedge 1 1 1 0 0 0 0 0 0 0 0
+flip 5 4296c28f 43574a3d 42a66666 430cb333 41b4147b 42c13d71 c237f5c3 42fe4ccd 41f2b852 41b051ec 42c5b333 c107d70a c1f2b852 c1b051ec c1b3eb85 c2c1428f c2c5b333 41075c29 c2d56666 42a6147b c31f87ae c20e851f c3640ccd c0a428f6 wedge 1 1 1 1 1 0 0 0 0 0 0
+flip 7 43640ccd 40a428f6 431f87ae 420e851f 42c5b333 c1075c29 42d56666 c2a6147b 41f2b852 41b051ec 41b3eb85 42c1428f c1f2b852 c1b051ec c1b3eb85 c2c1428f c2c5b333 41075c29 c31f851f c20e70a4 c2d56148 42a61eb8 c32f35c3 42e31eb8 wedge 0 0 0 0 0 0 0 0 1 1 1
+flip 9 43640ccd 40a428f6 431f87ae 420e851f 42c5b333 c1075c29 42d56666 c2a6147b 41f2b852 41b051ec 41b3eb85 42c1428f c1f2b852 c1b051ec c1b3eb85 c2c1428f c2c5b333 41075c29 c2d56666 42a6147b c31f87ae c20e851f c317b0a4 c2dc70a4 wedge 0 0 0 0 0 0 0 0 0 0 1
+$$
+MOL 17 20
+A 6 0 4368313a 3f8c7850
+A 6 0 434aa73a 428c121f
+A 6 0 43002e82 429dd879
+A 6 0 42a67f92 4196fa58
+A 6 0 42e19392 c248434f
+A 6 0 433b4282 c26bd004
+A 6 0 4287b621 c2dc3b8b
+A 6 0 c0d3b500 c2ca7531
+A 6 0 c2109ea0 c20129e6
+A 6 0 410c710b 41de13c2
+A 6 0 c1a6177a 42c1652e
+A 6 0 c2be774f 42d32b89
+A 6 0 c30c2a60 4236234b
+A 6 0 c356db86 421afa03
+A 6 0 c3677b0b c2098fd5
+A 6 0 c3270ff3 c2919983
+A 6 0 c2dd40c1 c1bb3a62
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 4 6 1
+B 6 7 1
+B 7 8 1
+B 8 9 1
+B 9 10 1
+B 10 11 1
+B 11 12 1
+B 12 13 1
+B 13 14 1
+B 14 15 1
+B 15 16 1
+B 5 0 1
+B 16 8 1
+B 9 3 1
+B 16 12 1
+END
+a 0 hs 2 nb 1 5 bd 0 16 rg 0 chiral 0 stereoActive 0 cw 1 5 sub 0 5 4 3 6 2 9 7 8 10 16 11 15 12 14 13 sav 4214f0a6 c08e3d74
+a 1 hs 2 nb 0 2 bd 0 1 rg 0 chiral 0 stereoActive 0 cw 0 2 sub 1 2 3 4 9 5 6 8 10 7 16 11 15 12 14 13 sav 41b3b850 41f03d72
+a 2 hs 2 nb 1 3 bd 1 2 rg 0 chiral 0 stereoActive 0 cw 1 3 sub 2 3 4 9 5 6 8 10 0 7 16 11 15 12 14 13 sav c16c51f0 4209dc28
+a 3 hs 1 nb 2 4 9 bd 2 3 18 rg 0 1 chiral 1 stereoActive 0 cw 2 9 4 sub 3 4 9 5 6 8 10 0 7 16 11 1 15 12 14 13 sav 362aaaab 362aaaab
+a 4 hs 1 nb 3 5 6 bd 3 4 5 rg 0 1 chiral 1 stereoActive 0 cw 3 6 5 sub 4 5 6 0 7 1 8 2 9 16 10 15 12 11 14 13 sav 362aaaab bb5a6aab
+a 5 hs 2 nb 4 0 bd 4 16 rg 0 chiral 0 stereoActive 0 cw 4 0 sub 5 0 1 2 3 9 8 10 7 16 11 6 15 12 14 13 sav 416c51e4 c209dc29
+a 6 hs 2 nb 4 7 bd 5 6 rg 1 chiral 0 stereoActive 0 cw 4 7 sub 6 7 8 9 16 10 3 15 12 11 2 14 13 1 0 5 sav 416c6668 c209e148
+a 7 hs 2 nb 6 8 bd 6 7 rg 1 chiral 0 stereoActive 0 cw 6 8 sub 7 8 9 16 10 3 15 12 11 2 4 14 13 1 5 0 sav c1b3cccd c1f03334
+a 8 hs 1 nb 7 9 16 bd 7 8 17 rg 1 2 chiral 1 stereoActive 0 cw 7 9 16 sub 8 9 16 10 3 15 12 11 2 4 14 13 1 5 6 0 sav 3bda5555 b52aaaab
+a 9 hs 1 nb 8 10 3 bd 8 9 18 rg 1 2 chiral 1 stereoActive 0 cw 8 3 10 sub 9 10 3 11 2 4 12 1 5 6 13 16 0 7 14 15 sav 80000000 362aaaab
+a 10 hs 2 nb 9 11 bd 9 10 rg 2 chiral 0 stereoActive 0 cw 9 11 sub 10 11 12 13 16 14 15 8 7 6 4 3 5 2 0 1 sav 41b3b852 41f03332
+a 11 hs 2 nb 10 12 bd 10 11 rg 2 chiral 0 stereoActive 0 cw 10 12 sub 11 12 13 16 14 15 8 7 9 6 3 4 2 5 1 0 sav c16c3d74 4209e666
+a 12 hs 1 nb 11 13 16 bd 11 12 19 rg 2 3 chiral 1 stereoActive 0 cw 11 13 16 sub 12 13 16 14 15 8 7 9 6 10 3 4 2 5 1 0 sav 3d8f5d55 40a70a3d
+a 13 hs 2 nb 12 14 bd 12 13 rg 3 chiral 0 stereoActive 0 cw 12 14 sub 13 14 15 16 8 7 9 6 10 3 4 11 2 5 1 0 sav c1e847b0 4204ae16
+a 14 hs 2 nb 13 15 bd 13 14 rg 3 chiral 0 stereoActive 0 cw 13 15 sub 14 15 16 8 12 7 9 11 6 10 3 4 2 5 1 0 sav c222147a c18ae148
+a 15 hs 2 nb 14 16 bd 14 15 rg 3 chiral 0 stereoActive 0 cw 14 16 sub 15 16 8 12 7 9 11 13 6 10 3 4 2 5 1 0 sav 407fae10 c22f9eb9
+a 16 hs 1 nb 15 8 12 bd 15 17 19 rg 3 2 chiral 1 stereoActive 0 cw 15 8 12 sub 16 8 12 7 9 11 13 6 10 3 14 4 2 5 1 0 sav 40751ec0 c062fc95
+b 0 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 1 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 2 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 3 small 1 macro 0 term 0 inter 0 stereo 0 rings 0 1
+b 4 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 5 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 6 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 7 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 8 small 1 macro 0 term 0 inter 0 stereo 0 rings 1 2
+b 9 small 1 macro 0 term 0 inter 0 stereo 0 rings 2
+b 10 small 1 macro 0 term 0 inter 0 stereo 0 rings 2
+b 11 small 1 macro 0 term 0 inter 0 stereo 0 rings 2
+b 12 small 1 macro 0 term 0 inter 0 stereo 0 rings 3
+b 13 small 1 macro 0 term 0 inter 0 stereo 0 rings 3
+b 14 small 1 macro 0 term 0 inter 0 stereo 0 rings 3
+b 15 small 1 macro 0 term 0 inter 0 stereo 0 rings 3
+b 16 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 17 small 1 macro 0 term 0 inter 0 stereo 0 rings 2
+b 18 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 19 small 1 macro 0 term 0 inter 0 stereo 0 rings 2 3
+r 0 size 6 benz 0 arom 0 mac 0 atoms 0 1 2 3 4 5 bonds 16 4 3 2 1 0 center 431db852 411fc28e
+r 1 size 6 benz 0 arom 0 mac 0 atoms 3 4 6 7 8 9 bonds 3 18 8 7 6 5 center 421945fb c224b853
+r 2 size 6 benz 0 arom 0 mac 0 atoms 8 9 10 11 12 16 bonds 17 19 11 10 9 8 center c28362fd 421297e5
+r 3 size 5 benz 0 arom 0 mac 0 atoms 12 13 14 15 16 bonds 19 15 14 13 12 center c32cd70a c1143958
+m charge 0 bbox c3677ae1 c2dc3d71 436830a4 42d32e14 center 36878788 b5a5a5a6
+$$
+MOL 5 5
+A 7 0 427f31fb a7200000
+A 6 0 419db826 4272b481
+A 6 0 c24e7511 42160000
+A 6 0 c24e7511 c2160000
+A 6 0 419db826 c272b481
+B 0 1 1
+B 1 2 2
+B 2 3 1
+B 3 4 2
+B 4 0 1
+END
+a 0 hs 1 nb 1 4 bd 0 4 rg 0 chiral 0 stereoActive 0 cw 1 4 sub 0 4 3 2 sav 42305c29 80000000
+a 1 hs 1 nb 0 2 bd 0 1 rg 0 chiral 0 stereoActive 0 cw 0 2 sub 1 2 3 4 sav 4159d70a 4227b852
+a 2 hs 1 nb 1 3 bd 1 2 rg 0 chiral 0 stereoActive 0 cw 1 3 sub 2 3 4 0 sav c20ea3d7 41cf47ae
+a 3 hs 1 nb 2 4 bd 2 3 rg 0 chiral 0 stereoActive 0 cw 2 4 sub 3 4 0 1 sav c20ea3d7 c1cf47ae
+a 4 hs 1 nb 3 0 bd 3 4 rg 0 chiral 0 stereoActive 0 cw 3 0 sub 4 0 1 2 sav 4159d70a c227b852
+b 0 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 1 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 2 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 3 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 4 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+r 0 size 5 benz 0 arom 1 mac 0 atoms 0 1 2 3 4 bonds 4 3 2 1 0 center b5cccccd 00000000
+m charge 0 bbox c24e70a4 c272b852 427f3333 4272b852 center b5cccccd 00000000
+$$
+MOL 5 5
+A 6 0 427f31fb a7200000
+A 6 0 419db826 4272b481
+A 6 0 c24e7511 42160000
+A 16 0 c24e7511 c2160000
+A 6 0 419db826 c272b481
+B 0 1 1
+B 1 2 2
+B 2 3 1
+B 3 4 1
+B 4 0 2
+END
+a 0 hs 1 nb 1 4 bd 0 4 rg 0 chiral 0 stereoActive 0 cw 1 4 sub 0 4 3 2 sav 42305c29 80000000
+a 1 hs 1 nb 0 2 bd 0 1 rg 0 chiral 0 stereoActive 0 cw 0 2 sub 1 2 3 4 sav 4159d70a 4227b852
+a 2 hs 1 nb 1 3 bd 1 2 rg 0 chiral 0 stereoActive 0 cw 1 3 sub 2 3 4 0 sav c20ea3d7 41cf47ae
+a 3 hs 0 nb 2 4 bd 2 3 rg 0 chiral 0 stereoActive 0 cw 2 4 sub 3 4 0 1 sav c20ea3d7 c1cf47ae
+a 4 hs 1 nb 3 0 bd 3 4 rg 0 chiral 0 stereoActive 0 cw 3 0 sub 4 0 1 2 sav 4159d70a c227b852
+b 0 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 1 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 2 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 3 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 4 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+r 0 size 5 benz 0 arom 1 mac 0 atoms 0 1 2 3 4 bonds 4 3 2 1 0 center b5cccccd 00000000
+m charge 0 bbox c24e70a4 c272b852 427f3333 4272b852 center b5cccccd 00000000
+$$
+MOL 5 5
+A 6 0 427f31fb a7200000
+A 6 0 419db826 4272b481
+A 6 0 c24e7511 42160000
+A 8 0 c24e7511 c2160000
+A 6 0 419db826 c272b481
+B 0 1 1
+B 1 2 2
+B 2 3 1
+B 3 4 1
+B 4 0 2
+END
+a 0 hs 1 nb 1 4 bd 0 4 rg 0 chiral 0 stereoActive 0 cw 1 4 sub 0 4 3 2 sav 42305c29 80000000
+a 1 hs 1 nb 0 2 bd 0 1 rg 0 chiral 0 stereoActive 0 cw 0 2 sub 1 2 3 4 sav 4159d70a 4227b852
+a 2 hs 1 nb 1 3 bd 1 2 rg 0 chiral 0 stereoActive 0 cw 1 3 sub 2 3 4 0 sav c20ea3d7 41cf47ae
+a 3 hs 0 nb 2 4 bd 2 3 rg 0 chiral 0 stereoActive 0 cw 2 4 sub 3 4 0 1 sav c20ea3d7 c1cf47ae
+a 4 hs 1 nb 3 0 bd 3 4 rg 0 chiral 0 stereoActive 0 cw 3 0 sub 4 0 1 2 sav 4159d70a c227b852
+b 0 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 1 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 2 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 3 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 4 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+r 0 size 5 benz 0 arom 1 mac 0 atoms 0 1 2 3 4 bonds 4 3 2 1 0 center b5cccccd 00000000
+m charge 0 bbox c24e70a4 c272b852 427f3333 4272b852 center b5cccccd 00000000
+$$
+MOL 6 6
+A 16 0 42960000 27855555
+A 16 0 42160000 4281e760
+A 16 0 c2160000 4281e760
+A 16 0 c2960000 28682051
+A 16 0 c2160000 c281e760
+A 16 0 42160000 c281e760
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 5 0 1
+END
+a 0 hs 0 nb 1 5 bd 0 5 rg 0 chiral 0 stereoActive 0 cw 1 5 sub 0 5 4 3 2 sav 42160000 80000000
+a 1 hs 0 nb 0 2 bd 0 1 rg 0 chiral 0 stereoActive 0 cw 0 2 sub 1 2 3 4 5 sav 41960000 4201e666
+a 2 hs 0 nb 1 3 bd 1 2 rg 0 chiral 0 stereoActive 0 cw 1 3 sub 2 3 4 5 0 sav c1960000 4201e666
+a 3 hs 0 nb 2 4 bd 2 3 rg 0 chiral 0 stereoActive 0 cw 2 4 sub 3 4 5 0 1 sav c2160000 80000000
+a 4 hs 0 nb 3 5 bd 3 4 rg 0 chiral 0 stereoActive 0 cw 3 5 sub 4 5 0 1 2 sav c1960000 c201e666
+a 5 hs 0 nb 4 0 bd 4 5 rg 0 chiral 0 stereoActive 0 cw 4 0 sub 5 0 1 2 3 sav 41960000 c201e666
+b 0 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 1 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 2 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 3 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 4 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 5 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+r 0 size 6 benz 0 arom 0 mac 0 atoms 0 1 2 3 4 5 bonds 5 4 3 2 1 0 center 00000000 00000000
+m charge 0 bbox c2960000 c281e666 42960000 4281e666 center 00000000 00000000
+$$
+MOL 2 1
+A 14 0 42160000 a7480000
+A 6 0 c2160000 27480000
+B 0 1 1
+END
+a 0 hs 3 nb 1 bd 0 rg chiral 0 stereoActive 0 cw 1 sub 0 sav 42960000 80000000
+a 1 hs 3 nb 0 bd 0 rg chiral 0 stereoActive 0 cw 0 sub 1 sav c2960000 80000000
+b 0 small 0 macro 0 term 1 inter 0 stereo 0 rings
+m charge 0 bbox c2160000 00000000 42160000 00000000 center 00000000 00000000
+$$
+MOL 10 10
+A 8 0 42a50000 c2960000
+A 16 0 42a50000 28200000
+A 8 0 42a50000 42960000
+A 7 0 431d8000 a7200000
+A 6 0 40f00000 a7200000
+A 6 0 c1f00000 4281e760
+A 6 0 c2d20000 4281e760
+A 6 0 c30e8000 27faeb4c
+A 6 0 c2d20000 c281e760
+A 6 0 c1f00000 c281e760
+B 0 1 2
+B 1 2 2
+B 1 3 1
+B 1 4 1
+B 4 5 2
+B 5 6 1
+B 6 7 2
+B 7 8 1
+B 8 9 2
+B 9 4 1
+END
+a 0 hs 0 nb 1 bd 0 rg chiral 0 stereoActive 1 cw 1 sub 0 sav 80000000 c2960000
+a 1 hs 0 nb 0 2 3 4 bd 0 1 2 3 rg chiral 1 stereoActive 1 cw 0 3 2 4 sub 1 2 3 4 5 9 6 8 7 sav 80000000 80000000
+a 2 hs 0 nb 1 bd 1 rg chiral 0 stereoActive 1 cw 1 sub 2 sav 80000000 42960000
+a 3 hs 2 nb 1 bd 2 rg chiral 0 stereoActive 0 cw 1 sub 3 sav 42960000 80000000
+a 4 hs 0 nb 1 5 9 bd 3 4 9 rg 0 chiral 0 stereoActive 0 cw 1 5 9 sub 4 5 9 6 8 7 sav 41c80000 80000000
+a 5 hs 1 nb 4 6 bd 4 5 rg 0 chiral 0 stereoActive 0 cw 4 6 sub 5 6 7 8 9 sav 41960000 4201e666
+a 6 hs 1 nb 5 7 bd 5 6 rg 0 chiral 0 stereoActive 0 cw 5 7 sub 6 7 8 9 4 1 0 2 3 sav c1960000 4201e666
+a 7 hs 1 nb 6 8 bd 6 7 rg 0 chiral 0 stereoActive 0 cw 6 8 sub 7 8 9 4 1 5 0 2 3 sav c2160000 80000000
+a 8 hs 1 nb 7 9 bd 7 8 rg 0 chiral 0 stereoActive 0 cw 7 9 sub 8 9 4 1 5 0 2 3 6 sav c1960000 c201e666
+a 9 hs 1 nb 8 4 bd 8 9 rg 0 chiral 0 stereoActive 0 cw 8 4 sub 9 4 1 5 0 2 3 6 7 sav 41960000 c201e666
+b 0 small 0 macro 0 term 1 inter 0 stereo 1 rings
+b 1 small 0 macro 0 term 1 inter 0 stereo 1 rings
+b 2 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 3 small 0 macro 0 term 0 inter 1 stereo 0 rings
+b 4 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 5 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 6 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 7 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 8 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 9 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+r 0 size 6 benz 1 arom 1 mac 0 atoms 4 5 6 7 8 9 bonds 9 8 7 6 5 4 center c2870000 00000000
+m charge 0 bbox c30e8000 c2960000 431d8000 42960000 center 00000000 00000000
+flip 3 42a50000 42960000 42a50000 00000000 42a50000 c2960000 431d8000 00000000 40f00000 00000000 c1f00000 4281e666 c2d20000 4281e666 c30e8000 00000000 c2d20000 c281e666 c1f00000 c281e666 wedge 1 1 1 0 0 0 0 0 0 0
+$$
+MOL 3 2
+A 6 0 c281e760 c1480000
+A 6 0 00000000 41c80000
+A 8 0 4281e760 c1480000
+B 0 1 1
+B 1 2 1
+END
+a 0 hs 3 nb 1 bd 0 rg chiral 0 stereoActive 0 cw 1 sub 0 sav c281e666 c2160000
+a 1 hs 2 nb 0 2 bd 0 1 rg chiral 0 stereoActive 0 cw 0 2 sub 1 2 sav 80000000 42160000
+a 2 hs 1 nb 1 bd 1 rg chiral 0 stereoActive 0 cw 1 sub 2 sav 4281e666 c2160000
+b 0 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 1 small 0 macro 0 term 1 inter 0 stereo 0 rings
+m charge 0 bbox c281e666 c1480000 4281e666 41c80000 center 00000000 00000000
+$$
+MOL 6 6
+A 6 0 42960000 27855555
+A 6 0 42160000 4281e760
+A 6 0 c2160000 4281e760
+A 6 0 c2960000 28682051
+A 6 0 c2160000 c281e760
+A 6 0 42160000 c281e760
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 5 0 1
+END
+a 0 hs 2 nb 1 5 bd 0 5 rg 0 chiral 0 stereoActive 0 cw 1 5 sub 0 5 4 3 2 sav 42160000 80000000
+a 1 hs 2 nb 0 2 bd 0 1 rg 0 chiral 0 stereoActive 0 cw 0 2 sub 1 2 3 4 5 sav 41960000 4201e666
+a 2 hs 2 nb 1 3 bd 1 2 rg 0 chiral 0 stereoActive 0 cw 1 3 sub 2 3 4 5 0 sav c1960000 4201e666
+a 3 hs 2 nb 2 4 bd 2 3 rg 0 chiral 0 stereoActive 0 cw 2 4 sub 3 4 5 0 1 sav c2160000 80000000
+a 4 hs 2 nb 3 5 bd 3 4 rg 0 chiral 0 stereoActive 0 cw 3 5 sub 4 5 0 1 2 sav c1960000 c201e666
+a 5 hs 2 nb 4 0 bd 4 5 rg 0 chiral 0 stereoActive 0 cw 4 0 sub 5 0 1 2 3 sav 41960000 c201e666
+b 0 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 1 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 2 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 3 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 4 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 5 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+r 0 size 6 benz 0 arom 0 mac 0 atoms 0 1 2 3 4 5 bonds 5 4 3 2 1 0 center 00000000 00000000
+m charge 0 bbox c2960000 c281e666 42960000 4281e666 center 00000000 00000000
+$$
+MOL 7 8
+A 6 0 429b40fe c2160000
+A 6 0 429b40fe 42160000
+A 6 0 40c986c0 4272b481
+A 6 0 c2821026 42160000
+A 6 0 c2821026 c2160000
+A 6 0 40c986c0 c272b481
+A 6 0 c2172510 26a41929
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 5 6 1
+B 5 0 1
+B 6 2 1
+END
+a 0 hs 2 nb 1 5 bd 0 6 rg 0 chiral 0 stereoActive 0 cw 1 5 sub 0 5 4 6 3 2 sav 420ea8f5 c1cf47ae
+a 1 hs 2 nb 0 2 bd 0 1 rg 0 chiral 0 stereoActive 0 cw 0 2 sub 1 2 3 6 4 5 sav 420ea8f5 41cf47ae
+a 2 hs 1 nb 1 3 6 bd 1 2 7 rg 0 1 chiral 1 stereoActive 0 cw 1 3 6 sub 2 3 6 4 5 0 sav 416b258f 420eb852
+a 3 hs 2 nb 2 4 bd 2 3 rg 1 chiral 0 stereoActive 0 cw 2 4 sub 3 4 5 6 0 1 sav c20ea8f6 41cf47ae
+a 4 hs 2 nb 3 5 bd 3 4 rg 1 chiral 0 stereoActive 0 cw 3 5 sub 4 5 6 0 2 1 sav c20ea8f6 c1cf47ae
+a 5 hs 1 nb 4 6 0 bd 4 5 6 rg 1 0 chiral 1 stereoActive 0 cw 4 0 6 sub 5 6 0 2 1 3 sav 416b258d c20eb852
+a 6 hs 2 nb 5 2 bd 5 7 rg 0 1 chiral 0 stereoActive 0 cw 5 2 sub 6 2 1 3 0 4 sav c2305c29 80000000
+b 0 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 1 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 2 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 3 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 4 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 5 small 1 macro 0 term 0 inter 0 stereo 0 rings 0 1
+b 6 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 7 small 1 macro 0 term 0 inter 0 stereo 0 rings 0 1
+r 0 size 5 benz 0 arom 0 mac 0 atoms 0 1 2 5 6 bonds 6 5 7 1 0 center 41d01cad 00000000
+r 1 size 5 benz 0 arom 0 mac 0 atoms 2 3 4 5 6 bonds 7 5 4 3 2 center c1f86666 00000000
+m charge 0 bbox c2820f5c c272b852 429b428f 4272b852 center 3abb36db 00000000
+$$
+MOL 12 13
+A 6 0 433b8000 365cf88b
+A 6 0 43160000 4281e760
+A 6 0 42960000 4281e760
+A 6 0 42160000 b5c27451
+A 6 0 42960000 c281e760
+A 6 0 43160000 c281e760
+A 6 0 c2160000 b5c27451
+A 6 0 c2960000 4281e760
+A 6 0 c3160000 4281e760
+A 6 0 c33b8000 b5c27451
+A 6 0 c3160000 c281e760
+A 6 0 c2960000 c281e760
+B 0 1 2
+B 1 2 1
+B 2 3 2
+B 3 4 1
+B 4 5 2
+B 3 6 1
+B 6 7 2
+B 7 8 1
+B 8 9 2
+B 9 10 1
+B 10 11 2
+B 5 0 1
+B 11 6 1
+END
+a 0 hs 1 nb 1 5 bd 0 11 rg 0 chiral 0 stereoActive 0 cw 1 5 sub 0 5 4 3 2 6 7 11 8 10 9 sav 42160000 80000000
+a 1 hs 1 nb 0 2 bd 0 1 rg 0 chiral 0 stereoActive 0 cw 0 2 sub 1 2 3 4 6 5 7 11 8 10 9 sav 41960000 4201e666
+a 2 hs 1 nb 1 3 bd 1 2 rg 0 chiral 0 stereoActive 0 cw 1 3 sub 2 3 4 6 5 7 11 0 8 10 9 sav c1960000 4201e666
+a 3 hs 0 nb 2 4 6 bd 2 3 5 rg 0 chiral 0 stereoActive 0 cw 2 6 4 sub 3 4 6 5 7 11 0 8 10 1 9 sav c1c80000 80000000
+a 4 hs 1 nb 3 5 bd 3 4 rg 0 chiral 0 stereoActive 0 cw 3 5 sub 4 5 0 1 2 sav c1960000 c201e666
+a 5 hs 1 nb 4 0 bd 4 11 rg 0 chiral 0 stereoActive 0 cw 4 0 sub 5 0 1 2 3 6 7 11 8 10 9 sav 41960000 c201e666
+a 6 hs 0 nb 3 7 11 bd 5 6 12 rg 1 chiral 0 stereoActive 0 cw 3 7 11 sub 6 7 11 8 10 9 sav 41c80000 80000000
+a 7 hs 1 nb 6 8 bd 6 7 rg 1 chiral 0 stereoActive 0 cw 6 8 sub 7 8 9 10 11 sav 41960000 4201e666
+a 8 hs 1 nb 7 9 bd 7 8 rg 1 chiral 0 stereoActive 0 cw 7 9 sub 8 9 10 11 6 3 2 4 1 5 0 sav c1960000 4201e666
+a 9 hs 1 nb 8 10 bd 8 9 rg 1 chiral 0 stereoActive 0 cw 8 10 sub 9 10 11 6 3 7 2 4 1 5 0 sav c2160000 80000000
+a 10 hs 1 nb 9 11 bd 9 10 rg 1 chiral 0 stereoActive 0 cw 9 11 sub 10 11 6 3 7 2 4 8 1 5 0 sav c1960000 c201e666
+a 11 hs 1 nb 10 6 bd 10 12 rg 1 chiral 0 stereoActive 0 cw 10 6 sub 11 6 3 7 2 4 8 1 5 9 0 sav 41960000 c201e666
+b 0 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 1 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 2 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 3 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 4 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 5 small 0 macro 0 term 0 inter 1 stereo 0 rings
+b 6 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 7 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 8 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 9 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 10 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 11 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 12 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+r 0 size 6 benz 1 arom 1 mac 0 atoms 0 1 2 3 4 5 bonds 11 4 3 2 1 0 center 42e10000 00000000
+r 1 size 6 benz 1 arom 1 mac 0 atoms 6 7 8 9 10 11 bonds 12 10 9 8 7 6 center c2e10000 00000000
+m charge 0 bbox c33b8000 c281e666 433b8000 4281e666 center 00000000 00000000
+flip 5 433b8000 00000000 43160000 c281e666 42960000 c281e666 42160000 00000000 42960000 4281e666 43160000 4281e666 c2160000 00000000 c2960000 4281e666 c3160000 4281e666 c33b8000 00000000 c3160000 c281e666 c2960000 c281e666 wedge 1 1 1 1 1 0 0 0 0 0 0 1 0
+$$
+MOL 10 11
+A 6 0 4301e760 c2160000
+A 6 0 4301e760 42160000
+A 6 0 4281e760 42960000
+A 6 0 274f2dff 42160000
+A 6 0 c281e760 42960000
+A 6 0 c301e760 42160000
+A 6 0 c301e760 c2160000
+A 6 0 c281e760 c2960000
+A 6 0 a904cdf0 c2160000
+A 6 0 4281e760 c2960000
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 5 6 1
+B 6 7 1
+B 7 8 1
+B 8 9 1
+B 9 0 1
+B 8 3 1
+END
+a 0 hs 2 nb 1 9 bd 0 9 rg 0 chiral 0 stereoActive 0 cw 1 9 sub 0 9 8 7 3 6 2 4 5 sav 4201e666 c1960000
+a 1 hs 2 nb 0 2 bd 0 1 rg 0 chiral 0 stereoActive 0 cw 0 2 sub 1 2 3 4 8 5 7 9 6 sav 4201e666 41960000
+a 2 hs 2 nb 1 3 bd 1 2 rg 0 chiral 0 stereoActive 0 cw 1 3 sub 2 3 4 8 5 7 9 6 0 sav 80000000 42160000
+a 3 hs 1 nb 2 4 8 bd 2 3 10 rg 0 1 chiral 1 stereoActive 0 cw 2 4 8 sub 3 4 8 5 7 9 6 0 1 sav 80000000 80000000
+a 4 hs 2 nb 3 5 bd 3 4 rg 1 chiral 0 stereoActive 0 cw 3 5 sub 4 5 6 7 8 9 0 1 2 sav 80000000 42160000
+a 5 hs 2 nb 4 6 bd 4 5 rg 1 chiral 0 stereoActive 0 cw 4 6 sub 5 6 7 8 9 3 0 2 1 sav c201e666 41960000
+a 6 hs 2 nb 5 7 bd 5 6 rg 1 chiral 0 stereoActive 0 cw 5 7 sub 6 7 8 9 3 0 2 4 1 sav c201e666 c1960000
+a 7 hs 2 nb 6 8 bd 6 7 rg 1 chiral 0 stereoActive 0 cw 6 8 sub 7 8 9 3 0 2 4 1 5 sav 80000000 c2160000
+a 8 hs 1 nb 7 9 3 bd 7 8 10 rg 1 0 chiral 1 stereoActive 0 cw 7 9 3 sub 8 9 3 0 2 4 1 5 6 sav 80000000 80000000
+a 9 hs 2 nb 8 0 bd 8 9 rg 0 chiral 0 stereoActive 0 cw 8 0 sub 9 0 1 2 3 4 5 6 7 sav 80000000 c2160000
+b 0 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 1 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 2 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 3 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 4 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 5 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 6 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 7 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 8 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 9 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 10 small 1 macro 0 term 0 inter 0 stereo 0 rings 0 1
+r 0 size 6 benz 0 arom 0 mac 0 atoms 0 1 2 3 8 9 bonds 9 8 10 2 1 0 center 4281e667 00000000
+r 1 size 6 benz 0 arom 0 mac 0 atoms 3 4 5 6 7 8 bonds 10 7 6 5 4 3 center c281e667 00000000
+m charge 0 bbox c301e666 c2960000 4301e666 42960000 center 00000000 00000000
+$$
+MOL 6 5
+A 6 0 c3231f3e c127c5b7
+A 6 0 c2c0b3a3 41bd5bed
+A 6 0 c2058ad9 c1889f64
+A 6 0 42058ad9 41889f64
+A 6 0 42c0b3a3 c1bd5bed
+A 6 0 43231f3e 4127c5b7
+B 0 1 1
+B 1 2 2
+B 2 3 1
+B 3 4 2
+B 4 5 1
+END
+a 0 hs 3 nb 1 bd 0 rg chiral 0 stereoActive 0 cw 1 sub 0 sav c2858a3d c208a3d7
+a 1 hs 1 nb 0 2 bd 0 1 rg chiral 0 stereoActive 1 cw 0 2 sub 1 2 3 4 5 sav 3ff3d700 4215d1ec
+a 2 hs 1 nb 1 3 bd 1 2 rg chiral 0 stereoActive 1 cw 1 3 sub 2 3 4 5 sav bff47ae0 c215d1ec
+a 3 hs 1 nb 2 4 bd 2 3 rg chiral 0 stereoActive 1 cw 2 4 sub 3 4 5 sav 3ff47ae0 4215d1ec
+a 4 hs 1 nb 3 5 bd 3 4 rg chiral 0 stereoActive 1 cw 3 5 sub 4 5 sav bff3d700 c215d1ec
+a 5 hs 3 nb 4 bd 4 rg chiral 0 stereoActive 0 cw 4 sub 5 sav 42858a3d 4208a3d7
+b 0 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 1 small 0 macro 0 term 0 inter 0 stereo 1 rings
+b 2 small 0 macro 0 term 0 inter 1 stereo 0 rings
+b 3 small 0 macro 0 term 0 inter 0 stereo 1 rings
+b 4 small 0 macro 0 term 1 inter 0 stereo 0 rings
+m charge 0 bbox c3231eb8 c1bd5c29 43231eb8 41bd5c29 center 36aaaaab 00000000
+flip 1 c2b90f5c 42c523d7 c2c0b333 41bd5c29 c2058f5c c188a3d7 42058f5c 4188a3d7 42c0b333 c1bd5c29 43231eb8 4127d70a wedge 1 0 0 0 0
+flip 2 c2cff0a4 c2fc428f c214c28f c2b7f5c3 c2058f5c c188a3d7 42058f5c 4188a3d7 42c0b333 c1bd5c29 43231eb8 4127d70a wedge 1 1 0 0 0
+flip 3 c3231eb8 c127d70a c2c0b333 41bd5c29 c2058f5c c188a3d7 42058f5c 4188a3d7 42c0b333 c1bd5c29 42b90f5c c2c523d7 wedge 0 0 0 0 1
+$$
+MOL 9 9
+A 6 0 42db490b 26b1c71c
+A 6 0 42a7fb79 428cf432
+A 6 0 41985062 42d7f432
+A 6 0 c25b490b 42bde81b
+A 6 0 c2ce0f91 42160000
+A 6 0 c2ce0f91 c2160000
+A 6 0 c25b490b c2bde81b
+A 6 0 41985062 c2d7f432
+A 6 0 42a7fb79 c28cf432
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 5 6 1
+B 6 7 1
+B 7 8 1
+B 8 0 1
+END
+a 0 hs 2 nb 1 8 bd 0 8 rg 0 chiral 0 stereoActive 0 cw 1 8 sub 0 8 7 6 5 4 3 2 sav 41cd3334 80000000
+a 1 hs 2 nb 0 2 bd 0 1 rg 0 chiral 0 stereoActive 0 cw 0 2 sub 1 2 3 4 5 6 7 8 sav 419d3332 4183eb86
+a 2 hs 2 nb 1 3 bd 1 2 rg 0 chiral 0 stereoActive 0 cw 1 3 sub 2 3 4 5 6 7 8 0 sav 408e8f60 41ca1eba
+a 3 hs 2 nb 2 4 bd 2 3 rg 0 chiral 0 stereoActive 0 cw 2 4 sub 3 4 5 6 7 8 0 1 sav c14d3334 41b1ae12
+a 4 hs 2 nb 3 5 bd 3 4 rg 0 chiral 0 stereoActive 0 cw 3 5 sub 4 5 6 7 8 0 1 2 sav c1c0d70a 410c6668
+a 5 hs 2 nb 4 6 bd 4 5 rg 0 chiral 0 stereoActive 0 cw 4 6 sub 5 6 7 8 0 1 2 3 sav c1c0d70a c10c6668
+a 6 hs 2 nb 5 7 bd 5 6 rg 0 chiral 0 stereoActive 0 cw 5 7 sub 6 7 8 0 1 2 3 4 sav c14d3334 c1b1ae12
+a 7 hs 2 nb 6 8 bd 6 7 rg 0 chiral 0 stereoActive 0 cw 6 8 sub 7 8 0 1 2 3 4 5 sav 408e8f60 c1ca1eba
+a 8 hs 2 nb 7 0 bd 7 8 rg 0 chiral 0 stereoActive 0 cw 7 0 sub 8 0 1 2 3 4 5 6 sav 419d3332 c183eb86
+b 0 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 1 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 2 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 3 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 4 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 5 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 6 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 7 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 8 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+r 0 size 9 benz 0 arom 0 mac 1 atoms 0 1 2 3 4 5 6 7 8 bonds 8 7 6 5 4 3 2 1 0 center 35638e39 00000000
+m charge 0 bbox c2ce0f5c c2d7f5c3 42db47ae 42d7f5c3 center 35638e39 00000000
+$$
+MOL 7 8
+A 6 0 429b40fe c2160000
+A 6 0 429b40fe 42160000
+A 6 0 40c986c0 4272b481
+A 6 0 c2172510 28c8c8e6
+A 6 0 40c986c0 c272b481
+A 6 0 c2821026 c2160000
+A 6 0 c2821026 42160000
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 5 6 1
+B 4 0 1
+B 6 2 1
+END
+a 0 hs 2 nb 1 4 bd 0 6 rg 0 chiral 0 stereoActive 0 cw 1 4 sub 0 4 3 5 2 6 sav 420ea8f5 c1cf47ae
+a 1 hs 2 nb 0 2 bd 0 1 rg 0 chiral 0 stereoActive 0 cw 0 2 sub 1 2 3 6 4 5 sav 420ea8f5 41cf47ae
+a 2 hs 1 nb 1 3 6 bd 1 2 7 rg 0 1 chiral 1 stereoActive 0 cw 1 6 3 sub 2 3 6 4 5 0 sav 416b258f 420eb852
+a 3 hs 2 nb 2 4 bd 2 3 rg 0 1 chiral 0 stereoActive 0 cw 2 4 sub 3 4 5 0 6 1 sav c2305c29 80000000
+a 4 hs 1 nb 3 5 0 bd 3 4 6 rg 0 1 chiral 1 stereoActive 0 cw 3 5 0 sub 4 5 0 6 1 2 sav 416b258d c20eb852
+a 5 hs 2 nb 4 6 bd 4 5 rg 1 chiral 0 stereoActive 0 cw 4 6 sub 5 6 2 1 3 0 sav c20ea8f6 c1cf47ae
+a 6 hs 2 nb 5 2 bd 5 7 rg 1 chiral 0 stereoActive 0 cw 5 2 sub 6 2 1 3 0 4 sav c20ea8f6 41cf47ae
+b 0 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 1 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 2 small 1 macro 0 term 0 inter 0 stereo 0 rings 0 1
+b 3 small 1 macro 0 term 0 inter 0 stereo 0 rings 0 1
+b 4 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 5 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 6 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 7 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+r 0 size 5 benz 0 arom 0 mac 0 atoms 0 1 2 3 4 bonds 6 3 2 1 0 center 41d01cab 00000000
+r 1 size 5 benz 0 arom 0 mac 0 atoms 2 3 4 5 6 bonds 7 5 4 3 2 center c1f86666 00000000
+m charge 0 bbox c2820f5c c272b852 429b428f 4272b852 center 3abb2492 00000000
+$$
+MOL 7 7
+A 6 0 422d3480 a7c80000
+A 6 0 c1ad3480 42160000
+A 6 0 c1ad3480 c2160000
+A 6 0 43475e07 a7480000
+A 6 0 43125593 425421cd
+A 6 0 42ba9a40 2785fec3
+A 6 0 43125593 c25421cd
+B 0 1 1
+B 1 2 1
+B 3 4 1
+B 4 5 1
+B 5 6 1
+B 2 0 1
+B 6 3 1
+END
+a 0 hs 2 nb 1 2 bd 0 5 rg 0 chiral 0 stereoActive 0 cw 1 2 sub 0 2 sav 4281e666 80000000
+a 1 hs 2 nb 0 2 bd 0 1 rg 0 chiral 0 stereoActive 0 cw 0 2 sub 1 2 sav c201e666 42610000
+a 2 hs 2 nb 1 0 bd 1 5 rg 0 chiral 0 stereoActive 0 cw 1 0 sub 2 0 sav c201e666 c2610000
+a 3 hs 2 nb 4 6 bd 2 6 rg 1 chiral 0 stereoActive 0 cw 4 6 sub 3 6 5 sav 425428f4 80000000
+a 4 hs 2 nb 3 5 bd 2 3 rg 1 chiral 0 stereoActive 0 cw 3 5 sub 4 5 6 sav bba3c000 42541eb8
+a 5 hs 2 nb 4 6 bd 3 4 rg 1 chiral 0 stereoActive 0 cw 4 6 sub 5 6 3 sav c2541eb8 80000000
+a 6 hs 2 nb 5 3 bd 4 6 rg 1 chiral 0 stereoActive 0 cw 5 3 sub 6 3 4 sav bba3c000 c2541eb8
+b 0 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 1 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 2 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 3 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 4 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 5 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 6 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+r 0 size 3 benz 0 arom 0 mac 0 atoms 0 1 2 bonds 5 1 0 center 00000000 00000000
+r 1 size 4 benz 0 arom 0 mac 0 atoms 3 4 5 6 bonds 6 4 3 2 center 4312551f 00000000
+m charge 0 bbox c1ad3333 c2541eb8 43475eb8 42541eb8 center 42a73cb6 00000000
+$$
+MOL 7 7
+A 29 0 41ed2b1b a6e49249
+A 7 0 42aac38a 4248bd3b
+A 7 0 42aac38a c248bd3b
+A 8 0 c167016c 4272b481
+A 6 0 c2ab88bf 42160000
+A 6 0 c2ab88bf c2160000
+A 8 0 c167016c c272b481
+B 0 1 1
+B 0 2 1
+B 0 3 1
+B 3 4 1
+B 4 5 1
+B 5 6 1
+B 6 0 1
+END
+a 0 hs 0 nb 1 2 3 6 bd 0 1 2 6 rg 0 chiral 1 stereoActive 0 cw 1 3 6 2 sub 0 2 3 6 4 5 sav 41c1020d 80000000
+a 1 hs 2 nb 0 bd 0 rg chiral 0 stereoActive 0 cw 0 sub 1 sav 425eeb84 4248b852
+a 2 hs 2 nb 0 bd 1 rg chiral 0 stereoActive 0 cw 0 sub 2 sav 425eeb84 c248b852
+a 3 hs 0 nb 0 4 bd 2 3 rg 0 chiral 0 stereoActive 0 cw 0 4 sub 3 4 5 6 sav 4159eb82 4227b852
+a 4 hs 2 nb 3 5 bd 3 4 rg 0 chiral 0 stereoActive 0 cw 3 5 sub 4 5 6 0 1 2 sav c20ea8f5 41cf47ae
+a 5 hs 2 nb 4 6 bd 4 5 rg 0 chiral 0 stereoActive 0 cw 4 6 sub 5 6 0 1 2 3 sav c20ea8f5 c1cf47ae
+a 6 hs 0 nb 5 0 bd 5 6 rg 0 chiral 0 stereoActive 0 cw 5 0 sub 6 0 1 2 3 4 sav 4159eb82 c227b852
+b 0 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 1 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 2 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 3 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 4 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 5 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 6 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+r 0 size 5 benz 0 arom 0 mac 0 atoms 0 3 4 5 6 bonds 6 5 4 3 2 center c2089db2 00000000
+m charge 0 bbox c2ab8a3d c272b852 42aac28f 4272b852 center babb16db 00000000
+$$
+MOL 8 9
+A 6 0 42b510e7 c25421cd
+A 6 0 430f90e7 a7a78af8
+A 6 0 42b510e7 425421cd
+A 6 0 42160000 27960000
+A 6 0 c2160000 a6c80000
+A 6 0 c2b510e7 425421cd
+A 6 0 c30f90e7 27b7fec3
+A 6 0 c2b510e7 c25421cd
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 5 6 1
+B 6 7 1
+B 3 0 1
+B 7 4 1
+END
+a 0 hs 2 nb 1 3 bd 0 7 rg 0 chiral 0 stereoActive 0 cw 1 3 sub 0 3 2 4 5 7 6 sav bba40000 c2541eb8
+a 1 hs 2 nb 0 2 bd 0 1 rg 0 chiral 0 stereoActive 0 cw 0 2 sub 1 2 3 4 5 7 6 sav 425428f8 80000000
+a 2 hs 2 nb 1 3 bd 1 2 rg 0 chiral 0 stereoActive 0 cw 1 3 sub 2 3 4 0 5 7 6 sav bba40000 42541eb8
+a 3 hs 1 nb 2 4 0 bd 2 3 7 rg 0 chiral 1 stereoActive 0 cw 2 4 0 sub 3 4 0 5 7 1 6 sav c21b37c0 80000000
+a 4 hs 1 nb 3 5 7 bd 3 4 8 rg 1 chiral 1 stereoActive 0 cw 3 5 7 sub 4 5 7 6 sav 421b37c0 80000000
+a 5 hs 2 nb 4 6 bd 4 5 rg 1 chiral 0 stereoActive 0 cw 4 6 sub 5 6 7 sav 3ba40000 42541eb8
+a 6 hs 2 nb 5 7 bd 5 6 rg 1 chiral 0 stereoActive 0 cw 5 7 sub 6 7 4 3 2 0 1 sav c25428f8 80000000
+a 7 hs 2 nb 6 4 bd 6 8 rg 1 chiral 0 stereoActive 0 cw 6 4 sub 7 4 3 5 2 0 1 sav 3ba40000 c2541eb8
+b 0 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 1 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 2 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 3 small 0 macro 0 term 0 inter 1 stereo 0 rings
+b 4 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 5 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 6 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 7 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 8 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+r 0 size 4 benz 0 arom 0 mac 0 atoms 0 1 2 3 bonds 7 2 1 0 center 42b510a4 00000000
+r 1 size 4 benz 0 arom 0 mac 0 atoms 4 5 6 7 bonds 8 6 5 4 center c2b510a4 00000000
+m charge 0 bbox c30f91ec c2541eb8 430f91ec 42541eb8 center 00000000 00000000
+flip 3 42b50f5c 42541eb8 430f91ec 00000000 42b50f5c c2541eb8 42160000 00000000 c2160000 00000000 c2b50f5c 42541eb8 c30f91ec 00000000 c2b50f5c c2541eb8 wedge 1 1 1 0 0 0 0 1 0
+$$
+MOL 5 6
+A 6 0 4281e760 c2160000
+A 6 0 4281e760 42160000
+A 6 0 a7c80000 a6a00000
+A 6 0 c281e760 42160000
+A 6 0 c281e760 c2160000
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 2 0 1
+B 4 2 1
+END
+a 0 hs 2 nb 1 2 bd 0 4 rg 0 chiral 0 stereoActive 0 cw 1 2 sub 0 2 3 4 sav 4201e666 c2610000
+a 1 hs 2 nb 0 2 bd 0 1 rg 0 chiral 0 stereoActive 0 cw 0 2 sub 1 2 3 4 sav 4201e666 42610000
+a 2 hs 0 nb 1 3 0 4 bd 1 2 4 5 rg 0 1 chiral 1 stereoActive 0 cw 1 3 4 0 sub 2 3 0 4 sav 80000000 80000000
+a 3 hs 2 nb 2 4 bd 2 3 rg 1 chiral 0 stereoActive 0 cw 2 4 sub 3 4 sav c201e666 42610000
+a 4 hs 2 nb 3 2 bd 3 5 rg 1 chiral 0 stereoActive 0 cw 3 2 sub 4 2 1 0 sav c201e666 c2610000
+b 0 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 1 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 2 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 3 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 4 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 5 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+r 0 size 3 benz 0 arom 0 mac 0 atoms 0 1 2 bonds 4 1 0 center 422d3333 00000000
+r 1 size 3 benz 0 arom 0 mac 0 atoms 2 3 4 bonds 5 3 2 center c22d3333 00000000
+m charge 0 bbox c281e666 c2160000 4281e666 42160000 center 00000000 00000000
+$$
+MOL 6 5
+A 6 0 42960000 4281e760
+A 6 0 42160000 2881e760
+A 7 0 42960000 c281e760
+A 6 0 c2160000 a7db9d81
+A 8 0 c2960000 4281e760
+A 8 0 c2960000 c281e760
+B 0 1 1
+B 1 2 1
+B 1 3 1
+B 3 4 2
+B 3 5 1
+END
+a 0 hs 3 nb 1 bd 0 rg chiral 0 stereoActive 0 cw 1 sub 0 sav 42160000 4281e666
+a 1 hs 1 nb 0 2 3 bd 0 1 2 rg chiral 1 stereoActive 0 cw 0 3 2 sub 1 2 3 4 5 sav 80000000 80000000
+a 2 hs 2 nb 1 bd 1 rg chiral 0 stereoActive 0 cw 1 sub 2 sav 42160000 c281e666
+a 3 hs 0 nb 1 4 5 bd 2 3 4 rg chiral 0 stereoActive 1 cw 1 4 5 sub 3 4 5 sav 80000000 80000000
+a 4 hs 0 nb 3 bd 3 rg chiral 0 stereoActive 1 cw 3 sub 4 sav c2160000 4281e666
+a 5 hs 1 nb 3 bd 4 rg chiral 0 stereoActive 0 cw 3 sub 5 sav c2160000 c281e666
+b 0 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 1 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 2 small 0 macro 0 term 0 inter 1 stereo 0 rings
+b 3 small 0 macro 0 term 1 inter 0 stereo 1 rings
+b 4 small 0 macro 0 term 1 inter 0 stereo 0 rings
+m charge 0 bbox c2960000 c281e666 42960000 4281e666 center 00000000 00000000
+flip 2 42960000 c281e666 42160000 00000000 42960000 4281e666 c2160000 00000000 c2960000 4281e666 c2960000 c281e666 wedge 1 1 0 0 0
+$$
+MOL 4 3
+A 6 0 c2c5f618 c0da6635
+A 6 0 c1efc05f 41b454b8
+A 6 0 41efc05f c1b454b8
+A 6 0 42c5f618 40da6635
+B 0 1 1
+B 1 2 2
+B 2 3 1
+END
+a 0 hs 3 nb 1 bd 0 rg chiral 0 stereoActive 0 cw 1 sub 0 sav c28a051f c1eae148
+a 1 hs 1 nb 0 2 bd 0 1 rg chiral 0 stereoActive 1 cw 0 2 sub 1 2 3 sav 40911ebc 4214e148
+a 2 hs 1 nb 1 3 bd 1 2 rg chiral 0 stereoActive 1 cw 1 3 sub 2 3 sav c0911ebc c214e148
+a 3 hs 3 nb 2 bd 2 rg chiral 0 stereoActive 0 cw 2 sub 3 sav 428a051f 41eae148
+b 0 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 1 small 0 macro 0 term 0 inter 0 stereo 1 rings
+b 2 small 0 macro 0 term 1 inter 0 stereo 0 rings
+m charge 0 bbox c2c5f5c3 c1b451ec 42c5f5c3 41b451ec center 36000000 34000000
+flip 1 c1a747ae 42c1fae1 c1efc28f 41b451ec 41efc28f c1b451ec 42c5f5c3 40da3d71 wedge 1 0 0
+$$
+MOL 6 5
+A 9 0 c3040e69 c1e830ff
+A 6 0 c2b9bb97 420bb0b2
+A 6 0 c18f2326 4203d34c
+A 6 0 418f2326 c203d34c
+A 6 0 42b9bb97 c20bb0b2
+A 17 0 43040e69 41e830ff
+B 0 1 1
+B 1 2 2
+B 2 3 1
+B 3 4 2
+B 4 5 1
+END
+a 0 hs 0 nb 1 bd 0 rg chiral 0 stereoActive 0 cw 1 sub 0 sav c21cc28e c27fc28f
+a 1 hs 1 nb 0 2 bd 0 1 rg chiral 0 stereoActive 1 cw 0 2 sub 1 2 3 4 5 sav c18f28f8 4203cccc
+a 2 hs 1 nb 1 3 bd 1 2 rg chiral 0 stereoActive 1 cw 1 3 sub 2 3 4 5 sav 419cccce 41ffd70a
+a 3 hs 1 nb 2 4 bd 2 3 rg chiral 0 stereoActive 1 cw 2 4 sub 3 4 5 sav c19cccce c1ffd70a
+a 4 hs 1 nb 3 5 bd 3 4 rg chiral 0 stereoActive 1 cw 3 5 sub 4 5 sav 418f28f8 c203cccc
+a 5 hs 0 nb 4 bd 4 rg chiral 0 stereoActive 0 cw 4 sub 5 sav 421cc28e 427fc28f
+b 0 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 1 small 0 macro 0 term 0 inter 0 stereo 1 rings
+b 2 small 0 macro 0 term 0 inter 1 stereo 0 rings
+b 3 small 0 macro 0 term 0 inter 0 stereo 1 rings
+b 4 small 0 macro 0 term 1 inter 0 stereo 0 rings
+m charge 0 bbox c3040f5c c20bae14 43040f5c 420bae14 center 00000000 00000000
+flip 1 c300ab85 42c9a3d7 c2b9bd71 420bae14 c18f1eb8 4203d70a 418f1eb8 c203d70a 42b9bd71 c20bae14 43040f5c 41e828f6 wedge 1 0 0 0 0
+flip 2 42c0947b 42bdd70a 41aa8f5c 42c1cccd c18f1eb8 4203d70a 418f1eb8 c203d70a 42b9bd71 c20bae14 43040f5c 41e828f6 wedge 1 1 0 0 0
+flip 3 c3040f5c c1e828f6 c2b9bd71 420bae14 c18f1eb8 4203d70a 418f1eb8 c203d70a 42b9bd71 c20bae14 4300ab85 c2c9a3d7 wedge 0 0 0 0 1
+$$
+MOL 8 8
+A 6 0 43160000 28160000
+A 6 0 42960000 a7480000
+A 6 0 42160000 4281e760
+A 6 0 c2160000 4281e760
+A 6 0 c2960000 27e6eb4c
+A 6 0 c3160000 28af0000
+A 6 0 c2160000 c281e760
+A 6 0 42160000 c281e760
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 4 6 1
+B 6 7 1
+B 7 1 1
+END
+a 0 hs 3 nb 1 bd 0 rg chiral 0 stereoActive 0 cw 1 sub 0 sav 42960000 80000000
+a 1 hs 1 nb 0 2 7 bd 0 1 7 rg 0 chiral 1 stereoActive 0 cw 0 2 7 sub 1 2 7 3 6 4 5 sav 41c80000 80000000
+a 2 hs 2 nb 1 3 bd 1 2 rg 0 chiral 0 stereoActive 0 cw 1 3 sub 2 3 4 5 6 7 sav 41960000 4201e666
+a 3 hs 2 nb 2 4 bd 2 3 rg 0 chiral 0 stereoActive 0 cw 2 4 sub 3 4 5 6 7 1 0 sav c1960000 4201e666
+a 4 hs 1 nb 3 5 6 bd 3 4 5 rg 0 chiral 1 stereoActive 0 cw 3 5 6 sub 4 5 6 7 1 0 2 sav c1c80000 80000000
+a 5 hs 3 nb 4 bd 4 rg chiral 0 stereoActive 0 cw 4 sub 5 sav c2960000 80000000
+a 6 hs 2 nb 4 7 bd 5 6 rg 0 chiral 0 stereoActive 0 cw 4 7 sub 6 7 1 0 2 3 sav c1960000 c201e666
+a 7 hs 2 nb 6 1 bd 6 7 rg 0 chiral 0 stereoActive 0 cw 6 1 sub 7 1 0 2 3 4 5 sav 41960000 c201e666
+b 0 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 1 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 2 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 3 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 4 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 5 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 6 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 7 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+r 0 size 6 benz 0 arom 0 mac 0 atoms 1 2 3 4 6 7 bonds 7 6 5 3 2 1 center 00000000 00000000
+m charge 0 bbox c3160000 c281e666 43160000 4281e666 center 00000000 00000000
+$$
+MOL 9 8
+A 6 0 c31e83ff 4264ee41
+A 6 0 c2c9eef7 41123407
+A 6 0 c2e3b000 c2817f45
+A 6 0 c1f4539a 420bb74f
+A 6 0 41d81083 c152a7c0
+A 7 0 416218bd c2ae1abe
+A 6 0 42c2de31 414a0175
+A 8 0 431afb9c c20de0e2
+A 8 0 42dc9f3a 42ad05f5
+B 0 1 1
+B 1 2 1
+B 1 3 1
+B 3 4 1
+B 4 5 1
+B 4 6 1
+B 6 7 1
+B 6 8 2
+END
+a 0 hs 3 nb 1 bd 0 rg chiral 0 stereoActive 0 cw 1 sub 0 sav c2663334 42405c29
+a 1 hs 1 nb 0 2 3 bd 0 1 2 rg chiral 1 stereoActive 0 cw 0 2 3 sub 1 2 3 4 5 6 7 8 sav bb5a8000 3b5a6aab
+a 2 hs 3 nb 1 bd 1 rg chiral 0 stereoActive 0 cw 1 sub 2 sav c14deb80 c293c7ae
+a 3 hs 2 nb 1 4 bd 2 3 rg chiral 0 stereoActive 0 cw 1 4 sub 3 4 5 6 7 8 sav 40ce1478 4213c7ae
+a 4 hs 1 nb 3 5 6 bd 3 4 5 rg chiral 1 stereoActive 0 cw 3 5 6 sub 4 5 6 7 8 sav 3b5a8000 bbda6000
+a 5 hs 2 nb 4 bd 4 rg chiral 0 stereoActive 0 cw 4 sub 5 sav c14e147b c293c290
+a 6 hs 0 nb 4 7 8 bd 5 6 7 rg chiral 0 stereoActive 1 cw 4 7 8 sub 6 7 8 sav bb5a5555 3bda6aab
+a 7 hs 1 nb 6 bd 6 rg chiral 0 stereoActive 0 cw 6 sub 7 sav 42663332 c2406667
+a 8 hs 0 nb 6 bd 7 rg chiral 0 stereoActive 1 cw 6 sub 8 sav 414e1478 4293c290
+b 0 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 1 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 2 small 0 macro 0 term 0 inter 1 stereo 0 rings
+b 3 small 0 macro 0 term 0 inter 1 stereo 0 rings
+b 4 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 5 small 0 macro 0 term 0 inter 1 stereo 0 rings
+b 6 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 7 small 0 macro 0 term 1 inter 0 stereo 1 rings
+m charge 0 bbox c31e851f c2ae199a 431afae1 42ad051f center ba918e39 35638e39
+flip 2 c2e3b852 c2817ae1 c2c9f0a4 41123d71 c31e828f 42650000 c1f451ec 420bb852 41d8147b c152b852 4162147b c2ae199a 42c2dc29 414a147b 431afae1 c20de148 42dc9eb8 42ad051f wedge 1 1 0 0 0 0 0 0
+flip 3 c2966666 431ceb85 c18d47ae 42d9a3d7 4253147b 4306999a c1f451ec 420bb852 41d8147b c152b852 4162147b c2ae199a 42c2dc29 414a147b 431afae1 c20de148 42dc9eb8 42ad051f wedge 1 1 1 0 0 0 0 0
+flip 5 c31e851f 4264eb85 c2c9f0a4 41123d71 c2e3ae14 c2818000 c1f451ec 420bb852 41d8147b c152b852 4162147b c2ae199a 42c2dc29 414a147b 42dc8f5c 42ad0a3d 431afd71 c20dc28f wedge 0 0 0 0 0 0 1 1
+$$
+MOL 9 9
+A 6 0 c2160000 c2c2a8ff
+A 6 0 42160000 c2c2a8ff
+A 6 0 42bde81b c2447be7
+A 6 0 42d7f432 41c5eaab
+A 6 0 428cf432 42b3620b
+A 6 0 a9871942 42801478
+A 6 0 c28cf432 42b3620b
+A 6 0 c2d7f432 41c5eaab
+A 6 0 c2bde81b c2447be7
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 5 6 2
+B 6 7 1
+B 7 8 1
+B 8 0 1
+END
+a 0 hs 2 nb 1 8 bd 0 8 rg 0 chiral 0 stereoActive 0 cw 1 8 sub 0 8 7 6 5 4 3 2 sav c10c6668 c1c0d70b
+a 1 hs 2 nb 0 2 bd 0 1 rg 0 chiral 0 stereoActive 0 cw 0 2 sub 1 2 3 4 5 6 7 8 sav 410c6668 c1c0d70b
+a 2 hs 2 nb 1 3 bd 1 2 rg 0 chiral 0 stereoActive 0 cw 1 3 sub 2 3 4 5 6 7 8 0 sav 41b1ae12 c14d3332
+a 3 hs 2 nb 2 4 bd 2 3 rg 0 chiral 0 stereoActive 0 cw 2 4 sub 3 4 5 6 7 8 0 1 sav 41ca1eba 408e8f58
+a 4 hs 2 nb 3 5 bd 3 4 rg 0 chiral 0 stereoActive 0 cw 3 5 sub 4 5 6 7 8 0 1 2 sav 4183eb86 42353334
+a 5 hs 1 nb 4 6 bd 4 5 rg 0 chiral 0 stereoActive 1 cw 4 6 sub 5 6 7 8 0 1 2 3 sav 80000000 c1cd3334
+a 6 hs 1 nb 5 7 bd 5 6 rg 0 chiral 0 stereoActive 1 cw 5 7 sub 6 7 8 0 1 2 3 4 sav c183eb86 42353334
+a 7 hs 2 nb 6 8 bd 6 7 rg 0 chiral 0 stereoActive 0 cw 6 8 sub 7 8 0 1 2 3 4 5 sav c1ca1eba 408e8f58
+a 8 hs 2 nb 7 0 bd 7 8 rg 0 chiral 0 stereoActive 0 cw 7 0 sub 8 0 1 2 3 4 5 6 sav c1b1ae12 c14d3332
+b 0 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 1 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 2 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 3 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 4 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 5 small 0 macro 1 term 0 inter 0 stereo 1 rings 0
+b 6 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 7 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 8 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+r 0 size 9 benz 0 arom 0 mac 1 atoms 0 1 2 3 4 5 6 7 8 bonds 8 7 6 5 4 3 2 1 0 center b5638e39 35aaaaab
+m charge 0 bbox c2d7f5c3 c2c2a8f6 42d7f5c3 42b36148 center b5638e39 35aaaaab
+$$
+MOL 12 12
+A 6 0 4310e38d a7055555
+A 6 0 42faf474 4290e38d
+A 6 0 4290e38d 42faf474
+A 6 0 28e5e92c 4310e38d
+A 6 0 c290e38d 42faf474
+A 6 0 c2faf474 4290e38d
+A 6 0 c310e38d 288f27ae
+A 6 0 c2faf474 c290e38d
+A 6 0 c290e38d c2faf474
+A 6 0 a833770b c310e38d
+A 6 0 4290e38d c2faf474
+A 6 0 42faf474 c290e38d
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 5 6 1
+B 6 7 1
+B 7 8 1
+B 8 9 2
+B 9 10 1
+B 10 11 1
+B 11 0 1
+END
+a 0 hs 2 nb 1 11 bd 0 11 rg 0 chiral 0 stereoActive 0 cw 1 11 sub 0 11 10 9 8 7 6 5 4 3 2 sav 419b47ac 80000000
+a 1 hs 2 nb 0 2 bd 0 1 rg 0 chiral 0 stereoActive 0 cw 0 2 sub 1 2 3 4 5 6 7 8 9 10 11 sav 41868520 411b3334
+a 2 hs 2 nb 1 3 bd 1 2 rg 0 chiral 0 stereoActive 0 cw 1 3 sub 2 3 4 5 6 7 8 9 10 11 0 sav 411b3334 41868520
+a 3 hs 2 nb 2 4 bd 2 3 rg 0 chiral 0 stereoActive 0 cw 2 4 sub 3 4 5 6 7 8 9 10 11 0 1 sav 80000000 419b47ac
+a 4 hs 2 nb 3 5 bd 3 4 rg 0 chiral 0 stereoActive 0 cw 3 5 sub 4 5 6 7 8 9 10 11 0 1 2 sav c11b3334 41868520
+a 5 hs 2 nb 4 6 bd 4 5 rg 0 chiral 0 stereoActive 0 cw 4 6 sub 5 6 7 8 9 10 11 0 1 2 3 sav c1868520 411b3334
+a 6 hs 2 nb 5 7 bd 5 6 rg 0 chiral 0 stereoActive 0 cw 5 7 sub 6 7 8 9 10 11 0 1 2 3 4 sav c19b47ac 80000000
+a 7 hs 2 nb 6 8 bd 6 7 rg 0 chiral 0 stereoActive 0 cw 6 8 sub 7 8 9 10 11 0 1 2 3 4 5 sav c1868520 c11b3334
+a 8 hs 1 nb 7 9 bd 7 8 rg 0 chiral 0 stereoActive 1 cw 7 9 sub 8 9 10 11 0 1 2 3 4 5 6 sav c11b3334 c1868520
+a 9 hs 1 nb 8 10 bd 8 9 rg 0 chiral 0 stereoActive 1 cw 8 10 sub 9 10 11 0 1 2 3 4 5 6 7 sav 80000000 c19b47ac
+a 10 hs 2 nb 9 11 bd 9 10 rg 0 chiral 0 stereoActive 0 cw 9 11 sub 10 11 0 1 2 3 4 5 6 7 8 sav 411b3334 c1868520
+a 11 hs 2 nb 10 0 bd 10 11 rg 0 chiral 0 stereoActive 0 cw 10 0 sub 11 0 1 2 3 4 5 6 7 8 9 sav 41868520 c11b3334
+b 0 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 1 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 2 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 3 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 4 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 5 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 6 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 7 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 8 small 0 macro 1 term 0 inter 0 stereo 1 rings 0
+b 9 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 10 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 11 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+r 0 size 12 benz 0 arom 0 mac 1 atoms 0 1 2 3 4 5 6 7 8 9 10 11 bonds 11 10 9 8 7 6 5 4 3 2 1 0 center b52aaaab b6555555
+m charge 0 bbox c310e3d7 c310e3d7 4310e3d7 4310e3d7 center b52aaaab b6555555
+$$
+MOL 6 6
+A 6 0 c318e8d2 bea7a4c1
+A 6 0 c2a20cde 41a8857d
+A 6 0 c1d4738e c1f3eff5
+A 6 0 42354fc5 c11197c9
+A 6 0 42ec8e43 c1d41f15
+A 6 0 42c1c53f 42357a02
+B 0 1 1
+B 1 2 2
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 5 3 1
+END
+a 0 hs 3 nb 1 bd 0 rg chiral 0 stereoActive 0 cw 1 sub 0 sav c28fc290 c1ab3333
+a 1 hs 1 nb 0 2 bd 0 1 rg chiral 0 stereoActive 1 cw 0 2 sub 1 2 3 4 5 sav 410b47b0 4211eb85
+a 2 hs 1 nb 1 3 bd 1 2 rg chiral 0 stereoActive 1 cw 1 3 sub 2 3 4 5 sav c10b5c28 c211e666
+a 3 hs 1 nb 2 4 5 bd 2 3 5 rg 0 chiral 1 stereoActive 0 cw 2 4 5 sub 3 4 5 sav c23d6665 c16170a4
+a 4 hs 2 nb 3 5 bd 3 4 rg 0 chiral 0 stereoActive 0 cw 3 5 sub 4 5 sav 423cae14 c2329eb8
+a 5 hs 2 nb 4 3 bd 4 5 rg 0 chiral 0 stereoActive 0 cw 4 3 sub 5 3 2 1 0 sav 41715c28 427cb852
+b 0 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 1 small 0 macro 0 term 0 inter 0 stereo 1 rings
+b 2 small 0 macro 0 term 0 inter 1 stereo 0 rings
+b 3 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 4 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 5 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+r 0 size 3 benz 0 arom 0 mac 0 atoms 3 4 5 bonds 5 4 3 center 42adaaab 404ffffb
+m charge 0 bbox c318e8f6 c1f3eb85 42ec8f5c 42357ae1 center 00000000 b52aaaab
+flip 1 c27e6666 42bc0a3d c2a20f5c 41a88f5c c1d47ae1 c1f3eb85 423551ec c111999a 42ec8f5c c1d428f6 42c1c7ae 42357ae1 wedge 1 0 0 0 0 0
+flip 2 c2e7bd71 c2f9a3d7 c22feb85 c2cee148 c1d47ae1 c1f3eb85 423551ec c111999a 42ec8f5c c1d428f6 42c1c7ae 42357ae1 wedge 1 1 0 0 0 0
+$$
+MOL 20 21
+A 7 0 c30fd78e c318197f
+A 6 0 c33df8d7 c2b9ed8f
+A 6 0 c3842000 c2ceb121
+A 6 0 c321d2f9 c1bb923b
+A 8 0 c34ff442 420ec1c0
+A 7 0 c2af17a1 c15107e8
+A 6 0 c26d97c8 4261d007
+A 6 0 c2d30e77 42e72d72
+A 8 0 c29ac2ba 43391b39
+A 8 0 c333ce64 42d269e1
+A 6 0 416e1361 4285ab95
+A 6 0 427409fe 40f66265
+A 6 0 42212161 c280c24f
+A 7 0 42ccdb88 c2d4bb51
+A 6 0 4321907b c270f17c
+A 6 0 436b6a45 c292a159
+A 6 0 438dd571 c17e5ee9
+A 6 0 438108da 425a6474
+A 6 0 433837ea 42875ad5
+A 6 0 4307f74d 41242acb
+B 0 1 1
+B 1 2 1
+B 1 3 1
+B 3 4 2
+B 3 5 1
+B 5 6 1
+B 6 7 1
+B 7 8 2
+B 7 9 1
+B 6 10 1
+B 10 11 1
+B 11 12 2
+B 12 13 1
+B 13 14 1
+B 14 15 2
+B 15 16 1
+B 16 17 2
+B 17 18 1
+B 18 19 2
+B 19 11 1
+B 19 14 1
+END
+a 0 hs 2 nb 1 bd 0 rg chiral 0 stereoActive 0 cw 1 sub 0 sav 42388520 c26c8f5e
+a 1 hs 1 nb 0 2 3 bd 0 1 2 rg chiral 1 stereoActive 0 cw 0 3 2 sub 1 2 3 4 5 6 7 10 8 9 11 12 19 13 18 14 17 15 16 sav 80000000 3bda9555
+a 2 hs 3 nb 1 bd 1 rg chiral 0 stereoActive 0 cw 1 sub 2 sav c2948f5c c1263d70
+a 3 hs 0 nb 1 4 5 bd 2 3 4 rg chiral 0 stereoActive 1 cw 1 5 4 sub 3 4 5 6 7 10 8 9 11 12 19 13 18 14 17 15 16 sav 3b5a0000 bbda82ab
+a 4 hs 0 nb 3 bd 3 rg chiral 0 stereoActive 1 cw 3 sub 4 sav c238851c 426c8f5c
+a 5 hs 1 nb 3 6 bd 4 5 rg chiral 0 stereoActive 0 cw 3 6 sub 5 6 7 10 8 9 11 12 19 13 18 14 17 15 16 sav 41b87ae2 c1ec7ae2
+a 6 hs 1 nb 5 7 10 bd 5 6 9 rg chiral 1 stereoActive 0 cw 5 10 7 sub 6 7 10 8 9 11 12 19 13 18 14 17 15 16 sav 80000000 bbda5555
+a 7 hs 0 nb 6 8 9 bd 6 7 8 rg chiral 0 stereoActive 1 cw 6 8 9 sub 7 8 9 sav 80000000 b6800000
+a 8 hs 0 nb 7 bd 7 rg chiral 0 stereoActive 1 cw 7 sub 8 sav 41e13334 428b0a3e
+a 9 hs 1 nb 7 bd 8 rg chiral 0 stereoActive 0 cw 7 sub 9 sav c2948f5c c1261478
+a 10 hs 2 nb 6 11 bd 9 10 rg chiral 0 stereoActive 0 cw 6 11 sub 10 11 12 19 13 18 14 17 15 16 sav 41613334 420b0f5b
+a 11 hs 0 nb 10 12 19 bd 10 11 19 rg 0 chiral 0 stereoActive 0 cw 10 12 19 sub 11 12 19 13 18 14 17 15 16 sav c197d039 41c29d02
+a 12 hs 1 nb 11 13 bd 11 12 rg 0 chiral 0 stereoActive 0 cw 11 13 sub 12 13 14 15 19 16 18 17 sav c225c290 c170b84c
+a 13 hs 1 nb 12 14 bd 12 13 rg 0 chiral 0 stereoActive 0 cw 12 14 sub 13 14 15 19 16 18 11 17 10 6 5 7 3 8 9 1 4 0 2 sav 3fc147c0 c2303d72
+a 14 hs 0 nb 13 15 19 bd 13 14 20 rg 0 1 chiral 0 stereoActive 0 cw 13 15 19 sub 14 15 19 16 18 11 17 10 12 6 5 7 3 8 9 1 4 0 2 sav 4067ae0b c070da75
+a 15 hs 1 nb 14 16 bd 14 15 rg 1 chiral 0 stereoActive 0 cw 14 16 sub 15 16 17 18 19 11 10 12 6 13 5 7 3 8 9 1 4 0 2 sav 414ce140 c20d0000
+a 16 hs 1 nb 15 17 bd 15 16 rg 1 chiral 0 stereoActive 0 cw 15 17 sub 16 17 18 19 11 14 10 12 13 6 5 7 3 8 9 1 4 0 2 sav 4213b336 c0d147b0
+a 17 hs 1 nb 16 18 bd 16 17 rg 1 chiral 0 stereoActive 0 cw 16 18 sub 17 18 19 11 14 10 12 13 15 6 5 7 3 8 9 1 4 0 2 sav 41c10000 41e5ae14
+a 18 hs 1 nb 17 19 bd 17 18 rg 1 chiral 0 stereoActive 0 cw 17 19 sub 18 19 11 14 10 12 13 15 6 16 5 7 3 8 9 1 4 0 2 sav c14cccd0 420d0000
+a 19 hs 0 nb 18 11 14 bd 18 19 20 rg 1 0 chiral 0 stereoActive 0 cw 18 11 14 sub 19 11 14 10 12 13 15 6 16 5 7 17 3 8 9 1 4 0 2 sav 3ebf2600 40a6d3a3
+b 0 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 1 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 2 small 0 macro 0 term 0 inter 1 stereo 0 rings
+b 3 small 0 macro 0 term 1 inter 0 stereo 1 rings
+b 4 small 0 macro 0 term 0 inter 1 stereo 0 rings
+b 5 small 0 macro 0 term 0 inter 1 stereo 0 rings
+b 6 small 0 macro 0 term 0 inter 1 stereo 0 rings
+b 7 small 0 macro 0 term 1 inter 0 stereo 1 rings
+b 8 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 9 small 0 macro 0 term 0 inter 1 stereo 0 rings
+b 10 small 0 macro 0 term 0 inter 1 stereo 0 rings
+b 11 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 12 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 13 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 14 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 15 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 16 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 17 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 18 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 19 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 20 small 1 macro 0 term 0 inter 0 stereo 0 rings 0 1
+r 0 size 5 benz 0 arom 0 mac 0 atoms 11 12 13 14 19 bonds 19 20 13 12 11 center 42c88000 c22a6c8c
+r 1 size 6 benz 1 arom 1 mac 0 atoms 14 15 16 17 18 19 bonds 20 18 17 16 15 14 center 4351d17f c0347adc
+m charge 0 bbox c3842000 c318199a 438dd5c3 43391c29 center 3a04cccd 3499999a
+flip 2 c3842000 c2ceae14 c33df852 c2b9eb85 c30fd99a c3181c29 c321d1ec c1bb999a c34ff333 420ec28f c2af199a c150f5c3 c26d999a 4261cccd c2d30f5c 42e72e14 c29ac28f 43391c29 c333cf5c 42d26b85 416e147b 4285ae14 42740a3d 40f66666 42211eb8 c280c28f 42ccdc29 c2d4bd71 43218f5c c270f5c3 436b6b85 c292a3d7 438dd5c3 c17e6666 438108f6 425a6666 43383852 42875c29 4307f852 412428f6 wedge 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+flip 4 c333d47b 42d26666 c34ff5c3 420eae14 c38d1eb8 41ca28f6 c321d1ec c1bb999a c33df333 c2b9f5c3 c2af199a c150f5c3 c26d999a 4261cccd c2d30f5c 42e72e14 c29ac28f 43391c29 c333cf5c 42d26b85 416e147b 4285ae14 42740a3d 40f66666 42211eb8 c280c28f 42ccdc29 c2d4bd71 43218f5c c270f5c3 436b6b85 c292a3d7 438dd5c3 c17e6666 438108f6 425a6666 43383852 42875c29 4307f852 412428f6 wedge 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+flip 5 c30fdeb8 c318170a c28b2e14 c30db5c3 c1bbc28f c348dc29 c225c28f c2906666 42035c29 c27751ec c2af199a c150f5c3 c26d999a 4261cccd c2d30f5c 42e72e14 c29ac28f 43391c29 c333cf5c 42d26b85 416e147b 4285ae14 42740a3d 40f66666 42211eb8 c280c28f 42ccdc29 c2d4bd71 43218f5c c270f5c3 436b6b85 c292a3d7 438dd5c3 c17e6666 438108f6 425a6666 43383852 42875c29 4307f852 412428f6 wedge 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+flip 6 c30fd70a c318199a c33df852 c2b9eb85 c3842000 c2ceb333 c321d1ec c1bb999a c34ff333 420ec28f c2af199a c150f5c3 c26d999a 4261cccd c2d30f5c 42e72e14 c333cf5c 42d26b85 c29ac28f 43391c29 416e147b 4285ae14 42740a3d 40f66666 42211eb8 c280c28f 42ccdc29 c2d4bd71 43218f5c c270f5c3 436b6b85 c292a3d7 438dd5c3 c17e6666 438108f6 425a6666 43383852 42875c29 4307f852 412428f6 wedge 0 0 0 0 0 0 0 1 1 0 0 0 0 0 0 0 0 0 0 0 0
+flip 9 c345d1ec 4369d47b c361f333 43244ccd c3961d71 4319e8f6 c333cf5c 42d25c29 c34ff0a4 420e999a c2d3147b 42e723d7 c26d999a 4261cccd c2af0f5c c15147ae c2258f5c c2906b85 c321cf5c c1bbd70a 416e147b 4285ae14 42740a3d 40f66666 42211eb8 c280c28f 42ccdc29 c2d4bd71 43218f5c c270f5c3 436b6b85 c292a3d7 438dd5c3 c17e6666 438108f6 425a6666 43383852 42875c29 4307f852 412428f6 wedge 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0
+flip 10 c30fd70a c318199a c33df852 c2b9eb85 c3842000 c2ceb333 c321d1ec c1bb999a c34ff333 420ec28f c2af199a c150f5c3 c26d999a 4261cccd c2d30f5c 42e72e14 c29ac28f 43391c29 c333cf5c 42d26b85 416e147b 4285ae14 42740a3d 40f66666 4307f852 412428f6 43218f5c c270f5c3 42ccdc29 c2d4bd71 42c2428f c33530a4 41ed851f c356028f c201cccd c32c028f c1d947ae c2c26666 42211eb8 c280c28f wedge 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1
+$$
+MOL 10 9
+A 8 0 c31e04b9 422747ce
+A 6 0 c2c637d6 c0932686
+A 8 0 c2dbb542 c29da648
+A 6 0 c1eba337 41b9ac9f
+A 8 0 c195ad84 42c2df07
+A 6 0 41eba337 c1b9ac9f
+A 8 0 4195ad84 c2c2df07
+A 6 0 42c637d6 40932686
+A 8 0 42dbb542 429da648
+A 8 0 431e04b9 c22747ce
+B 0 1 1
+B 1 2 2
+B 1 3 1
+B 3 4 1
+B 3 5 1
+B 5 6 1
+B 5 7 1
+B 7 8 2
+B 7 9 1
+END
+a 0 hs 1 nb 1 bd 0 rg chiral 0 stereoActive 0 cw 1 sub 0 sav c26ba3d8 4239ae14
+a 1 hs 0 nb 0 2 3 bd 0 1 2 rg chiral 0 stereoActive 1 cw 0 2 3 sub 1 2 3 4 5 6 7 8 9 sav bb5a8000 bb5a6000
+a 2 hs 0 nb 1 bd 1 rg chiral 0 stereoActive 1 cw 1 sub 2 sav c12bd708 c29470a4
+a 3 hs 1 nb 1 4 5 bd 2 3 4 rg chiral 1 stereoActive 0 cw 1 5 4 sub 3 4 5 6 7 8 9 sav 3bda7555 b62aaaab
+a 4 hs 1 nb 3 bd 3 rg chiral 0 stereoActive 0 cw 3 sub 4 sav 412bd70c 429475c3
+a 5 hs 1 nb 3 6 7 bd 4 5 6 rg chiral 1 stereoActive 0 cw 3 6 7 sub 5 6 7 8 9 sav bbda8000 36000000
+a 6 hs 1 nb 5 bd 5 rg chiral 0 stereoActive 0 cw 5 sub 6 sav c12bd70c c29475c3
+a 7 hs 0 nb 5 8 9 bd 6 7 8 rg chiral 0 stereoActive 1 cw 5 9 8 sub 7 8 9 sav 3b5a8000 3b5a5555
+a 8 hs 0 nb 7 bd 7 rg chiral 0 stereoActive 1 cw 7 sub 8 sav 412bd708 429470a4
+a 9 hs 1 nb 7 bd 8 rg chiral 0 stereoActive 0 cw 7 sub 9 sav 426ba3d8 c239ae14
+b 0 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 1 small 0 macro 0 term 1 inter 0 stereo 1 rings
+b 2 small 0 macro 0 term 0 inter 1 stereo 0 rings
+b 3 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 4 small 0 macro 0 term 0 inter 1 stereo 0 rings
+b 5 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 6 small 0 macro 0 term 0 inter 1 stereo 0 rings
+b 7 small 0 macro 0 term 1 inter 0 stereo 1 rings
+b 8 small 0 macro 0 term 1 inter 0 stereo 0 rings
+m charge 0 bbox c31e051f c2c2e148 431e051f 42c2e148 center 35cccccd 00000000
+flip 2 c2dbb333 c29da8f6 c2c63852 c0933333 c31e028f 422747ae c1eb999a 41b9ae14 c195ae14 42c2e148 41eb999a c1b9ae14 4195ae14 c2c2e148 42c63852 40933333 42dbb333 429da3d7 431e051f c22747ae wedge 1 1 0 0 0 0 0 0 0
+flip 4 c29b2e14 430fdeb8 c195851f 42c2e148 424bd70a 42fa75c3 c1eb999a 41b9ae14 c2c63852 c0928f5c 41eb999a c1b9ae14 4195ae14 c2c2e148 42c63852 40933333 42dbb333 429da3d7 431e051f c22747ae wedge 1 1 1 1 0 0 0 0 0
+flip 6 c31e051f 422747ae c2c63852 c0933333 c2dbb333 c29da3d7 c1eb999a 41b9ae14 c195ae14 42c2e148 41eb999a c1b9ae14 4195ae14 c2c2e148 42c63852 40933333 431e028f c22747ae 42dbb333 429da8f6 wedge 0 0 0 0 0 0 0 1 1
+$$
+MOL 7 8
+A 6 0 429b40fe c2160000
+A 6 0 429b40fe 42160000
+A 6 0 40c986c0 4272b481
+A 6 0 c2821026 42160000
+A 6 0 c2821026 c2160000
+A 6 0 40c986c0 c272b481
+A 6 0 c2172510 26a41929
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 5 6 1
+B 5 0 1
+B 6 2 1
+END
+a 0 hs 2 nb 1 5 bd 0 6 rg 0 chiral 0 stereoActive 0 cw 1 5 sub 0 5 4 6 3 2 sav 420ea8f5 c1cf47ae
+a 1 hs 2 nb 0 2 bd 0 1 rg 0 chiral 0 stereoActive 0 cw 0 2 sub 1 2 3 6 4 5 sav 420ea8f5 41cf47ae
+a 2 hs 1 nb 1 3 6 bd 1 2 7 rg 0 1 chiral 1 stereoActive 0 cw 1 3 6 sub 2 3 6 4 5 0 sav 416b258f 420eb852
+a 3 hs 2 nb 2 4 bd 2 3 rg 1 chiral 0 stereoActive 0 cw 2 4 sub 3 4 5 6 0 1 sav c20ea8f6 41cf47ae
+a 4 hs 2 nb 3 5 bd 3 4 rg 1 chiral 0 stereoActive 0 cw 3 5 sub 4 5 6 0 2 1 sav c20ea8f6 c1cf47ae
+a 5 hs 1 nb 4 6 0 bd 4 5 6 rg 1 0 chiral 1 stereoActive 0 cw 4 0 6 sub 5 6 0 2 1 3 sav 416b258d c20eb852
+a 6 hs 2 nb 5 2 bd 5 7 rg 0 1 chiral 0 stereoActive 0 cw 5 2 sub 6 2 1 3 0 4 sav c2305c29 80000000
+b 0 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 1 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 2 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 3 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 4 small 1 macro 0 term 0 inter 0 stereo 0 rings 1
+b 5 small 1 macro 0 term 0 inter 0 stereo 0 rings 0 1
+b 6 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 7 small 1 macro 0 term 0 inter 0 stereo 0 rings 0 1
+r 0 size 5 benz 0 arom 0 mac 0 atoms 0 1 2 5 6 bonds 6 5 7 1 0 center 41d01cad 00000000
+r 1 size 5 benz 0 arom 0 mac 0 atoms 2 3 4 5 6 bonds 7 5 4 3 2 center c1f86666 00000000
+m charge 0 bbox c2820f5c c272b852 429b428f 4272b852 center 3abb36db 00000000
+$$
+MOL 11 11
+A 8 0 c3341f89 c2870d58
+A 6 0 c31ed1b8 408c4e7a
+A 6 0 c2abc815 41af1ef9
+A 6 0 c20910b8 c2020f56
+A 6 0 421aa5fe c17026a4
+A 6 0 42b492b8 c28ad43e
+A 6 0 4323370a c24fa2cf
+A 6 0 433884db 41a00363
+A 6 0 4304e4fe 4294d042
+A 6 0 426fdd42 42639ad7
+A 8 0 c3527195 426b28a2
+B 0 1 2
+B 1 2 1
+B 2 3 2
+B 3 4 1
+B 4 5 2
+B 5 6 1
+B 6 7 2
+B 7 8 1
+B 8 9 2
+B 1 10 1
+B 9 4 1
+END
+a 0 hs 0 nb 1 bd 0 rg chiral 0 stereoActive 1 cw 1 sub 0 sav c1aa6660 c28fd1eb
+a 1 hs 0 nb 0 2 10 bd 0 1 9 rg chiral 0 stereoActive 1 cw 0 2 10 sub 1 2 10 3 4 5 9 6 8 7 sav bb5b0000 bb5a8000
+a 2 hs 1 nb 1 3 bd 1 2 rg chiral 0 stereoActive 1 cw 1 3 sub 2 3 4 5 9 6 8 7 sav 412a7ae6 420fd1eb
+a 3 hs 1 nb 2 4 bd 2 3 rg chiral 0 stereoActive 1 cw 2 4 sub 3 4 5 9 6 8 7 sav c12a7ae2 c20fcccc
+a 4 hs 0 nb 3 5 9 bd 3 4 10 rg 0 chiral 0 stereoActive 0 cw 3 5 9 sub 4 5 9 6 8 7 sav c1c283fc c0bacf15
+a 5 hs 1 nb 4 6 bd 4 5 rg 0 chiral 0 stereoActive 0 cw 4 6 sub 5 6 7 8 9 sav c12a6666 c20fccce
+a 6 hs 1 nb 5 7 bd 5 6 rg 0 chiral 0 stereoActive 0 cw 5 7 sub 6 7 8 9 4 3 2 1 0 10 sav 41ce851e c1d9a3d7
+a 7 hs 1 nb 6 8 bd 6 7 rg 0 chiral 0 stereoActive 0 cw 6 8 sub 7 8 9 4 3 5 2 1 0 10 sav 4211dc2a 410c0000
+a 8 hs 1 nb 7 9 bd 7 8 rg 0 chiral 0 stereoActive 0 cw 7 9 sub 8 9 4 3 5 2 6 1 0 10 sav 412a51e8 420fd70b
+a 9 hs 1 nb 8 4 bd 8 10 rg 0 chiral 0 stereoActive 0 cw 8 4 sub 9 4 3 5 2 6 1 7 0 10 sav c1ce70a3 41d9999a
+a 10 hs 1 nb 1 bd 9 rg chiral 0 stereoActive 0 cw 1 sub 10 sav c24e7ae0 4259a3d7
+b 0 small 0 macro 0 term 1 inter 0 stereo 1 rings
+b 1 small 0 macro 0 term 0 inter 1 stereo 0 rings
+b 2 small 0 macro 0 term 0 inter 0 stereo 1 rings
+b 3 small 0 macro 0 term 0 inter 1 stereo 0 rings
+b 4 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 5 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 6 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 7 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 8 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 9 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 10 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+r 0 size 6 benz 1 arom 1 mac 0 atoms 4 5 6 7 8 9 bonds 10 8 7 6 5 4 center 42df2ef0 401fc965
+m charge 0 bbox c35270a4 c28ad1ec 4338851f 4294d1ec center 3a6e8ba3 00000000
+flip 1 c3527333 426b1eb8 c31ed1ec 408c28f6 c2abc7ae 41af1eb8 c209147b c2020a3d 421aa3d7 c17028f6 42b4947b c28ad1ec 43233852 c24fa3d7 4338851f 41a00000 4304e3d7 4294d1ec 426fe148 4263999a c3341c29 c287147b wedge 1 0 0 0 0 0 0 0 0 1 0
+flip 2 4105999a 42de999a c28128f6 42bb999a c2abc7ae 41af1eb8 c209147b c2020a3d 421aa3d7 c17028f6 42b4947b c28ad1ec 43233852 c24fa3d7 4338851f 41a00000 4304e3d7 4294d1ec 426fe148 4263999a c2e86b85 43143333 wedge 1 1 0 0 0 0 0 0 0 1 0
+flip 3 c3342148 c286fae1 c300851f c2f3cccd c25e51ec c2d0d1ec c209147b c2020a3d 421aa3d7 c17028f6 42b4947b c28ad1ec 43233852 c24fa3d7 4338851f 41a00000 4304e3d7 4294d1ec 426fe148 4263999a c315d47b c341cf5c wedge 1 1 1 0 0 0 0 0 0 1 0
+$$
+MOL 6 5
+A 6 0 c2960000 4281e760
+A 6 0 c2160000 00000000
+A 9 0 c2960000 c281e760
+A 6 0 42160000 00000000
+A 17 0 42960000 c281e760
+A 35 0 42960000 4281e760
+B 0 1 1
+B 1 2 1
+B 1 3 2
+B 3 4 1
+B 3 5 1
+END
+a 0 hs 3 nb 1 bd 0 rg chiral 0 stereoActive 0 cw 1 sub 0 sav c2160000 4281e666
+a 1 hs 0 nb 0 2 3 bd 0 1 2 rg chiral 0 stereoActive 1 cw 0 2 3 sub 1 2 3 4 5 sav 80000000 80000000
+a 2 hs 0 nb 1 bd 1 rg chiral 0 stereoActive 0 cw 1 sub 2 sav c2160000 c281e666
+a 3 hs 0 nb 1 4 5 bd 2 3 4 rg chiral 0 stereoActive 1 cw 1 4 5 sub 3 4 5 sav 80000000 80000000
+a 4 hs 0 nb 3 bd 3 rg chiral 0 stereoActive 0 cw 3 sub 4 sav 42160000 c281e666
+a 5 hs 0 nb 3 bd 4 rg chiral 0 stereoActive 0 cw 3 sub 5 sav 42160000 4281e666
+b 0 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 1 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 2 small 0 macro 0 term 0 inter 0 stereo 1 rings
+b 3 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 4 small 0 macro 0 term 1 inter 0 stereo 0 rings
+m charge 0 bbox c2960000 c281e666 42960000 4281e666 center 00000000 00000000
+flip 2 c2960000 c281e666 c2160000 00000000 c2960000 4281e666 42160000 00000000 42960000 c281e666 42960000 4281e666 wedge 1 1 0 0 0
+$$
+MOL 12 12
+A 8 0 4336c67a 4264d611
+A 6 0 430ca558 c09ae2fd
+A 6 0 4283b099 3f1ecdb1
+A 8 0 4204b190 4288429f
+A 6 0 c226829d 42932e6a
+A 8 0 c2949920 430d19b7
+A 6 0 c2a78394 4138a98e
+A 8 0 c31e8ed5 418803f4
+A 6 0 c24c5787 c25fdfa4
+A 8 0 c2ba6e09 c2ec090a
+A 6 0 41bdb94b c275b73a
+A 8 0 42618c47 c300f050
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 4 6 1
+B 6 7 1
+B 6 8 1
+B 8 9 1
+B 8 10 1
+B 10 11 1
+B 10 2 1
+END
+a 0 hs 1 nb 1 bd 0 rg chiral 0 stereoActive 0 cw 1 sub 0 sav 42288520 42783333
+a 1 hs 2 nb 0 2 bd 0 1 rg chiral 0 stereoActive 0 cw 0 2 sub 1 2 3 10 4 8 11 5 6 9 7 sav 4182b850 c207051f
+a 2 hs 1 nb 1 3 10 bd 1 2 11 rg 0 chiral 1 stereoActive 0 cw 1 3 10 sub 2 3 10 4 8 11 5 6 9 7 sav 41c76c15 bfe8f5b9
+a 3 hs 0 nb 2 4 bd 2 3 rg 0 chiral 0 stereoActive 0 cw 2 4 sub 3 4 5 6 7 8 9 10 11 sav 41a88520 41f83332
+a 4 hs 1 nb 3 5 6 bd 3 4 5 rg 0 chiral 1 stereoActive 0 cw 3 5 6 sub 4 5 6 7 8 9 10 11 2 1 0 sav c12e3d70 41b406d2
+a 5 hs 1 nb 4 bd 4 rg chiral 0 stereoActive 0 cw 4 sub 5 sav c202ae15 42870520
+a 6 hs 1 nb 4 7 8 bd 5 6 7 rg 0 chiral 1 stereoActive 0 cw 4 7 8 sub 6 7 8 9 10 11 2 1 3 0 sav c1c77779 3fe8f5d5
+a 7 hs 1 nb 6 bd 6 rg chiral 0 stereoActive 0 cw 6 sub 7 sav c2959999 40aeb852
+a 8 hs 1 nb 6 9 10 bd 7 8 9 rg 0 chiral 1 stereoActive 0 cw 6 9 10 sub 8 9 10 11 2 1 3 0 4 5 sav c160c83e c1a57779
+a 9 hs 1 nb 8 bd 8 rg chiral 0 stereoActive 0 cw 8 sub 9 sav c2287ae1 c2783332
+a 10 hs 1 nb 8 11 2 bd 9 10 11 rg 0 chiral 1 stereoActive 0 cw 8 11 2 sub 10 11 2 1 3 0 4 5 6 7 sav 412e61dc c1b406d4
+a 11 hs 1 nb 10 bd 10 rg chiral 0 stereoActive 0 cw 10 sub 11 sav 4202ae14 c287051f
+b 0 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 1 small 0 macro 0 term 0 inter 1 stereo 0 rings
+b 2 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 3 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 4 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 5 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 6 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 7 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 8 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 9 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 10 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 11 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+r 0 size 6 benz 0 arom 0 mac 0 atoms 2 3 4 6 8 10 bonds 11 9 7 5 3 2 center c10f5557 40c28f58
+m charge 0 bbox c31e8f5c c300f0a4 4336c7ae 430d199a center 00000000 ba5a0000
+flip 1 432d51ec c290b333 430ca666 c09ae148 4283ae14 3f1eb852 4204ae14 4288428f c226851f 42932e14 c294999a 430d199a c2a7851f 4138a3d7 c31e8f5c 41880000 c24c5c29 c25fe148 c2ba6b85 c2ec0a3d 41bdc28f c275b852 42618f5c c300f0a4 wedge 1 0 0 0 0 0 0 0 0 0 0 0
+$$
+MOL 6 5
+A 6 0 c2e2e425 423f4356
+A 6 0 c259dd24 3fbe44f1
+A 35 0 c282326a c2918316
+A 6 0 417256d2 41eb3299
+A 6 0 4294406e c1876fc3
+A 6 0 430fbced 412fbd0e
+B 0 1 1
+B 1 2 1
+B 1 3 1
+B 3 4 2
+B 4 5 1
+END
+a 0 hs 3 nb 1 bd 0 rg chiral 0 stereoActive 0 cw 1 sub 0 sav c26beb84 423951eb
+a 1 hs 1 nb 0 2 3 bd 0 1 2 rg chiral 1 stereoActive 0 cw 0 2 3 sub 1 2 3 4 5 sav bb5aaaab 3b5a8000
+a 2 hs 0 nb 1 bd 1 rg chiral 0 stereoActive 0 cw 1 sub 2 sav c12a1478 c2948000
+a 3 hs 1 nb 1 4 bd 2 3 rg chiral 0 stereoActive 1 cw 1 4 sub 3 4 5 sav 40aa3d78 42147ae2
+a 4 hs 1 nb 3 5 bd 3 4 rg chiral 0 stereoActive 1 cw 3 5 sub 4 5 sav c0aa1488 c2147ae2
+a 5 hs 3 nb 4 bd 4 rg chiral 0 stereoActive 0 cw 4 sub 5 sav 428b3853 41df47ae
+b 0 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 1 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 2 small 0 macro 0 term 0 inter 1 stereo 0 rings
+b 3 small 0 macro 0 term 0 inter 0 stereo 1 rings
+b 4 small 0 macro 0 term 1 inter 0 stereo 0 rings
+m charge 0 bbox c2e2e666 c291851f 430fbd71 423f47ae center 362aaaab b4aaaaab
+flip 2 c2823852 c2918000 c259e148 3fbeb852 c2e2e666 423f5c29 41726666 41eb3333 4294428f c18770a4 430fbd71 412fae14 wedge 1 1 0 0 0
+flip 3 c2e2e666 423f47ae c259e148 3fbeb852 c2823333 c291851f 41726666 41eb3333 4294428f c18770a4 427e0000 c2b6570a wedge 0 0 0 0 1
+$$
+MOL 9 9
+A 6 0 43012aab c281e760
+A 16 0 42b75555 281b8e39
+A 8 0 43012aab 4281e760
+A 6 0 41855555 a731c71c
+A 6 0 c1a6aaab 4281e760
+A 6 0 c2bfaaab 4281e760
+A 6 0 c3055555 27f207be
+A 6 0 c2bfaaab c281e760
+A 6 0 c1a6aaab c281e760
+B 0 1 1
+B 1 2 2
+B 1 3 1
+B 3 4 2
+B 4 5 1
+B 5 6 2
+B 6 7 1
+B 7 8 2
+B 8 3 1
+END
+a 0 hs 3 nb 1 bd 0 rg chiral 0 stereoActive 0 cw 1 sub 0 sav 42160000 c281e666
+a 1 hs 0 nb 0 2 3 bd 0 1 2 rg chiral 1 stereoActive 1 cw 0 2 3 sub 1 2 3 4 8 5 7 6 sav 80000000 80000000
+a 2 hs 0 nb 1 bd 1 rg chiral 0 stereoActive 1 cw 1 sub 2 sav 42160000 4281e666
+a 3 hs 0 nb 1 4 8 bd 2 3 8 rg 0 chiral 0 stereoActive 0 cw 1 4 8 sub 3 4 8 5 7 6 sav 41c80000 80000000
+a 4 hs 1 nb 3 5 bd 3 4 rg 0 chiral 0 stereoActive 0 cw 3 5 sub 4 5 6 7 8 sav 41960000 4201e666
+a 5 hs 1 nb 4 6 bd 4 5 rg 0 chiral 0 stereoActive 0 cw 4 6 sub 5 6 7 8 3 1 0 2 sav c1960000 4201e666
+a 6 hs 1 nb 5 7 bd 5 6 rg 0 chiral 0 stereoActive 0 cw 5 7 sub 6 7 8 3 1 4 0 2 sav c2160000 80000000
+a 7 hs 1 nb 6 8 bd 6 7 rg 0 chiral 0 stereoActive 0 cw 6 8 sub 7 8 3 1 4 0 2 5 sav c1960000 c201e666
+a 8 hs 1 nb 7 3 bd 7 8 rg 0 chiral 0 stereoActive 0 cw 7 3 sub 8 3 1 4 0 2 5 6 sav 41960000 c201e666
+b 0 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 1 small 0 macro 0 term 1 inter 0 stereo 1 rings
+b 2 small 0 macro 0 term 0 inter 1 stereo 0 rings
+b 3 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 4 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 5 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 6 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 7 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+b 8 small 1 macro 0 term 0 inter 0 stereo 0 rings 0
+r 0 size 6 benz 1 arom 1 mac 0 atoms 3 4 5 6 7 8 bonds 8 7 6 5 4 3 center c26951ec 00000000
+m charge 0 bbox c305547b c281e666 43012b85 4281e666 center 3b5aae39 00000000
+flip 2 43012b85 4281e666 42b7570a 00000000 43012b85 c281e666 41855c29 00000000 c1a6a3d7 4281e666 c2bfa8f6 4281e666 c305547b 00000000 c2bfa8f6 c281e666 c1a6a3d7 c281e666 wedge 1 1 0 0 0 0 0 0 0
+$$
+MOL 5 4
+A 6 0 42e10000 421be273
+A 6 0 42960000 c1cfd89a
+A 6 0 27a0e3d9 c1cfd89a
+A 6 0 c2960000 c1cfd89a
+A 6 0 c2e10000 421be273
+B 0 1 1
+B 1 2 2
+B 2 3 2
+B 3 4 1
+END
+a 0 hs 3 nb 1 bd 0 rg chiral 0 stereoActive 0 cw 1 sub 0 sav 42160000 4281e666
+a 1 hs 1 nb 0 2 bd 0 1 rg chiral 0 stereoActive 1 cw 0 2 sub 1 2 3 4 sav 41960000 c201e666
+a 2 hs 0 nb 1 3 bd 1 2 rg chiral 0 stereoActive 1 cw 1 3 sub 2 3 4 sav 80000000 80000000
+a 3 hs 1 nb 2 4 bd 2 3 rg chiral 0 stereoActive 1 cw 2 4 sub 3 4 sav c1960000 c201e666
+a 4 hs 3 nb 3 bd 3 rg chiral 0 stereoActive 0 cw 3 sub 4 sav c2160000 4281e666
+b 0 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 1 small 0 macro 0 term 0 inter 0 stereo 1 rings
+b 2 small 0 macro 0 term 0 inter 0 stereo 1 rings
+b 3 small 0 macro 0 term 1 inter 0 stereo 0 rings
+m charge 0 bbox c2e10000 c1cfd70a 42e10000 421be148 center 00000000 354ccccd
+flip 1 42e10000 c2b5dc29 42960000 c1cfd70a 00000000 c1cfd70a c2960000 c1cfd70a c2e10000 421be148 wedge 1 0 0 0
+flip 2 42e10000 421be148 42960000 c1cfd70a 00000000 c1cfd70a c2960000 c1cfd70a c2e10000 c2b5dc29 wedge 0 0 0 1
+$$
+MOL 13 13
+A 6 0 4300f57d c2b78cf0
+A 6 0 431b8de7 c1ad3140
+A 6 0 43128399 4253376b
+A 6 0 42cfd183 42e50e4a
+A 6 0 42160000 431561d4
+A 6 0 c2160000 431561d4
+A 6 0 c2cfd183 42e50e4a
+A 6 0 c3128399 4253376b
+A 6 0 c31b8de7 c1ad3140
+A 6 0 c300f57d c2b78cf0
+A 6 0 c291a42a c30d826c
+A 6 0 aab53148 c2f71f20
+A 6 0 4291a42a c30d826c
+B 0 1 1
+B 1 2 1
+B 2 3 1
+B 3 4 1
+B 4 5 1
+B 5 6 1
+B 6 7 1
+B 7 8 1
+B 8 9 1
+B 9 10 1
+B 10 11 1
+B 11 12 2
+B 12 0 1
+END
+a 0 hs 2 nb 1 12 bd 0 12 rg 0 chiral 0 stereoActive 0 cw 1 12 sub 0 12 11 10 9 8 7 6 5 4 3 2 sav 416c666c c1233334
+a 1 hs 2 nb 0 2 bd 0 1 rg 0 chiral 0 stereoActive 0 cw 0 2 sub 1 2 3 4 5 6 7 8 9 10 11 12 sav 418e8520 c00a3d70
+a 2 hs 2 nb 1 3 bd 1 2 rg 0 chiral 0 stereoActive 0 cw 1 3 sub 2 3 4 5 6 7 8 9 10 11 12 0 sav 41863d6c 40cb851c
+a 3 hs 2 nb 2 4 bd 2 3 rg 0 chiral 0 stereoActive 0 cw 2 4 sub 3 4 5 6 7 8 9 10 11 12 0 1 sav 413e7ae8 41570a3a
+a 4 hs 2 nb 3 5 bd 3 4 rg 0 chiral 0 stereoActive 0 cw 3 5 sub 4 5 6 7 8 9 10 11 12 0 1 2 sav 408970a0 418b6668
+a 5 hs 2 nb 4 6 bd 4 5 rg 0 chiral 0 stereoActive 0 cw 4 6 sub 5 6 7 8 9 10 11 12 0 1 2 3 sav c08970a0 418b6668
+a 6 hs 2 nb 5 7 bd 5 6 rg 0 chiral 0 stereoActive 0 cw 5 7 sub 6 7 8 9 10 11 12 0 1 2 3 4 sav c13e7ae8 41570a3a
+a 7 hs 2 nb 6 8 bd 6 7 rg 0 chiral 0 stereoActive 0 cw 6 8 sub 7 8 9 10 11 12 0 1 2 3 4 5 sav c1863d6c 40cb851c
+a 8 hs 2 nb 7 9 bd 7 8 rg 0 chiral 0 stereoActive 0 cw 7 9 sub 8 9 10 11 12 0 1 2 3 4 5 6 sav c18e8520 c00a3d70
+a 9 hs 2 nb 8 10 bd 8 9 rg 0 chiral 0 stereoActive 0 cw 8 10 sub 9 10 11 12 0 1 2 3 4 5 6 7 sav c16c666c c1233334
+a 10 hs 2 nb 9 11 bd 9 10 rg 0 chiral 0 stereoActive 0 cw 9 11 sub 10 11 12 0 1 2 3 4 5 6 7 8 sav c10570a0 c2075c28
+a 11 hs 1 nb 10 12 bd 10 11 rg 0 chiral 0 stereoActive 1 cw 10 12 sub 11 12 0 1 2 3 4 5 6 7 8 9 sav 80000000 418f9998
+a 12 hs 1 nb 11 0 bd 11 12 rg 0 chiral 0 stereoActive 1 cw 11 0 sub 12 0 1 2 3 4 5 6 7 8 9 10 sav 410570a0 c2075c28
+b 0 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 1 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 2 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 3 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 4 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 5 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 6 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 7 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 8 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 9 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 10 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+b 11 small 0 macro 1 term 0 inter 0 stereo 1 rings 0
+b 12 small 0 macro 1 term 0 inter 0 stereo 0 rings 0
+r 0 size 13 benz 0 arom 0 mac 1 atoms 0 1 2 3 4 5 6 7 8 9 10 11 12 bonds 12 11 10 9 8 7 6 5 4 3 2 1 0 center 369d89d9 bac9b13b
+m charge 0 bbox c31b8ccd c30d828f 431b8ccd 43156148 center 369d89d9 bac9b13b
+$$
+MOL 8 7
+A 8 0 c31be90c 42446567
+A 6 0 c2c66e6d a834ee45
+A 8 0 c2e2c758 c2934c0d
+A 6 0 c1e2c758 41c46567
+A 6 0 41e2c758 c1c46567
+A 6 0 42c66e6d 27480000
+A 8 0 42e2c758 42934c0d
+A 8 0 431be90c c2446567
+B 0 1 1
+B 1 2 2
+B 1 3 1
+B 3 4 2
+B 4 5 1
+B 5 6 2
+B 5 7 1
+END
+a 0 hs 1 nb 1 bd 0 rg chiral 0 stereoActive 0 cw 1 sub 0 sav c262c290 42446666
+a 1 hs 0 nb 0 2 3 bd 0 1 2 rg chiral 0 stereoActive 1 cw 0 2 3 sub 1 2 3 4 5 6 7 sav bb5a8000 35aaaaab
+a 2 hs 0 nb 1 bd 1 rg chiral 0 stereoActive 1 cw 1 sub 2 sav c162b850 c2934ccd
+a 3 hs 1 nb 1 4 bd 2 3 rg chiral 0 stereoActive 1 cw 1 4 sub 3 4 5 6 7 sav 40e2b854 42134ccc
+a 4 hs 1 nb 3 5 bd 3 4 rg chiral 0 stereoActive 1 cw 3 5 sub 4 5 6 7 sav c0e2b854 c2134ccc
+a 5 hs 0 nb 4 6 7 bd 4 5 6 rg chiral 0 stereoActive 1 cw 4 7 6 sub 5 6 7 sav 3b5a8000 b5aaaaab
+a 6 hs 0 nb 5 bd 5 rg chiral 0 stereoActive 1 cw 5 sub 6 sav 4162b850 42934ccd
+a 7 hs 1 nb 5 bd 6 rg chiral 0 stereoActive 0 cw 5 sub 7 sav 4262c290 c2446666
+b 0 small 0 macro 0 term 1 inter 0 stereo 0 rings
+b 1 small 0 macro 0 term 1 inter 0 stereo 1 rings
+b 2 small 0 macro 0 term 0 inter 1 stereo 0 rings
+b 3 small 0 macro 0 term 0 inter 0 stereo 1 rings
+b 4 small 0 macro 0 term 0 inter 1 stereo 0 rings
+b 5 small 0 macro 0 term 1 inter 0 stereo 1 rings
+b 6 small 0 macro 0 term 1 inter 0 stereo 0 rings
+m charge 0 bbox c31be8f6 c2934ccd 431be8f6 42934ccd center b6000000 00000000
+flip 2 c2e2c7ae c2934ccd c2c670a4 00000000 c31be8f6 42446666 c1e2cccd 41c46666 41e2cccd c1c46666 42c670a4 00000000 42e2c7ae 42934ccd 431be8f6 c2446666 wedge 1 1 0 0 0 0 0
+flip 3 c28dc28f 43134a3d c162e148 42c46666 4262c28f 42f58000 c1e2cccd 41c46666 41e2cccd c1c46666 42c670a4 00000000 42e2c7ae 42934ccd 431be8f6 c2446666 wedge 1 1 1 0 0 0 0
+flip 4 c31be8f6 42446666 c2c670a4 00000000 c2e2c7ae c2934ccd c1e2cccd 41c46666 41e2cccd c1c46666 42c670a4 00000000 431be8f6 c2446666 42e2c7ae 42934ccd wedge 0 0 0 0 0 1 1
+$$
