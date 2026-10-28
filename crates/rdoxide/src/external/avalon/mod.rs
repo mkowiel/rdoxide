@@ -11,5 +11,6 @@ pub mod reaccsio;
 pub mod scan;
 pub mod set;
 pub mod smiles;
+pub mod stereo;
 pub mod tables;
 pub mod utilities;

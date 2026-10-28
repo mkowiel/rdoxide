@@ -144,6 +144,12 @@ impl<'a> Scan<'a> {
 
 /// C `printf("%g")` of a double
 pub fn fmt_g(v: f64) -> String {
+    fmt_gp(v, 6)
+}
+
+/// C `printf("%.<prec>g")` of a double
+pub fn fmt_gp(v: f64, prec: usize) -> String {
+    let prec = prec.max(1);
     if v == 0.0 {
         return if v.is_sign_negative() {
             "-0".into()
@@ -160,11 +166,15 @@ pub fn fmt_g(v: f64) -> String {
             "inf".into()
         };
     }
-    let e = format!("{:.5e}", v); // d.ddddde[-]x with 6 significant digits
+    let e = format!("{:.*e}", prec - 1, v); // d.ddddde[-]x with prec significant digits
     let (mant, exp) = e.split_once('e').expect("exponent");
     let exp: i32 = exp.parse().expect("exponent");
-    if !(-4..6).contains(&exp) {
-        let mant = mant.trim_end_matches('0').trim_end_matches('.');
+    if exp < -4 || exp >= prec as i32 {
+        let mant = if mant.contains('.') {
+            mant.trim_end_matches('0').trim_end_matches('.')
+        } else {
+            mant
+        };
         return format!(
             "{}e{}{:02}",
             mant,
@@ -172,8 +182,8 @@ pub fn fmt_g(v: f64) -> String {
             exp.abs()
         );
     }
-    let prec = (5 - exp).max(0) as usize;
-    let s = format!("{:.*}", prec, v);
+    let dec = (prec as i32 - 1 - exp).max(0) as usize;
+    let s = format!("{:.*}", dec, v);
     if s.contains('.') {
         s.trim_end_matches('0').trim_end_matches('.').to_string()
     } else {
@@ -194,6 +204,9 @@ mod tests {
         assert_eq!(fmt_g(0.0001), "0.0001");
         assert_eq!(fmt_g(0.00001), "1e-05");
         assert_eq!(fmt_g(-2.25), "-2.25");
+        assert_eq!(fmt_gp(12.5, 2), "12");
+        assert_eq!(fmt_gp(99.7, 2), "1e+02");
+        assert_eq!(fmt_gp(0.123, 2), "0.12");
     }
 
     #[test]
