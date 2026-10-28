@@ -230,3 +230,15 @@ linked list (last found first). As in C, `SSMatchExt` leaves the aromaticity fla
 the query. 380 molecule/query pairs (queries with `A`/`Q` atoms, bond types 5-8, mapping numbers) in
 `tests/data/avalon_ssmatch.jsonl` (driver `ss.c`) are identical to the C code. Next in the struchk chain: `fixcharges.c`,
 `patclean.c`, `shortcut.c`, the `struchk.c` driver itself.
+
+### A5b — struchk.c: InitCheckMol and RunStruchk (library options)
+
+`struchk.rs` ports the library entry points of `programs/struchk.c` for the options RDKit's MolKey uses (`-ta -ca -cc -cl
+-cn -cs -tm -da -dg -ds -or -l`): the option tokenizer of `InitCheckMol`, `ClearParameters` (the collision limit and the
+open log file survive it, as in C), `RunStruchk`, `ConvertAtomAliases`, `ConvertGroupsToSGroups`, `StripSmallFragments`
+(incl. `SplitMolecule`) and the global message list. Quirks kept: with `-l` the messages are flushed to the log file at
+the end of every check (newest first), so `GetCheckMolLog` is then empty; a failing `-ta`/`-ca` file only prints an
+error. The charge (`-tc`), tautomer (`-tt`), pattern (`-pc -pr -ps`) and profile (`-f`) options need `fixcharges.c`,
+`patclean.c` and the RD file reader; `init_check_mol` counts them as option errors for now. 306 option set x input
+combinations (SMILES, 2D/3D/shrunk/either-bond/alias molfiles) in `tests/data/avalon_struchk.jsonl` (driver `sc.c`)
+are identical to the C code. `fixcharges.c` was not needed for this step after all (MolKey does not use `-tc`).
