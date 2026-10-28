@@ -56,6 +56,21 @@ impl<'a> Scan<'a> {
 
     /// `%f` (width 0: unlimited) after skipping white space
     pub fn float(&mut self, width: usize) -> Option<f32> {
+        let (t, end) = self.float_token(width)?;
+        let v = t.parse::<f32>().ok()?;
+        self.pos = end;
+        Some(v)
+    }
+
+    /// `%lf` (width 0: unlimited) after skipping white space
+    pub fn double(&mut self, width: usize) -> Option<f64> {
+        let (t, end) = self.float_token(width)?;
+        let v = t.parse::<f64>().ok()?;
+        self.pos = end;
+        Some(v)
+    }
+
+    fn float_token(&mut self, width: usize) -> Option<(&'a str, usize)> {
         self.skip_ws();
         let limit = if width == 0 { usize::MAX } else { width };
         let start = self.pos;
@@ -101,10 +116,8 @@ impl<'a> Scan<'a> {
                 }
             }
         }
-        let t = std::str::from_utf8(&self.s[start..i]).ok()?;
-        let v = t.parse::<f32>().ok()?;
-        self.pos = i;
-        Some(v)
+        let t = std::str::from_utf8(&s[start..i]).ok()?;
+        Some((t, i))
     }
 
     /// `%Nc`: exactly `n` characters

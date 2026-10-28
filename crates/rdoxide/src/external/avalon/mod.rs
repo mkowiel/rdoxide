@@ -6,6 +6,7 @@ pub mod aacheck;
 pub mod canonizer;
 pub mod denormal;
 pub mod fingerprint;
+pub mod fixcharges;
 pub mod geometry;
 pub mod graph;
 pub mod layout;
