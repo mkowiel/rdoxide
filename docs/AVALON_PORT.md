@@ -143,3 +143,6 @@ A4 (all fingerprint classes) and the first part of A7: `rdoxide.Avalon.pyAvalonT
   `MakeBondTrans`, `InvertFragmentColor`, ring node table, `LayoutRingSegment`, `LayoutRings`,
   `HideMetalComplexProblems`, `MergeConnectedFragmentColors` (keeps the `if (color = col2)` typo); 72 molfiles
   identical to the C code including the single precision steps (`tests/data/avalon_layout1.jsonl`).
+* L2 `layout.rs` (layout.c lines 736-1176): `GetColoredGraph`, `ColorStrain`, `ImproveBondByFlip`,
+  `ImproveBondByStretch`, `ImproveMoleculeByBondFlip`, `ImproveSPAtoms`, `CountColor`; 94 molfiles identical to the C
+  code (`tests/data/avalon_layout2.jsonl`). `ColorStrain` adds two single precision products to a double, as C does.
