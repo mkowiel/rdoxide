@@ -2528,6 +2528,298 @@ pub fn fix_inward_hydrogens(mp: &mut Molecule, ring_count: &[i32], nbp: &[Neighb
     }
 }
 
+pub const CENTER_DISTANCE: i32 = 1;
+pub const TOP_BOTTOM_SEPARATION: i32 = 2;
+
+fn is_plain_h(a: &crate::external::avalon::reaccs::Atom) -> bool {
+    a.atom_symbol.as_bytes().first() == Some(&b'H') && a.atom_symbol.len() == 1
+}
+
+/// `TopBottomSeparation`: separation of the top and bottom attachments perpendicular to the fragment diameter
+pub fn top_bottom_separation(
+    mp: &Molecule,
+    fragment_color: i32,
+    top_color: i32,
+    bottom_color: i32,
+) -> f64 {
+    let mut dmax = 0.0f64;
+    let (mut dia1, mut dia2) = (usize::MAX, usize::MAX);
+    for i in 0..mp.atoms.len() {
+        let a1 = &mp.atoms[i];
+        if a1.color != fragment_color || is_plain_h(a1) {
+            continue;
+        }
+        for j in i + 1..mp.atoms.len() {
+            let a2 = &mp.atoms[j];
+            if a2.color != fragment_color || is_plain_h(a2) {
+                continue;
+            }
+            // SQR of float differences is evaluated in single precision
+            let dx = a1.x - a2.x;
+            let dy = a1.y - a2.y;
+            let d = f64::from(dx * dx + dy * dy);
+            if d > dmax {
+                dia1 = i;
+                dia2 = j;
+                dmax = d;
+            }
+        }
+    }
+    if dia1 == usize::MAX || dia2 == usize::MAX {
+        return 0.0;
+    }
+    let p = [f64::from(mp.atoms[dia1].x), f64::from(mp.atoms[dia1].y)];
+    let mut edia = [
+        fd(mp.atoms[dia2].x, mp.atoms[dia1].x),
+        fd(mp.atoms[dia2].y, mp.atoms[dia1].y),
+    ];
+    let d = (edia[0] * edia[0] + edia[1] * edia[1]).sqrt();
+    edia[0] /= d;
+    edia[1] /= d;
+    let eper = [edia[1], -edia[0]];
+    let mut total = 0.0;
+    let (edges, coords, numbers) = get_colored_graph(mp, fragment_color);
+    for b in &mp.bonds {
+        let mut i1 = (b.atoms[0] - 1) as usize;
+        let mut i2 = (b.atoms[1] - 1) as usize;
+        let (c1, c2) = (mp.atoms[i1].color, mp.atoms[i2].color);
+        if c1 != fragment_color && c2 != fragment_color {
+            continue;
+        }
+        if c1 == fragment_color && c2 == fragment_color {
+            continue;
+        }
+        if c2 == fragment_color {
+            std::mem::swap(&mut i1, &mut i2);
+        }
+        let c2 = mp.atoms[i2].color;
+        if c2 != top_color && c2 != bottom_color {
+            continue;
+        }
+        let seed = numbers[i1];
+        let mut p1 = [0.0, 0.0];
+        next_substituent_point(&mut p1, &coords, &edges, seed, 0);
+        let t = eper[0] * (p1[0] - p[0]) + eper[1] * (p1[1] - p[1]);
+        if c2 == top_color {
+            total += t;
+        } else {
+            total -= t;
+        }
+    }
+    total.abs() * dmax
+}
+
+/// `AttachmentCenterDistance`: distance of the attachment atoms of fragment `color` from its center
+pub fn attachment_center_distance(mp: &Molecule, color: i32, attachment_color: i32) -> f64 {
+    let col = |b: &crate::external::avalon::reaccs::Bond, k: usize| {
+        mp.atoms[(b.atoms[k] - 1) as usize].color
+    };
+    // the atom of the bond inside the fragment if the bond leaves it
+    let leaving = |b: &crate::external::avalon::reaccs::Bond| -> Option<usize> {
+        if col(b, 0) == color && col(b, 1) != color {
+            Some((b.atoms[0] - 1) as usize)
+        } else if col(b, 1) == color && col(b, 0) != color {
+            Some((b.atoms[1] - 1) as usize)
+        } else {
+            None
+        }
+    };
+    let mut att_dist = 0.0f64;
+    for i in 0..mp.bonds.len() {
+        let Some(ai1) = leaving(&mp.bonds[i]) else {
+            continue;
+        };
+        for j in i + 1..mp.bonds.len() {
+            let Some(ai2) = leaving(&mp.bonds[j]) else {
+                continue;
+            };
+            let dx = mp.atoms[ai1].x - mp.atoms[ai2].x;
+            let dy = mp.atoms[ai1].y - mp.atoms[ai2].y;
+            let dist = f64::from(dx * dx + dy * dy).sqrt();
+            let h = 4.0 * 1.54 - dist;
+            let m = if 0.0 < h { 0.0 } else { h };
+            att_dist += m * m;
+        }
+    }
+    let (mut xc, mut yc) = (0.0f64, 0.0f64);
+    let mut n = 0;
+    for a in &mp.atoms {
+        if a.color == color {
+            xc += f64::from(a.x);
+            yc += f64::from(a.y);
+            n += 1;
+        }
+    }
+    if n == 0 {
+        return 0.0;
+    }
+    xc /= f64::from(n);
+    yc /= f64::from(n);
+    let mut result = 0.0;
+    for b in &mp.bonds {
+        let (a0, a1) = (
+            &mp.atoms[(b.atoms[0] - 1) as usize],
+            &mp.atoms[(b.atoms[1] - 1) as usize],
+        );
+        let at = if a0.color == color && a1.color == attachment_color {
+            a0
+        } else if a1.color == color && a0.color == attachment_color {
+            a1
+        } else {
+            continue;
+        };
+        result += (f64::from(at.x) - xc) * (f64::from(at.x) - xc);
+        result += (f64::from(at.y) - yc) * (f64::from(at.y) - yc);
+    }
+    result - 10.0 * att_dist
+}
+
+/// `FloodInvertColor`: negates the colour of the part of the fragment reachable from `start` without crossing `flip_bond`
+pub fn flood_invert_color(
+    mp: &mut Molecule,
+    nbp: &[Neighbourhood],
+    start: usize,
+    fragment_color: i32,
+    flip_bond: usize,
+) -> usize {
+    if mp.atoms[start].color != fragment_color {
+        return 0;
+    }
+    let mut nflip = 1;
+    mp.atoms[start].color *= -1;
+    for i in 0..nbp[start].atoms.len() {
+        if flip_bond == nbp[start].bonds[i] {
+            continue;
+        }
+        let ai = nbp[start].atoms[i];
+        if mp.atoms[ai].color != fragment_color {
+            continue;
+        }
+        nflip += flood_invert_color(mp, nbp, ai, fragment_color, flip_bond);
+    }
+    nflip
+}
+
+/// `ChangeAtomColors`: returns the number of atoms recolored
+pub fn change_atom_colors(mp: &mut Molecule, from: i32, to: i32) -> usize {
+    let mut n = 0;
+    for a in &mut mp.atoms {
+        if a.color == from {
+            a.color = to;
+            n += 1;
+        }
+    }
+    n
+}
+
+fn mirror_negative(mp: &mut Molecule, color: i32, p1: [f64; 2], r12: [f64; 2]) {
+    for ap in &mut mp.atoms {
+        if ap.color == -color {
+            let p = [f64::from(ap.x), f64::from(ap.y)];
+            let q = ((p[0] - p1[0]) * r12[0] + (p[1] - p1[1]) * r12[1])
+                / (r12[0] * r12[0] + r12[1] * r12[1]);
+            ap.x = (p1[0] - (p[0] - p1[0]) + 2.0 * r12[0] * q) as f32;
+            ap.y = (p1[1] - (p[1] - p1[1]) + 2.0 * r12[1] * q) as f32;
+        }
+    }
+}
+
+fn fragment_score(
+    mp: &Molecule,
+    improvement_type: i32,
+    color: i32,
+    col1: i32,
+    col2: i32,
+) -> Option<f64> {
+    let color_strain = -color_strain(mp, color, color);
+    match improvement_type {
+        CENTER_DISTANCE => Some(attachment_center_distance(mp, color, col1) + color_strain),
+        TOP_BOTTOM_SEPARATION => Some(top_bottom_separation(mp, color, col1, col2) + color_strain),
+        _ => None,
+    }
+}
+
+/// `ImproveFragmentByBondFlip`: flips one side of bond `bi` and keeps it if the score improves; returns the score change
+pub fn improve_fragment_by_bond_flip(
+    mp: &mut Molecule,
+    nbp: &[Neighbourhood],
+    bi: usize,
+    improvement_type: i32,
+    col1: i32,
+    col2: i32,
+    forced_undo: bool,
+) -> f64 {
+    if mp.bonds[bi].bond_type & DONT_FLIP_BOND != 0 {
+        return 0.0;
+    }
+    let (b0, b1) = (
+        (mp.bonds[bi].atoms[0] - 1) as usize,
+        (mp.bonds[bi].atoms[1] - 1) as usize,
+    );
+    if mp.atoms[b0].color != mp.atoms[b1].color {
+        return 0.0;
+    }
+    let color = mp.atoms[b0].color;
+    let Some(strain1) = fragment_score(mp, improvement_type, color, col1, col2) else {
+        return 0.0;
+    };
+    flood_invert_color(mp, nbp, b0, color, bi);
+    if mp.atoms[b1].color == -color {
+        change_atom_colors(mp, -color, color);
+        return 0.0;
+    }
+    let p1 = [f64::from(mp.atoms[b0].x), f64::from(mp.atoms[b0].y)];
+    let p2 = [f64::from(mp.atoms[b1].x), f64::from(mp.atoms[b1].y)];
+    let r12 = [p2[0] - p1[0], p2[1] - p1[1]];
+    mirror_negative(mp, color, p1, r12);
+    change_atom_colors(mp, -color, color);
+    let strain2 = fragment_score(mp, improvement_type, color, col1, col2).unwrap_or(0.0);
+    if strain1 > strain2 || forced_undo {
+        flood_invert_color(mp, nbp, b0, color, bi);
+        mirror_negative(mp, color, p1, r12);
+        change_atom_colors(mp, -color, color);
+    }
+    strain2 - strain1
+}
+
+/// `ImproveFragmentByAllBondFlips`: repeatedly applies the best flip of fragment `color`
+pub fn improve_fragment_by_all_bond_flips(
+    mp: &mut Molecule,
+    nbp: &[Neighbourhood],
+    color: i32,
+    improvement_type: i32,
+    col1: i32,
+    col2: i32,
+) -> bool {
+    let mut result = false;
+    loop {
+        let mut best_improvement = 0.0;
+        let mut best_bond = None;
+        for i in 0..mp.bonds.len() {
+            let b = &mp.bonds[i];
+            if b.bond_type & DONT_FLIP_BOND != 0
+                || mp.atoms[(b.atoms[0] - 1) as usize].color != color
+                || mp.atoms[(b.atoms[1] - 1) as usize].color != color
+            {
+                continue;
+            }
+            let improvement =
+                improve_fragment_by_bond_flip(mp, nbp, i, improvement_type, col1, col2, true);
+            if improvement > best_improvement + 0.001 {
+                best_improvement = improvement;
+                best_bond = Some(i);
+            }
+        }
+        match best_bond {
+            Some(bi) => {
+                improve_fragment_by_bond_flip(mp, nbp, bi, improvement_type, col1, col2, false);
+                result = true;
+            }
+            None => return result,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3002,6 +3294,88 @@ mod tests {
             out += &dump3("rimprove", &c);
             scale_by_fixed_fragments(&mut c);
             out += &dump3("rscale", &c);
+            if out != want {
+                bad.push(format!("{input}\nwant:\n{want}\ngot:\n{out}"));
+            }
+        }
+        assert!(bad.is_empty(), "{} differ; first:\n{}", bad.len(), bad[0]);
+    }
+
+    /// fragment bond flipping and its scores must agree with the C code
+    #[test]
+    fn layout_fragment_flips_match_c() {
+        use crate::external::avalon::smi2mol::{TRUE_DB_STEREO, smi_to_mol};
+        let text = include_str!("../../../../../tests/data/avalon_layout7.jsonl");
+        let g = |v: f64| fmt_gp(v, 9);
+        let mut bad = Vec::new();
+        for line in text.lines() {
+            let v: serde_json::Value = serde_json::from_str(line).expect("json");
+            let input = v["input"].as_str().unwrap();
+            let want = v["output"].as_str().unwrap();
+            let Some(mp) = smi_to_mol(input, TRUE_DB_STEREO).unwrap() else {
+                assert_eq!(want, "NULL\n");
+                continue;
+            };
+            let mut base = seeded(7, &mp);
+            recolor_molecule(&mut base);
+            layout_rings(&mut base);
+            let nbp = setup_neighbourhood(&base).unwrap();
+            let (as_, bs) = ring_state(&base);
+            let mut rs = vec![0i32; base.bonds.len()];
+            for i in 0..base.bonds.len() {
+                if bs[i] != 0 {
+                    let col = base.atoms[(base.bonds[i].atoms[0] - 1) as usize].color;
+                    rs[i] = (0..base.atoms.len())
+                        .filter(|&j| as_[j] != 0 && base.atoms[j].color == col)
+                        .count() as i32;
+                }
+            }
+            sprout_ring_substituents(&mut base, &as_, &rs, &nbp);
+            link_ring_fragments(&mut base, &as_);
+            layout_chain_atoms(&mut base, &as_, &nbp);
+            layout_rubber_fragments(&mut base);
+            link_remaining_fragments(&mut base);
+            let mut out = dump3("base", &base);
+            let mut c = base.clone();
+            let nring = as_.iter().filter(|&&x| x != 0).count();
+            let n = c.atoms.len();
+            for (i, a) in c.atoms.iter_mut().enumerate() {
+                a.color = if nring > 0 {
+                    if as_[i] != 0 {
+                        2
+                    } else if i % 2 == 1 {
+                        4
+                    } else {
+                        3
+                    }
+                } else if i < n.div_ceil(2) {
+                    2
+                } else if i % 2 == 1 {
+                    4
+                } else {
+                    3
+                };
+            }
+            out += &format!("acd {}\n", g(attachment_center_distance(&c, 2, 3)));
+            out += &format!("acd2 {}\n", g(attachment_center_distance(&c, 2, 4)));
+            out += &format!("tbs {}\n", g(top_bottom_separation(&c, 2, 3, 4)));
+            out += &format!("tbs2 {}\n", g(top_bottom_separation(&c, 2, 4, 3)));
+            for t in 1..=2 {
+                for k in 0..c.bonds.len().min(14) {
+                    for fu in 0..2 {
+                        let mut d = c.clone();
+                        let r = improve_fragment_by_bond_flip(&mut d, &nbp, k, t, 3, 4, fu == 1);
+                        out += &format!("flip t{t} b{k} u{fu} {}\n", g(r));
+                        if r != 0.0 {
+                            out += &dump3("flipped", &d);
+                        }
+                    }
+                }
+                let mut d = c.clone();
+                let r = improve_fragment_by_all_bond_flips(&mut d, &nbp, 2, t, 3, 4);
+                out += &format!("all t{t} {}\n", i32::from(r));
+                out += &dump3("allflip", &d);
+            }
             if out != want {
                 bad.push(format!("{input}\nwant:\n{want}\ngot:\n{out}"));
             }

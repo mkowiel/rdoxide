@@ -166,3 +166,10 @@ Ported `BondLengthSQR`, `AtomBondClash`, `CountCollisions`, `BondLinksAtoms`, `S
 single precision as in C (`fd`, and `SQR` of float differences in `ScaleByFixedFragments`). Checked on 90 SMILES
 (`tests/data/avalon_layout6.jsonl`, driver `lay6.c`), including randomly placed colliding layouts that exercise the
 stretch and random-nudge paths. `FixInwardHydrogens` never fires on this corpus (the test only proves it a no-op there).
+
+### L7 — layout.c fragment bond flips
+
+Ported `TopBottomSeparation`, `AttachmentCenterDistance`, `FloodInvertColor`, `ChangeAtomColors`,
+`ImproveFragmentByBondFlip` and `ImproveFragmentByAllBondFlips`. Checked on 56 SMILES with a synthetic coloring
+(ring atoms = fragment, others = top/bottom attachments) in `tests/data/avalon_layout7.jsonl` (driver `lay7.c`).
+The flip-and-undo trials reproduce C's float round-off since the undo is a second reflection, not a restore.
