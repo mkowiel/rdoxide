@@ -17,6 +17,24 @@ pub type FragmentId = usize;
 pub const COORDINATES_LIMIT: f32 = 10000000.0;
 pub const INVALID_COORDINATES: f32 = COORDINATES_LIMIT + 1.0;
 
+/// `sketcherMinimizerAtomChiralityInfo::sketcherMinimizerChirality`
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Chirality {
+    Clockwise,
+    CounterClockwise,
+    #[default]
+    Unspecified,
+}
+
+/// `sketcherMinimizerAtomChiralityInfo`
+#[derive(Debug, Clone, Copy, Default)]
+pub struct AtomChiralityInfo {
+    pub looking_from: Option<AtomId>,
+    pub atom1: Option<AtomId>,
+    pub atom2: Option<AtomId>,
+    pub direction: Chirality,
+}
+
 /// `sketcherMinimizerAtom`
 #[derive(Debug, Clone)]
 pub struct Atom {
@@ -58,6 +76,7 @@ pub struct Atom {
     pub coordinates: PointF,
     pub template_coordinates: PointF,
     pub force: PointF,
+    pub chirality_info: AtomChiralityInfo,
 }
 
 impl Default for Atom {
@@ -101,6 +120,7 @@ impl Default for Atom {
             coordinates: PointF::default(),
             template_coordinates: PointF::default(),
             force: PointF::default(),
+            chirality_info: AtomChiralityInfo::default(),
         }
     }
 }
