@@ -13,6 +13,7 @@ pub mod reaccs;
 pub mod reaccsio;
 pub mod scan;
 pub mod set;
+pub mod smi2mol;
 pub mod smiles;
 pub mod stereo;
 pub mod tables;
