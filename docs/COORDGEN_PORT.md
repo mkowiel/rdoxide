@@ -98,3 +98,13 @@ into `sketcherMinimizerMolecule`, runs `runGenerateCoordinates` and copies the c
   for the platform `acos`. Not yet: `scoreClashes`/`scoreCrossBonds`, `avoidClashes*`, `checkForClashes`, conformer search,
   peptide constraints (residues). (`tests/data/coordgen_minim.txt`, `tools/coordgen_drv/minim.cpp`,
   `tools/make_coordgen_minim_corpus.py`.)
+* CG5b `external::coordgen::{dofs,clashes}`: fragment degrees of freedom (flip, change parent bond length, rotate, scale
+  atoms, invert bond: states, `apply`, penalties), `Fragment::setCoordinates`, `buildMoleculeFromFragments` with
+  `alignWithParentDirection` (constrained and unconstrained), clash scoring (`scoreClashes`, crossing bonds, atoms inside
+  rings, DOF penalties), `checkForClashes`, `avoidTerminalClashes`, the DOF search (`flipFragments`, `runSearch`,
+  `growSolutions`; ordered maps give upstream's iteration order), the peptide backbone constraints, `avoidClashesOfMolecule`
+  and `avoidClashes`. 108 molecules (101 with a non-macrocycle layout; 60 need the full search and minimization) give
+  the same clean-pose flag, clash energy and final coordinates as the C++ code (`tests/data/coordgen_clash.txt`,
+  `tools/coordgen_drv/clash.cpp`, `tools/make_coordgen_clash_corpus.py`). Deliberate difference: sets and maps keyed by pointer
+  upstream use atom index order. `checkForClashes` is available but its caller in the fragment builder (atoms flagged
+  `needsCheckForClashes`) is still `unimplemented!` until the driver sets that flag. Corpus gap: the atoms-inside-rings term is not exercised.
