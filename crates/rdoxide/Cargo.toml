@@ -11,9 +11,15 @@ include = ["src/**", "data/**"]
 
 [dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
+tiny-skia = { version = "0.11", default-features = false, features = ["std", "png-format"], optional = true }
 
 [lints]
 workspace = true
 
 [dev-dependencies]
 serde_json = "1"
+
+[features]
+default = ["png"]
+# PNG output of the molecule drawer (rasterises the drawer's SVG with tiny-skia)
+png = ["dep:tiny-skia"]

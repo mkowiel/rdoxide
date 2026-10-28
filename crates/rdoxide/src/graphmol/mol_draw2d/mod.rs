@@ -24,6 +24,8 @@ pub mod font;
 pub mod helpers;
 pub mod mol_draw2d_svg;
 pub mod options_json;
+#[cfg(feature = "png")]
+pub mod raster;
 pub mod string_rect;
 pub mod svg_canvas;
 pub mod utils;

@@ -1301,6 +1301,65 @@ impl PyMolDraw2DSVG {
     }
 }
 
+/// Cairo molecule drawer (the PNG is rendered with tiny-skia)
+#[pyclass(
+    name = "MolDraw2DCairo",
+    module = "rdoxide.Chem.Draw.rdMolDraw2D",
+    extends = PyMolDraw2D
+)]
+#[derive(Debug)]
+pub struct PyMolDraw2DCairo;
+
+#[pymethods]
+#[allow(non_snake_case)]
+impl PyMolDraw2DCairo {
+    #[new]
+    #[pyo3(signature = (width, height, panelWidth = -1, panelHeight = -1, noFreetype = false))]
+    fn new(
+        width: i32,
+        height: i32,
+        panelWidth: i32,
+        panelHeight: i32,
+        noFreetype: bool,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        // the text of the PNG drawer is always drawn as glyph outlines
+        let _ = noFreetype;
+        let d = MolDraw2DSVG::with_text(
+            width,
+            height,
+            panelWidth,
+            panelHeight,
+            MolDrawOptions::default(),
+            false,
+        )
+        .py()?;
+        Ok(PyClassInitializer::from(PyMolDraw2D { d }).add_subclass(PyMolDraw2DCairo))
+    }
+
+    /// add the last bits of the drawing
+    fn FinishDrawing(mut slf: PyRefMut<'_, Self>) {
+        slf.as_super().d.finish_drawing();
+    }
+
+    /// return the PNG
+    fn GetDrawingText<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, pyo3::types::PyBytes>> {
+        let svg = slf.as_super().d.get_drawing_text();
+        let png = rdoxide::graphmol::mol_draw2d::raster::svg_to_png(&svg).py()?;
+        Ok(pyo3::types::PyBytes::new(py, &png))
+    }
+
+    /// write the PNG to a file
+    fn WriteDrawingText(mut slf: PyRefMut<'_, Self>, fName: &str) -> PyResult<()> {
+        let svg = slf.as_super().d.get_drawing_text();
+        let png = rdoxide::graphmol::mol_draw2d::raster::svg_to_png(&svg).py()?;
+        std::fs::write(fName, png)
+            .map_err(|e| pyo3::exceptions::PyIOError::new_err(format!("cannot write {fName}: {e}")))
+    }
+}
+
 // ----------------------------------------------------------------------
 // functions
 // ----------------------------------------------------------------------
@@ -1917,6 +1976,7 @@ pub fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyMolDrawOptions>()?;
     m.add_class::<PyMolDraw2D>()?;
     m.add_class::<PyMolDraw2DSVG>()?;
+    m.add_class::<PyMolDraw2DCairo>()?;
     m.add_class::<PyContourParams>()?;
     m.add_function(wrap_pyfunction!(contour_and_draw_gaussians_py, m)?)?;
     m.add_function(wrap_pyfunction!(contour_and_draw_grid_py, m)?)?;
