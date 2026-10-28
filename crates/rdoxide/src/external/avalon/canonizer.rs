@@ -2,12 +2,19 @@
 
 use super::graph::CRand;
 use super::pattern::{AugmentedAtom, string_to_augmented_atom, transform_augmented_atoms};
-use super::perceive::{DOUBLE, Neighbourhood, SINGLE, TRIPLE, ring_state, set_ring_size_flags};
+use super::perceive::{
+    DOUBLE, Neighbourhood, SINGLE, TRIPLE, perceive_aromatic_bonds, perceive_dy_aromaticity,
+    ring_state, set_ring_size_flags, setup_neighbourhood,
+};
 use super::reaccs::{CIS_TRANS_EITHER, CIS_TRANS_SWAPPED, Molecule, NONE, number_of};
+use super::smi2mol::{DO_LAYOUT, DROP_TRIVIAL_HYDROGENS, TRUE_DB_STEREO, smi_to_mol};
+use super::smiles::{AROMATIC_SMILES, DY_AROMATICITY, ISOMERIC_SMILES, mol_to_smi_ext};
 use super::utilities::{
-    DOWN, UP, atom_symbol_match, compute_implicit_h, flood_fill_fragments, get_num_property,
+    ANCILLARY_STEREO, DOWN, NO_QUERY_H_COUNT, NON_STEREO_HYDROGENS, UP, atom_symbol_match,
+    compute_implicit_h, flood_fill_fragments, get_num_property, make_some_hydrogens_implicit,
     reset_colors, strip_molecule,
 };
+use std::sync::atomic::{AtomicU32, Ordering};
 
 /// `TO_MONOMER` of `smi2mol.h`
 pub const TO_MONOMER: i32 = 0x1000;
@@ -595,6 +602,211 @@ pub fn remove_inorganic_fragments(mp: &mut Molecule) {
     reset_colors(mp);
 }
 
+pub const DB_STEREO: i32 = 0x01;
+pub const CENTER_STEREO: i32 = 0x02;
+pub const SCRAMBLE: i32 = 0x04;
+pub const COMPONENT_SET: i32 = 0x08;
+pub const MAIN_PART: i32 = 0x10;
+pub const FORCE_OCTET: i32 = 0x20;
+pub const REMOVE_ISOTOPE: i32 = 0x40;
+pub const REMOVE_MAPPING: i32 = 0x80;
+
+/// the file-level `seed` of `canonizer.c` used by `ScrambleMolecule`
+static SCRAMBLE_SEED: AtomicU32 = AtomicU32::new(13);
+
+/// `SetSeed`
+pub fn set_seed(seed: i32) {
+    SCRAMBLE_SEED.store(seed as u32, Ordering::SeqCst);
+}
+
+/// `RemoveStandardComponents`: removes the SMILES of the (canonical) `salts` from the '.'-separated `smiles`
+pub fn remove_standard_components(smiles: &str, salts: &[&str]) -> String {
+    if smiles.is_empty() || salts.is_empty() {
+        return smiles.to_string();
+    }
+    let mut s = smiles.to_string();
+    loop {
+        let mut changed = false;
+        for salt in salts {
+            if !s.contains(salt) {
+                continue;
+            }
+            let start = format!("{salt}.");
+            if s.starts_with(&start) {
+                s.drain(..start.len());
+                changed = true;
+                continue;
+            }
+            let middle = format!(".{salt}.");
+            if let Some(m) = s.find(&middle) {
+                // keep the first '.'
+                s.drain(m + 1..m + middle.len());
+                changed = true;
+                continue;
+            }
+            let end = format!(".{salt}");
+            if let Some(m) = s.find(&end) {
+                if s.len() - m == end.len() {
+                    s.truncate(m);
+                    changed = true;
+                }
+            }
+        }
+        if !changed {
+            return s;
+        }
+    }
+}
+
+/// `CanSmilesStep`: one canonicalization pass; `None` if the SMILES cannot be processed
+pub fn can_smiles_step(insmiles: &str, flags: i32) -> Option<String> {
+    let mut mp = smi_to_mol(
+        insmiles,
+        TRUE_DB_STEREO | DO_LAYOUT | DROP_TRIVIAL_HYDROGENS,
+    )
+    .ok()??;
+    if flags & CENTER_STEREO == 0 {
+        for b in &mut mp.bonds {
+            if b.bond_type == SINGLE {
+                b.stereo_symbol = NONE;
+            }
+        }
+    }
+    if flags & REMOVE_ISOTOPE != 0 {
+        for a in &mut mp.atoms {
+            a.mass_difference = 0;
+        }
+    }
+    if flags & REMOVE_MAPPING != 0 {
+        for a in &mut mp.atoms {
+            a.mapping = NONE;
+        }
+    }
+    if flags & (COMPONENT_SET | MAIN_PART) != 0 {
+        split_ionic_bonds(&mut mp);
+    }
+    if flags & FORCE_OCTET != 0 {
+        force_octet(&mut mp, &mut Vec::new());
+    }
+    if flags & MAIN_PART != 0 {
+        remove_inorganic_fragments(&mut mp);
+    }
+    if flags & SCRAMBLE != 0 {
+        let mut seed = SCRAMBLE_SEED.load(Ordering::SeqCst);
+        scramble_molecule(&mut mp, &mut seed);
+        SCRAMBLE_SEED.store(seed, Ordering::SeqCst);
+    }
+    if flags & TO_MONOMER == 0 {
+        make_some_hydrogens_implicit(
+            &mut mp,
+            NON_STEREO_HYDROGENS | NO_QUERY_H_COUNT | ANCILLARY_STEREO,
+        );
+    }
+    let mut nbp = setup_neighbourhood(&mp)?;
+    if flags & DY_AROMATICITY != 0 {
+        perceive_dy_aromaticity(&mut mp, &nbp);
+    } else {
+        perceive_aromatic_bonds(&mut mp);
+    }
+    let numbering = canonical_numbering(&mut mp, &mut nbp, flags);
+    let mut smiles = if flags & TO_MONOMER != 0 {
+        for a in &mut mp.atoms {
+            if a.atom_symbol == "R" {
+                a.charge = 1;
+            }
+        }
+        let mut s = mol_to_smi_ext(
+            &mut mp,
+            TO_MONOMER | ISOMERIC_SMILES | AROMATIC_SMILES,
+            Some(&numbering),
+        )
+        .ok()??;
+        s = s.replacen("([*+])", "&1", 1);
+        s = s.replacen("[*+]", "&1", 1);
+        for i in 2..20 {
+            s = s.replacen(&format!("([*+{i}])"), &format!("&{i}"), 1);
+            s = s.replacen(&format!("[*+{i}]"), &format!("&{i}"), 1);
+        }
+        s
+    } else {
+        mol_to_smi_ext(&mut mp, ISOMERIC_SMILES | AROMATIC_SMILES, Some(&numbering)).ok()??
+    };
+    if flags & DB_STEREO == 0 {
+        smiles.retain(|c| c != '/' && c != '\\');
+    }
+    Some(smiles)
+}
+
+/// `UnifyFragmentDBStereo`: lets every '.'-separated fragment start its double bond marks with '/'
+pub fn unify_fragment_db_stereo(smiles: &mut String) {
+    #[derive(PartialEq)]
+    enum State {
+        Start,
+        Slash,
+        Backslash,
+    }
+    let mut state = State::Start;
+    let mut out = String::with_capacity(smiles.len());
+    for c in smiles.chars() {
+        let c = match c {
+            '\\' => match state {
+                State::Start => {
+                    state = State::Backslash;
+                    '/'
+                }
+                State::Backslash => '/',
+                State::Slash => '\\',
+            },
+            '/' => match state {
+                State::Start => {
+                    state = State::Slash;
+                    '/'
+                }
+                State::Backslash => '\\',
+                State::Slash => '/',
+            },
+            '.' => {
+                state = State::Start;
+                '.'
+            }
+            other => other,
+        };
+        out.push(c);
+    }
+    *smiles = out;
+}
+
+/// `makeComponentSet`: drops fragments that repeat the preceding one
+pub fn make_component_set(smiles: &str) -> String {
+    let mut result = String::new();
+    let mut last = "";
+    for tok in smiles.split('.').filter(|t| !t.is_empty()) {
+        if last.is_empty() {
+            result.push_str(tok);
+            last = tok;
+        } else if last != tok {
+            result.push('.');
+            result.push_str(tok);
+            last = tok;
+        }
+    }
+    result
+}
+
+/// `CanSmiles`: the canonical SMILES of `insmiles`; `None` if anything goes wrong
+pub fn can_smiles(insmiles: &str, flags: i32) -> Option<String> {
+    let mut smiles = can_smiles_step(insmiles, flags)?;
+    unify_fragment_db_stereo(&mut smiles);
+    if flags & TO_MONOMER == 0 && (smiles.contains('/') || smiles.contains('\\')) {
+        smiles = can_smiles_step(&smiles, flags & !MAIN_PART)?;
+        unify_fragment_db_stereo(&mut smiles);
+    }
+    if flags & COMPONENT_SET != 0 {
+        smiles = make_component_set(&smiles);
+    }
+    Some(smiles)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -725,6 +937,35 @@ mod tests {
             "{} of {n} differ; first:\n{}",
             bad.len(),
             bad[0]
+        );
+    }
+
+    /// `CanSmiles` and `RemoveStandardComponents` must agree with the C code
+    #[test]
+    fn can_smiles_matches_c() {
+        let text = include_str!("../../../../../tests/data/avalon_cansmiles.jsonl");
+        let mut bad = Vec::new();
+        for line in text.lines() {
+            let v: serde_json::Value = serde_json::from_str(line).expect("json");
+            let flags = v["flags"].as_str().unwrap();
+            let input = v["input"].as_str().unwrap();
+            let want = v["output"].as_str().unwrap();
+            let got = if flags == "S" {
+                let (smi, salts) = input.split_once('\t').unwrap();
+                let salts: Vec<&str> = salts.split(',').collect();
+                remove_standard_components(smi, &salts)
+            } else {
+                can_smiles(input, flags.parse().unwrap()).unwrap_or_else(|| "NULL".to_string())
+            };
+            if got != want {
+                bad.push(format!("{flags} {input}: want {want}, got {got}"));
+            }
+        }
+        assert!(
+            bad.is_empty(),
+            "{} differ; first:\n{}",
+            bad.len(),
+            bad[..bad.len().min(8)].join("\n")
         );
     }
 }

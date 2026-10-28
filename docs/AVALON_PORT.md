@@ -201,3 +201,10 @@ ring list is empty), so the stream `ImproveCollisions` draws from is the state l
 `smi_to_mol` no longer rejects `DO_LAYOUT`: it recolors, applies an optional coordinate string after `|` (`KEEP_POSITION`
 atoms, `DONT_FLIP_BOND` between two of them), calls `layout_molecule` and restores the atom ordinals as colors.
 159 inputs incl. coordinate strings with missing/garbled fields in `tests/data/avalon_layout11.jsonl` (driver `smil.c`).
+
+### A3 — CanSmiles
+
+`can_smiles` (`CanSmilesStep`, `UnifyFragmentDBStereo`, `makeComponentSet`) and `remove_standard_components` are ported
+in `canonizer.rs`; the scramble seed is the C file-level `seed` (starts at 13, `set_seed`). 627 cases (SMILES x flag
+combinations incl. `MAIN_PART|COMPONENT_SET`, `FORCE_OCTET`, `SCRAMBLE`, `TO_MONOMER`, `DY_AROMATICITY`, random SMILES of
+the same molecules, and salt removal) in `tests/data/avalon_cansmiles.jsonl` (driver `cs.c`) are identical to the C code.
