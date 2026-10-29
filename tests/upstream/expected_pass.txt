@@ -1405,6 +1405,11 @@ External/pubchem_shape/Wrap/test_rdshapealign.py::TestCase::test6_notColorAtoms
 External/pubchem_shape/Wrap/test_rdshapealign.py::TestCase::test7_customFeatures
 External/pubchem_shape/Wrap/test_rdshapealign.py::TestCase::test8_customFeatures
 External/pubchem_shape/Wrap/test_rdshapealign.py::TestCase::test9_FixedScore
+External/YAeHMOP/Wrap/testEHTTools.py::TestCase::test1
+External/YAeHMOP/Wrap/testEHTTools.py::TestCase::test2
+External/YAeHMOP/Wrap/testEHTTools.py::TestCase::test3
+External/YAeHMOP/Wrap/testEHTTools.py::TestCase::test4
+External/YAeHMOP/Wrap/testEHTTools.py::TestCase::test5
 External/FreeSASA/Wrap/testFreeSASA.py::TestCase::test_basics
 External/FreeSASA/Wrap/testFreeSASA.py::TestCase::test_opts
 rdkit/Chem/AtomPairs/UnitTestDescriptors.py::DocTestCase::runTest

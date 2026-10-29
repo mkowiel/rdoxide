@@ -265,7 +265,7 @@ fn arg<'py, T>(
     default: T,
 ) -> PyResult<T>
 where
-    T: for<'a> FromPyObjectOwned<'py>,
+    T: FromPyObjectOwned<'py>,
 {
     match get(args, kwargs, pos, name)? {
         Some(v) => v.extract::<T>().map_err(Into::into),
