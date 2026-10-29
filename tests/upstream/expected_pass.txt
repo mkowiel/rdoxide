@@ -1401,6 +1401,13 @@ External/CoordGen/Wrap/testCoordGen.py::TestCase::test_basics
 External/CoordGen/Wrap/testCoordGen.py::TestCase::test_template1
 External/CoordGen/Wrap/testCoordGen.py::TestCase::test_template2
 External/CoordGen/Wrap/testCoordGen.py::TestCase::test_template3
+External/pubchem_shape/Wrap/test_rdshapealign.py::TestCase::test2_NoColor
+External/pubchem_shape/Wrap/test_rdshapealign.py::TestCase::test4_ShapeInputOptions
+External/pubchem_shape/Wrap/test_rdshapealign.py::TestCase::test5_ShapeShapeOverlay
+External/pubchem_shape/Wrap/test_rdshapealign.py::TestCase::test6_notColorAtoms
+External/pubchem_shape/Wrap/test_rdshapealign.py::TestCase::test7_customFeatures
+External/pubchem_shape/Wrap/test_rdshapealign.py::TestCase::test8_customFeatures
+External/pubchem_shape/Wrap/test_rdshapealign.py::TestCase::test9_FixedScore
 rdkit/Chem/AtomPairs/UnitTestDescriptors.py::DocTestCase::runTest
 rdkit/Chem/AtomPairs/UnitTestDescriptors.py::TestCase::testGetTopologicalTorsionFingerprintAsIds
 rdkit/Chem/AtomPairs/UnitTestDescriptors.py::TestCase::testGithub334

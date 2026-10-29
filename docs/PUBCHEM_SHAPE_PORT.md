@@ -24,3 +24,12 @@ Licence file to add with S1: `LICENSES/PubChemAlign3D-PublicDomain.txt` (the NCB
   Corpus gaps: perturbing that copy, the `line_iter > 3` limit or the 0.7 pose filter does not change any result.
   Deliberately different: the C++ returns an uninitialized pose when no starting pose scores above zero (shapes without
   volume atoms); here it is the zero quaternion.
+
+## Status: S3 + S4 done
+
+`shape.rs` (shape preparation, alignment, scoring, conformer transform) and the Python module
+`rdoxide.Chem.rdShapeAlign` are in. Against the official wheel, `AlignMol`/`AlignShapes` agree to ~1e-14
+for default settings. Upstream `test_rdshapealign.py`: 7/9 pass. `test1_Defaults` and `test3_FromShape`
+(`max_preiters=3`, `opt_param=0.5`) differ in the colour score by 1e-3: the pose after so few pre-iterations is
+sensitive to floating-point contraction (the wheel is compiled with FMA contraction, the oracle for the bit-exact
+corpus is not), so they stay out of the ratchet.

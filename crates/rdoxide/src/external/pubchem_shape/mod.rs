@@ -5,6 +5,7 @@
 pub mod consts;
 pub mod functions;
 pub mod neighbor;
+pub mod shape;
 
 #[cfg(test)]
 mod tests {

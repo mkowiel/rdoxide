@@ -47,3 +47,4 @@ rdkit/VLib/NodeLib/UnitTestNodeLib.py
 rdkit/Chem/UnitTestPandasTools.py
 External/AvalonTools/Wrap/testAvalonTools.py
 External/CoordGen/Wrap/testCoordGen.py
+External/pubchem_shape/Wrap/test_rdshapealign.py
