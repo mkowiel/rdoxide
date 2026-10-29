@@ -197,6 +197,7 @@ Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::testSetBadRingSystemTempl
 Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::testSetRingSystemTemplates
 Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::testUseMultipleTemplates
 Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::testUseTemplateAndCoordMap
+Code/GraphMol/Depictor/Wrap/testDepictor.py::TestCase::testUsingCoordGenCtxtMgr
 Code/GraphMol/Deprotect/Wrap/rough_test.py::TestCase::testDeprotect
 Code/GraphMol/Deprotect/Wrap/rough_test.py::TestCase::testDeprotectInPlace
 Code/GraphMol/Deprotect/Wrap/rough_test.py::TestCase::testDeprotectVector
@@ -1396,6 +1397,10 @@ External/AvalonTools/Wrap/testAvalonTools.py::TestCase::testGitHub1062
 External/AvalonTools/Wrap/testAvalonTools.py::TestCase::testRDK151
 External/AvalonTools/Wrap/testAvalonTools.py::TestCase::testStruChk
 External/AvalonTools/Wrap/testAvalonTools.py::TestCase::testStruChkInMemoryLog
+External/CoordGen/Wrap/testCoordGen.py::TestCase::test_basics
+External/CoordGen/Wrap/testCoordGen.py::TestCase::test_template1
+External/CoordGen/Wrap/testCoordGen.py::TestCase::test_template2
+External/CoordGen/Wrap/testCoordGen.py::TestCase::test_template3
 rdkit/Chem/AtomPairs/UnitTestDescriptors.py::DocTestCase::runTest
 rdkit/Chem/AtomPairs/UnitTestDescriptors.py::TestCase::testGetTopologicalTorsionFingerprintAsIds
 rdkit/Chem/AtomPairs/UnitTestDescriptors.py::TestCase::testGithub334

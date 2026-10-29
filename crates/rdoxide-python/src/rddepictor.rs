@@ -277,11 +277,10 @@ fn load_default_ring_system_templates_py() {
 }
 
 /// Returns whether RDKit was built with CoordGen support
-/// (always False: CoordGen is not part of rdoxide)
 #[pyfunction]
 #[pyo3(name = "IsCoordGenSupportAvailable")]
 fn is_coord_gen_support_available() -> bool {
-    false
+    true
 }
 
 /// Set whether or not the CoordGen library should be preferred to the RDKit
@@ -289,32 +288,44 @@ fn is_coord_gen_support_available() -> bool {
 #[pyfunction]
 #[pyo3(name = "SetPreferCoordGen", signature = (val))]
 fn set_prefer_coord_gen(val: bool) {
-    let _ = val;
+    rdoxide::graphmol::depictor::set_prefer_coord_gen(val);
 }
 
-/// Always returns False (CoordGen support not enabled)
+/// Return whether or not the CoordGen library is used for depiction
 #[pyfunction]
 #[pyo3(name = "GetPreferCoordGen")]
 fn get_prefer_coord_gen() -> bool {
-    false
+    rdoxide::graphmol::depictor::prefer_coord_gen()
 }
 
 /// Context manager to temporarily set CoordGen library preference in RDKit
 /// depiction.
 #[pyclass(name = "UsingCoordGen", module = "rdoxide.Chem.rdDepictor")]
 #[derive(Debug)]
-struct PyUsingCoordGen;
+struct PyUsingCoordGen {
+    temp_state: bool,
+    prev_state: std::sync::atomic::AtomicBool,
+}
 
 #[pymethods]
 impl PyUsingCoordGen {
     #[new]
     #[pyo3(signature = (temp_state))]
     fn new(temp_state: bool) -> Self {
-        let _ = temp_state;
-        PyUsingCoordGen
+        PyUsingCoordGen {
+            temp_state,
+            prev_state: std::sync::atomic::AtomicBool::new(false),
+        }
     }
 
-    fn __enter__(&self) {}
+    fn __enter__(&self) {
+        use std::sync::atomic::Ordering;
+        self.prev_state.store(
+            rdoxide::graphmol::depictor::prefer_coord_gen(),
+            Ordering::Relaxed,
+        );
+        rdoxide::graphmol::depictor::set_prefer_coord_gen(self.temp_state);
+    }
 
     #[pyo3(signature = (exc_type, exc_val, traceback))]
     fn __exit__(
@@ -324,6 +335,9 @@ impl PyUsingCoordGen {
         traceback: &Bound<'_, PyAny>,
     ) {
         let _ = (exc_type, exc_val, traceback);
+        rdoxide::graphmol::depictor::set_prefer_coord_gen(
+            self.prev_state.load(std::sync::atomic::Ordering::Relaxed),
+        );
     }
 }
 
