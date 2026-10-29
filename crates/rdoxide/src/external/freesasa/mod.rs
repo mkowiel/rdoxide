@@ -5,6 +5,7 @@ pub mod classifier;
 pub mod classifier_data;
 pub mod lr;
 pub mod nb;
+pub mod rdfreesasa;
 pub mod sr;
 
 /// `freesasa_algorithm`
