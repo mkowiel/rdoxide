@@ -137,3 +137,8 @@ into `sketcherMinimizerMolecule`, runs `runGenerateCoordinates` and copies the c
   unclean and the wheel ends in another state, while the oracle driver built without floating point contraction agrees
   exactly with this port. `treatNonterminalBondsToMetalAsZeroOrder` is rejected. Next: the Python module `rdCoordGen`,
   `Compute2DCoords(useCoordGen)`, the ratchet.
+* CG7b `rdoxide.Chem.rdCoordGen` (`AddCoords`, `CoordGenParams`, `SetDefaultTemplateFileDir`), `rdDepictor.IsCoordGenSupportAvailable`
+  (true), `SetPreferCoordGen`/`GetPreferCoordGen`/`UsingCoordGen`, and `Compute2DCoords` going through CoordGen when it is
+  preferred and `forceRDKit` is not set. Upstream `External/CoordGen/Wrap/testCoordGen.py` (4 tests) and
+  `testUsingCoordGenCtxtMgr` now pass and are in the ratchet; the full ratchet shows no regression. Not ported: the Mae
+  template reader (`SetDefaultTemplateFileDir` is accepted and ignored: the templates are built in).
