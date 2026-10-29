@@ -47,6 +47,7 @@ mod rddeprotect;
 mod rddeterminebonds;
 mod rddistgeom;
 mod rddistgeom_dg;
+mod rdehttools;
 mod rdenumeratestereoisomers;
 mod rdfiltercatalog;
 mod rdfingerprintgenerator;
@@ -211,6 +212,7 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
         rdtrajectory::init,
     )?;
     add_submodule(m, "rdCoordGen", "rdoxide.Chem.rdCoordGen", rdcoordgen::init)?;
+    add_submodule(m, "rdEHTTools", "rdoxide.Chem.rdEHTTools", rdehttools::init)?;
     add_submodule(
         m,
         "rdCIPLabeler",
