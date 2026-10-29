@@ -469,10 +469,30 @@ fn copy_coordinate(mol: &mut ROMol, efrags: Vec<EmbeddedFrag>, clear_confs: bool
     }
 }
 
+static PREFER_COORD_GEN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// `RDDepict::preferCoordGen`
+pub fn prefer_coord_gen() -> bool {
+    PREFER_COORD_GEN.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// sets `RDDepict::preferCoordGen`
+pub fn set_prefer_coord_gen(v: bool) {
+    PREFER_COORD_GEN.store(v, std::sync::atomic::Ordering::Relaxed);
+}
+
 /// `RDDepict::compute2DCoords(mol, params)`: returns the conformer id.
 pub fn compute_2d_coords(mol: &mut ROMol, params: &Compute2DCoordParameters) -> Result<u32> {
     if mol.needs_update_property_cache() {
         mol.update_property_cache(false)?;
+    }
+    // default to use CoordGen if it is preferred
+    if !params.force_rdkit && prefer_coord_gen() {
+        let cg = crate::external::coordgen::add_coords::CoordGenParams {
+            coord_map: params.coord_map.cloned().unwrap_or_default(),
+            ..Default::default()
+        };
+        return crate::external::coordgen::add_coords::add_coords(mol, &cg);
     }
     let mut cp = mol.clone();
     let arings = symmetrize_sssr(&mut cp, SymmetrizeSSSRAlgorithm::Default, true, true, false)?;
