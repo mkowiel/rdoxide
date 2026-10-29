@@ -33,3 +33,11 @@ for default settings. Upstream `test_rdshapealign.py`: 7/9 pass. `test1_Defaults
 (`max_preiters=3`, `opt_param=0.5`) differ in the colour score by 1e-3: the pose after so few pre-iterations is
 sensitive to floating-point contraction (the wheel is compiled with FMA contraction, the oracle for the bit-exact
 corpus is not), so they stay out of the ratchet.
+
+### FMA confirmed (2026-10-29)
+
+Rebuilding the oracle (`tools/pcshape_drv/align.cpp`) with `-ffp-contract=on` (clang's default, as used for the arm64 macOS
+wheel) on the `test1.sdf` pair with `opt_param=0.5`, `max_preiters=3` gives the shape score `0.7726256085280513` of the wheel;
+`-ffp-contract=off` gives `0.7726256085280518`, which is what rdoxide returns. So the two differing upstream tests are an
+artefact of fused multiply-add in the reference build, not a porting error. x86-64 builds without `-mfma` do not contract and
+match rdoxide.
