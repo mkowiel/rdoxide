@@ -917,6 +917,7 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-28 — Stage 296: Avalon Toolkit port. Not a speed change.
 * 2026-10-29 — Stage 297: PNG drawing (MolDraw2DCairo on tiny-skia). Not a speed change.
 * 2026-10-29 — docs/bench/upstream_speed.html regenerated (rdoxide 940e1ea vs RDKit 2026.9.1): summed test time 48.6 s -> 25.7 s on 1949 common passing tests, 3 tests clearly slower.
+* 2026-10-29 — docs/bench/upstream_speed.html regenerated (rdoxide 81325e1 vs RDKit 2026.9.1): summed test time 47.4 s -> 26.0 s on 1965 common passing tests, 2 tests clearly slower.
 * 2026-10-29 — Stage 301: YAeHMOP extended Hueckel port and `rdEHTTools`. Not a speed change.
 * 2026-10-29 — Stage 299: CoordGen port and `rdCoordGen`. Not a speed change.
 * 2026-10-29 — Stage 298: PNG drawing checked against the official wheel's MolDraw2DCairo on 10 molecules (size, ink bounding box within 2 px, ink amount within 10%, mean grey difference < 1 of 255; measured 0.13-0.35): `tests/python/test_png_reference.py`, references from `tools/make_png_reference.py`. Not a speed change.
