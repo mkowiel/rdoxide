@@ -33,7 +33,11 @@ fn classifier_from(v: i64) -> PyResult<Classifier> {
 }
 
 /// FreeSASA options: algorithm, classifier and probe radius
-#[pyclass(name = "SASAOpts", module = "rdoxide.Chem.rdFreeSASA")]
+#[pyclass(
+    name = "SASAOpts",
+    module = "rdoxide.Chem.rdFreeSASA",
+    skip_from_py_object
+)]
 #[derive(Debug, Clone)]
 struct PySasaOpts {
     opts: SasaOpts,
