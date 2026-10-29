@@ -68,6 +68,8 @@ pub struct Dof {
     pub fragment: FragmentId,
     pub pivot: Option<AtomId>,
     pub atoms: Vec<AtomId>,
+    pub current_state: u16,
+    pub optimal_state: u16,
 }
 
 impl Fragment {
@@ -113,6 +115,8 @@ impl Model {
             fragment,
             pivot: Some(pivot),
             atoms: Vec::new(),
+            current_state: 0,
+            optimal_state: 0,
         });
         self.dofs.len() - 1
     }
@@ -131,6 +135,8 @@ impl Model {
                 fragment: f,
                 pivot: None,
                 atoms: Vec::new(),
+                current_state: 0,
+                optimal_state: 0,
             });
             let id = self.dofs.len() - 1;
             self.fragments[f].dofs.push(id);

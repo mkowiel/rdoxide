@@ -912,3 +912,4 @@ New Python test files are also run against the official wheel to validate expect
 * 2026-10-27 — Stage 290: InChI polymer validation (P1); 33/123 polymer corpus cases agree. Not a speed change.
 * 2026-10-28 — Stage 296: Avalon Toolkit port. Not a speed change.
 * 2026-10-29 — Stage 297: PNG drawing (MolDraw2DCairo on tiny-skia). Not a speed change.
+* 2026-10-29 — docs/bench/upstream_speed.html regenerated (rdoxide 940e1ea vs RDKit 2026.9.1): summed test time 48.6 s -> 25.7 s on 1949 common passing tests, 3 tests clearly slower.
