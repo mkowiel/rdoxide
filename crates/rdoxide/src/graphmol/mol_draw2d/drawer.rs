@@ -54,6 +54,9 @@ pub struct MolDraw2DSVG {
     pub(super) draw_mols: Vec<DrawMol>,
     global_draw_trans: Option<DrawMol>,
     pub(super) needs_init: bool,
+    /// keep the molecules that are drawn, for the metadata of PNG output (`MolDraw2DCairo::updateMetadata`)
+    pub record_metadata: bool,
+    pub metadata_mols: Vec<(ROMol, i32)>,
 }
 
 impl MolDraw2DSVG {
@@ -117,6 +120,8 @@ impl MolDraw2DSVG {
             draw_mols: Vec::new(),
             global_draw_trans: None,
             needs_init: true,
+            record_metadata: false,
+            metadata_mols: Vec::new(),
         };
         if width > 0 && height > 0 {
             drawer.init_drawing();
@@ -276,6 +281,13 @@ impl MolDraw2DSVG {
             self.canvas.scale = dm.scale;
         }
         Ok(())
+    }
+
+    /// notes a molecule that is drawn when PNG metadata is wanted
+    fn note_metadata(&mut self, mol: &ROMol, conf_id: i32) {
+        if self.record_metadata && self.canvas.options.include_metadata {
+            self.metadata_mols.push((mol.clone(), conf_id));
+        }
     }
 
     fn active_draw_mol(&self) -> Option<&DrawMol> {
@@ -558,6 +570,7 @@ impl MolDraw2DSVG {
         conf_id: i32,
     ) -> Result<()> {
         self.setup_text_drawer();
+        self.note_metadata(mol, conf_id);
         // we need ring info for drawing, so copy the molecule in order to
         // add it
         let mut lmol = mol.clone();
@@ -608,6 +621,7 @@ impl MolDraw2DSVG {
         conf_id: i32,
     ) -> Result<()> {
         self.setup_text_drawer();
+        self.note_metadata(mol, conf_id);
         let mch = McHighlights {
             style: self.canvas.options.multi_colour_highlight_style,
             atom_map: highlight_atom_map,
@@ -776,6 +790,7 @@ impl MolDraw2DSVG {
                 }
             }
             let conf_id = conf_ids.map_or(-1, |c| c[i]);
+            self.note_metadata(mol, conf_id);
             let mut dm = DrawMol::new(
                 mol,
                 legend,

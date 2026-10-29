@@ -7,14 +7,22 @@ listed in `README.md` in this directory.
 
 | Crate | Version | License |
 |-------|---------|---------|
+| adler2 | 2.0.1 | 0BSD OR MIT OR Apache-2.0 |
 | android_system_properties | 0.1.6 | MIT OR Apache-2.0 |
+| arrayref | 0.3.9 | BSD-2-Clause |
+| arrayvec | 0.7.8 | MIT OR Apache-2.0 |
 | autocfg | 1.5.1 | Apache-2.0 OR MIT |
+| bitflags | 1.3.2 | MIT/Apache-2.0 |
 | bumpalo | 3.20.3 | MIT OR Apache-2.0 |
+| bytemuck | 1.25.2 | Zlib OR Apache-2.0 OR MIT |
 | cc | 1.6.0 | MIT OR Apache-2.0 |
 | cfg-if | 1.0.5 | MIT OR Apache-2.0 |
 | chrono | 0.4.45 | MIT OR Apache-2.0 |
 | core-foundation-sys | 0.8.7 | MIT OR Apache-2.0 |
+| crc32fast | 1.5.3 | MIT OR Apache-2.0 |
+| fdeflate | 0.3.7 | MIT OR Apache-2.0 |
 | find-msvc-tools | 0.1.14 | MIT OR Apache-2.0 |
+| flate2 | 1.1.10 | MIT OR Apache-2.0 |
 | futures-core | 0.3.34 | MIT OR Apache-2.0 |
 | futures-task | 0.3.34 | MIT OR Apache-2.0 |
 | futures-util | 0.3.34 | MIT OR Apache-2.0 |
@@ -27,9 +35,12 @@ listed in `README.md` in this directory.
 | libc | 0.2.190 | MIT OR Apache-2.0 |
 | log | 0.4.34 | MIT OR Apache-2.0 |
 | memchr | 2.8.3 | Unlicense OR MIT |
+| miniz_oxide | 0.8.9 | MIT OR Zlib OR Apache-2.0 |
+| miniz_oxide | 0.9.1 | MIT OR Zlib OR Apache-2.0 |
 | num-traits | 0.2.19 | MIT OR Apache-2.0 |
 | once_cell | 1.21.4 | MIT OR Apache-2.0 |
 | pin-project-lite | 0.2.17 | Apache-2.0 OR MIT |
+| png | 0.17.16 | MIT OR Apache-2.0 |
 | portable-atomic | 1.15.0 | Apache-2.0 OR MIT |
 | proc-macro2 | 1.0.107 | MIT OR Apache-2.0 |
 | pyo3 | 0.29.3 | MIT OR Apache-2.0 |
@@ -44,10 +55,14 @@ listed in `README.md` in this directory.
 | serde_derive | 1.0.229 | MIT OR Apache-2.0 |
 | serde_json | 1.0.151 | MIT OR Apache-2.0 |
 | shlex | 2.0.1 | MIT OR Apache-2.0 |
+| simd-adler32 | 0.3.10 | MIT |
 | slab | 0.4.12 | MIT |
+| strict-num | 0.1.1 | MIT |
 | syn | 2.0.119 | MIT OR Apache-2.0 |
 | syn | 3.0.6 | MIT OR Apache-2.0 |
 | target-lexicon | 0.13.5 | Apache-2.0 WITH LLVM-exception |
+| tiny-skia | 0.11.4 | BSD-3-Clause |
+| tiny-skia-path | 0.11.4 | BSD-3-Clause |
 | unicode-ident | 1.0.26 | (MIT OR Apache-2.0) AND Unicode-3.0 |
 | wasm-bindgen | 0.2.129 | MIT OR Apache-2.0 |
 | wasm-bindgen-macro | 0.2.129 | MIT OR Apache-2.0 |
@@ -59,4 +74,5 @@ listed in `README.md` in this directory.
 | windows-link | 0.2.1 | MIT OR Apache-2.0 |
 | windows-result | 0.4.1 | MIT OR Apache-2.0 |
 | windows-strings | 0.5.1 | MIT OR Apache-2.0 |
+| zlib-rs | 0.6.8 | Zlib |
 | zmij | 1.0.23 | MIT |
