@@ -1,8 +1,5 @@
 # Upstream RDKit Python tests known to pass on rdoxide (ratchet).
 # Maintained by tools/run_upstream_tests.py --update
-<<<<<<< HEAD
-=======
->>>>>>> origin/main
 Code/ChemicalFeatures/Wrap/testFeatures.py::TestCase::testBasic
 Code/ChemicalFeatures/Wrap/testFeatures.py::TestCase::testPickle
 Code/DataManip/MetricMatrixCalc/Wrap/testMatricCalc.py::TestCase::test0DistsArray
@@ -1408,6 +1405,8 @@ External/pubchem_shape/Wrap/test_rdshapealign.py::TestCase::test6_notColorAtoms
 External/pubchem_shape/Wrap/test_rdshapealign.py::TestCase::test7_customFeatures
 External/pubchem_shape/Wrap/test_rdshapealign.py::TestCase::test8_customFeatures
 External/pubchem_shape/Wrap/test_rdshapealign.py::TestCase::test9_FixedScore
+External/FreeSASA/Wrap/testFreeSASA.py::TestCase::test_basics
+External/FreeSASA/Wrap/testFreeSASA.py::TestCase::test_opts
 rdkit/Chem/AtomPairs/UnitTestDescriptors.py::DocTestCase::runTest
 rdkit/Chem/AtomPairs/UnitTestDescriptors.py::TestCase::testGetTopologicalTorsionFingerprintAsIds
 rdkit/Chem/AtomPairs/UnitTestDescriptors.py::TestCase::testGithub334

@@ -1,8 +1,11 @@
 //! Port of FreeSASA 2.0.3 (Simon Mitternacht, MIT; see `LICENSES/FreeSASA-MIT.txt`): solvent accessible surface areas by
 //! Lee & Richards' or Shrake & Rupley's algorithm and the atom classifiers RDKit's `External/FreeSASA` uses.
 
+pub mod classifier;
+pub mod classifier_data;
 pub mod lr;
 pub mod nb;
+pub mod rdfreesasa;
 pub mod sr;
 
 /// `freesasa_algorithm`
