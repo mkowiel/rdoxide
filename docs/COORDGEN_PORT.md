@@ -107,7 +107,7 @@ into `sketcherMinimizerMolecule`, runs `runGenerateCoordinates` and copies the c
   the same clean-pose flag, clash energy and final coordinates as the C++ code (`tests/data/coordgen_clash.txt`,
   `tools/coordgen_drv/clash.cpp`, `tools/make_coordgen_clash_corpus.py`). Deliberate difference: sets and maps keyed by pointer
   upstream use atom index order. `checkForClashes` is available but its caller in the fragment builder (atoms flagged
-  `needsCheckForClashes`) is still `unimplemented!` until the driver sets that flag. Corpus gap: the atoms-inside-rings term is not exercised.
+  `needsCheckForClashes`) now calls it (CG6b). Corpus gap: the atoms-inside-rings term is not exercised.
 * CG6a `external::coordgen::driver`: the `sketcherMinimizer` pipeline as RDKit's `CoordGen::addCoords` uses it:
   canonical ordering (Morgan scores), splitting into molecules, cross-atom flags, fragment initialization (number of
   children atoms, longest chain), `buildFromFragments`, `avoidClashes`, `bestRotation`, `maybeFlip`, arranging several
@@ -117,3 +117,16 @@ into `sketcherMinimizerMolecule`, runs `runGenerateCoordinates` and copies the c
   `tools/make_coordgen_sketch_corpus.py`); molecules that need the macrocycle builder are skipped in the test (it counts
   them). Not ported: residue/protein layouts, proximity relations (zero order bonds), the Maestro reader. Next: the
   macrocycle builder, then `AddCoords` (scaling, centring, coordinate maps, template molecules) and the Python module.
+* CG6b `external::coordgen::polyomino`, `external::coordgen::macrocycle`: `CoordgenMacrocycleBuilder`. Rings of nine or more
+  atoms are laid out on the contour of a polyomino (hexagon lattice: skewed, ragged and round shapes, pentagon corners for
+  odd sizes) chosen by double bond (cis/trans) and fused ring constraints plus heteroatom and substituent restraints;
+  when no shape fits the ring is opened at a bond (`findBondToOpen`), laid out by a nested sketcher with minimization
+  skipped (`openCycleAndGenerateCoords`; the nested sketcher is a second `Model`, `Minimizer::skip_minimization` and
+  `Model::force_open_macrocycles`) and pulled closed by a stretch interaction (`avoidClashesOfMolecule` takes extra
+  interactions). `newScorePlanarity` and the fragment builder use it. 130 macrocycles (crown ethers, cyclic peptides,
+  macrolides, E/Z polyenes, fused and bridged; 8+ take the open-ring fallback) give the same coordinates as the C++
+  library (`tests/data/coordgen_macro.txt`, `tools/make_coordgen_macro_corpus.py`, driver `sketch.cpp`).
+  Upstream quirk kept: `scorePathRestraints` indexes the path with the position in the list of substituted atoms.
+  Corpus gap: perturbing the restraint weights (heteroatom, substituent clash) does not change any result, so those
+  constants are not verified by the corpus. Next: `AddCoords` (scaling, centring, coordinate maps, template molecules)
+  and the Python module.

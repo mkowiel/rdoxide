@@ -571,9 +571,23 @@ impl Minimizer {
 
     /// `avoidClashesOfMolecule`: true if the pose is clean
     pub fn avoid_clashes_of_molecule(&mut self, m: &mut Model, mol: MolId) -> bool {
+        self.avoid_clashes_of_molecule_with(m, mol, Vec::new())
+    }
+
+    /// `avoidClashesOfMolecule(molecule, extraInteractions)`
+    pub fn avoid_clashes_of_molecule_with(
+        &mut self,
+        m: &mut Model,
+        mol: MolId,
+        extra: Vec<Interaction>,
+    ) -> bool {
         self.clear_interactions();
         self.add_clash_interactions_of_molecule(m, mol, false);
         self.add_peptide_bond_inversion_constraints_of_molecule(m, mol);
+        for interaction in extra {
+            self.extra_interactions.push(self.interactions.len());
+            self.interactions.push(interaction);
+        }
         let mut clash_e = self.score_clashes(m, mol, true, true);
         let clean_pose = self.flip_fragments(m, mol, &mut clash_e);
         if !clean_pose {
