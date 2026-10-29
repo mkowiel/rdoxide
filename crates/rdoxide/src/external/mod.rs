@@ -9,4 +9,5 @@ pub mod inchi;
 pub mod inchi_api;
 pub mod inchi_input;
 pub mod inchi_to_mol;
+pub mod pubchem_shape;
 pub mod ring_decomposer_lib;
