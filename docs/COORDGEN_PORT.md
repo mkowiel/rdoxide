@@ -130,3 +130,10 @@ into `sketcherMinimizerMolecule`, runs `runGenerateCoordinates` and copies the c
   Corpus gap: perturbing the restraint weights (heteroatom, substituent clash) does not change any result, so those
   constants are not verified by the corpus. Next: `AddCoords` (scaling, centring, coordinate maps, template molecules)
   and the Python module.
+* CG7a `external::coordgen::add_coords`: RDKit's `CoordGen::addCoords` and `CoordGenParams` (scaling 50, precision 0.01,
+  coordinate maps and template molecules as constrained atoms, double bond stereo only, centring when there is no map or
+  template). 86 of 87 molecules (plain, with coordMap, with template molecule) equal the RDKit wheel's `rdCoordGen.AddCoords`
+  (`tests/data/coordgen_addcoords.txt`, `tools/make_coordgen_addcoords_corpus.py`). Ibuprofen differs: its minimization ends
+  unclean and the wheel ends in another state, while the oracle driver built without floating point contraction agrees
+  exactly with this port. `treatNonterminalBondsToMetalAsZeroOrder` is rejected. Next: the Python module `rdCoordGen`,
+  `Compute2DCoords(useCoordGen)`, the ratchet.
