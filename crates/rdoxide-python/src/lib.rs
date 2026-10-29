@@ -40,6 +40,7 @@ mod rdchemreactions_enumerate;
 mod rdchemreactions_png;
 mod rdcip_labeler;
 mod rdclustering;
+mod rdcoordgen;
 mod rddepictor;
 mod rddepictor_constrained;
 mod rddeprotect;
@@ -209,6 +210,7 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
         "rdoxide.Chem.rdtrajectory",
         rdtrajectory::init,
     )?;
+    add_submodule(m, "rdCoordGen", "rdoxide.Chem.rdCoordGen", rdcoordgen::init)?;
     add_submodule(
         m,
         "rdCIPLabeler",
