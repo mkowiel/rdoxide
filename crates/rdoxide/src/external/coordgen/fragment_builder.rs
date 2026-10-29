@@ -7,6 +7,7 @@ use std::collections::{BTreeSet, VecDeque};
 use super::cip::AtomPriority;
 use super::fragment::DofKind;
 use super::maths::{BONDLENGTH, PointF, SKETCHER_EPSILON};
+use super::minimizer::Minimizer;
 use super::model::{AtomId, BondId, FragmentId, Model, RingId};
 use super::templates::{alignment_matrix, templates};
 
@@ -211,7 +212,11 @@ impl Model {
             // `maybeMinimizeRings` of the (now empty) list does nothing
         } else if planarity_score > UNTREATABLE_SYSTEM_PLANARITY_SCORE {
         } else {
-            unimplemented!("macrocycle builder (openCycleAndGenerateCoords)");
+            let first_ring = self.find_central_ring_of_system(&rings);
+            self.open_cycle_and_generate_coords(first_ring);
+            let a0 = self.rings[first_ring].atoms[0];
+            let mol = self.atoms[a0].molecule.expect("molecule");
+            self.molecules[mol].require_minimization = true;
         }
     }
 
@@ -220,8 +225,15 @@ impl Model {
         let mut score = 0.0f32;
         for &r in rings {
             let ring = &self.rings[r];
+            if ring.is_macrocycle() && self.find_bond_to_open(r).is_none() {
+                continue;
+            }
             if ring.is_macrocycle() {
-                unimplemented!("macrocycle builder (findBondToOpen)");
+                for &other in &ring.fused_with {
+                    if self.rings[other].is_macrocycle() {
+                        score += NON_PLANAR_SYSTEM_SCORE;
+                    }
+                }
             }
             for &b in &ring.bonds {
                 let n = self.bonds[b].rings.len();
@@ -307,7 +319,7 @@ impl Model {
     }
 
     /// `listOfCoordinatesFromListofRingAtoms`: regular polygon
-    fn polygon_coordinates(n_atoms: usize) -> Vec<PointF> {
+    pub(super) fn polygon_coordinates(n_atoms: usize) -> Vec<PointF> {
         let a = (2.0 * PI / n_atoms as f64) as f32;
         let mut out = Vec::new();
         let mut coords = PointF::new(0.0, 0.0);
@@ -327,10 +339,11 @@ impl Model {
         let (parent, fusion_atoms, fusion_bond) = self.shared_atoms_with_drawn_ring(ring);
         let ring_atoms = self.rings[ring].atoms.clone();
         let atoms = self.order_chain_of_atoms(&ring_atoms, ring_atoms[0]);
-        if atoms.len() >= MACROCYCLE {
-            unimplemented!("macrocycle builder (newMacrocycle)");
-        }
-        let mut coords = Self::polygon_coordinates(atoms.len());
+        let mut coords = if atoms.len() >= MACROCYCLE {
+            self.new_macrocycle(ring, &atoms)
+        } else {
+            Self::polygon_coordinates(atoms.len())
+        };
         let Some(parent) = parent else {
             for (i, &a) in atoms.iter().enumerate() {
                 self.set_coordinates(a, coords[i]);
@@ -661,7 +674,8 @@ impl Model {
                 self.atoms[neigh].coordinates_set = false;
             }
             if self.atoms[at].needs_check_for_clashes {
-                unimplemented!("CoordgenMinimizer::checkForClashes");
+                self.atoms[neigh].needs_check_for_clashes = true;
+                Minimizer::check_for_clashes(self, neigh);
             }
             let at_fragment = self.atoms[at].fragment.expect("fragment");
             for dof in self.fragment_dofs_of_atom(at_fragment, at) {

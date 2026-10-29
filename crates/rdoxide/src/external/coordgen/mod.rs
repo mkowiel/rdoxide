@@ -8,9 +8,11 @@ pub mod driver;
 pub mod fragment;
 pub mod fragment_builder;
 pub mod fragmenter;
+pub mod macrocycle;
 pub mod maths;
 pub mod minimizer;
 pub mod model;
+pub mod polyomino;
 pub mod templates;
 #[cfg(test)]
 mod testutil;

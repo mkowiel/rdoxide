@@ -243,7 +243,7 @@ pub struct Molecule {
 }
 
 /// the arena that owns the objects of one sketcher
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct Model {
     pub atoms: Vec<Atom>,
     pub bonds: Vec<Bond>,
@@ -251,6 +251,25 @@ pub struct Model {
     pub molecules: Vec<Molecule>,
     pub fragments: Vec<super::fragment::Fragment>,
     pub dofs: Vec<super::fragment::Dof>,
+    /// `CoordgenMacrocycleBuilder::m_precision`
+    pub precision: f32,
+    /// `CoordgenMacrocycleBuilder::m_forceOpenMacrocycles`
+    pub force_open_macrocycles: bool,
+}
+
+impl Default for Model {
+    fn default() -> Self {
+        Model {
+            atoms: Vec::new(),
+            bonds: Vec::new(),
+            rings: Vec::new(),
+            molecules: Vec::new(),
+            fragments: Vec::new(),
+            dofs: Vec::new(),
+            precision: 1.0,
+            force_open_macrocycles: false,
+        }
+    }
 }
 
 impl Model {

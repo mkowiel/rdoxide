@@ -324,6 +324,8 @@ pub struct Minimizer {
     /// indices in `interactions` (`_extraInteractions`)
     pub extra_interactions: Vec<usize>,
     pub precision: f32,
+    /// `skipMinimization`
+    pub skip_minimization: bool,
 }
 
 impl Default for Minimizer {
@@ -337,6 +339,7 @@ impl Default for Minimizer {
             even_angles: false,
             extra_interactions: Vec::new(),
             precision: 1.0,
+            skip_minimization: false,
         }
     }
 }
@@ -385,6 +388,9 @@ impl Minimizer {
 
     /// `run`. The coordinates of the lowest energy are never restored: upstream never updates its running minimum.
     pub fn run(&mut self, m: &mut Model) {
+        if self.skip_minimization {
+            return;
+        }
         if self.interactions.is_empty() {
             self.setup_interactions(m, false);
         }

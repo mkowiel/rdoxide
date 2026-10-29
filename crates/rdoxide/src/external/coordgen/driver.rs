@@ -239,6 +239,7 @@ impl Sketcher {
             .filter(|&b| !m.bonds[b].skip)
             .collect();
         m.molecules[min_mol].bonds = bonds;
+        m.precision = self.minimizer.precision;
         Self::canonical_ordering(m, min_mol);
         self.atoms = m.molecules[min_mol].atoms.clone();
         self.bonds = m.molecules[min_mol].bonds.clone();
@@ -296,7 +297,7 @@ impl Sketcher {
     }
 
     /// `findFragments` (with `initializeFragments`)
-    fn find_fragments(&mut self, m: &mut Model) {
+    pub(super) fn find_fragments(&mut self, m: &mut Model) {
         assert!(!self.molecules.is_empty());
         for mol in self.molecules.clone() {
             m.split_into_fragments(mol);
@@ -931,6 +932,7 @@ mod tests {
         let atoms = model.molecules[mol].atoms.clone();
         for &a in &atoms {
             model.set_coordinates(a, PointF::new(0.0, 0.0));
+            model.atoms[a].coordinates_set = false;
         }
         model.assign_bonds_and_neighbors(mol);
         for line in input.lines().filter(|l| l.starts_with("S ")) {
@@ -994,15 +996,14 @@ mod tests {
     }
 
     /// the whole layout must be the one `runGenerateCoordinates` makes (`tests/data/coordgen_sketch.txt`)
-    #[test]
-    fn layout_matches_cpp() {
-        let text = include_str!("../../../../../tests/data/coordgen_sketch.txt");
+    /// compares every record of a corpus; returns (compared, skipped)
+    fn compare(text: &str) -> (usize, usize) {
         let (mut bad, mut n, mut skipped) = (Vec::new(), 0, 0);
         for rec in text.split("$$\n").filter(|r| !r.is_empty()) {
             let end = rec.find("END\n").unwrap() + 4;
             let (input, want) = rec.split_at(end);
             let Ok(got) = catch_unwind(AssertUnwindSafe(|| run(input))) else {
-                skipped += 1; // a macrocycle or a ring system for the macrocycle builder
+                skipped += 1; // a ring system the port does not handle yet
                 continue;
             };
             n += 1;
@@ -1020,12 +1021,28 @@ mod tests {
                 ));
             }
         }
-        assert!(n > 50, "{n} compared, {skipped} skipped");
         assert!(
             bad.is_empty(),
             "{} of {n} differ; first:\n{}",
             bad.len(),
             bad[0]
         );
+        (n, skipped)
+    }
+
+    /// the whole layout must be the one `runGenerateCoordinates` makes (`tests/data/coordgen_sketch.txt`)
+    #[test]
+    fn layout_matches_cpp() {
+        let text = include_str!("../../../../../tests/data/coordgen_sketch.txt");
+        let (n, skipped) = compare(text);
+        assert!(n > 50, "{n} compared, {skipped} skipped");
+    }
+
+    #[test]
+    fn macrocycles_match_cpp() {
+        let text = include_str!("../../../../../tests/data/coordgen_macro.txt");
+        let (n, skipped) = compare(text);
+        eprintln!("{n} compared, {skipped} skipped");
+        assert!(n > 50, "{n} compared, {skipped} skipped");
     }
 }
