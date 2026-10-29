@@ -139,6 +139,7 @@ mod rdreducedgraphs;
 mod rdresonance;
 mod rdrgroupdecomposition;
 mod rdscaffoldnetwork;
+mod rdshapealign;
 mod rdshapehelpers;
 mod rdsimdivpickers;
 mod rdslnparse;
@@ -215,6 +216,12 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
     add_submodule(m, "rdCoordGen", "rdoxide.Chem.rdCoordGen", rdcoordgen::init)?;
     add_submodule(m, "rdEHTTools", "rdoxide.Chem.rdEHTTools", rdehttools::init)?;
     add_submodule(m, "rdFreeSASA", "rdoxide.Chem.rdFreeSASA", rdfreesasa::init)?;
+    add_submodule(
+        m,
+        "rdShapeAlign",
+        "rdoxide.Chem.rdShapeAlign",
+        rdshapealign::init,
+    )?;
     add_submodule(
         m,
         "rdCIPLabeler",
