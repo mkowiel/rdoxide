@@ -53,6 +53,7 @@ mod rdfingerprintgenerator;
 mod rdfmcs;
 mod rdforcefield;
 mod rdfragcatalog;
+mod rdfreesasa;
 mod rdgaussianshape;
 mod rdgeneralizedsubstruct;
 mod rdinchi;
@@ -211,6 +212,7 @@ fn _rdoxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
         rdtrajectory::init,
     )?;
     add_submodule(m, "rdCoordGen", "rdoxide.Chem.rdCoordGen", rdcoordgen::init)?;
+    add_submodule(m, "rdFreeSASA", "rdoxide.Chem.rdFreeSASA", rdfreesasa::init)?;
     add_submodule(
         m,
         "rdCIPLabeler",
