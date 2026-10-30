@@ -44,6 +44,9 @@ def main(path: str, out: str) -> None:
 
     rdkit_alias.install()
     results = {}
+    if "/Contrib/" in path:
+        # Contrib scripts import their neighbours (`import sascorer`); appended, so nothing is shadowed
+        sys.path.append(str(Path(path).resolve().parent))
     # The test module is loaded under a private name, so child processes that
     # target functions in it can only work if they are forked, not spawned.
     try:

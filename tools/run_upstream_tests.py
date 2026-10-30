@@ -63,6 +63,8 @@ def run_file(path: Path, timeout: int) -> dict[str, tuple[str, str]]:
             os.environ,
             RDBASE=str(UPSTREAM),
             PYTHONDONTWRITEBYTECODE="1",
+            # Contrib tests start `python` subprocesses
+            PATH=str(Path(sys.executable).parent) + os.pathsep + os.environ.get("PATH", ""),
             **({"RDOXIDE_UPSTREAM_LONG": "1"} if LONG else {}),
             # `import rdkit` resolves to rdoxide (also in subprocesses of tests)
             PYTHONPATH=str(ROOT / "tools" / "_alias"),

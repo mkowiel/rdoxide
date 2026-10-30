@@ -50,3 +50,5 @@ External/CoordGen/Wrap/testCoordGen.py
 External/pubchem_shape/Wrap/test_rdshapealign.py
 External/YAeHMOP/Wrap/testEHTTools.py
 External/FreeSASA/Wrap/testFreeSASA.py
+Contrib/SA_Score/UnitTestSAScore.py
+Contrib/FreeWilson/test/test_freewilson.py

@@ -115,8 +115,9 @@ jobs:
           path: dist
       - name: Install
         run: |
-          python -m pip install pytest numpy pandas pillow
-          python -m pip install --no-index --find-links dist rdoxide
+          python -m pip install uv
+          uv pip install --system pytest numpy pandas pillow ipython matplotlib scikit-learn tqdm
+          uv pip install --system --no-index --find-links dist rdoxide
       - run: python tools/run_upstream_tests.py -v
 
   # On main only: the fat-LTO release build that gets shipped, to catch
