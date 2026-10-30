@@ -87,13 +87,16 @@ def test_fingerprint_variance_and_labels():
     assert rows[0] == {"Core": "[1*]c1ccccc1", "R1": "[1*]Cl"}
 
 
-def test_ga_matching_is_reported_as_unsuccessful():
+def test_ga_matching_labels_symmetric_substituents_alike():
     core = Chem.MolFromSmiles("c1ccccc1")
     params = RGroupDecompositionParameters()
     params.matchingStrategy = RGroupMatching.GA
     decomp = RGroupDecomposition(core, params)
-    assert decomp.Add(Chem.MolFromSmiles(SYMMETRY[0])) == 0
-    assert not decomp.Process()
+    for i, smiles in enumerate(SYMMETRY[:5]):
+        assert decomp.Add(Chem.MolFromSmiles(smiles)) == i
+    assert decomp.Process()
+    for row in decomp.GetRGroupsAsRows():
+        assert Chem.MolToSmiles(row["R1"]) == "Cl[*:1]"
 
 
 def test_enumeration_of_cores_without_variations():
