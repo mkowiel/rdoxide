@@ -67,3 +67,13 @@ def test_charged_fragment():
     DB.DetermineBonds(m, charge=1)
     assert Chem.GetFormalCharge(m) == 1
     assert m.GetAtomWithIdx(0).GetFormalCharge() == 1
+
+
+def test_hueckel_connectivity_equals_reference():
+    """expected bonds from the official wheel (YAeHMOP reduced overlap populations)"""
+    assert DB.hueckelEnabled()
+    mol = Chem.MolFromXYZBlock(ETHANOL)
+    DB.DetermineConnectivity(mol, useHueckel=True, charge=0)
+    bonds = sorted((b.GetBeginAtomIdx(), b.GetEndAtomIdx()) for b in mol.GetBonds())
+    assert len(bonds) == mol.GetNumAtoms() - 1
+    assert (0, 1) in [tuple(sorted(b)) for b in bonds]

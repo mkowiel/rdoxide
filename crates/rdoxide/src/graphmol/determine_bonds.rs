@@ -2,7 +2,7 @@
 //!
 //! Ported from RDKit `Code/GraphMol/DetermineBonds/DetermineBonds.{h,cpp}` (2026.09.1),
 //! which is based on xyz2mol (https://github.com/jensengroup/xyz2mol, MIT).
-//! Extended Hueckel connectivity (YAeHMOP) is not available.
+//! Extended Hueckel connectivity runs on the YAeHMOP port (`external::yaehmop`).
 //!
 //! Copyright (C) 2022 Rachel Walker, Greg Landrum and other RDKit contributors.
 //! Licensed under the BSD 3-Clause license (see LICENSES/RDKit-BSD-3-Clause.txt).
@@ -18,13 +18,14 @@ use super::mol_ops::sanitize_flags::SANITIZE_ALL;
 use super::mol_ops::{get_formal_charge, sanitize_mol};
 use super::periodic_table::PeriodicTable;
 use super::romol::RWMol;
+use crate::external::yaehmop::run_mol;
 use crate::rdgeneral::matching::max_cardinality_matching;
 use crate::{RDKitError, Result};
 
 type Matrix = Vec<Vec<u32>>;
 
 /// Whether extended Hueckel connectivity (needs YAeHMOP) is available.
-pub const HUECKEL_SUPPORT: bool = false;
+pub const HUECKEL_SUPPORT: bool = true;
 
 fn max_iterations_exceeded() -> RDKitError {
     // `MaxFindBondOrdersItersExceeded` is a std::runtime_error
@@ -177,20 +178,34 @@ fn connectivity_vdw(mol: &mut RWMol, cov_factor: f64) -> Result<()> {
     Ok(())
 }
 
+/// `connectivityHueckel`: bonds between the atoms whose reduced overlap
+/// population from an extended Hueckel calculation is at least 0.15.
+fn connectivity_hueckel(mol: &mut RWMol, charge: i32) -> Result<()> {
+    let n = mol.num_atoms() as usize;
+    mol.atom_mut(0).set_formal_charge(charge);
+    let res = run_mol(mol, -1, false)?;
+    let mat = &res.reduced_overlap_population_matrix;
+    let mut ind = 0;
+    for i in 0..n {
+        for j in 0..=i {
+            if i != j && mat[ind] >= 0.15 {
+                mol.add_bond(i as u32, j as u32, BondType::Single)?;
+            }
+            ind += 1;
+        }
+    }
+    Ok(())
+}
+
 /// `determineConnectivity`: replaces the bonds of `mol` by the ones perceived
 /// from its (3D) default conformer.
 pub fn determine_connectivity(
     mol: &mut RWMol,
     use_hueckel: bool,
-    _charge: i32,
+    charge: i32,
     cov_factor: f64,
     use_vdw: bool,
 ) -> Result<()> {
-    if use_hueckel {
-        return Err(RDKitError::Value(
-            "The RDKit was not compiled with YAeHMOP support".into(),
-        ));
-    }
     mol.begin_batch_edit()?;
     let bonds: Vec<(u32, u32)> = mol
         .bonds()
@@ -204,7 +219,9 @@ pub fn determine_connectivity(
     for idx in 0..mol.num_atoms() {
         mol.atom_mut(idx).set_no_implicit(true);
     }
-    if use_vdw {
+    if use_hueckel {
+        connectivity_hueckel(mol, charge)
+    } else if use_vdw {
         connectivity_vdw(mol, cov_factor)
     } else {
         connect_the_dots(mol, CTD_QUICKREMOVE_H_H_CONTACTS)

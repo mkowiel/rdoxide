@@ -242,6 +242,7 @@ Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testTorsionValue
 Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testUSR
 Code/GraphMol/Descriptors/Wrap/testMolDescriptors.py::TestCase::testUSRCAT
 Code/GraphMol/DetermineBonds/Wrap/testDetermineBonds.py::TestCase::testCtDConnectivity
+Code/GraphMol/DetermineBonds/Wrap/testDetermineBonds.py::TestCase::testHueckelConnectivity
 Code/GraphMol/DetermineBonds/Wrap/testDetermineBonds.py::TestCase::testMaxIterations
 Code/GraphMol/DetermineBonds/Wrap/testDetermineBonds.py::TestCase::testVdWBonds
 Code/GraphMol/DetermineBonds/Wrap/testDetermineBonds.py::TestCase::testVdWConnectivity
