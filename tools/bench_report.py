@@ -162,7 +162,7 @@ td:nth-child(n+2),th:nth-child(n+2){{text-align:right;white-space:nowrap}}
 <div class="card"><b>{median:.2f}x</b><span>median per-test time ratio, rdoxide / RDKit (below 1 = rdoxide faster)</span></div>
 <div class="card"><b>{wall_rd:.0f} s → {wall_ox:.0f} s</b><span>file wall time incl. imports, {len(common_files)} files with common passing tests</span></div>
 <div class="card"><b>{len(slower)} / {len(rows)}</b><span>tests clearly slower on rdoxide (&gt;20 ms and &gt;20 %)</span></div>
-<div class="card"><b>{n_total['rdoxide']} / {n_total['rdkit']}</b><span>tests passing: rdoxide / RDKit ({only_rdkit} pass only on RDKit)</span></div>
+<div class="card"><b>{len(rows)} / {n_total['rdoxide'] - len(rows)} / {only_rdkit}</b><span>tests passing on both / only on rdoxide / only on RDKit ({n_total['rdoxide']} pass on rdoxide, {n_total['rdkit']} on RDKit)</span></div>
 </div>
 {table('Tests that run slower on rdoxide (largest absolute loss)', slower)}
 {solo_html}
