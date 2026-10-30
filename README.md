@@ -16,9 +16,11 @@ the RDKit project.
 * Python **3.10 – 3.15** (single `abi3` wheel).
 * No C/C++ dependencies — the whole stack below Python is Rust.
 
-> **Status: pre-alpha.** The port proceeds in stages; see
-> [docs/PLAN.md](docs/PLAN.md) and [docs/STATUS.md](docs/STATUS.md) for what
-> is available. Symbols that are not ported yet are absent rather than stubbed.
+> **Status: alpha (2026.9.1a0).** Most of RDKit's Python API is ported and
+> checked against the official 2026.09.1 build, but expect gaps and rough
+> edges. 2064 of 2101 tests of RDKit's own Python test-suite pass (see
+> [docs/STATUS.md](docs/STATUS.md) and [CHANGELOG.md](CHANGELOG.md)). Symbols
+> that are not ported are absent rather than stubbed.
 
 ## What is ported
 
@@ -40,20 +42,35 @@ detail and test evidence in [docs/STATUS.md](docs/STATUS.md)):
   tautomers, scaffolds, hashing, resonance, stereoisomer enumeration.
 * **3D**: depiction, distance geometry/ETKDG, UFF/MMFF, alignment, shape
   and Gaussian-shape tools, interaction fields, trajectories.
-* **Drawing**: `rdMolDraw2D` with the SVG back end.
 
-Not ported yet: InChI, Avalon, CoordGen, ChemDraw (CDXML/CDX) and Marvin
-readers, FreeSASA, YAeHMOP, PyMOL helpers, and the remaining gaps listed as
-partial in [docs/STATUS.md](docs/STATUS.md).
+* **External libraries** (translated to Rust, each under its own license):
+  InChI 1.07.3 (including polymers), Avalon Toolkit, CoordGen, FreeSASA,
+  YAeHMOP (`rdEHTTools`), pubchem-align3d (`rdShapeAlign`), RingDecomposerLib.
+* **Drawing**: `rdMolDraw2D` with SVG and PNG (tiny-skia) output.
+
+Not ported yet: binary ChemDraw CDX (needs the proprietary ChemDraw SDK),
+PyMOL helpers, Boost-archive serialisation, the InChI time limit, and the
+remaining gaps listed as partial in [docs/STATUS.md](docs/STATUS.md).
 
 Not planned: the C++ API and headers, the Java/C# wrappers, the PostgreSQL
-cartridge, the Cairo/Qt/FreeType drawing back ends (drawing is SVG only),
+cartridge, the Cairo/Qt/FreeType drawing back ends (drawing is SVG and PNG),
 `Contrib/` and the demos/GUI. Symbols that are not ported are absent rather
 than stubbed, so `hasattr` checks behave like an RDKit build without them.
 
-## Installing from GitHub
+## Installing
 
-There are no PyPI releases yet, so install straight from the repository. This
+Wheels of each release (one `abi3` wheel per platform: Linux x86-64/aarch64,
+macOS x86-64/arm64, Windows x86-64) are attached to the
+[GitHub releases](https://github.com/mkowiel/rdoxide/releases); no Rust
+toolchain is needed:
+
+```bash
+pip install --pre rdoxide-2026.9.1a0-*.whl
+```
+
+### From the repository
+
+To get the latest development version, install straight from the repository. This
 builds from source and needs a [Rust toolchain](https://rustup.rs) (no C/C++
 compiler); `maturin` is fetched automatically as the build backend.
 
