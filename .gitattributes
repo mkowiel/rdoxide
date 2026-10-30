@@ -1,2 +1,5 @@
 # test inputs are compared byte-for-byte with RDKit output: keep them as-is
 tests/data/** -text
+
+# checkouts on Windows must not turn LF into CRLF: data files are compiled in and parsed byte for byte
+* text=auto eol=lf
