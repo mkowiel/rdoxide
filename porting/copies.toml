@@ -512,3 +512,11 @@ to = "python/rdoxide/Chem/PandasTools.py"
 [[copy]]
 from = "rdkit/Chem/PandasPatcher.py"
 to = "python/rdoxide/Chem/PandasPatcher.py"
+
+[[copy]]
+from = "rdkit/ML/InfoTheory/BitClusterer.py"
+to = "python/rdoxide/ML/InfoTheory/BitClusterer.py"
+
+[[copy]]
+from = "rdkit/ML/InfoTheory/BitRank.py"
+to = "python/rdoxide/ML/InfoTheory/BitRank.py"

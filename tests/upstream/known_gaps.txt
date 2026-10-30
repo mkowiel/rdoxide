@@ -1,0 +1,4 @@
+rdkit/Chem/UnitTestLipinski.py::TestCase_Regression::testLipinskiLong | stale reference data (`Oc1ccccc1/C=N/NC(=O)c1ccncc1` expects 4 H-bond donors): fails on the official wheel too (needs `--long`)
+rdkit/Chem/UnitTestQED.py::TestCase::testRegression | the reference QED of line 2197 differs by 1e-3: the official wheel gives the same value as rdoxide (needs `--long`)
+rdkit/Chem/UnitTestSurf.py::TestCase::testTPSALongNCI | the NCI data file has a molecule that RDKit cannot parse on line 2900: fails on the official wheel too (needs `--long`)
+rdkit/ML/InfoTheory/UnitTestBitRanker.py::TestCase::test0Ranker | `FEW_CDK2.GDB` (a legacy GDBM database) is not part of the RDKit repository, so the test is skipped everywhere

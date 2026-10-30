@@ -4,6 +4,7 @@ module (not as part of upstream's `rdkit` package) and print JSON results."""
 import importlib.util
 import json
 import multiprocessing
+import os
 import sys
 import unittest
 from pathlib import Path
@@ -54,6 +55,8 @@ def main(path: str, out: str) -> None:
         mod = importlib.util.module_from_spec(spec)
         sys.modules["__upstream_test__"] = mod
         spec.loader.exec_module(mod)
+        if os.environ.get("RDOXIDE_UPSTREAM_LONG") and hasattr(mod, "doLong"):
+            mod.doLong = True  # upstream's `-l` switch for the long regression tests
     except BaseException as e:  # noqa: BLE001 - import failures are results too
         results["<collection>"] = ["failed", f"{type(e).__name__}: {e}"]
     else:
