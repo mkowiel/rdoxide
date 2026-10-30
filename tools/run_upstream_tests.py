@@ -88,7 +88,7 @@ def main() -> int:
     ap.add_argument("-j", type=int, default=os.cpu_count() or 2)
     ap.add_argument("-k", default="", help="only run files whose path contains this string")
     ap.add_argument("--timeout", type=int, default=600)
-    ap.add_argument("-v", "--verbose", action="store_true", help="show failures")
+    ap.add_argument("-v", "--verbose", action="store_true", help="show failures and skips")
     args = ap.parse_args()
 
     if not UPSTREAM.exists():
@@ -114,8 +114,8 @@ def main() -> int:
         print(f"REGRESSION: {t}\n    {results.get(t, ('', 'not run'))[1][-500:]}")
     if args.verbose:
         for t, (o, d) in sorted(results.items()):
-            if o == "failed":
-                print(f"FAILED {t}\n    {d.strip().splitlines()[-1] if d.strip() else ''}")
+            if o in ("failed", "skipped"):
+                print(f"{o.upper()} {t}\n    {d.strip().splitlines()[-1] if d.strip() else ''}")
     if new:
         print(f"{len(new)} newly passing test(s)" + ("" if args.update else " (run with --update to record)"))
         for t in new:
