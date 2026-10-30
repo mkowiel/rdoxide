@@ -290,7 +290,7 @@ impl ExplicitBitVect {
     }
 
     fn count(&self) -> u32 {
-        self.words.iter().map(|w| w.count_ones()).sum()
+        popcount_words(&self.words)
     }
 
     fn get(&self, i: u32) -> bool {
@@ -298,13 +298,13 @@ impl ExplicitBitVect {
     }
 
     fn zip(&self, o: &Self, f: impl Fn(u64, u64) -> u64) -> Self {
-        let mut words: Vec<u64> = self
-            .words
+        let common = self.words.len().min(o.words.len());
+        let mut words: Vec<u64> = self.words[..common]
             .iter()
-            .enumerate()
-            .map(|(i, &a)| f(a, o.words.get(i).copied().unwrap_or(0)))
+            .zip(&o.words[..common])
+            .map(|(&a, &b)| f(a, b))
             .collect();
-        words.truncate(self.words.len());
+        words.extend(self.words[common..].iter().map(|&a| f(a, 0)));
         let mut r = ExplicitBitVect {
             size: self.size,
             words,
@@ -336,11 +336,7 @@ impl ExplicitBitVect {
 
     /// popcount of `self & o` over the shared words
     pub fn num_on_in_common(&self, o: &Self) -> u32 {
-        self.words
-            .iter()
-            .zip(&o.words)
-            .map(|(a, b)| (a & b).count_ones())
-            .sum()
+        and_popcount_words(&self.words, &o.words)
     }
 
     /// popcount of `self ^ o`
@@ -505,6 +501,42 @@ impl BitVect for SparseBitVect {
                 .collect(),
         }
     }
+}
+
+/// Width of the independent accumulators of the popcount kernels: four lanes let the compiler use vector
+/// popcount instructions (NEON `cnt`, AVX2/AVX-512 popcount sequences) instead of a scalar loop-carried sum.
+const LANES: usize = 4;
+
+/// Number of set bits in `words`
+pub fn popcount_words(words: &[u64]) -> u32 {
+    let mut acc = [0u32; LANES];
+    let chunks = words.chunks_exact(LANES);
+    let rest = chunks.remainder();
+    for c in chunks {
+        for k in 0..LANES {
+            acc[k] += c[k].count_ones();
+        }
+    }
+    acc.iter().sum::<u32>() + rest.iter().map(|w| w.count_ones()).sum::<u32>()
+}
+
+/// Number of set bits in `a & b` over the shared words
+pub fn and_popcount_words(a: &[u64], b: &[u64]) -> u32 {
+    let n = a.len().min(b.len());
+    let (a, b) = (&a[..n], &b[..n]);
+    let mut acc = [0u32; LANES];
+    let (ca, cb) = (a.chunks_exact(LANES), b.chunks_exact(LANES));
+    let (ra, rb) = (ca.remainder(), cb.remainder());
+    for (x, y) in ca.zip(cb) {
+        for k in 0..LANES {
+            acc[k] += (x[k] & y[k]).count_ones();
+        }
+    }
+    acc.iter().sum::<u32>()
+        + ra.iter()
+            .zip(rb)
+            .map(|(x, y)| (x & y).count_ones())
+            .sum::<u32>()
 }
 
 #[cfg(test)]
