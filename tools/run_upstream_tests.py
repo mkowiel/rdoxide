@@ -156,7 +156,7 @@ def main() -> int:
     ap.add_argument("-k", default="", help="only run files whose path contains this string")
     ap.add_argument("--timeout", type=int, default=600)
     ap.add_argument("--report", metavar="FILE", help="write a markdown list of failing, skipped and unrun tests")
-    ap.add_argument("-v", "--verbose", action="store_true", help="show failures")
+    ap.add_argument("-v", "--verbose", action="store_true", help="show failures and skips")
     args = ap.parse_args()
 
     if not UPSTREAM.exists():
@@ -182,8 +182,8 @@ def main() -> int:
         print(f"REGRESSION: {t}\n    {results.get(t, ('', 'not run'))[1][-500:]}")
     if args.verbose:
         for t, (o, d) in sorted(results.items()):
-            if o == "failed":
-                print(f"FAILED {t}\n    {d.strip().splitlines()[-1] if d.strip() else ''}")
+            if o in ("failed", "skipped"):
+                print(f"{o.upper()} {t}\n    {d.strip().splitlines()[-1] if d.strip() else ''}")
     if args.report:
         write_report(Path(args.report), results, files)
     if new:
