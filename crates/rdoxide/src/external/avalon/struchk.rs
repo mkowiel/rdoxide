@@ -938,6 +938,10 @@ mod tests {
 
     /// the structure checker must answer what the Avalon C code answers (result bits, messages, molecule)
     #[test]
+    #[cfg_attr(
+        windows,
+        ignore = "the oracle output depends on the platform libm (trigonometry), which differs in the last bit on Windows"
+    )]
     fn struchk_matches_c() {
         // one test: the checker state is global
         check_corpus(include_str!(
