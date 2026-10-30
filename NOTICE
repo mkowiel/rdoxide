@@ -25,16 +25,20 @@ Licensing summary
 * Data tables under crates/rdoxide/data/ are extracted from RDKit
   (Code/GraphMol/atomic_data.cpp) and remain under the RDKit BSD license.
 
-The combined work is therefore distributed under "BSD-3-Clause AND MIT AND
-Apache-2.0 WITH LLVM-exception AND MPL-2.0 AND BSL-1.0 AND OFL-1.1" (MIT applies only to the
-files derived from linchemin, xyz2mol and InChI, MPL-2.0 only to the files translated
-from Eigen, BSL-1.0 only to the number reader translated from Boost.JSON).
+The combined work is therefore distributed under "BSD-3-Clause AND BSD-2-Clause AND MIT AND Apache-2.0 AND Apache-2.0 WITH LLVM-exception AND MPL-2.0 AND BSL-1.0 AND OFL-1.1 AND LicenseRef-PublicDomain"
+(MIT applies only to the files derived from linchemin, xyz2mol, InChI and
+FreeSASA; BSD-2-Clause only to the files translated from YAeHMOP; MPL-2.0 only
+to the files translated from Eigen; BSL-1.0 only to the number reader
+translated from Boost.JSON; Apache-2.0 only to the Roboto font; OFL-1.1 only to
+the Telex font; the pubchem-align3d translation is a US Government work in the
+public domain, see LICENSES/PubChemAlign3D-PublicDomain.txt).
 Redistributions (source or binary) must retain this NOTICE file and the
 license texts in LICENSE and LICENSES/.
 
-Third-party components that are ported in later stages (e.g. InChI, Avalon,
-CoordGen, RingDecomposerLib) have their own licenses; when such a component is
-ported, its license is added to LICENSES/ and listed below.
+Third-party components ported from RDKit's External/ directory (InChI, Avalon,
+CoordGen, FreeSASA, YAeHMOP, pubchem-align3d, RingDecomposerLib) have their own
+licenses; when such a component is ported, its license is added to LICENSES/
+and listed below.
 
 Third-party license index
 -------------------------
@@ -55,6 +59,11 @@ LICENSES/SciPy-BSD-3-Clause.txt                           SciPy (linear assignme
 LICENSES/InChI-MIT.txt                                    InChI Software v1.07.3 (crates/rdoxide/src/external/inchi/),
                                                          Copyright (c) 2024 IUPAC and InChI Trust; originally
                                                          developed at NIST
+LICENSES/Avalon-BSD-3-Clause-Novartis.txt                 Avalon Toolkit 2.0.5-pre.3 (external/avalon/), Novartis Pharma AG
+LICENSES/CoordGen-BSD-3-Clause-Schrodinger.txt            coordgenlibs 3.0.2 (external/coordgen/), Schrodinger, Inc.
+LICENSES/FreeSASA-MIT.txt                                 FreeSASA 2.0.3 (external/freesasa/), Simon Mitternacht
+LICENSES/PubChemAlign3D-PublicDomain.txt                  NCBI pubchem-align3d (external/pubchem_shape/), public domain
+LICENSES/YAeHMOP-BSD-2-Clause.txt                         YAeHMOP tightbind (external/yaehmop/), Greg Landrum
 LICENSES/RingDecomposerLib-BSD-3-Clause.txt              RingDecomposerLib (ring families, SSSR),
                                                          Copyright (c) 2016 University of Hamburg,
                                                          ZBH - Center for Bioinformatics
@@ -80,3 +89,7 @@ MMFF94 parameters
   Code/ForceField/MMFF/Params.cpp, which carries the parameter files of the Merck
   Molecular Force Field: Copyright (c) Merck and Co., Inc., 1994-1999. All Rights
   Reserved. The copyright notice is kept in the header of each table.
+
+Rust crate dependencies
+  Statically linked crates (including tiny-skia, BSD-3-Clause, used for PNG
+  output) are listed with their licenses in LICENSES/CRATES.md.
