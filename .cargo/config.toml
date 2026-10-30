@@ -1,6 +1,14 @@
 # Python extension modules resolve libpython symbols at load time.
 [target.x86_64-apple-darwin]
-rustflags = ["-C", "link-arg=-undefined", "-C", "link-arg=dynamic_lookup"]
+rustflags = ["-C", "link-arg=-undefined", "-C", "link-arg=dynamic_lookup", "-C", "target-cpu=x86-64-v2"]
 
 [target.aarch64-apple-darwin]
 rustflags = ["-C", "link-arg=-undefined", "-C", "link-arg=dynamic_lookup"]
+
+# x86-64-v2 (every x86 CPU since 2009: POPCNT, SSE4.2) lets the bit-vector popcounts compile to hardware
+# instructions instead of the generic bit-twiddling fallback. aarch64 has NEON popcount in its baseline.
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-C", "target-cpu=x86-64-v2"]
+
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-cpu=x86-64-v2"]

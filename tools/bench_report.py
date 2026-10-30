@@ -19,6 +19,8 @@ def main() -> None:
     ap.add_argument("--solo", nargs="*", default=[], help="JSON files of files re-run alone (no parallel noise)")
     ap.add_argument("--substruct", nargs=2, metavar=("RDKIT_JSON", "RDOXIDE_JSON"), help="tools/bench_substruct.py outputs")
     ap.add_argument("--threads", nargs=2, metavar=("RDKIT_JSON", "RDOXIDE_JSON"), help="tools/bench_threads.py outputs")
+    ap.add_argument("--fingerprints", nargs=4, metavar=("MICRO_RDKIT", "MICRO_RDOXIDE", "BITVECT_RDKIT", "BITVECT_RDOXIDE"),
+                    help="tools/bench_micro.py and tools/bench_bitvect.py outputs")
     args = ap.parse_args()
     data = json.loads(Path(args.results).read_text())
     rows = []  # (test id, rdkit s, rdoxide s)
@@ -111,6 +113,29 @@ def main() -> None:
             f"<th>RDKit / rdoxide all</th></tr>{body}</table>"
         )
 
+    fp_html = ""
+    if args.fingerprints:
+        mr, mx, br, bx = (json.loads(Path(x).read_text()) for x in args.fingerprints)
+        body = ""
+        for op in mr:
+            if any(k in op for k in ("Morgan", "RDKit FP", "AtomPair", "Torsion", "MACCS", "Tanimoto")):
+                body += (
+                    f"<tr><td>{html.escape(op)}</td><td>{mr[op]:.1f}</td><td>{mx[op]:.1f}</td>"
+                    f"<td>{mr[op] / mx[op]:.2f}x</td></tr>"
+                )
+        for op in br:
+            body += (
+                f"<tr><td>{html.escape(op)}</td><td>{br[op]:.1f}</td><td>{bx[op]:.1f}</td>"
+                f"<td>{br[op] / bx[op]:.2f}x</td></tr>"
+            )
+        fp_html = (
+            "<h2>Fingerprint calculation and bit-vector similarity (ms; 1000 molecules per pass for the generators)</h2>"
+            "<table><tr><th>operation</th><th>RDKit</th><th>rdoxide</th><th>RDKit / rdoxide</th></tr>"
+            f"{body}</table>"
+            '<p class="note">Popcounts run on 64-bit words with four independent accumulators so that the compiler can use '
+            "vector popcount instructions; the large similarity searches are limited by memory bandwidth.</p>"
+        )
+
     page = f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>rdoxide vs RDKit speed</title>
@@ -143,6 +168,7 @@ td:nth-child(n+2),th:nth-child(n+2){{text-align:right;white-space:nowrap}}
 {solo_html}
 {sub_html}
 {thr_html}
+{fp_html}
 {table('Tests where rdoxide gains most', faster)}
 <p class="note">Method: tools/bench_upstream_speed.py runs each upstream test file in its own process under both interpreters (4 files in parallel), timing every test; tools/bench_report.py builds this page. Parallel runs add noise to short tests; the timings of the slowest ones are worth re-running alone.</p>
 </main></body></html>"""
