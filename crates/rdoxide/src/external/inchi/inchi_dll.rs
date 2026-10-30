@@ -113,6 +113,27 @@ fn c_exp(x: f64, prec: usize) -> String {
     format!("{mant}e{}{:02}", if e < 0 { '-' } else { '+' }, e.abs())
 }
 
+/// `format!("{x:.prec$}")` for moderate values without the exact big-number path of the standard formatter: the
+/// scaled value is rounded as an integer unless it lies too close to a rounding boundary to be sure
+fn fixed(x: f64, prec: usize) -> String {
+    const POW: [f64; 5] = [1.0, 10.0, 100.0, 1000.0, 10000.0];
+    let v = x.abs() * POW[prec];
+    if v < 1e15 {
+        let r = v.round();
+        if (v - r).abs() < 0.499 {
+            let n = r as u64;
+            let p = POW[prec] as u64;
+            let sign = if x.is_sign_negative() { "-" } else { "" };
+            return if prec == 0 {
+                format!("{sign}{n}")
+            } else {
+                format!("{sign}{}.{:0width$}", n / p, n % p, width = prec)
+            };
+        }
+    }
+    format!("{x:.prec$}")
+}
+
 /// `WriteCoord`: a coordinate in 10 characters (or a little more for huge
 /// values)
 pub fn write_coord(x: f64) -> String {
@@ -128,17 +149,17 @@ pub fn write_coord(x: f64) -> String {
     } else if x < -9999999.9 {
         c_exp(x, 2)
     } else if x < -999999.99 {
-        format!("{x:.2}")
+        fixed(x, 2)
     } else if x < -99999.999 {
-        format!("{x:.3}")
+        fixed(x, 3)
     } else if x < 99999.9999 {
-        format!("{x:.4}")
+        fixed(x, 4)
     } else if x < 999999.999 {
-        format!("{x:.3}")
+        fixed(x, 3)
     } else if x < 9999999.99 {
-        format!("{x:.2}")
+        fixed(x, 2)
     } else if x < 99999999.9 {
-        format!("{x:.1}")
+        fixed(x, 1)
     } else {
         c_exp(x, 3)
     };
@@ -1034,4 +1055,36 @@ pub fn get_std_inchi(inp: &InchiInput) -> (i32, InchiOutput) {
         return (IS_ERROR, o);
     }
     get_inchi1(inp, true)
+}
+
+#[cfg(test)]
+mod fixed_format_tests {
+    use super::fixed;
+
+    #[test]
+    fn fixed_matches_the_standard_formatter() {
+        let mut x = -123.456789f64;
+        for i in 0..20000 {
+            x = (x * 1.000731 + 0.0371 * f64::from(i % 17)) % 99999.0;
+            for p in 0..=4usize {
+                assert_eq!(fixed(x, p), format!("{x:.p$}"), "{x} at {p}");
+            }
+        }
+        for x in [
+            0.0,
+            -0.0,
+            0.00005,
+            0.00015,
+            -0.00005,
+            1.00005,
+            2.5,
+            0.5,
+            12345.67895,
+            -0.00001,
+        ] {
+            for p in 0..=4usize {
+                assert_eq!(fixed(x, p), format!("{x:.p$}"), "{x} at {p}");
+            }
+        }
+    }
 }

@@ -2690,10 +2690,40 @@ pub fn set_bonds_after_check_one_bond(
 pub const MAX_NUM_RAD: usize = 256;
 const NUM_BIT: usize = 16; // `bitWord` is `U_SHORT`
 
+/// The bit sets of a `NodeSet`, `rows` of `len` words each in one allocation (the C code allocates every row
+/// separately; a canonicalization allocates thousands of them, almost all never touched)
+#[derive(Debug, Clone, Default)]
+pub struct BitRows {
+    words: Vec<u16>,
+    len: usize,
+    rows: usize,
+}
+
+impl BitRows {
+    pub fn is_empty(&self) -> bool {
+        self.rows == 0
+    }
+}
+
+impl std::ops::Index<usize> for BitRows {
+    type Output = [u16];
+    fn index(&self, i: usize) -> &[u16] {
+        assert!(i < self.rows, "node set row out of range");
+        &self.words[i * self.len..(i + 1) * self.len]
+    }
+}
+
+impl std::ops::IndexMut<usize> for BitRows {
+    fn index_mut(&mut self, i: usize) -> &mut [u16] {
+        assert!(i < self.rows, "node set row out of range");
+        &mut self.words[i * self.len..(i + 1) * self.len]
+    }
+}
+
 /// `NodeSet`: a list of bit sets of vertices
 #[derive(Debug, Clone, Default)]
 pub struct NodeSet {
-    pub bitword: Vec<Vec<u16>>,
+    pub bitword: BitRows,
     pub len_set: usize,
 }
 
@@ -2701,7 +2731,11 @@ pub struct NodeSet {
 pub fn node_set_create(n: usize, l: usize) -> NodeSet {
     let len = n.div_ceil(NUM_BIT);
     NodeSet {
-        bitword: vec![vec![0; len]; l],
+        bitword: BitRows {
+            words: vec![0; len * l],
+            len,
+            rows: l,
+        },
         len_set: len,
     }
 }
