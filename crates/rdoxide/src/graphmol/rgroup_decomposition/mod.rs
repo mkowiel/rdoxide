@@ -1,15 +1,15 @@
 //! Port of RDKit `Code/GraphMol/RGroupDecomposition`: decomposes molecules
 //! into a core and its R groups.
 //!
-//! Not ported: the genetic algorithm matching strategy (`RGroupGa`, which
-//! needs `External/GA`) and enumeration of the input cores (needs
-//! `MolEnumerator::enumerate`); requesting them is an error.
+//! Not ported: enumeration of the input cores (needs
+//! `MolEnumerator::enumerate`); requesting it is an error.
 
 mod core;
 mod data;
 mod decomp;
 mod decomp_data;
 mod fingerprint_score;
+mod ga;
 mod params;
 mod score;
 mod utils;

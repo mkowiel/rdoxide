@@ -7,6 +7,7 @@ use std::time::Instant;
 use super::core::RCore;
 use super::data::{RGroupData, RGroupMatch};
 use super::fingerprint_score::{FingerprintVarianceScoreData, fingerprint_variance_score};
+use super::ga::RGroupGa;
 use super::params::{
     RGroupDecompositionParameters, rgroup_labelling, rgroup_matching, rgroup_score,
 };
@@ -669,45 +670,73 @@ impl RGroupDecompData {
                 score: -1.0,
             });
         }
-        if self.params.matching_strategy == rgroup_matching::GA {
-            return Err(RDKitError::Runtime(
-                "the GA matching strategy is not supported".into(),
-            ));
-        }
         let t0 = Instant::now();
         self.scorer.start_processing();
 
-        let mut offset = 0;
-        if prune_matches && self.params.score_method != rgroup_score::FINGERPRINT_VARIANCE {
-            offset = self.previous_match_size;
+        if self.params.matching_strategy == rgroup_matching::GA {
+            let mut ga = RGroupGa::new(
+                &self.matches,
+                &self.labels,
+                &self.params,
+                (self.params.timeout >= 0.0).then_some(t0),
+            );
+            if u64::from(ga.number_permutations()) < 100 * ga.population_size() as u64 {
+                self.params.matching_strategy = rgroup_matching::EXHAUSTIVE;
+            } else {
+                let result = if self.params.ga_number_runs > 1 {
+                    let results = ga.run_batch()?;
+                    // the first of the best scores wins
+                    results.into_iter().reduce(|best, r| {
+                        if best.scorer.best_score() < r.scorer.best_score() {
+                            r
+                        } else {
+                            best
+                        }
+                    })
+                } else {
+                    Some(ga.run(1)?)
+                };
+                if let Some(result) = result {
+                    self.scorer = result.scorer;
+                }
+            }
         }
-        self.previous_match_size = self.matches.len();
-        let sizes: Vec<usize> = self.matches[offset..].iter().map(Vec::len).collect();
-        self.permutation = vec![0; sizes.len()];
-        let mut iterator = CartesianProduct::new(&sizes);
-        let mut count = 0usize;
-        while iterator.next() {
-            if count > iterator.max_permutations {
-                return Err(RDKitError::Value("next() did not finish".into()));
+
+        let mut iterator = None;
+        if self.params.matching_strategy != rgroup_matching::GA {
+            let mut offset = 0;
+            if prune_matches && self.params.score_method != rgroup_score::FINGERPRINT_VARIANCE {
+                offset = self.previous_match_size;
             }
-            let permutation = iterator.permutation.clone();
-            let new_score = self.score(&permutation, true)?;
-            // heuristic to overcome floating point comparison issues
-            if (new_score - self.scorer.best_score()).abs() < 1e-6 {
-                self.scorer.push_tie_to_store(&permutation);
-            } else if new_score > self.scorer.best_score() {
-                self.scorer.set_best_permutation(&permutation, new_score);
-                self.scorer.clear_tie_store();
-                self.scorer.push_tie_to_store(&permutation);
+            self.previous_match_size = self.matches.len();
+            let sizes: Vec<usize> = self.matches[offset..].iter().map(Vec::len).collect();
+            self.permutation = vec![0; sizes.len()];
+            let mut cartesian = CartesianProduct::new(&sizes);
+            let mut count = 0usize;
+            while cartesian.next() {
+                if count > cartesian.max_permutations {
+                    return Err(RDKitError::Value("next() did not finish".into()));
+                }
+                let permutation = cartesian.permutation.clone();
+                let new_score = self.score(&permutation, true)?;
+                // heuristic to overcome floating point comparison issues
+                if (new_score - self.scorer.best_score()).abs() < 1e-6 {
+                    self.scorer.push_tie_to_store(&permutation);
+                } else if new_score > self.scorer.best_score() {
+                    self.scorer.set_best_permutation(&permutation, new_score);
+                    self.scorer.clear_tie_store();
+                    self.scorer.push_tie_to_store(&permutation);
+                }
+                count += 1;
             }
-            count += 1;
+            iterator = Some(cartesian);
         }
 
         if self.scorer.tie_store_size() > 1 {
             self.scorer.break_ties(
                 &self.matches,
                 &self.labels,
-                Some(&iterator),
+                iterator.as_ref(),
                 t0,
                 self.params.timeout,
             )?;
