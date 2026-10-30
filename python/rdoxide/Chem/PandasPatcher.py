@@ -204,8 +204,17 @@ def patched_to_html(self, *args, **kwargs):
     fmt.formatters = orig_formatters
 
 
+def _formatter_indexes_truncated_frame():
+  import inspect
+  try:
+    return "tr_frame" in inspect.getsource(orig_get_formatter)
+  except (OSError, TypeError):
+    return False
+
+
 def patched_get_formatter(self, i, *args, **kwargs):
-  if (isinstance(self.formatters, dict) and isinstance(i, int) and i not in self.columns
+  if (isinstance(self.formatters, dict) and not _formatter_indexes_truncated_frame()
+      and isinstance(i, int) and i not in self.columns
       and hasattr(self, "tr_col_num") and i >= self.tr_col_num):
     max_cols = 0
     if hasattr(self, "max_cols_fitted"):

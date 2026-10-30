@@ -35,7 +35,7 @@ wheel per platform, Linux/macOS/Windows).
 
 ### Verification
 
-* 2064 of 2101 tests of RDKit's own Python test-suite pass (the ratchet in
+* 2076 of 2101 tests of RDKit's own Python test-suite pass (the ratchet in
   `tests/upstream/expected_pass.txt`), alongside Rust and pytest suites and
   differential comparisons against the official RDKit wheel.
 * Multicore: batch APIs use all cores with results independent of the thread
@@ -46,11 +46,8 @@ wheel per platform, Linux/macOS/Windows).
 * Not ported: binary ChemDraw CDX (proprietary SDK), Qt drawing
   (`rdMolDraw2DQt`), PyMOL helpers, Boost-archive serialisation, InChI CRU
   folding (the official library crashes on it), the InChI time limit (`-W`).
-* Differences from the official wheel: 10 of the 2101 upstream tests fail
-  (Qt drawing, `nbWrap`/Boost wrapper conflicts, a MaxMin picker test with a
-  float argument, pandas rendering, `BitEnsemble.InitScoreTable`, two
-  FMA-sensitive shape scores) and 27 are skipped by upstream itself (long
-  tests, missing IPython/matplotlib/test database); see
-  [docs/STATUS.md](docs/STATUS.md) and `docs/bench/upstream_speed.html`.
+* Differences from the official wheel: 9 of the 2101 upstream tests fail and
+  16 are skipped by upstream itself (long tests, missing test database); each
+  one is listed with its reason in [docs/UPSTREAM_TESTS.md](docs/UPSTREAM_TESTS.md).
 * The API is not frozen; symbols that are not ported are absent rather than
   stubbed.
