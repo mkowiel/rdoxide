@@ -128,6 +128,22 @@ pub struct RGroupScorer {
 }
 
 impl RGroupScorer {
+    /// The scorer holding the result of a GA run: the tied best permutations
+    /// and their score.
+    pub fn from_permutations(permutations: &[Vec<usize>], score: f64) -> Self {
+        let mut scorer = RGroupScorer {
+            best_score: score,
+            ..Default::default()
+        };
+        for permutation in permutations {
+            scorer.push_tie_to_store(permutation);
+        }
+        if let Some(front) = scorer.store.front() {
+            scorer.saved = front.clone();
+        }
+        scorer
+    }
+
     pub fn best_score(&self) -> f64 {
         self.best_score
     }

@@ -3,7 +3,7 @@ resolver = "3"
 members = ["crates/rdoxide", "crates/rdoxide-python"]
 
 [workspace.package]
-version = "2026.9.1"
+version = "2026.9.1-alpha.0"
 edition = "2024"
 rust-version = "1.85"
 license = "BSD-3-Clause AND BSD-2-Clause AND MIT AND Apache-2.0 AND Apache-2.0 WITH LLVM-exception AND MPL-2.0 AND BSL-1.0 AND OFL-1.1 AND LicenseRef-PublicDomain"
@@ -11,7 +11,7 @@ repository = "https://github.com/mkowiel/rdoxide"
 authors = ["Marcin Kowiel", "RDKit contributors (upstream C++ code this project is ported from)"]
 
 [workspace.dependencies]
-rdoxide = { path = "crates/rdoxide", version = "2026.9.1" }
+rdoxide = { path = "crates/rdoxide", version = "2026.9.1-alpha.0" }
 pyo3 = { version = "0.29", features = ["abi3-py310", "multiple-pymethods"] }
 
 [workspace.lints.rust]

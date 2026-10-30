@@ -12,7 +12,7 @@ license-files = ["LICENSE", "LICENSES/*", "NOTICE"]
 authors = [{ name = "Marcin Kowiel" }]
 keywords = ["chemistry", "cheminformatics", "rdkit", "rust"]
 classifiers = [
-    "Development Status :: 2 - Pre-Alpha",
+    "Development Status :: 3 - Alpha",
     "Programming Language :: Rust",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
@@ -29,6 +29,12 @@ dynamic = ["version"]
 [project.optional-dependencies]
 test = ["pytest>=8"]
 pandas = ["pandas"]
+
+[project.urls]
+Homepage = "https://github.com/mkowiel/rdoxide"
+Repository = "https://github.com/mkowiel/rdoxide"
+Changelog = "https://github.com/mkowiel/rdoxide/blob/main/CHANGELOG.md"
+Issues = "https://github.com/mkowiel/rdoxide/issues"
 
 [tool.maturin]
 python-source = "python"
