@@ -5,6 +5,7 @@ pub mod avalon;
 pub mod avalon_tools;
 pub mod coordgen;
 pub mod freesasa;
+pub mod ga;
 pub mod inchi;
 pub mod inchi_api;
 pub mod inchi_input;

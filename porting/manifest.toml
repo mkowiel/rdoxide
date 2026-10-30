@@ -1258,6 +1258,8 @@
 "Code/GraphMol/RGroupDecomposition/RGroupDecompParams.h" = "f0237ddb2c93b39731d388d9cf3746dae27791b0"
 "Code/GraphMol/RGroupDecomposition/RGroupFingerprintScore.cpp" = "8b4d226e750904524cbe8a188d3eb78e367f6100"
 "Code/GraphMol/RGroupDecomposition/RGroupFingerprintScore.h" = "102bbb8103d331eea9ce92b1790600382b04e161"
+"Code/GraphMol/RGroupDecomposition/RGroupGa.cpp" = "5843109912079aaad1396fd7026017c222825daa"
+"Code/GraphMol/RGroupDecomposition/RGroupGa.h" = "a7287c4a229e63bc12d87c007166bb49207c7210"
 "Code/GraphMol/RGroupDecomposition/RGroupMatch.h" = "3819f1eab7fa5c68cb4b407a9fdc45923424ee83"
 "Code/GraphMol/RGroupDecomposition/RGroupScore.cpp" = "74c21a9778890625b956337481fb4fd89aa6ca9a"
 "Code/GraphMol/RGroupDecomposition/RGroupScore.h" = "087c844ae25ad87c50f5d29d5e1e0eda517f5e74"
@@ -1777,6 +1779,18 @@
 
 [module."rdoxide_python::rdchemreactions_enumerate".sources]
 "Code/GraphMol/ChemReactions/Wrap/Enumerate.cpp" = "48b90a2bb0a837c6d0465791b85f3f8cadee806e"
+
+[module."rdoxide::external::ga".sources]
+"External/GA/ga/GaBase.h" = "74aadf8005f75b955230bb32a4b5bd1651619693"
+"External/GA/ga/GaOperation.h" = "22583e455686f693083c3c7d13585c6839ad9951"
+"External/GA/ga/IntegerStringChromosomePolicy.cpp" = "6b4703a6ffb8924918c314c2d5cbde832324163f"
+"External/GA/ga/IntegerStringChromosomePolicy.h" = "3ac7c3e3062638acfddae4f0933778e5184cd7e7"
+"External/GA/ga/LinkedPopLinearSel.h" = "b155cc1ecb19b4fca717108b2a2a91570a5fa026"
+"External/GA/ga/StringChromosome.cpp" = "232416f4432d78c763a25f0cd9dd22af40a4e059"
+"External/GA/ga/StringChromosome.h" = "212f5af55f766faa15339f2378115d73631bb556"
+"External/GA/ga/StringChromosomeBase.h" = "8348610340577d090af7b260aa124f3f7f1c3150"
+"External/GA/util/RandomUtil.cpp" = "b4a23ac1ca37c40a074aaa891a4e2a4a387ec12d"
+"External/GA/util/RandomUtil.h" = "e1482785a305b6e9b11d356ee8e039fd691c6aa9"
 
 # InChI Software v1.07.3 is external (UPSTREAM.toml [external.InChI]); the
 # rdoxide::external::inchi modules name their C sources in their headers and

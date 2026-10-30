@@ -212,14 +212,21 @@ fn multi_core() {
     }
 }
 
+/// upstream `testGaSymmetryMatching`: small problems fall back to exhaustive search
 #[test]
-fn ga_matching_is_reported_unsupported() {
+fn ga_matching_labels_symmetric_substituents_alike() {
     let core = mol("c1ccccc1");
     let params = RGroupDecompositionParameters {
         matching_strategy: rdoxide::graphmol::rgroup_decomposition::rgroup_matching::GA,
         ..Default::default()
     };
     let mut decomp = RGroupDecomposition::new(&core, params).unwrap();
-    assert_eq!(decomp.add(&mol(SYM_DATA[0])).unwrap(), 0);
-    assert!(!decomp.process());
+    for (i, smiles) in SYM_DATA.iter().take(5).enumerate() {
+        assert_eq!(decomp.add(&mol(smiles)).unwrap(), i as i32);
+    }
+    assert!(decomp.process());
+    let rows = decomp.rgroups_as_rows().unwrap();
+    for i in 0..5 {
+        assert_eq!(row_string(&rows, i), "Core:c1ccc([*:1])cc1 R1:Cl[*:1]");
+    }
 }
