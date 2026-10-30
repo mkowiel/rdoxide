@@ -20,26 +20,31 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # macOS and Windows runners disabled for now; restore to re-enable:
-        # os: [ubuntu-latest, macos-latest, windows-latest]
-        os: [ubuntu-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test -p rdoxide
       - name: Dependency licenses
-        run: python3 tools/check_licenses.py
+        run: python tools/check_licenses.py
 
   # One wheel for everything: the extension uses the stable ABI (abi3-py310),
   # so the same file installs on every supported Python.
   wheel:
-    name: Build wheel
-    runs-on: ubuntu-latest
+    name: Build wheel (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -59,7 +64,7 @@ jobs:
           args: --profile ci --out dist
       - uses: actions/upload-artifact@v4
         with:
-          name: wheel
+          name: wheel-${{ matrix.os }}
           path: dist/*.whl
           if-no-files-found: error
 
@@ -70,9 +75,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # macOS and Windows runners disabled for now; restore to re-enable:
-        # os: [ubuntu-latest, macos-latest, windows-latest]
-        os: [ubuntu-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
         python: ["3.10", "3.11", "3.12", "3.13", "3.14", "3.15"]
     steps:
       - uses: actions/checkout@v4
@@ -82,7 +85,7 @@ jobs:
           allow-prereleases: true
       - uses: actions/download-artifact@v4
         with:
-          name: wheel
+          name: wheel-${{ matrix.os }}
           path: dist
       - name: Install and test
         shell: bash
@@ -108,7 +111,7 @@ jobs:
       - run: python tools/sync_upstream.py diff
       - uses: actions/download-artifact@v4
         with:
-          name: wheel
+          name: wheel-ubuntu-latest
           path: dist
       - name: Install
         run: |
