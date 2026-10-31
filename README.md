@@ -18,7 +18,7 @@ the RDKit project.
 
 > **Status: alpha (2026.9.1a0).** Most of RDKit's Python API is ported and
 > checked against the official 2026.09.1 build, but expect gaps and rough
-> edges. 2076 of 2101 tests of RDKit's own Python test-suite pass (see
+> edges. 2081 of 2105 tests of RDKit's own Python test-suite pass (see
 > [docs/UPSTREAM_TESTS.md](docs/UPSTREAM_TESTS.md) for the rest and [CHANGELOG.md](CHANGELOG.md)). Symbols
 > that are not ported are absent rather than stubbed.
 

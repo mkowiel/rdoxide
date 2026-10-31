@@ -211,7 +211,10 @@ impl PyMol {
     /// Returns the number of Bonds in the molecule.
     #[pyo3(name = "GetNumBonds", signature = (onlyHeavy = true))]
     #[allow(non_snake_case)]
-    fn get_num_bonds(&self, onlyHeavy: bool) -> PyResult<u32> {
+    fn get_num_bonds(
+        &self,
+        #[pyo3(from_py_with = crate::pyconv::truthy)] onlyHeavy: bool,
+    ) -> PyResult<u32> {
         if onlyHeavy {
             Ok(self.mol.num_bonds())
         } else {

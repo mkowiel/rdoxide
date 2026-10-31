@@ -532,3 +532,11 @@ def patched_get_formatter(self, i, *args, **kwargs):
 [[copy]]
 from = "rdkit/DataStructs/BitEnsembleDb.py"
 to = "python/rdoxide/DataStructs/BitEnsembleDb.py"
+
+[[copy]]
+from = "rdkit/ML/InfoTheory/BitClusterer.py"
+to = "python/rdoxide/ML/InfoTheory/BitClusterer.py"
+
+[[copy]]
+from = "rdkit/ML/InfoTheory/BitRank.py"
+to = "python/rdoxide/ML/InfoTheory/BitRank.py"

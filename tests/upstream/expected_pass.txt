@@ -1383,6 +1383,10 @@ Code/SimDivPickers/Wrap/testPickers.py::TestCase::testInts
 Code/SimDivPickers/Wrap/testPickers.py::TestCase::testIssue208
 Code/SimDivPickers/Wrap/testPickers.py::TestCase::testLazyLeader
 Code/SimDivPickers/Wrap/testPickers.py::TestCase::testNonUniqueCrash
+Contrib/FreeWilson/test/test_freewilson.py::pytest::test_chembl
+Contrib/FreeWilson/test/test_freewilson.py::pytest::test_fep_benchmark_3D
+Contrib/FreeWilson/test/test_freewilson.py::pytest::test_multicore
+Contrib/SA_Score/UnitTestSAScore.py::TestCase::test1
 External/AvalonTools/Wrap/testAvalonTools.py::TestCase::test1
 External/AvalonTools/Wrap/testAvalonTools.py::TestCase::test2
 External/AvalonTools/Wrap/testAvalonTools.py::TestCase::test3
@@ -2018,6 +2022,7 @@ rdkit/ML/Descriptors/UnitTestMolDescriptors.py::TestDescriptors::test_github3511
 rdkit/ML/Descriptors/UnitTestParser.py::TestCase::testMultipleCalcs
 rdkit/ML/Descriptors/UnitTestParser.py::TestCase::testSingleCalcs
 rdkit/ML/InfoTheory/UnitTestCorrMatGen.py::TestCase::test0CorrMat
+rdkit/ML/InfoTheory/UnitTestCorrMatGen.py::TestCase::test1Cluster
 rdkit/ML/InfoTheory/UnitTestCorrMatGen.py::TestCase::test_getValLTM
 rdkit/ML/SLT/UnitTestRisk.py::TestCase::testBurges
 rdkit/ML/SLT/UnitTestRisk.py::TestCase::testCherkassky
