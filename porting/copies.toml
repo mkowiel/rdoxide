@@ -512,6 +512,26 @@ to = "python/rdoxide/Chem/PandasTools.py"
 [[copy]]
 from = "rdkit/Chem/PandasPatcher.py"
 to = "python/rdoxide/Chem/PandasPatcher.py"
+# pandas >= 3 looks the column up in the already truncated frame (`tr_frame`), older versions in
+# the full one; the shift only compensates for the latter (upstream's fails with IndexError)
+patch = [
+  { old = """def patched_get_formatter(self, i, *args, **kwargs):
+  if (isinstance(self.formatters, dict) and isinstance(i, int)""", new = """def _formatter_indexes_truncated_frame():
+  import inspect
+  try:
+    return "tr_frame" in inspect.getsource(orig_get_formatter)
+  except (OSError, TypeError):
+    return False
+
+
+def patched_get_formatter(self, i, *args, **kwargs):
+  if (isinstance(self.formatters, dict) and not _formatter_indexes_truncated_frame()
+      and isinstance(i, int)""" },
+]
+
+[[copy]]
+from = "rdkit/DataStructs/BitEnsembleDb.py"
+to = "python/rdoxide/DataStructs/BitEnsembleDb.py"
 
 [[copy]]
 from = "rdkit/ML/InfoTheory/BitClusterer.py"

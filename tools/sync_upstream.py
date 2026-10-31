@@ -568,7 +568,8 @@ def rename_package(path: Path) -> None:
 
 def regen_copies() -> None:
     """Copy files (pure-python modules, test data) listed in porting/copies.toml; the
-    package name in the imports of the Python modules is changed to rdoxide."""
+    package name in the imports of the Python modules is changed to rdoxide.  An entry may
+    carry `patch = [{old = "...", new = "..."}]` replacements for fixes that upstream lacks."""
     if not COPIES.exists():
         return
     with open(COPIES, "rb") as fh:
@@ -585,6 +586,11 @@ def regen_copies() -> None:
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dst)
         rename_package(dst)
+        for patch in entry.get("patch", []):
+            text = dst.read_text(encoding="utf-8")
+            if patch["old"] not in text:
+                sys.exit(f"{entry['to']}: patch no longer applies, upstream changed:\n{patch['old']}")
+            dst.write_text(text.replace(patch["old"], patch["new"], 1), encoding="utf-8")
         n += 1
     print(f"copied {n} upstream paths")
 
