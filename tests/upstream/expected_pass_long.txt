@@ -1,0 +1,8 @@
+# Long upstream tests (enabled with `run_upstream_tests.py --long`) known to pass.
+# Maintained by tools/run_upstream_tests.py --long --update
+rdkit/Chem/UnitTestGraphDescriptors_2.py::TestCase::testChi1Long
+rdkit/Chem/UnitTestGraphDescriptors_2.py::TestCase::test_FullRegression
+rdkit/Chem/UnitTestGraphDescriptors_2.py::TestCase_python::test_equivalence
+rdkit/Chem/UnitTestSurf.py::TestCase::testTPSALong
+rdkit/Chem/UnitTestSurf.py::TestCase_descriptorRegression::testLabuteASALong
+rdkit/Chem/UnitTestSurf.py::TestCase_descriptorRegression::testMOELong
